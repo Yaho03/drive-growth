@@ -1,0 +1,51 @@
+name: 검증
+on:
+  pull_request:
+  push:
+    branches: [main, 'app/**', 'core/**', 'docs/**', 'infra/**', 'experiment/**']
+permissions:
+  contents: read
+jobs:
+  repository-checks:
+    name: repository-checks
+    runs-on: ubuntu-latest
+    outputs:
+      android_sources: ${{ steps.scope.outputs.android_sources }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 scripts/check_repository.py
+      - name: Android 소스 포함 여부 확인
+        id: scope
+        shell: bash
+        run: |
+          if git ls-files app/src core/src | grep -q .; then
+            echo "android_sources=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "android_sources=false" >> "$GITHUB_OUTPUT"
+            echo "문서·기본 설정만 포함: Android 실행 검사는 소스 추가 후 수행합니다." >> "$GITHUB_STEP_SUMMARY"
+          fi
+  android-checks:
+    needs: repository-checks
+    if: needs.repository-checks.outputs.android_sources == 'true'
+    name: android-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - run: ./gradlew :core:test :app:assembleDebug :app:lintDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-reports
+          path: |
+            core/build/reports/tests/
+            app/build/reports/lint-results-debug.html
