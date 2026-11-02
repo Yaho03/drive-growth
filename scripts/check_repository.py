@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = (
     "README.md", "AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md",
     "docs/01_PRD.md", "docs/02_SYSTEM_ARCHITECTURE.md", "docs/06_VERIFICATION.md",
+    "docs/08_PROJECT_PLAN.md", "docs/09_UI_UX_SPEC.md",
     ".github/PULL_REQUEST_TEMPLATE.md", ".github/ISSUE_TEMPLATE/feature.md",
     ".github/ISSUE_TEMPLATE/bug.md", ".github/workflows/ci.yml",
     "gradlew", "gradle/wrapper/gradle-wrapper.jar",

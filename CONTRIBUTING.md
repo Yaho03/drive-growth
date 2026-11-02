@@ -81,6 +81,8 @@ Codex는 적용되는 AGENTS.md 계층을 확인한다. Claude Code에는 CLAUDE
 
 ## 문서 이름과 통합 기준
 
+폴더명은 소문자 영어를 사용하고 여러 단어는 하이픈으로 연결한다. 예: `contest/`, `data/`, `design-assets/`. 공식 자료의 출처·다운로드일·버전·해시는 `docs/contest/04_OFFICIAL_RESOURCES.md`에 통합하고 `downloads/`에는 실제 보관 파일만 둔다.
+
 - 일반 문서는 `NN_ENGLISH_NAME.md` 형식의 영어 파일명과 한글 본문을 사용한다. 번호는 문서 목차의 분류 순서이며 권장 읽기 순서는 README에 별도 안내한다.
 - 도구가 찾는 `README.md`, `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`와 GitHub 템플릿 이름은 유지한다. 다운로드한 공식 양식은 원본 이름을 보존한다.
 - 같은 결정·산식·상태를 여러 파일에 복제하지 않는다. 같은 주제의 요구사항은 PRD, 외부 사례와 적용 제안은 조사 문서에 모은다. 기술 설계와 실행 결과는 역할이 달라 분리한다.

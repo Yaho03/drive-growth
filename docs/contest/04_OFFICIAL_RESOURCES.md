@@ -10,7 +10,7 @@
 |---|---|---|---|
 | 공모전 접수양식·개인정보 동의서 DOCX | 실제 접수·기획서 작성·전원 서명 | [공식 원본](https://appdevchallenge.auto-hmg.io/downloads/contest-application-consent.docx) | **다운로드 및 본문 확인 완료**, 아래 보관본 |
 | Pleos 개발 리소스 | 에뮬레이터 등 공식 개발 자료 탐색 | [Resources & Emulator](https://developers.pleos.ai/playground/discover/resources) | 포털 링크 확인 |
-| Pleos Connect 에뮬레이터 | 차량 앱 개발·시연 | [설치 안내](https://document.pleos.ai/docs/connect/guide/getting-started/application-development/setup-connect-sdk-emulator) | 설치 경로 확인, 미설치 |
+| Pleos Connect 에뮬레이터 | 차량 앱 개발·시연 | [설치 안내](https://document.pleos.ai/docs/connect/guide/getting-started/application-development/setup-connect-sdk-emulator) | 조사 당시 설치 경로 확인; 이후 설치 결과는 개발환경 구성 기록 참조 |
 | Vehicle SDK 공식 샘플 | 차량 기능 지원 확인·조회·변경·구독 예제 | [GitHub](https://github.com/Pleos-Playground/pleos-sample-vehicle-app) | 저장소·README 확인, 소스 미다운로드 |
 | NaviHelper 공식 샘플 | 내비 연동 예제 | [GitHub](https://github.com/Pleos-Playground/pleos-sample-navi-app) | 공식 문서의 연결 및 저장소 확인 |
 | FusedLocation 공식 샘플 | 위치 연동 예제 | [GitHub](https://github.com/Pleos-Playground/pleos-sample-fusedlocation-app) | 공식 문서의 연결 및 저장소 확인 |
@@ -19,7 +19,21 @@
 
 보관본: [공모전 접수양식·동의서](downloads/공모전_접수양식_개인정보동의서_2026-11-02.docx)
 
-원본 URL·보관 정보·해시는 [다운로드 기록](downloads/01_DOWNLOAD_LOG.md)에 기록합니다. 양식은 작성하거나 변형하지 않은 원본입니다. 제출 전에 최신 원본과 비교해야 합니다.
+### 공식 접수양식 보관 기록
+
+| 항목 | 기록 |
+|---|---|
+| 자료 | 공모전 접수양식 및 개인정보 수집·이용 동의서 |
+| 공식 출처 | [원본 다운로드](https://appdevchallenge.auto-hmg.io/downloads/contest-application-consent.docx) |
+| 다운로드 기준일 | 2026-11-02 KST |
+| 프로젝트 정리·보관일 | 2026-11-03 KST |
+| 보관 위치 | 위 보관본 링크 참조: `downloads/공모전_접수양식_개인정보동의서_2026-11-02.docx` |
+| 확인 상태 | DOCX 구조·본문 확인. 미작성·미서명 원본이며 편집하지 않음 |
+| 양식에 표시된 버전 | `1020 ver.` |
+| 파일 크기 | 55,208 bytes |
+| SHA-256 | `07be893d58b0e96ab7788f0d189d6829f0e59a2cee4bc18cb90ec37eeda2f5fd` |
+
+제출 전에 공식 URL의 최신 원본과 비교합니다. `downloads/`에는 실제 받은 파일만 두고, 출처·다운로드일·버전·해시는 이 문서에서 관리합니다. 개발 도구의 실제 설치·실행 결과는 [개발환경 구성 기록](../05_DEVELOPMENT_SETUP.md)을 참조합니다.
 
 ### 에뮬레이터 다운로드 방식
 
