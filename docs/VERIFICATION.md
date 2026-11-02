@@ -16,10 +16,10 @@
 | 화면 클래스 | Kotlin 2.0.21 컴파일러와 API35 android.jar로 독립 컴파일 | 성공. 화면·입력 실제 실행 미검증 |
 | Android/Pleos 도구 | [TECH_SPIKE.md](TECH_SPIKE.md) | SDK 설치·Pleos API34 부팅·차량 서비스 존재 확인 |
 | 새 기획서 수치 | 단계별 필요 EXP 독립 합산 | 표의 누적 EXP 일치. 실제 성장 페이스·리텐션 검증 아님 |
-| 저장소 검사 | `python3 scripts/check_repository.py` | 재실행 통과: 필수 파일 17개·문서 19개·로컬 링크 47개. 이전에 없던 조사 문서가 생성되어 링크 오류 해소 |
+| 저장소 검사 | `python3 scripts/check_repository.py` | 이번 게시 파일만 분리해 실행: 필수 파일 17개·문서 19개·로컬 링크 48개 통과. PDF는 제외하고 참조를 로컬 보관 설명으로 변경 |
 | 워크플로 문법 | Ruby YAML 파싱·job 이름 확인 | `repository-checks`, `android-checks` 확인. GitHub 원격 실행 검증 아님 |
 | 앱 빌드·Lint | `./gradlew :core:test :app:assembleDebug :app:lintDebug` | `:app:processDebugMainManifest`에서 Manifest 누락으로 실패. Lint까지 도달하지 못함. 핵심 테스트는 이전 통과 결과 재사용 |
-| GitHub CI·보호 규칙 | 비공개 원격 `Yaho03/drive-growth` 생성 확인 | 초기 문서·설정 PR의 실행 결과는 GitHub Actions와 PR 기록에서 확인. 보호 규칙 적용은 이번 작업 범위 밖 |
+| GitHub CI·보호 규칙 | 비공개 원격 `Yaho03/drive-growth` 생성 확인 | 초기 문서·설정 [PR #1](https://github.com/Yaho03/drive-growth/pull/1)의 실행 결과는 Actions·PR 기록에서 확인. 보호 규칙 적용은 이번 작업 범위 밖 |
 
 `repository-checks`는 필수 파일과 로컬 Markdown 링크를 확인한다. 이 검사는 제품 동작이나 워크플로의 원격 성공을 증명하지 않는다. `android-checks`는 핵심 테스트·APK 빌드·Android Lint를 실행하도록 정의했다. 이번 게시에는 앱·핵심 소스가 없으므로 Android 검사는 명시적으로 생략한다. 소스가 어느 한 모듈에라도 추가되면 실행하며 실패를 숨기지 않는다.
 
@@ -49,7 +49,7 @@
 |---|---|
 | 공식 양식 원본 | 다운로드 보관 완료 |
 | 팀 기획서 초안 | 최신 PDF 확인. 차종 교체 성장은 사용자 확정; 성장·해금·보상 기준안 작성 및 성장표 산술 확인. 미기재 규칙·최종 밸런스 검증·자산 권리·디자인은 남음. [차량 기획](vehicle-game-design.md) 참조 |
-| 게시 범위 | 문서·조사 데이터·공유용 원본 자료·Gradle 및 협업 기본 설정. 앱·핵심 구현과 테스트 소스는 로컬에 보존하고 이번 게시에서 제외 |
+| 게시 범위 | 문서·조사 데이터·빈 공식 양식·Gradle 및 협업 기본 설정. 원본 PDF는 로컬 보관하며 게시하지 않음. 앱·핵심 구현과 테스트 소스는 로컬에 보존하고 이번 게시에서 제외 |
 | APK·소스 대응표 | 미생성 |
 | 실제 앱 시연 영상·대표 화면 | 미생성 |
 | 개인정보·동의·서명 | 임의 작성하지 않음 |

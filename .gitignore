@@ -13,3 +13,6 @@ local.properties
 .env.*
 captures/
 artifacts/private/
+
+# 원본 기획서 PDF는 로컬 보관
+*.pdf
