@@ -2,6 +2,31 @@
 
 기준일: 2026-11-03 KST. 이 문서는 실제 수행 결과와 남은 검증의 기준이다. 제품 결정은 [01_PRD.md](01_PRD.md), 계산 규칙은 [02_SYSTEM_ARCHITECTURE.md](02_SYSTEM_ARCHITECTURE.md)에서 관리한다.
 
+## 현재 공통 개발 기반 검증 — 2026-11-04
+
+사용자가 준비 작업을 진행하도록 요청한 범위에서 KGP 2.2.21·AGP 8.10.1·Gradle Wrapper 8.11.1(공식 배포 SHA-256 포함)·JDK 17 조합을 실제 설정에 적용했다. 검증 대상은 기존 로컬 선행 소스이며 렌터카 제품 기능 완성본이 아니다. 아래 결과는 이전 실패·단독 컴파일 기록을 지우지 않고 현재 상태를 갱신한다.
+
+| 확인 | 실제 결과·범위 |
+|---|---|
+| `./gradlew :core:test :app:assembleDebug :app:lintDebug --stacktrace` | BUILD SUCCESSFUL. 핵심 JUnit 테스트 13개, 실패/오류/생략 0. Debug APK 빌드와 Android Lint 완료 |
+| Android Lint | 오류 0·경고 12. 대상 API, 도구 최신 버전 안내, 백업 속성, draw 중 할당, 아이콘·View 생성자 경고를 확인했다. 경고를 숨기거나 렌터카 품질 검증 완료로 바꾸지 않음 |
+| `./gradlew :app:connectedDebugAndroidTest --stacktrace` | Pleos Emulator 2.1.0/API34에서 기존 SnapshotStoreTest 8개 통과, 실패/오류/생략 0. 필드 보존·null·중복 정산·손상/버전 오류·중단 복원·전체 교체·비유한 샘플 저장 검증 |
+| APK 설치·기본 실행 | `adb -s emulator-5556 install -r ...` 성공. 활성 사용자 10의 CAR_SPEED 권한 허용 후 MainActivity COLD 실행 `Status: ok`, topResumedActivity가 앱인 것 확인. 전체 게임 흐름/화면 가독성 시험 아님 |
+| 차량 권한 경계 | CAR_POWERTRAIN을 `pm grant`로 변경하려는 시험 명령은 변경 불가 권한 타입으로 거절됐다. 권한 우회 없음. 이 결과가 차량 신호 수신 실패 또는 성공을 확정하는 것은 아님 |
+| 크래시 구분 | 기본 실행 확인 시 해당 앱의 FATAL EXCEPTION 기록은 발견하지 못했다. 에뮬레이터 DrivingView의 별도 native crash가 있어 장기 안정성·플랫폼 전체 정상으로 판정하지 않음 |
+| 팀 재현 | 이 컴퓨터 arm64·Temurin 17.0.6+10·SDK35/Build Tools35·Pleos API34의 결과. 다른 팀원 3명의 환경·실행은 미확인 |
+
+APK는 `app/build/outputs/apk/debug/app-debug.apk`, 크기 2,564,962 bytes, SHA-256 `ce46ae78dc4995d20062da4779d905da7ebf8e75e65a3d6ef25c71ed04a93845`다. Debug 개발 확인용이며 제출 release APK가 아니다. 자동 생성 파일과 테스트 로그는 개인 정보·로컬 경로가 포함될 수 있어 원본을 그대로 게시하지 않는다. 소스 커밋과 최종 APK의 대응은 게시 버전에서 별도 기록한다.
+
+로컬 근거: `/tmp/drive-environment-check.log`, `/tmp/drive-environment-instrumentation.log`, `core/build/test-results/test/TEST-io.drivegrowth.core.DriveEngineTest.xml`, `app/build/outputs/androidTest-results/connected/debug/` 및 `app/build/reports/lint-results-debug.xml`. 이 경로는 이 컴퓨터의 결과이며 저장소를 내려받은 팀원이 이미 갖고 있는 파일이 아니다.
+
+### 남은 검증과 게시 해석
+
+- 기존 소스의 DO 선언·dataSync 서비스·주행 중 표시 정책은 #13에서 다시 검토한다. 컴파일·설치·테스트 성공은 게임의 백그라운드 기록·음성 허용을 입증하지 않는다.
+- #20의 현재 코드 실행 근거로 핵심·저장 테스트를 사용할 수 있으나 실제 쓰기 실패 주입·주행 중 종료/재진입·차량 권한 거부·수신 타이밍·실차는 이번에 시험하지 않았다. SnapshotStore의 전체 파일 저장 시험과 Runtime의 메모리/디스크 실패 복원 통합 시험을 구분한다.
+- 렌터카 거래·탁송·영업·보유 개체·가게의 새 규칙과 계약은 별도 구현·#28 통합 검증이 필요하다. 기존 시험용 XP/이벤트 계산이 현재 게임 규칙이라는 뜻은 아니다.
+- 공통 소스가 게시되면 원격 CI에서 Android 소스 포함 조건을 만족하므로 core 테스트·APK 빌드·Lint가 실행되어야 한다. 현재 로컬 성공을 원격 CI 성공으로 미리 기록하지 않는다.
+
 ## OT·Pleos 조사와 개발 기반 문서 게시
 
 2026-11-03 사용자가 이번 문서 보완을 **PR 없이 `main`에 직접 반영**하도록 명시적으로 요청했다. 범위는 OT 전체 요약, 공식 개발 자료·주행 정책 조사, 이에 따른 기획·설계·검증 계획, 호환성을 고려한 개발 기반·권장 버전 설명의 Markdown 13개다. 앱·테스트 소스, APK, 원본 PDF, 개발 도구·캐시와 빌드 설정 변경은 포함하지 않는다. 문서에 선택한 권장 버전은 실제 설정에 아직 적용하지 않았다.
@@ -37,7 +62,7 @@
 | 앱 빌드·Lint | `./gradlew :core:test :app:assembleDebug :app:lintDebug` | `:app:processDebugMainManifest`에서 Manifest 누락으로 실패. Lint까지 도달하지 못함. 핵심 테스트는 이전 통과 결과 재사용 |
 | GitHub CI·보호 규칙 | 비공개 원격 `Yaho03/drive-growth` 생성 확인 | 문서 통합·영어 파일명·작업 영역별 브랜치 규칙을 적용한 [PR #2](https://github.com/Yaho03/drive-growth/pull/2)의 실행 결과는 Actions·PR 기록에서 확인. 보호 규칙 적용은 이번 작업 범위 밖 |
 
-`repository-checks`는 필수 파일과 로컬 Markdown 링크를 확인한다. 이 검사는 제품 동작이나 워크플로의 원격 성공을 증명하지 않는다. `android-checks`는 핵심 테스트·APK 빌드·Android Lint를 실행하도록 정의했다. 이번 게시에는 앱·핵심 소스가 없으므로 Android 검사는 명시적으로 생략한다. 소스가 어느 한 모듈에라도 추가되면 실행하며 실패를 숨기지 않는다.
+`repository-checks`는 필수 파일과 로컬 Markdown 링크를 확인한다. 이 검사는 제품 동작이나 워크플로의 원격 성공을 증명하지 않는다. `android-checks`는 핵심 테스트·APK 빌드·Android Lint를 실행하도록 정의했다. 초기 문서 게시에는 앱·핵심 소스가 없어 Android 검사를 생략했다. 이번 공통 소스 공유부터 Android 검사를 실행한다. 소스가 어느 한 모듈에라도 추가되면 실행하며 실패를 숨기지 않는다.
 
 ## 과거 핵심 테스트 범위
 
@@ -88,8 +113,8 @@
 |---|---|
 | 공식 양식 원본 | 다운로드 보관 완료 |
 | 팀 기획서 초안 | 원본 PDF 보존. 이후 사용자 결정에 따른 렌터카 방향을 로컬 Markdown에 반영. 제출용 수정 PDF·경제 밸런스·자산 권리·실제 앱과의 일치는 미완료. [제품 기준](01_PRD.md) 참조 |
-| 게시 범위 | 문서·조사 데이터·빈 공식 양식·Gradle 및 협업 기본 설정. 원본 PDF는 로컬 보관하며 게시하지 않음. 앱·핵심 구현과 테스트 소스는 로컬에 보존하고 이번 게시에서 제외 |
-| APK·소스 대응표 | 미생성 |
+| 게시 범위 | 문서·조사 데이터·빈 공식 양식·Gradle 및 협업 기본 설정. 원본 PDF는 로컬 보관하며 게시하지 않음. 기존 앱·핵심 테스트 소스는 기술 검증 기반으로 공유하며 새 렌터카 기능은 미구현 |
+| APK·소스 대응표 | 상단 로컬 Debug 해시·검증 조건 기록. 최종 제출 Release 버전 대응은 #29 |
 | 실제 앱 시연 영상·대표 화면 | 미생성 |
 | 개인정보·동의·서명 | 임의 작성하지 않음 |
 | 최종 기능 범위 일치 확인 | 앱·문서·영상 준비 후 필요 |
@@ -133,3 +158,11 @@
 [#11](https://github.com/Yaho03/drive-growth/issues/11)에 로컬 소스 11개·설정 5개의 SHA-256과 기능별 정적 확인·미검증·후속 작업을 기록했다. 확인한 목록의 집계 SHA-256은 `3bdc56f4102589631eb6e716844689ed548566f9c4cf3b41584b989d3233b70f`이며 계산 입력은 이슈에 기록한 경로, 탭, 파일 SHA-256, 줄바꿈을 경로순으로 연결한 UTF-8 문자열이다. 최신 앱 실행은 수행하지 않았다. 기존 코드 검증은 #20, 환경은 #12, 정책·실제 신호는 #13에 인계한다.
 
 #14의 미완료 안건은 #24·#25로 분리하고 기존 결정 기록을 보존한다. 팀 회의 개최·미정 규칙 완료·앱 구현 완료를 주장하지 않는다. 작업별 선행조건은 [진행 계획](08_PROJECT_PLAN.md)의 최신 연결을 따른다.
+
+## 제출 초안 인계
+
+[공식 심사용 항목 1–8 제출 초안](10_SUBMISSION_DRAFT.md)을 작성했다. 원본 양식·개인정보·서명은 수정하지 않았다. 현재 기획 문안이며 실제 화면·Release APK·영상·최종 접근권 및 제출 검사는 #29에서 수행한다.
+
+## 공통 소스 최초 CI 확인
+
+PR #32 최초 Android CI는 앱 컴파일 전 `setup-android@v3`의 기본 `tools` 패키지를 찾지 못해 실패했다. 액션의 공식 `packages` 입력으로 필요한 `platform-tools`만 요청하도록 수정했다. API35·Build Tools35 설치 및 실제 Gradle 검사는 그대로 유지하며 실패를 생략 처리하지 않는다. [액션 입력 근거](https://github.com/android-actions/setup-android/blob/v3/action.yml). 재실행 결과는 PR 검사에서 확인한다.
