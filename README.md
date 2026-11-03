@@ -31,7 +31,9 @@
 
 ## 개발환경과 실행
 
-JDK 17, Android SDK Platform 35·Build Tools 35.0.0이 필요합니다. Gradle Wrapper가 포함되어 있습니다. 일반 개발환경에서는 `ANDROID_HOME` 또는 개인 `local.properties`의 `sdk.dir`로 SDK를 지정합니다. 로컬 SDK·빌드 캐시는 커밋하지 않습니다.
+채택한 개발 기반과 결정 대기 기술은 [기술 설계](docs/02_SYSTEM_ARCHITECTURE.md#개발-기반-결정), **현재 적용값과 호환성을 대조한 권장 버전 조합**은 [개발환경 기준](docs/05_DEVELOPMENT_SETUP.md#개발-기반과-버전-기준)에서 관리합니다. 권장 조합은 공식 도구 지원 범위를 확인한 문서 기준이며 아직 빌드 설정에 적용하거나 Pleos 앱으로 실행 검증하지 않았습니다. 기존 조합에 대한 호환성 설명은 공모전의 사용 금지 판정이 아닙니다.
+
+Gradle Wrapper가 포함되어 있습니다. 일반 개발환경에서는 `ANDROID_HOME` 또는 개인 `local.properties`의 `sdk.dir`로 SDK를 지정합니다. 로컬 SDK·빌드 캐시는 커밋하지 않습니다.
 
 문서 검사는 `python3 scripts/check_repository.py`로 실행합니다. 아래는 앱 소스와 로컬 도구가 있는 개발 작업 공간의 예시이며 `.local-tools/env.sh`는 저장소에 포함하지 않습니다.
 
@@ -65,12 +67,13 @@ APK 설치 명령과 다운로드 링크는 실제 산출물을 생성·검증�
 | [02_SYSTEM_ARCHITECTURE.md](docs/02_SYSTEM_ARCHITECTURE.md) | 시스템 구조·기술 계약 | 모듈 역할, 입력 데이터, 상태 전환, 계산·저장·UI 제한. 구현 전에 확인 |
 | [03_GAME_BENCHMARK.md](docs/03_GAME_BENCHMARK.md) | 참고 게임 비교·분석 | 유명 방치형 게임 7개의 근거와 우리 게임 적용 제안. 외부 사실과 제안을 구분하며 확정 요구사항은 PRD에 기록 |
 | [04_VEHICLE_RESEARCH.md](docs/04_VEHICLE_RESEARCH.md) | 차량 조사 | 조사 범위, 차종 분류, 출처·확인 한계·자산 권리. 차량 사실은 연결된 CSV에서 관리 |
-| [05_DEVELOPMENT_SETUP.md](docs/05_DEVELOPMENT_SETUP.md) | 개발환경 구성 | Android·Pleos SDK와 에뮬레이터 설치·실행 방법 및 당시 검증 기록. 개발환경 준비 시 참고 |
+| [05_DEVELOPMENT_SETUP.md](docs/05_DEVELOPMENT_SETUP.md) | 개발 기반·버전 | 현재 설정과 채택·추가 검증·결정 대기 구분, 공식 호환성 근거, 과거 Android·Pleos 환경 설치·실행 기록 |
 | [06_VERIFICATION.md](docs/06_VERIFICATION.md) | 검증·완료 상태 | 실행한 검사, 실패·미검증 사항, 시연 조건·제출 준비 상태. PR·머지·제출 전 확인 |
 | [07_REFERENCES.md](docs/07_REFERENCES.md) | 외부 참고 근거 | 유명·수상 레포에서 채택한 특징과 AI 지침 로딩 근거. 협업·구조를 바꿀 때 참고 |
 | [08_PROJECT_PLAN.md](docs/08_PROJECT_PLAN.md) | 프로젝트 진행 계획 | 지금 할 일·선행조건·통합 회의와 M0–M3 단계 안내. 담당·목표일은 회의 후 확정 |
-| [09_UI_UX_SPEC.md](docs/09_UI_UX_SPEC.md) | 화면 흐름·디자인 명세 | 화면별 동작·상태·디자인·자산을 적을 틀만 준비. 시안·구현 완료 아님 |
+| [09_UI_UX_SPEC.md](docs/09_UI_UX_SPEC.md) | 화면 흐름·디자인 명세 | 주행 시 숨김·주차 후 복귀·실패 상태·디자인 제약 정리. 화면 배치·시안·구현은 미완료 |
 | [공모전 자료 안내](docs/contest/README.md) | 공식 공모전 자료 목차 | 일정·심사·접수, Pleos 개발자료, 차량 API와 공식 자료·다운로드 보관 기록 |
+| [OT 전체 요약](docs/contest/05_ORIENTATION_NOTES.md) | 온라인 설명회·질의응답 | 전체 35개 구간의 핵심 내용, 시각별 영상 링크, 기존 안내와의 차이. 기획·제출·SDK 조건 확인 시 참고 |
 | [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md) | AI 작업 진입점 | 같은 협업·제품·기술·검증 문서를 읽게 하는 지침. 공통 규칙을 중복 작성하지 않음 |
 
 차량 목록의 기준 데이터는 [vehicles.csv](docs/data/vehicles.csv)입니다. PDF 기획서 원본은 로컬에만 보관하며 GitHub에 올리지 않습니다. 조사 문서의 제안은 팀이 결정하기 전까지 확정 기획이나 구현 완료를 의미하지 않습니다.

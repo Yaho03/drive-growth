@@ -1,6 +1,6 @@
 # 차량 API와 설계 조건
 
-- 확인 기준일: **2026-11-02, 한국 시간(KST)**
+- 최초 확인: **2026-11-02 KST**. **2026-11-03 백그라운드 기록·주행 제한 심화 확인**.
 - 대상: 차량에 설치되어 실행되는 **Pleos Connect 앱**
 - SDK 소개 문서 기준 버전: **Vehicle SDK v2.3.2 / Vehicle Service v2.3.21**, **NaviHelper SDK v3.0.5**. 별도의 최신 Sample App 가이드는 Service **v2.3.22**를 사용하므로, SDK와 설치된 Service의 버전을 각각 확인한다.
 - 용도: 아이디어를 구체화할 때 활용할 수 있는 기능, 조건, 확인 과제의 근거 자료
@@ -111,7 +111,7 @@ Pleos 공식 FAQ는 클러스터와 동일한 차량 속도를 사용하려면 A
 
 기능에 따라 `AreaBounds` 또는 영역별 범위 정보가 함께 제공된다. SDK 연결 및 차량 통신은 비동기이며 성공·실패 콜백을 구분해야 한다.
 
-API 선언에 권한이 `normal`로 표시되는 것과 앱 마켓 정책상 권한 사용이 승인되는 것은 같은 의미가 아니다. SDK 정책은 Vehicle API 권한을 선언하고, Pleos App Market과 사전 협의·승인된 범위 안에서 사용하도록 안내한다. 공모전 개발 환경의 구체적인 권한 제공 방식은 별도로 확인한다.
+API 선언에 권한이 `normal`로 표시되는 것과 앱 마켓 정책상 권한 사용이 승인되는 것은 같은 의미가 아니다. SDK 정책은 Vehicle API 권한을 선언하고, Pleos App Market과 사전 협의·승인된 범위 안에서 사용하도록 안내한다. **2026-11-03 보완:** OT는 공모전 개발 단계의 사전 승인과 마켓 배포 승인을 구분했다. 승인 설명·자료 차이의 기준은 [개발 자료 2절](02_PLEOS_DEVELOPMENT.md)을 따른다. 개발 단계 승인 면제는 모든 API의 지원이나 주행 중 게임 허용을 보장하지 않는다.
 
 - [Capability 사용 가이드](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/Vehicle/check-capability)
 - [Vehicle 연결 및 비동기 처리 개요](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/Vehicle/intro)
@@ -173,7 +173,9 @@ Pleos는 `CarUxRestrictions`를 기준으로 주행 중 제한 상태를 확인�
 
 따라서 ‘화면 애니메이션을 멈춘다’, ‘속도가 0이다’, ‘브레이크를 밟았다’만으로 모든 게임 화면이나 조작을 허용할 수 있다고 가정하지 않는다. 필요한 기능을 플랫폼의 실제 제한 상태에 맞춰 설계하고 검증한다.
 
-공식 문서는 운전 중 시선 분산을 줄이고, 게임 등 주의를 분산시키는 활동을 유도하지 않도록 안내한다. 이는 정차 후 이용하는 게임 요소나 허용 범위 내 데이터 처리까지 일괄 금지한다고 판정한 내용은 아니다. 구체적인 앱 동작 모델과 카테고리에 대한 확인이 필요하다.
+**2026-11-03 하위 심사 문서 추가 확인:** [운전자 주의 분산 심사](https://document.pleos.ai/docs/pleos-only/distribute/app-review-guide/review-driver-distraction-elements)는 게임·동영상·브라우저를 미디어 앱으로 분류하고, **운전 중 실행·사용 불가**, 운전 시작 시 **UI 숨김과 사용 일시 중지**, 주행 중 일시 중지 해제 금지, 헤드업 알림 금지를 명시한다. 화면만 숨기면 나머지 게임 기능은 허용된다는 규정으로 축소하지 않는다.
+
+이는 App Market 심사 정책이며 공모전의 별도 가산점 기준이 아니다. 문서의 ‘정차’ 표현만으로 신호 대기·속도 0에서 조작을 허용하지 않으며 실제 `CarUxRestrictions`·카테고리 정책을 함께 확인한다. 이 페이지는 게임의 **주행 중 백그라운드 기록·계산·음성**을 명시적으로 허용하지 않는다. 반대로 앱의 모든 데이터 처리가 금지된다고 확대하지도 않는다. 해당 핵심 흐름은 개별 앱 모델에 대한 확인이 남는다.
 
 - [주행 안전을 고려한 설계](https://document.pleos.ai/docs/pleos-only/vehicle-app-planning-guide/driver-distraction-guideline)
 - [지역별 주행 규제 정책](https://document.pleos.ai/docs/pleos-only/vehicle-app-planning-guide/driving-restiction-policy)
@@ -193,6 +195,22 @@ Pleos는 `CarUxRestrictions`를 기준으로 주행 중 제한 상태를 확인�
 
 주행 기록을 계속 수집하는 아이디어라면 내비게이션 등 다른 앱이 전면에 있을 때의 처리, 앱 종료·복귀, 서비스 연결 해제, 기록 저장 시점 등을 실제 환경에서 확인해야 한다. 이 문서에서는 백그라운드 상시 수집이 허용되거나 보장된다고 확정하지 않았다.
 
+### 5.3 백그라운드 기록 심화 확인
+
+2026-11-03 공개 문서 대조 결과다. **Pleos에 조건부 백그라운드 동작 모델은 있지만, 게임 앱의 주행 중 자동 기록 예외는 확인하지 못했다.** 기록 요구사항은 유지하되 정책 적합성과 실행 지속성을 서로 다른 완료 조건으로 둔다.
+
+| 쟁점 | 공식 문서에서 확인한 내용 | 우리 앱에 적용할 때의 한계 |
+|---|---|---|
+| 화면 숨김과 종료 | [앱 구조](https://document.pleos.ai/docs/pleos-only/vehicle-app-planning-guide/app-structure-screen-model)는 화면에서 사라져도 백그라운드에 남을 수 있다고 설명. 화면 갱신·애니메이션·불필요한 센서 수집은 정리하고 지속 작업의 중단·재개 정책을 요구 | 숨김은 프로세스 종료와 다르지만, 프로세스 생존이나 차량 수집의 허가를 보장하지 않음 |
+| 최상위 Back 이후 서비스 | [CCP 가이드](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/ccp-rotary-controller-development)는 앱 숨김 후 **백그라운드 동작이 허용된 기능**이 서비스 생명주기에 따라 지속될 수 있다고 설명 | ‘허용된 기능’이라는 조건이 있으므로 모든 게임 기록을 허용한다고 해석하지 않음 |
+| 차량 SDK 연결·구독 | [도메인 객체 획득](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/Vehicle/obtain-domain-object)은 초기화·사용 종료 시 해제, [Callback](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/Vehicle/callback)은 등록·해제·실패 처리를 안내 | 읽은 문서에 Activity 숨김 시 모든 구독을 종료하라는 조건은 없지만, 숨김·프로세스 종료·차량 Suspend 이후 연속 수신 보장도 없음 |
+| DO 선언 | [주행 규제 구현](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/driving-restriction-development-guide)은 DO 선언 여부와 별도로 `CarUxRestrictions`·`ActiveRestrictions` 반영 요구 | DO 선언·API 권한·사용자 동의가 게임 기능의 주행 중 허용을 각각 대신하지 않음 |
+| 카테고리 예외 | [Music/Audio](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/music-audio-app-developement-guide)는 오디오가 주 기능인 앱의 백그라운드 재생을 요구. [Navigation](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/navigation-app-development-guide)은 Background 경로 안내를 금지하고 OEM 안전운행 정보만 예외로 설명 | 음악·음성·휴게소 기능을 붙였다는 이유로 게임에 다른 카테고리의 예외가 적용되지 않음. Navigation의 안내 제한을 데이터 기록 금지로 확대하지도 않음 |
+
+일반 Android의 [Foreground Service](https://developer.android.com/develop/background-work/services/fgs)는 사용자가 인지할 수 있는 지속 작업과 알림 등을 전제로 하는 실행 수단이다. 화면이 전면에 있는 Activity와 같은 뜻이 아니며, Pleos 게임 정책의 허가 근거도 아니다. 채택 여부는 미정이다. 채택 검토 시 실제 Android 버전·시작 조건·서비스 유형·권한·Pleos 알림 정책을 확인한다. 위치 수집에는 [Pleos 위치 정책의 별도 한계](02_PLEOS_DEVELOPMENT.md)도 적용한다.
+
+사용자에게 수집 항목·목적·보관 조건을 설명하고 허용한 데이터만 접근해야 한다는 [개인정보 심사](https://document.pleos.ai/docs/pleos-only/distribute/app-review-guide/review-user-privacy-security)도 함께 확인했다. 사용자 동의, API 권한, 카테고리 정책 적합성, 실제 콜백 수신은 각각 확인해야 한다. 주행 중 음성의 판단은 [개발 자료 9.1절](02_PLEOS_DEVELOPMENT.md)에서 관리한다.
+
 ## 6. 남은 질문과 검증 방법
 
 | 질문 | 현재 확인 상태 | 다음 확인 방법 |
@@ -204,10 +222,21 @@ Pleos는 `CarUxRestrictions`를 기준으로 주행 중 제한 상태를 확인�
 | 조향각의 실제 값과 갱신 범위는? | 앞바퀴 조향각·degree로 명세 확인 | Capability 결과와 에뮬레이터 값 대조 |
 | 트립 시간의 단위·초기화 조건은? | 확정하지 않음 | 해당 메서드·리스너 상세 및 동작 확인 |
 | 휴게소 목록과 경로상 거리는 제공되는가? | 확인한 클래스에 검색 메서드 없음 | 내비게이션 데이터 필드·별도 공식 데이터 경로 확인 |
-| 앱을 보지 않는 동안 주행 기록을 계속 받을 수 있는가? | 보장 여부 미확인 | 앱 실행 모델·주행 제한·수명주기 테스트 |
+| 앱을 보지 않는 동안 주행 기록을 계속 받을 수 있는가? | 조건부 백그라운드 모델 확인. 게임 자동 기록의 허용·연속 전달 보장은 미확인(5.3절) | 아래 앱 모델에 대한 정책 답변과 별도의 실제 수신·중단·복원 시험 |
 | 크루즈·방향지시등 등 기능이 차량마다 지원되는가? | 도메인/API 존재 확인 | 각 기능 Capability와 차종 지원표 확인 |
-| 게임 요소와 주행 중 기록·음성의 결합이 허용되는가? | 일반 정책 확인, 개별 앱 판정 없음 | 실제 앱 기능·카테고리를 기준으로 운영사에 확인 |
-| 실차 배포에 필요한 API 권한은 승인 가능한가? | 사전 협의·승인 정책 확인 | 공모전 개발 권한과 App Market 등록 절차 구분 확인 |
+| 게임 요소와 주행 중 기록·음성의 결합이 허용되는가? | 게임 UI 숨김·일시 중지 정책 확인. 백그라운드 기록·계산·음성의 개별 허용은 미확인 | 실제 앱 기능·카테고리를 기준으로 운영사에 확인 |
+| 실차 배포에 필요한 API 권한은 승인 가능한가? | 배포 사전 협의·승인 정책 확인, 앱별 승인 결과는 미확인 | OT의 개발 승인 면제와 구분해 App Market 등록 시 확인 |
+
+### 6.1 공식 확인이 필요한 구체적 질문
+
+아래는 **문의 초안이며 발송·답변 수신 전**이다. 공개 [공모전 FAQ](https://appdevchallenge.auto-hmg.io/faq)에는 이 앱 모델에 대한 답을 찾지 못했다. FAQ의 공식 문의 경로는 `appdevchallenge@hyundai-partners.com`이다. 담당·확인일은 미정이다.
+
+1. 주차 중 사용자가 기록을 시작하고 동의한 뒤, 주행 중 게임 UI·음성·알림·조작을 중단한 상태에서 속도·기어·주행거리 등 필요한 이벤트만 로컬에 저장하고 주차 후 게임 결과에 반영하는 모델이 허용되는가? 이 모델은 **검토안**이며 제품의 계산 시점 확정이 아니다.
+2. 허용된다면 필요한 카테고리·DO 선언·실행 서비스·알림·Vehicle 권한과 승인 조건은 무엇인가? 비시각적 기록과 주행 중 게임 계산은 각각 어디까지 허용되는가?
+3. 화면 숨김·다른 앱 전면 전환·사용자 전환·IGN OFF/Suspend에서 SDK 연결 및 이벤트 전달의 공식 보장 범위는 무엇인가? 재연결 때 누락 구간을 조회할 수 있는가?
+4. 위 답변은 공모전 에뮬레이터 개발과 App Market 배포에 각각 어떻게 적용되는가? 주행 중 음성 문의는 [개발 자료 9.1절](02_PLEOS_DEVELOPMENT.md)의 유형별 질문을 함께 사용한다.
+
+답변을 확보하면 적용 버전·기능 범위·조건을 기록하고 PRD·기술 계약·검증 계획에 반영한다. 에뮬레이터에서 동작한다는 사실만으로 정책 승인으로 처리하지 않는다.
 
 ## 7. 기획서에 반영할 때의 표현 원칙
 

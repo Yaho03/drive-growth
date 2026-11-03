@@ -1,6 +1,72 @@
-# Android / Pleos 로컬 개발 환경 확인 기록
+# 개발 기반·버전 기준과 로컬 환경 기록
 
 확인일: 2026-11-03 KST
+
+## 개발 기반과 버전 기준
+
+기술 책임·선택 이유·게임 기획에 따른 결정 대기는 [기술 설계](02_SYSTEM_ARCHITECTURE.md#개발-기반-결정), 공식 Pleos SDK 조사 버전은 [개발 자료 2절](contest/02_PLEOS_DEVELOPMENT.md)에서 관리한다. 이 절은 실제 설정과 팀이 사용할 기준의 차이를 설명한다. 현재 설정은 저장소 파일, 설치 이력은 아래 기록, 실제 통과 결과는 [검증 문서](06_VERIFICATION.md)가 근거다.
+
+- **문서 기준 채택:** 앞으로 적용·검증할 권장 조합을 정했다. 설정 파일 반영이나 앱 실행 성공을 뜻하지 않는다.
+- **현재 적용값:** 실제 저장소 설정에 남아 있는 값이다. 권장값과 다르면 적용 대기다.
+- **결정 대기:** 게임·정책·환경 조건이 더 필요한 항목이다.
+
+### 호환성을 고려한 권장 조합
+
+2026-11-03 재작성. **Kotlin/KGP 2.2.21 + AGP 8.10.1 + Gradle 8.11.1 + JDK 17**을 문서상 빌드 기준으로 채택한다. 기존 조합을 그대로 권장하거나 Kotlin만 바꾸는 방식 대신, KGP·AGP·Gradle·Android 컴파일러의 조건을 함께 대조했다. 공모전에서 정한 의무 버전이 아니라 프로젝트의 기술 선택이다. 설정 변경·설치·실행은 아직 하지 않았다.
+
+| 구성 | 현재 적용값·기록 | 문서상 권장 기준 | 상태·적용 이유 |
+|---|---|---|---|
+| 언어·플랫폼 | Kotlin / Pleos Connect·AAOS | 유지 | 차량용 Android 앱 기반 채택. 게임 엔진 선택과 별개 |
+| Kotlin / KGP | `2.0.21` | **`2.2.21`** | 적용 대기. 아래 AGP·Gradle이 KGP 완전 지원 범위에 들어오는 조합 |
+| Android Gradle Plugin(AGP) | `8.8.2` | **`8.10.1`** | 적용 대기. Kotlin 2.2 계열의 Android 빌드 조건과 패치 릴리스의 R8 수정 반영을 함께 고려 |
+| Gradle Wrapper | `8.10.2` | **`8.11.1`** | 적용 대기. AGP 8.10의 최소·기본 버전. Wrapper 버전과 배포 SHA-256을 함께 갱신할 대상 |
+| JDK·JVM 대상 | Java 17, `jvmTarget = 17`, `jvmToolchain(17)` | **17 계열 유지** | AGP 요구와 일치. IDE 실행용 JBR과 Gradle JDK는 구분. 실제 사용할 17 패치 빌드는 환경 준비 시 기록 |
+| 컴파일 API | `compileSdk = 35` | **35 유지** | AGP 8.10은 API 36까지 지원하므로 범위 안. 별도 요구 없이 컴파일 API까지 올리지 않음 |
+| 최소 API | `minSdk = 28` | **28 유지** | Pleos의 최소 28 이상 조건 충족. 모든 API 28 차량에서의 기능 보장은 아님 |
+| 대상 API | `targetSdk = 34` | **초기 개발 기준 34 유지** | Pleos API 34 환경에서 동작을 확인할 기준. 최종 제출·마켓 정책에 따른 변경 여부는 재확인 |
+| Android Build Tools | CI 설치·로컬 기록 `35.0.0` | **35.0.0 유지** | AGP 8.10의 최소·기본 버전과 일치. 현재 앱 설정에서 명시 고정된 값은 아님 |
+| 첫 차량 시험 환경 | Pleos Emulator `2.1.0`, API `34` | **유지** | 공식 Pleos 안내와 기존 부팅 기록 기준. SDK 연동·화면 실행까지 확인한 것은 아님 |
+| Android Studio | 팀 공통 버전 미기록 | **Rabbit 2 / 2026.2.2** | 공식 stable 및 AGP 지원표를 대조한 IDE 기준. 설치·팀 장비 검증은 미수행. 자동 AGP 업그레이드 제안으로 위 기준을 바꾸지 않음 |
+| 단위 테스트 | JUnit `4.13.2` | **유지** | 기존 로직 검증 기반. UI·기기 테스트 기술은 별도 선택 |
+
+`compileSdk`는 컴파일할 API, `minSdk`는 설치 가능한 최소 API, `targetSdk`는 대상으로 삼는 Android 동작 기준, 에뮬레이터 API는 시험 기기의 실제 OS다. 새 빌드 조합을 사용한다고 차량 OS가 바뀌지는 않는다. API 35의 `android.car.jar`를 참조하는 코드는 API 34에 있는 메서드인지 확인하고 미지원·누락 처리를 검증한다.
+
+### 선택 근거와 기존 조합의 차이
+
+| 대조 대상 | 공식 근거 | 판단 |
+|---|---|---|
+| Kotlin ↔ AGP·Gradle | [KGP 호환표](https://kotlinlang.org/docs/gradle-configure-project.html): KGP 2.2.20–2.2.21은 Gradle 7.6.3–8.14, AGP 7.3.1–8.11.1을 완전 지원 범위로 제시 | 권장 AGP 8.10.1·Gradle 8.11.1이 모두 포함됨 |
+| AGP ↔ Gradle·JDK·SDK | [AGP 8.10 릴리스](https://developer.android.com/build/releases/agp-8-10-0-release-notes): Gradle 8.11.1, JDK 17, Build Tools 35.0.0, 최대 API 36. 8.10.1의 R8 수정도 안내 | 권장 조합과 compileSdk 35가 범위 안 |
+| Kotlin ↔ Android 컴파일러 | [D8/R8 조건](https://developer.android.com/build/kotlin-support): Kotlin 2.2 행의 R8 기준 8.10.21. [AGP 8.10.1에 대응하는 R8 고정 소스](https://r8.googlesource.com/r8/+/797269e8b303243d4ef999fa1817bd64a1f2de0b/src/main/java/com/android/tools/r8/Version.java#16)의 버전은 8.10.24 | 요구 버전 이상. 공식 `agp-8.10.1` 태그로 대조했으며 POM의 별도 R8 의존성을 확인했다는 뜻은 아님. D8/R8를 앱 의존성으로 강제 추가하지 않음 |
+| IDE ↔ AGP | [Android Studio 릴리스·호환표](https://developer.android.com/studio/releases): Rabbit 2 / 2026.2.2는 stable이며 AGP 7.1–9.5 지원 | AGP 8.10.1 포함. IDE의 내장 JBR 버전과 Gradle용 JDK 17 선택은 별도 확인 |
+| Pleos 개발 조건 | [공식 개발환경](https://document.pleos.ai/docs/connect/guide/getting-started/application-development/setup-connect-sdk-emulator): Java/Kotlin, Gradle 8.0 이상, 최소 API 28 이상, Emulator 2.1.0 / API 34 | 공개된 기본 환경 조건 충족. Pleos가 이 전체 버전 조합을 개별 인증했다는 뜻은 아님 |
+
+기존 KGP 2.0.21의 AGP 완전 지원 표 상한은 8.5여서 현재 AGP 8.8.2는 표 밖이다. 이것은 **현대차 공모전의 사용 금지나 실제 빌드 실패 판정이 아니다.** 해당 조합은 현재 설정 기록으로 보존하고, 앞으로의 권장 조합과 구분한다. KGP 2.1.21도 AGP 상한이 8.7.2이므로 Kotlin만 소폭 올리는 방식으로 이 차이가 해결된다고 쓰지 않는다.
+
+이번 선택은 위 지원 범위의 교집합을 바탕으로 한다. AGP 9나 최신 Kotlin 계열로 함께 이동할 별도 필요는 확인하지 않았다. 기존 Kotlin을 유지하려고 AGP를 낮추는 안은 compileSdk 35의 지원 조건까지 다시 바꿔야 하므로 기본안으로 택하지 않았다.
+
+### 적용 순서와 실행 검증의 완료 조건
+
+다음은 **후속 적용 계획**이며 이번에 수행한 작업이 아니다.
+
+1. 환경 준비 시 루트 `build.gradle.kts`의 Android·Kotlin 플러그인과 Gradle Wrapper를 위 조합으로 함께 맞춘다. Wrapper 배포 파일의 공식 SHA-256을 확인하고, IDE·터미널·CI가 JDK 17을 쓰는지 대조한다. 개별 도구만 임의 업그레이드하지 않는다.
+2. 의존성 해석·동기화에서 Kotlin 메타데이터·JVM 대상·AGP 요구 충돌을 확인한다. 경고를 숨기거나 버전 검사 우회로 통과 처리하지 않는다.
+3. 실행할 앱 소스가 준비되면 기존 `./gradlew :core:test :app:assembleDebug :app:lintDebug`로 검사한다. 소스·Manifest 부재로 생략·실패한 결과와 버전 호환 실패를 구분한다.
+4. 필요한 Pleos SDK를 연결한 뒤 API 34 에뮬레이터에서 설치·실행·서비스 연결·차량 콜백을 확인한다. 적용한 SDK·차량 Service 버전과 실패 로그를 기록한다.
+5. 정산·저장·UI·주행 정책 검증은 해당 기능이 합의·구현된 뒤 별도로 수행한다. Release 서명·최적화 구성 변경 시 해당 빌드도 재검증한다.
+
+현재 결론은 **문서상 도구 호환 조건 대조 완료 / 권장 조합 결정 / 설정 미적용 / Pleos 앱 빌드·실행 미검증**이다. SDK의 실제 메타데이터·의존성이나 차량 환경에서 추가 제약이 발견되면 근거를 남겨 이 조합을 조정한다. UI·게임 엔진·저장·서버·음성 흐름의 미정 항목은 기술 설계를 따르며 이번 버전 결정으로 확정하지 않는다.
+
+### Pleos 연동과 버전 확정 조건
+
+Maven 저장소 주소는 등록돼 있지만 앱에는 아직 Pleos Vehicle·음성·내비게이션·위치 SDK 의존성이 선언돼 있지 않다. **공식 문서에서 조사한 버전과 프로젝트에 적용·검증한 버전은 다르다.** SDK별 숫자·자료 불일치는 [개발 자료 2절](contest/02_PLEOS_DEVELOPMENT.md)을 기준으로 삼아 중복 관리하지 않는다.
+
+- Vehicle·AAOS 차량 API는 기록 기능의 검증 대상으로 삼되 실제 사용할 속성·권한·Capability와 런타임 전달을 확인한다.
+- TTS·STT·NaviHelper·FusedLocation·Gleo는 기능별 필요성과 정책·인증·승인 조건을 확인한 뒤 연결한다. 미연결 상태는 기능 제외가 아니다.
+- 에뮬레이터 이미지 버전, SDK 라이브러리 버전, 차량 내 Service 버전을 따로 기록한다. 빠른 시작 예제의 버전과 상세 SDK 문서가 다르면 동일하다고 가정하지 않는다.
+- 다운로드·Gradle 동기화, 컴파일, 권한·서비스 연결, 실제 콜백·화면·저장 결과를 단계별로 확인한다. 첫 단계 성공을 마지막 단계 성공으로 표시하지 않는다.
+
+이 문서의 새 기준은 **문서 대조 완료 / 설정 변경 없음 / 새 빌드·앱 실행 미수행** 상태다. 아래 설치·부팅·실패 이력은 보존하며 새 버전 조합의 검증 근거로 대체하지 않는다.
 
 ## 현재 상태
 
@@ -138,6 +204,12 @@ adb -s emulator-5556 shell getprop sys.boot_completed
 ```
 
 스크립트는 해당 AVD만 사용하고, 화면 없이 실행하며, 종료 시 스냅샷을 저장하지 않는다. 사용자 데이터 초기화 옵션은 사용하지 않는다. 기본 실행 메모리는 4096MB이고 AVD 생성 프로필은 `automotive_1080p_landscape`다. 실제 부팅 로그의 초기 화면 설정은 1080×600 / 120dpi였다. 최종 제품 화면 사양과 일치하는지 별도로 확인한다.
+
+## 화면 시험과 기존 부팅 기록의 구분
+
+2026-11-03 조사 보완: 위 `start-pleos.sh`의 화면 없는 실행은 부팅·서비스 확인용 기록이다. **시각 UI 검증이나 FormFactorConsole 시험 완료가 아니다.** 공식 폼 팩터 시험은 별도 창으로 실행한 Emulator와 Host Display Bridge를 사용하며 Headless·Android Studio 내장 Running Devices 창은 해당 시험에 사용할 수 없다. 실제 실행 옵션·AVD 이름은 시험 착수 시 확인한다. 이번 문서 보완에서 스크립트나 AVD 설정을 바꾸지는 않았다.
+
+차량 상태 웹 콘솔(8088), SDK 샘플 앱, 화면 크기 시험 도구는 목적이 다르다. 설치·포트·종료 조건은 [공식 자료 목록](contest/04_OFFICIAL_RESOURCES.md) 6절과 [Virtual Console 안내](contest/02_PLEOS_DEVELOPMENT.md) 5절을 기준으로 사용한다. 이미 기록된 headless 부팅 성공을 이 시험들의 성공으로 재분류하지 않는다.
 
 ## 남은 검증
 
