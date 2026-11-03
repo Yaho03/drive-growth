@@ -162,3 +162,7 @@ APK는 `app/build/outputs/apk/debug/app-debug.apk`, 크기 2,564,962 bytes, SHA-
 ## 제출 초안 인계
 
 [공식 심사용 항목 1–8 제출 초안](10_SUBMISSION_DRAFT.md)을 작성했다. 원본 양식·개인정보·서명은 수정하지 않았다. 현재 기획 문안이며 실제 화면·Release APK·영상·최종 접근권 및 제출 검사는 #29에서 수행한다.
+
+## 공통 소스 최초 CI 확인
+
+PR #32 최초 Android CI는 앱 컴파일 전 `setup-android@v3`의 기본 `tools` 패키지를 찾지 못해 실패했다. 액션의 공식 `packages` 입력으로 필요한 `platform-tools`만 요청하도록 수정했다. API35·Build Tools35 설치 및 실제 Gradle 검사는 그대로 유지하며 실패를 생략 처리하지 않는다. [액션 입력 근거](https://github.com/android-actions/setup-android/blob/v3/action.yml). 재실행 결과는 PR 검사에서 확인한다.
