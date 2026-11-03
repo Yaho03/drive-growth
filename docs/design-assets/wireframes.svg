@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1180" viewBox="0 0 1600 1180" role="img" aria-labelledby="title desc">
+<title id="title">드라이브 키우기 핵심 화면 와이어프레임</title>
+<desc id="desc">주차 상태에서 사용하는 가게, 보유 차량, 탁송 선택, 정산 결과의 배치 초안. 수치는 예시이며 실차 이미지가 아니다.</desc>
+<style>text{font-family:Arial,"Apple SD Gothic Neo",sans-serif;fill:#E8F0F4;font-size:20px}.small{font-size:16px;fill:#9DB1C0}.title{font-size:27px;font-weight:bold}.label{font-size:18px}.button{fill:#75E8BE}.dark{fill:#0C1722}.panel{fill:#172634;stroke:#466070;stroke-width:2}</style>
+<rect width="1600" height="1180" fill="#09121B"/>
+<text x="28" y="42" class="title">드라이브 키우기 · 렌터카 가게 화면 설계</text>
+<text x="28" y="72" class="small">와이어프레임 / 실제 앱 화면 아님 / 중립 도형·레이아웃 예시 / 게임 규칙과 자산 권리는 별도 확인</text>
+<rect x="28" y="103" width="744" height="464" rx="12" fill="#0C1722" stroke="#466070" stroke-width="2"/>
+<text x="50" y="142" class="title">01 가게 전체</text>
+<text x="50" y="174" class="small">주차·UX 허용 확인 후 표시 · 예시 데이터</text>
+<line x1="48" y1="190" x2="752" y2="190" stroke="#466070"/>
+<rect x="48" y="209" width="465" height="258" rx="12" fill="#172634" stroke="#466070" stroke-width="2"/>
+<text x="66" y="240" class="label">작은 렌터카 가게 · 보유 공간 2/4</text>
+<rect x="68" y="259" width="172" height="62" rx="12" fill="#314A58" stroke="#466070" stroke-width="2"/>
+<text x="88" y="298" class="label">가게·간판</text>
+<rect x="93" y="356" width="96" height="40" rx="8" fill="#49616D" stroke="#92A5AD" stroke-width="2"/>
+<rect x="113" y="341" width="57" height="30" rx="8" fill="#647F8C" stroke="#92A5AD" stroke-width="2"/>
+<circle cx="115" cy="398" r="9" fill="#09121B"/><circle cx="169" cy="398" r="9" fill="#09121B"/>
+<text x="90" y="433" class="small">개체 V-01</text>
+<rect x="288" y="356" width="96" height="40" rx="8" fill="#49616D" stroke="#92A5AD" stroke-width="2"/>
+<rect x="308" y="341" width="57" height="30" rx="8" fill="#647F8C" stroke="#92A5AD" stroke-width="2"/>
+<circle cx="310" cy="398" r="9" fill="#09121B"/><circle cx="364" cy="398" r="9" fill="#09121B"/>
+<text x="285" y="433" class="small">개체 V-02</text>
+<rect x="531" y="209" width="220" height="258" rx="12" fill="#172634" stroke="#466070" stroke-width="2"/>
+<text x="548" y="245" class="label">가게 요약</text>
+<text x="548" y="290" class="label">머니 1,000</text>
+<text x="548" y="331" class="label">미확인 결과 2건</text>
+<text x="548" y="377" class="small">활성 탁송 없음</text>
+<rect x="548" y="399" width="180" height="48" rx="12" fill="#75E8BE" stroke="#75E8BE" stroke-width="2"/>
+<text x="564" y="430" class="dark label">결과 보기</text>
+<rect x="50" y="495" width="155" height="48" rx="12" fill="#75E8BE" stroke="#75E8BE" stroke-width="2"/>
+<text x="66" y="526" class="dark label">차량 보기</text>
+<rect x="221" y="495" width="155" height="48" rx="12" fill="#75E8BE" stroke="#75E8BE" stroke-width="2"/>
+<text x="237" y="526" class="dark label">탁송 선택</text>
+<rect x="392" y="495" width="195" height="48" rx="12" fill="#75E8BE" stroke="#75E8BE" stroke-width="2"/>
+<text x="408" y="526" class="dark label">확장·꾸미기</text>
+<text x="607" y="526" class="small">도감·더보기</text>
+<rect x="828" y="103" width="744" height="464" rx="12" fill="#0C1722" stroke="#466070" stroke-width="2"/>
+<text x="850" y="142" class="title">02 보유 차량·차고</text>
+<text x="850" y="174" class="small">주차·UX 허용 확인 후 표시 · 예시 데이터</text>
+<line x1="848" y1="190" x2="1552" y2="190" stroke="#466070"/>
+<rect x="848" y="209" width="218" height="246" rx="12" fill="#172634" stroke="#466070" stroke-width="2"/>
+<rect x="906" y="253" width="96" height="40" rx="8" fill="#49616D" stroke="#92A5AD" stroke-width="2"/>
+<rect x="926" y="238" width="57" height="30" rx="8" fill="#647F8C" stroke="#92A5AD" stroke-width="2"/>
+<circle cx="928" cy="295" r="9" fill="#09121B"/><circle cx="982" cy="295" r="9" fill="#09121B"/>
+<text x="903" y="330" class="small">같은 차종 · V-01</text>
+<text x="868" y="363" class="label">Lv.1 · 대여 가능</text>
+<text x="868" y="402" class="small">사고 이력은 별도 표시</text>
+<rect x="1086" y="209" width="218" height="246" rx="12" fill="#172634" stroke="#466070" stroke-width="2"/>
+<rect x="1144" y="253" width="96" height="40" rx="8" fill="#49616D" stroke="#92A5AD" stroke-width="2"/>
+<rect x="1164" y="238" width="57" height="30" rx="8" fill="#647F8C" stroke="#92A5AD" stroke-width="2"/>
+<circle cx="1166" cy="295" r="9" fill="#09121B"/><circle cx="1220" cy="295" r="9" fill="#09121B"/>
+<text x="1141" y="330" class="small">같은 차종 · V-02</text>
+<text x="1106" y="363" class="label">Lv.1 · 수리 중</text>
+<text x="1106" y="402" class="small">사고 이력은 별도 표시</text>
+<rect x="1324" y="209" width="227" height="246" rx="12" fill="#172634" stroke="#466070" stroke-width="2"/>
+<text x="1341" y="246" class="label">선택 차량 상세</text>
+<text x="1341" y="289" class="small">개체별 상태·이력</text>
+<text x="1341" y="326" class="small">행동 가능 여부 확인</text>
+<rect x="1341" y="373" width="192" height="48" rx="12" fill="#75E8BE" stroke="#75E8BE" stroke-width="2"/>
+<text x="1357" y="404" class="dark label">상세·관리</text>
+<rect x="850" y="495" width="150" height="48" rx="12" fill="#75E8BE" stroke="#75E8BE" stroke-width="2"/>
+<text x="866" y="526" class="dark label">가게로</text>
+<text x="1023" y="526" class="small">강화·수리·처분은 비용/소비 확인 후 확정</text>
+<rect x="28" y="607" width="744" height="464" rx="12" fill="#0C1722" stroke="#466070" stroke-width="2"/>
+<text x="50" y="646" class="title">03 목적지·탁송 선택</text>
+<text x="50" y="678" class="small">주차·UX 허용 확인 후 표시 · 예시 데이터</text>
+<line x1="48" y1="694" x2="752" y2="694" stroke="#466070"/>
+<rect x="48" y="713" width="703" height="65" rx="12" fill="#172634" stroke="#466070" stroke-width="2"/>
+<text x="66" y="752" class="label">목적지 선택  ·  예상 50km (관측 주행 거리와 구분)</text>
+<rect x="48" y="796" width="339" height="157" rx="12" fill="#172634" stroke="#466070" stroke-width="2"/>
+<text x="66" y="832" class="title">수익 탁송</text>
+<text x="66" y="874" class="label">도착 후 보상 · 금액 예시</text>
+<text x="66" y="918" class="small">선택 후보와 완료 조건 확인</text>
+<rect x="406" y="796" width="345" height="157" rx="12" fill="#172634" stroke="#466070" stroke-width="2"/>
+<text x="425" y="832" class="title">차량 구매 탁송</text>
+<text x="425" y="874" class="label">게임머니 지불 → 도착 후 영입</text>
+<text x="425" y="918" class="small">구매금·개체·조건 확인</text>
+<rect x="50" y="999" width="150" height="48" rx="12" fill="#75E8BE" stroke="#75E8BE" stroke-width="2"/>
+<text x="66" y="1030" class="dark label">가게로</text>
+<rect x="417" y="999" width="220" height="48" rx="12" fill="#75E8BE" stroke="#75E8BE" stroke-width="2"/>
+<text x="433" y="1030" class="dark label">선택안 상세·확정</text>
+<rect x="828" y="607" width="744" height="464" rx="12" fill="#0C1722" stroke="#466070" stroke-width="2"/>
+<text x="850" y="646" class="title">04 정산·영업 결과</text>
+<text x="850" y="678" class="small">주차·UX 허용 확인 후 표시 · 예시 데이터</text>
+<line x1="848" y1="694" x2="1552" y2="694" stroke="#466070"/>
+<rect x="848" y="713" width="437" height="251" rx="12" fill="#172634" stroke="#466070" stroke-width="2"/>
+<text x="866" y="749" class="label">결과 요약 · 저장 확정 후 표시</text>
+<text x="866" y="795" class="label">기본 주행</text>
+<text x="1164" y="795" class="label">+100</text>
+<text x="866" y="838" class="label">탁송 완료</text>
+<text x="1164" y="838" class="label">+200</text>
+<text x="866" y="881" class="label">렌트·시설</text>
+<text x="1164" y="881" class="label">+50</text>
+<text x="866" y="924" class="label">이번 합계</text>
+<text x="1164" y="924" class="label">+350</text>
+<rect x="1306" y="713" width="245" height="251" rx="12" fill="#172634" stroke="#466070" stroke-width="2"/>
+<text x="1324" y="750" class="label">획득·영업 내역</text>
+<text x="1324" y="797" class="small">차량 영입 / 리뷰</text>
+<text x="1324" y="836" class="small">단골 정보 / 가상 사고</text>
+<text x="1324" y="878" class="small">사고는 게임 사건</text>
+<text x="1324" y="922" class="small">미확인 결과 1/2</text>
+<rect x="850" y="999" width="150" height="48" rx="12" fill="#75E8BE" stroke="#75E8BE" stroke-width="2"/>
+<text x="866" y="1030" class="dark label">가게로</text>
+<rect x="1018" y="999" width="180" height="48" rx="12" fill="#75E8BE" stroke="#75E8BE" stroke-width="2"/>
+<text x="1034" y="1030" class="dark label">결과 상세</text>
+<text x="1222" y="1030" class="small">열람으로 보상 재지급 안 함</text>
+<rect x="28" y="1100" width="1544" height="56" rx="12" fill="#172634" stroke="#466070" stroke-width="2"/>
+<text x="48" y="1135" class="label">주행·UX 제한·신호 불명 → 게임 UI 숨김·사용 중지 / 주차·허용 후 사용자가 복귀하면 상태를 다시 조회</text>
+</svg>
