@@ -68,7 +68,20 @@ Maven 저장소 주소는 등록돼 있지만 앱에는 아직 Pleos Vehicle·�
 
 이 문서의 새 기준은 **문서 대조 완료 / 설정 변경 없음 / 새 빌드·앱 실행 미수행** 상태다. 아래 설치·부팅·실패 이력은 보존하며 새 버전 조합의 검증 근거로 대체하지 않는다.
 
-## 현재 상태
+## 권장 도구의 로컬 설치 확인
+
+2026-11-03 사용자 요청으로 권장 도구를 프로젝트의 `.local-tools`에 준비했다. 위 권장 기준 결정 당시의 미설치 기록과 구분한다. 제품의 Gradle 설정은 그대로이며 앱 구현·APK 빌드·Pleos 연동은 수행하지 않았다.
+
+| 항목 | 로컬 결과 |
+|---|---|
+| Gradle 8.11.1 | 공식 ZIP의 SHA-256 확인 후 `.local-tools/distributions/gradle-8.11.1`에 설치. Java 17.0.6으로 `--version` 실행 성공 |
+| Kotlin/KGP 2.2.21·AGP 8.10.1 | `.local-tools/toolchain-check`의 독립 확인용 Gradle 프로젝트에서 플러그인 다운로드·해석과 `help` 성공. 제품 앱의 컴파일·SDK 연동 검증은 아님 |
+| 기존 도구 | JDK 17.0.6, Android Platform 35·Build Tools 35.0.0·ADB 설치 유지. Pleos 이미지 재설치 없음 |
+| Android Studio Rabbit 2 | 공식 Mac ARM DMG SHA-256 일치, `.local-tools/ide/Android Studio.app`에 설치. 제품 정보 `AndroidStudio2026.2.2` 확인. 최초 복사본 서명 오류 후 원본 이미지 검사·속성 보존 재복사를 수행했고 최종 `codesign --verify --deep --strict` 통과. 보안 우회·재서명 없음. IDE 첫 실행·설정 마법사·프로젝트 열기는 미수행 |
+
+Gradle의 `--version`에 표시되는 내장 Kotlin 2.0.20은 Gradle 자체 스크립트용이며 앱에 사용하는 KGP 2.2.21과 다르다. 원래 프로젝트는 여전히 Kotlin 2.0.21·AGP 8.8.2·Wrapper 8.10.2를 가리킨다. 새 도구를 내려받은 것만으로 제품의 버전이 전환되지 않는다. 확인 로그는 `.local-tools/toolchain-check/verification.log`에 있고 로컬 도구·캐시는 Git 대상이 아니다.
+
+## 기존 설치 상태
 
 사용자가 **Android SDK와 Pleos/42dot 라이선스, 대용량 이미지 다운로드 및 설치를 명시적으로 승인**했다. Platform 35, Build Tools 35.0.0, Platform Tools, Command-line Tools, ARM64 에뮬레이터를 설치했다. Pleos 이미지의 크기·SHA-1 검증과 설치를 마쳤고, 전용 AVD의 부팅 완료 및 차량 서비스 실행을 확인했다.
 
