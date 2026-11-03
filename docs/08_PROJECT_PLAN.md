@@ -19,7 +19,7 @@
 | C | 호열 @hoyeol903 | 개별 보유 차량·도감·가챠·강화·수리·판매·폐차·보상 지급 규칙 | `core/.../garage`, `core/.../progression` |
 | D | 환석 @Yaho03 | 가게·화면·튜토리얼·꾸미기·결과·랭킹 화면·앱 연결 | `app/.../ui`, `app/.../navigation` |
 
-위 패키지는 생성 예정 영역이며 이미 파일이 있다는 뜻이 아니다. A–D의 기능 담당은 확정됐으며 이슈 생성 즉시 해당 계정을 할당한다. 교차 확인자는 #25에서 정한다. 다른 사람의 이름을 추측해 배정하지 않는다.
+위 패키지는 생성 예정 영역이며 이미 파일이 있다는 뜻이 아니다. A–D의 기능 담당은 확정됐으며 이슈 생성 즉시 해당 계정을 할당한다. 교차 검증자는 기능 연결성과 검토 건수 균형을 기준으로 각 구현 이슈에 지정한다. 다른 사람의 이름을 추측해 배정하지 않는다.
 
 | 공유 대상 | 책임·변경 방식 |
 |---|---|
@@ -43,7 +43,7 @@
 | #20 기존 코드 | 기존 엔진·디스크 저장 테스트·새 계약과 차이 | 새 렌터카 기능은 공통/기능 구현 및 #28에서 검증 |
 | #21 제출 | 공식 항목에 맞춘 제출 초안 | 실제 화면·APK·영상·서명·개인정보·최종 검증은 #29 |
 | #24 규칙 | PRD 결정 대기표·안전 사례·영향 기능 | 팀의 의미 결정, 시험 수치와 최종 경제 수치 확정 |
-| #25 분담 | A–D 책임·공유 파일·통합 순서 | 공통 기반 담당·교차 확인자·목표일 |
+| #25 분담 | A–D 책임·공유 파일·통합 순서 | 공통 기반 담당·목표일 |
 | #27 계약 | 단위·ID·레코드·명령·오류·원자성·대표 예제 | 구현용 타입/fixture·저장 기술 및 미정 정책 의존 구간 |
 
 문서 준비와 팀 합의를 구분한다. 미정의 영향과 다시 결정할 조건은 #24/#25에 남기며 이슈를 만들었다고 결정하거나 구현했다고 표시하지 않는다.
@@ -68,4 +68,22 @@ M0는 환경·조사, M1은 계약·기획·화면, M2는 기능 구현, M3는 �
 
 ## 기능과 구현 이슈 대응
 
-구현 이슈 생성·독립 검토 결과를 이 절에 연결한다. 미정 기능은 blocked 또는 후속 생성 조건으로 표시하며 제품에서 제외하지 않는다.
+구현 이슈는 OMX `plan`으로 분해하고 별도 Critic이 전체 본문을 PRD와 대조했다. 타입 계약의 구체화·실제 기능 연결 완료 조건을 보완했고 순환 의존·담당 매핑을 확인했다. 이는 AI 계획 검토이며 사람 승인·기능 구현 검증이 아니다. 미정 기능은 blocked 또는 후속 생성 조건으로 표시하며 제품에서 제외하지 않는다.
+
+| 파트·담당 | 상세 구현 이슈 |
+|---|---|
+| 공통 · 주 담당 지정 필요 | [#33 공통 모델·명령·오류 타입과 독립 개발 fixture 연결](https://github.com/Yaho03/drive-growth/issues/33) / [#34 단일 거래 원장·원자적 저장·복원과 재시도 처리](https://github.com/Yaho03/drive-growth/issues/34) / [#35 차량·게임 규칙 콘텐츠 로딩과 버전·참조 검증](https://github.com/Yaho03/drive-growth/issues/35) |
+| A · 정원 @jeongwonbahk | [#36 차량·모의 입력 정규화와 주행·주차 제한 상태 연결](https://github.com/Yaho03/drive-growth/issues/36) / [#37 목적지·거리 조건에 따른 수익·구매 탁송 후보 선택](https://github.com/Yaho03/drive-growth/issues/37) / [#38 탁송 목적지 1회 변경과 구매 취소·환급 처리](https://github.com/Yaho03/drive-growth/issues/38) / [#39 도착 근거·기본 주행 수익·탁송 완료의 중복 없는 정산](https://github.com/Yaho03/drive-growth/issues/39) / [#40 휴식 인정·다음 출발 버프와 조건부 음성 연결](https://github.com/Yaho03/drive-growth/issues/40) |
+| B · 경민 @rudals0414 | [#41 고객 요청 생성·차량 궁합과 대여 배정](https://github.com/Yaho03/drive-growth/issues/41) / [#42 대여 매출·가상 사고·리뷰·단골 결과 정산](https://github.com/Yaho03/drive-growth/issues/42) / [#43 종료 후 영업의 정상·감액·상한 구간 계산과 복원](https://github.com/Yaho03/drive-growth/issues/43) / [#44 가게 단계·차량 공간·부대시설 해금과 추가 수익](https://github.com/Yaho03/drive-growth/issues/44) / [#45 퀘스트·업적·경제 이벤트의 진행과 보상 처리](https://github.com/Yaho03/drive-growth/issues/45) |
+| C · 호열 @hoyeol903 | [#46 개별 보유 차량·대여 가능 조회와 도감 상태 관리](https://github.com/Yaho03/drive-growth/issues/46) / [#47 가챠 후보·추첨·보장 이력과 차량 지급 거래](https://github.com/Yaho03/drive-growth/issues/47) / [#48 차량 레벨·강화와 중복 차량 재료 소비](https://github.com/Yaho03/drive-growth/issues/48) / [#49 가상 사고 이력·수리 회복·중고 판매·폐차](https://github.com/Yaho03/drive-growth/issues/49) / [#50 초기 차량 선택·첫 보상의 1회 지급과 초기화 복원](https://github.com/Yaho03/drive-growth/issues/50) |
+| D · 환석 @Yaho03 | [#51 공통 앱 조립·탐색·주행 제한과 화면 상태 연결](https://github.com/Yaho03/drive-growth/issues/51) / [#52 가게 전체·보유 차량·도감과 차량 관리 화면 연결](https://github.com/Yaho03/drive-growth/issues/52) / [#53 목적지·탁송 선택·변경·취소 확인 화면 연결](https://github.com/Yaho03/drive-growth/issues/53) / [#54 미확인 정산·영업 결과·기록과 재실행 열람 연결](https://github.com/Yaho03/drive-growth/issues/54) / [#55 가게 확장·시설·꾸미기 미리보기와 적용 화면](https://github.com/Yaho03/drive-growth/issues/55) / [#56 첫 실행·초기 차량 선택·튜토리얼과 첫 성장 화면](https://github.com/Yaho03/drive-growth/issues/56) / [#57 퀘스트·업적·이벤트·휴식 상태와 보상 확인 화면](https://github.com/Yaho03/drive-growth/issues/57) / [#58 합의된 랭킹 지표·조회 경로와 비교 화면 연결](https://github.com/Yaho03/drive-growth/issues/58) |
+
+공통 #33 모델·fixture, #34 저장, #35 콘텐츠의 주 담당은 #25에서 지정한다. 이슈의 blocked는 기능 제외가 아니라 필요한 계약·정책·담당이 아직 충족되지 않았다는 뜻이다. #33의 해당 계약 코드가 준비되면 각 기능은 fake로 병렬 개발하고 실제 연결 조건을 충족한 뒤 완료한다.
+
+휴대폰 연동·친구 방문/선물·차량 꾸미기는 아직 세부 채택/범위 미정이다. #24/#25에서 결정하면 D가 연결 화면·동기화 요구를 정리하고 관련 파트의 후속 이슈를 만든다. 손님 서사·시즌은 제외하며 실제 구현 목록에 넣지 않는다.
+
+## 교차 검증 배정
+
+사용자 요청으로 실제 연결 기능을 우선하면서 총 26건을 정원 7건·경민 7건·호열 6건·환석 6건으로 나눴다. 개별 검증자의 기준 위치는 각 구현 이슈 본문이며 GitHub assignee는 구현 책임자다. 교차 검증자를 공동 구현자로 추가하지 않는다.
+
+구현자는 본인 검증 체크박스, 검증자는 PR 근거·대표 정상/실패 재현 후 교차 검증 체크박스를 완료한다. 공통 #33–#35는 구현 담당이 미정이라 교차 검증자 우선 배정이며, 구현자와 같아지면 다른 팀원으로 바꾸고 분배를 다시 확인한다. 건수 균형이 작업 난이도·시간의 동등함을 보장하지 않으므로 실제 부담이 몰리면 관련 기능 담당끼리 조정한다.
