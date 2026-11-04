@@ -135,6 +135,10 @@ APK는 `app/build/outputs/apk/debug/app-debug.apk`, 크기 2,564,962 bytes, SHA-
 
 NaviHelper의 SDK 값은 목적지·경로 이벤트와 연결해 검증한다. 0 단독으로 도착을 확정하지 않는다. 게임 카테고리의 주행 중 기록·음성 허용은 공개 안내에서 명시적으로 확인되지 않았고 실차 검증은 미수행이다. 기능별 권한·정책과 미지원 대안은 [차량 API 조사](contest/03_VEHICLE_API.md), 구현 경계는 [공통 계약](02_SYSTEM_ARCHITECTURE.md)을 따른다. [NaviHelper 이벤트 명세](https://document.pleos.ai/en/api-reference/connect-sdk-pleos/NaviHelper/event-listeners)
 
+### 플랫폼 검증 인계
+
+[#13](https://github.com/Yaho03/drive-growth/issues/13)은 위 에뮬레이터 실행 근거를 관리한다. [#80](https://github.com/Yaho03/drive-growth/issues/80)은 실제 내비 거리·도착 확인의 선행조건, [#81](https://github.com/Yaho03/drive-growth/issues/81)은 주행 중 기록·음성 등 해당 기능 활성화의 선행조건, [#82](https://github.com/Yaho03/drive-growth/issues/82)는 실차·실제 전원 전환 검증의 선행조건이다. 모의 입력과 뼈대 검증의 착수 조건은 진행 계획을 따른다.
+
 ## 제출 상태
 
 공식 일정·양식은 [공모전 자료](contest/README.md)를 따른다. 1차 접수 마감은 2026-11-15 23:59 KST이며, 앱 개발 산출물은 공식 필수 기획서와 별도로 준비한다.
