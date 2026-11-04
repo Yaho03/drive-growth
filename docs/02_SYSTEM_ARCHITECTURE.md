@@ -247,6 +247,20 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 구체 구현 인계: [공통 모델·fixture #33](https://github.com/Yaho03/drive-growth/issues/33), [원자적 저장 #34](https://github.com/Yaho03/drive-growth/issues/34), [콘텐츠 로딩 #35](https://github.com/Yaho03/drive-growth/issues/35). #27은 논리 계약과 담당 간 경계 확인을 추적하며 이 세 이슈의 코드 완료를 대신하지 않는다.
 
+### 차량 표본·화면 잠금·도착 증거 계약
+
+| 소비 작업 | 입력과 반환 기준 |
+|---|---|
+| #36 차량 입력 | `VehicleObservation`은 입력 출처, 동일 부팅 내 단조 수신 시각(ms), UTC Unix 수신 시각(ms), 속도(m/s), 기어와 UX 제한을 전달한다. 현재 AAOS 조회의 수신 시각은 센서 측정 시각과 구분한다. |
+| #51 화면 조립 | `Observation<VehicleInteraction>`을 받는다. `ALLOWED`일 때만 게임 조작을 열고, `RESTRICTED` 또는 `Missing`이면 제한을 유지한다. |
+| #37·#38·#39·#53 탁송 | 관측 이동 거리와 내비 예상 경로 거리에는 기존의 별도 거리 타입을 사용한다. 도착은 활성 경로의 앱 내부 `RouteId`, 입력 출처, UTC 수신 시각을 가진 `DeliveryArrivalEvidence`로 전달한다. |
+
+속도·기어·UX는 각각 `Observation`으로 전달한다. 미수신, 권한 거부, 미지원, 오래된 값은 각각 `NO_DATA`, `PERMISSION_DENIED`, `UNSUPPORTED`, `STALE`이다. 누락을 속도 0이나 제한 해제로 치환하지 않는다. 주차 후보는 차량 출처, 유한한 정차 범위 속도, P, UX 허용을 모두 요구한다. #36에서 시각 유효성·연속 관측을 확인한 후 화면 상태를 결정한다. 허용 속도 오차와 시간 기준은 소비자가 정책을 명시해 전달한다.
+
+경로 재선택·재탐색마다 새 `RouteId`를 발급한다. 같은 활성 경로와 예상 출처에 연결할 수 있는 도착 콜백만 정산에 전달한다. 정차·P·거리 0·조회 성공만으로 도착을 만들지 않는다. SDK 거리 단위나 경로 연결 근거가 없으면 예상 거리를 `Missing`으로 유지하고, 도착을 확인할 수 없는 의뢰는 보상을 확정하지 않는다. 최종 정산의 중복 방지는 기존 거래 요청 ID와 단일 원장 경계를 따른다. [#13 실행 근거](https://github.com/Yaho03/drive-growth/issues/13)
+
+#34·#35의 기존 거래·콘텐츠 타입, 저장 형식과 식별값은 유지한다. 실제 어댑터와 화면 연결은 #36·#51에서 검증하고, #62는 거래·콘텐츠 뼈대와 기존 소비 경계를 검증한다. 플랫폼 지원과 정책 확인은 #13·#24에서 추적한다.
+
 ### 거래 원장 영속 저장
 
 #34의 첫 영속 어댑터는 앱 내부의 SQLite 데이터베이스 하나를 `SQLiteOpenHelper`로 관리한다. 초기 스키마는 v1이다. Android 기본 API로 잔액·보유 차량·거래 결과를 한 트랜잭션에서 확정하고, 요청 ID의 유일성을 DB에서 강제한다. 기존 `SnapshotStore`는 출처별 주행 기록과 경험치를 한 파일로 저장한다. `AtomicFile`의 파일 교체는 해당 용도에 적합하며, 거래 원장에 그대로 적용하면 중복 키·동시 갱신 규칙을 직접 구현해야 한다. 기존 파일은 유지하고 과거 경험치를 게임머니로 변환하지 않는다. [SQLiteDatabase](https://developer.android.com/reference/android/database/sqlite/SQLiteDatabase), [SQLiteOpenHelper](https://developer.android.com/reference/android/database/sqlite/SQLiteOpenHelper), [AtomicFile](https://developer.android.com/reference/android/util/AtomicFile)
