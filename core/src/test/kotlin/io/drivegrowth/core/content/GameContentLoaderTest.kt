@@ -84,6 +84,32 @@ class GameContentLoaderTest {
         assertEquals(5, snapshot.unlockedAt(2).size)
     }
 
+    @Test fun `보장 기준을 RARE 아래로 내리면 거절한다`() {
+        rejected(content = contentWith("gacha_guaranteed_from=RARE", "gacha_guaranteed_from=ADVANCED"))
+        // 리뷰 재현: 보장 기준과 그랜저를 모두 ADVANCED로 내려 1레벨에 희귀 이상이 없는 경우
+        rejected(content = contentWith("gacha_guaranteed_from=RARE", "gacha_guaranteed_from=ADVANCED")
+            .replace("25000,RARE", "25000,ADVANCED"))
+    }
+
+    @Test fun `첫 레벨의 보장 후보가 가중치 0이면 거절한다`() {
+        // 리뷰 재현: 1레벨 RARE는 가중치 0, 가중치가 있는 LEGEND는 2레벨에서만 해금
+        val reason = rejected(content = contentWith("RARE:50,LEGEND:3", "RARE:0,LEGEND:53"))
+        assertTrue(reason.contains("가중치"))
+    }
+
+    @Test fun `검증된 스냅샷의 목록과 확률은 외부에서 바꿀 수 없다`() {
+        val load = GameContentLoader.load(facts, content)
+        val snapshot = (load as ContentLoad.Loaded).snapshot
+        val before = snapshot.copy()
+        assertThrows(UnsupportedOperationException::class.java) { (snapshot.vehicles as MutableList<*>).clear() }
+        assertThrows(UnsupportedOperationException::class.java) { (snapshot.catalog.vehicles as MutableList<*>).clear() }
+        assertThrows(UnsupportedOperationException::class.java) { (snapshot.gacha.weights as MutableMap<*, *>).clear() }
+        assertEquals(before, snapshot)
+        assertEquals(5, snapshot.vehicles.size)
+        assertEquals(1000, snapshot.gacha.weights.values.sum())
+        assertEquals(5, (load.asVehicleCatalog().load() as ContractResult.Success).value.vehicles.size)
+    }
+
     @Test fun `메타·머리·형식 오류는 기본값 없이 거절한다`() {
         rejected(content = contentWith("# trial=true\n", ""))                         // 메타 누락
         rejected(content = contentWith("# trial=true", "# trial=yes"))

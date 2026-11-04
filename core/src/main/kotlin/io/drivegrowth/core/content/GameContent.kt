@@ -11,6 +11,8 @@ import io.drivegrowth.core.contract.VehicleDefinition
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.progression.GachaRules
 import io.drivegrowth.core.progression.Rarity
+import java.util.Collections
+import java.util.EnumMap
 
 // 차량 사실(vehicles.csv)과 별도로 관리하는 게임용 값. 실제 판매가·실차 능력치가 아니다.
 data class VehicleGameData(
@@ -121,20 +123,23 @@ object GameContentLoader {
 
         val gacha = GachaRules(parseWeights(meta.getValue("gacha_weights")), meta.getValue("gacha_pity").toInt(),
             Rarity.valueOf(meta.getValue("gacha_guaranteed_from")))
-        // 가챠가 열리는 첫 레벨부터 보장 대상 차량이 있어야 이후 모든 레벨에서도 있다(해금은 줄지 않음).
+        // PRD: 보장은 희귀 이상. 기준을 그 아래로 내리는 콘텐츠는 거절한다.
+        require(gacha.guaranteedFrom >= Rarity.RARE) { "보장 희귀도는 RARE 이상" }
+        // 가챠가 열리는 첫 레벨부터 실제로 뽑힐 수 있는(가중치 > 0) 보장 대상 차량이 있어야
+        // 이후 모든 레벨에서도 있다(해금은 줄지 않음).
         val firstLevel = vehicles.minOf { it.unlockShopLevel }
-        require(vehicles.any { it.rarity >= gacha.guaranteedFrom && it.unlockShopLevel == firstLevel }) {
-            "가게 레벨 $firstLevel 에 해금된 ${gacha.guaranteedFrom} 이상 차량이 없음"
-        }
+        require(vehicles.any {
+            it.unlockShopLevel == firstLevel && it.rarity >= gacha.guaranteedFrom && (gacha.weights[it.rarity] ?: 0) > 0
+        }) { "가게 레벨 $firstLevel 에 해금되고 가중치가 양수인 ${gacha.guaranteedFrom} 이상 차량이 없음" }
 
         return GameContentSnapshot(
             catalog = VehicleCatalogSnapshot(
                 ContentVersion(meta.getValue("content_version")),
-                vehicles.map { VehicleDefinition(it.vehicleId, facts.getValue(it.vehicleId)) },
+                vehicles.map { VehicleDefinition(it.vehicleId, facts.getValue(it.vehicleId)) }.frozen(),
             ),
             ruleVersion = RuleVersion(meta.getValue("rule_version")),
             trial = meta.getValue("trial").toBooleanStrict(),
-            vehicles = vehicles,
+            vehicles = vehicles.frozen(),
             gacha = gacha,
         )
     }
@@ -146,6 +151,9 @@ object GameContentLoader {
         }
         require(weights.keys == Rarity.entries.toSet() && weights.size == text.split(',').size) { "희귀도마다 가중치 하나씩 필요" }
         require(weights.values.all { it >= 0 } && weights.values.sumOf { it.toLong() } == 1000L) { "가중치는 0 이상, 합 1000(천분율)" }
-        return weights
+        return Collections.unmodifiableMap(EnumMap(weights))
     }
+
+    // 검증 후 Java 호출자가 목록을 바꿔 확률·후보가 달라지지 않도록 복사본을 읽기 전용으로 감싼다.
+    private fun <T> List<T>.frozen(): List<T> = Collections.unmodifiableList(ArrayList(this))
 }

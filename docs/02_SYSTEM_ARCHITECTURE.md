@@ -248,9 +248,9 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 - 사실 CSV에 없는 ID 또는 중복 ID
 - 0 이하·비정수 금액
 - 확률 합 오류
-- 첫 해금 레벨에 보장 희귀도 차량이 없음
+- 보장 희귀도가 RARE 미만이거나, 첫 해금 레벨에 가중치가 양수인 보장 대상 차량이 없음
 
-성공 시 `GameContentSnapshot`을 돌려주고, `asVehicleCatalog()`로 위 `VehicleCatalog` 계약을 제공한다. 시험 입력은 testFixtures의 `GameContentFixtures`다. 실제 게임용 가격표와 가게 레벨별 해금표는 PRD 결정 대기다.
+성공 시 읽기 전용 목록·확률을 가진 `GameContentSnapshot`을 돌려주고, `asVehicleCatalog()`로 위 `VehicleCatalog` 계약을 제공한다. 시험 입력은 testFixtures의 `GameContentFixtures`다. 실제 게임용 가격표와 가게 레벨별 해금표는 PRD 결정 대기다.
 
 이 첫 버전은 한 요청에서 재화 변화와 보유 개체 한 대의 변경을 표현한다. 다중 개체 소비, 의뢰·대여·시간 구간·열람 상태의 거래 모델은 후속 계약 범위다. 메모리 fixture는 그 정책이나 실제 저장을 대체하지 않는다.
 
