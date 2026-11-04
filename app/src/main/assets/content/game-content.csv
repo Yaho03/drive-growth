@@ -1,0 +1,12 @@
+# content_version=fixture-content-v0
+# rule_version=fixture-rule-v0
+# trial=true
+# gacha_weights=COMMON:747,ADVANCED:200,RARE:50,LEGEND:3
+# gacha_pity=30
+# gacha_guaranteed_from=RARE
+vehicle_id,game_price,rarity,unlock_shop_level
+hyundai_casper,8000,COMMON,1
+hyundai_avante,10000,COMMON,1
+hyundai_sonata,15000,ADVANCED,1
+hyundai_grandeur,25000,RARE,1
+genesis_g90,60000,LEGEND,2
