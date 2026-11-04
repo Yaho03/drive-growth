@@ -105,6 +105,23 @@ APK는 `app/build/outputs/apk/debug/app-debug.apk`, 크기 2,564,962 bytes, SHA-
 
 시험 전 Virtual Console 입력과 앱 데이터의 대응을 확인한다. 크루즈 목표 속도를 실제 차량 속도로 사용하지 않으며, SDK 초기화 메시지만으로 연결·콜백 수신·값 반영을 통과시키지 않는다. 상세 해석은 [공식 시험 자료](contest/04_OFFICIAL_RESOURCES.md) 6절을 따른다.
 
+## #13 차량 입력 실행 검증
+
+2026-11-04, Pleos Connect Emulator 2.1.0 / API 34와 Virtual Console을 사용했다. 기준은 `main` 커밋 `ccea6e0`이다. Debug APK SHA-256은 `d66491ba119a105d953194c231fa30e49aae20cf8862ab3cf03edd42f22db997`이며, 설치된 APK와 일치했다. 앱의 수신 값을 보기 위한 진단 빌드는 `VehicleInput`에 로그만 추가해 별도로 실행했다. [#13 검증 기록](https://github.com/Yaho03/drive-growth/issues/13)
+
+| 실행 조건 | 확인한 결과 |
+|---|---|
+| 기준 APK에서 D·0 km/h → P | D에서 `DO=true`, `UxR=80`, 게임 메뉴 숨김과 조작 잠금 안내를 확인했다. P 복귀 후 `DO=false`, `UxR=0`, 홈·차고·기록 메뉴가 다시 표시됐다. |
+| 차량 신호 엔진 단위 시험 | `./gradlew :core:test --tests '*DriveEngineTest' :app:assembleDebug` 성공. 테스트 13개에서 D 정차·신호 누락 무정산, P와 조작 허용이 이어진 뒤 1회 정산 등을 확인했다. |
+| 활성 사용자에서 속도 권한 철회 | 진단 빌드에서 권한 없음 경로를 6회 연속 확인했다. 이 경로는 속도·UX 누락, 기어 UNKNOWN, 무효 표본을 전달한다. 시스템 권한 대화상자 종료 후의 앱 화면은 미확인이다. 시험 뒤 속도 권한을 복원했다. |
+| 다른 Pleos 화면이 전면인 동안 P → D·0 km/h | 같은 앱 프로세스에서 기어 변경을 읽고 D 표본 11개를 약 1초 간격으로 수신했다. |
+| Virtual Console에서 D → 가속 → 제동 → P | 콘솔 속도 61 km/h, 앱 유효 속도 표본 3.33–17.50 m/s, 주차 후 차량 출처 기록 1건(101.17 m, 14.35초, 경험치 0)을 확인했다. 시험 도중 Pleos DrivingView와 앱 사이에서 전면 창이 바뀌었다. 전체 이동 구간의 백그라운드 수신은 별도로 확인해야 한다. |
+| 앱 응답 지연 | 진단 시작 중 ANR을 관측했다. AVD 재시작 후 위 신호 수신을 재현했으며 ANR 원인과 장시간 안정성은 미확인이다. |
+
+차량 속도와 기어는 Android Automotive `CarPropertyManager`, 조작 제한은 `CarUxRestrictionsManager`에서 읽는다. 앱의 표본 시각은 수신 시각이다. 실제 차량 도착은 주차와 별개이며, NaviHelper의 목적지·경로 상태 API는 문서에서 확인했다. 현재 앱의 NaviHelper 연결과 예상 거리·도착 이벤트 수신은 미검증이다. [Pleos 속도 조회 FAQ](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/vehicle-app-faq#클러스터-속도-조회-방법), [NaviHelper API](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/NaviHelper/navi-helper/ai.pleos.playground.navi.helper/navi-helper/entry)
+
+게임 카테고리의 주행 중 기록·음성 허용, IGN OFF/Suspend, 실차 동작은 별도 근거와 시험이 필요하다. #36·#51·#63은 D 정차와 P 복귀의 실행 결과를 사용할 수 있다. #24·#27에서는 주차 판정과 탁송 도착 근거를 별도 상태로 처리한다.
+
 ## 제출 상태
 
 공식 일정·양식은 [공모전 자료](contest/README.md)를 따른다. 1차 접수 마감은 2026-11-15 23:59 KST이며, 앱 개발 산출물은 공식 필수 기획서와 별도로 준비한다.
