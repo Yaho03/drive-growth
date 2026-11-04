@@ -68,7 +68,7 @@ M0는 환경·조사, M1은 계약·기획·화면, M2는 기능 구현, M3는 �
 
 ## 기능과 구현 이슈 대응
 
-구현 이슈는 OMX `plan`으로 분해하고 별도 Critic이 전체 본문을 PRD와 대조했다. 타입 계약의 구체화·실제 기능 연결 완료 조건을 보완했고 순환 의존·담당 매핑을 확인했다. 이는 AI 계획 검토이며 사람 승인·기능 구현 검증이 아니다. 미정 기능은 blocked 또는 후속 생성 조건으로 표시하며 제품에서 제외하지 않는다.
+구현 이슈는 OMX `plan`으로 분해하고 별도 Critic이 전체 본문을 PRD와 대조했다. 타입 계약의 구체화·실제 기능 연결 완료 조건을 보완했고 순환 의존·담당 매핑을 확인했다. 이는 AI 계획 검토이며 사람 승인·기능 구현 검증이 아니다. 미정 기능은 구현 이슈의 시작 조건 또는 후속 생성 조건에 표시한다.
 
 | 파트·담당 | 상세 구현 이슈 |
 |---|---|
@@ -78,13 +78,13 @@ M0는 환경·조사, M1은 계약·기획·화면, M2는 기능 구현, M3는 �
 | C · 호열 @hoyeol903 | [#46 개별 보유 차량·대여 가능 조회와 도감 상태 관리](https://github.com/Yaho03/drive-growth/issues/46) / [#47 가챠 후보·추첨·보장 이력과 차량 지급 거래](https://github.com/Yaho03/drive-growth/issues/47) / [#48 차량 레벨·강화와 중복 차량 재료 소비](https://github.com/Yaho03/drive-growth/issues/48) / [#49 가상 사고 이력·수리 회복·중고 판매·폐차](https://github.com/Yaho03/drive-growth/issues/49) / [#50 초기 차량 선택·첫 보상의 1회 지급과 초기화 복원](https://github.com/Yaho03/drive-growth/issues/50) |
 | D · 환석 @Yaho03 | [#51 공통 앱 조립·탐색·주행 제한과 화면 상태 연결](https://github.com/Yaho03/drive-growth/issues/51) / [#52 가게 전체·보유 차량·도감과 차량 관리 화면 연결](https://github.com/Yaho03/drive-growth/issues/52) / [#53 목적지·탁송 선택·변경·취소 확인 화면 연결](https://github.com/Yaho03/drive-growth/issues/53) / [#54 미확인 정산·영업 결과·기록과 재실행 열람 연결](https://github.com/Yaho03/drive-growth/issues/54) / [#55 가게 확장·시설·꾸미기 미리보기와 적용 화면](https://github.com/Yaho03/drive-growth/issues/55) / [#56 첫 실행·초기 차량 선택·튜토리얼과 첫 성장 화면](https://github.com/Yaho03/drive-growth/issues/56) / [#57 퀘스트·업적·이벤트·휴식 상태와 보상 확인 화면](https://github.com/Yaho03/drive-growth/issues/57) / [#58 합의된 랭킹 지표·조회 경로와 비교 화면 연결](https://github.com/Yaho03/drive-growth/issues/58) |
 
-공통 #33 모델·fixture는 환석, #34 저장은 경민, #35 콘텐츠는 호열이 맡는다. 이슈의 blocked는 기능 제외가 아니라 필요한 계약·정책·담당이 아직 충족되지 않았다는 뜻이다. #33의 해당 계약 코드가 준비되면 각 기능은 fake로 병렬 개발하고 실제 연결 조건을 충족한 뒤 완료한다.
+공통 #33 모델·fixture는 환석, #34 저장은 경민, #35 콘텐츠는 호열이 맡는다. 구현 이슈의 대기는 GitHub의 Blocked by와 본문의 시작 조건에서 확인한다. 착수할 수 있으면 ready를 붙인다. 묶음·통합 검증은 빌드와 검증 근거가 준비될 때까지 blocked 라벨로 표시한다. #33의 해당 계약 코드가 준비되면 각 기능은 fake로 병렬 개발하고 실제 연결 조건을 충족한 뒤 완료한다.
 
 휴대폰 연동·친구 방문/선물·차량 꾸미기는 아직 세부 채택/범위 미정이다. #24/#25에서 결정하면 D가 연결 화면·동기화 요구를 정리하고 관련 파트의 후속 이슈를 만든다. 손님 서사·시즌은 제외하며 실제 구현 목록에 넣지 않는다.
 
 ## 교차 검증 배정
 
-개별 범위의 교차 검증자는 구현 이슈 본문과 `reviewer:계정` 라벨에 표시한다. Assignee는 구현 담당이며, 묶음 검증 이슈의 Assignee는 결과 취합 담당이다. 취합 담당도 본인 구현 범위는 다른 검증자에게 넘긴다. 본인 검증과 교차 검증의 완료 처리 기준은 [CONTRIBUTING.md](../CONTRIBUTING.md#구현-이슈의-검증-책임)를 따른다.
+개별 범위의 교차 검증자는 묶음 검증 이슈의 분담표와 연결된 구현 이슈 본문에서 확인한다. Assignee는 구현 담당이며, 묶음 검증 이슈의 Assignee는 결과 취합 담당이다. 취합 담당도 본인 구현 범위는 다른 검증자에게 넘긴다. 본인 검증과 교차 검증의 완료 처리 기준은 [CONTRIBUTING.md](../CONTRIBUTING.md#구현-이슈의-검증-책임)를 따른다.
 
 
 ## 기능 묶음별 교차 검증
