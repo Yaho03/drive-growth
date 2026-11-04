@@ -123,6 +123,18 @@ APK는 `app/build/outputs/apk/debug/app-debug.apk`, 크기 2,564,962 bytes, SHA-
 
 게임 카테고리의 주행 중 기록·음성 허용, IGN OFF/Suspend, 실차 동작은 별도 근거와 시험이 필요하다. #36·#51·#63은 D 정차와 P 복귀의 실행 결과를 사용할 수 있다. #24·#27에서는 주차 판정과 탁송 도착 근거를 별도 상태로 처리한다.
 
+### 추가 재현과 플랫폼 한계
+
+| 시험 | 확인한 결과 |
+|---|---|
+| 기준 APK에서 속도 권한 철회 | 권한 없음과 조작 잠금 안내가 표시됐다. 활성 사용자 권한과 플래그를 시험 전 상태로 복원했다. |
+| 다른 Pleos 화면을 앞에 둔 상태에서 이동 | 진단 APK에서 1.39–17.22 m/s, 차량 출처 95.59 m 신규 기록을 확인했다. 샘플링한 창 포커스에서 게임이 전면으로 관측되지 않았다. 모든 화면 전환 순간을 연속 캡처하지는 않았다. |
+| 이동 중 기준 APK 강제 종료·재실행 | 저장된 6.02 m가 같은 ID의 중단 기록 1건으로 복원됐고 경험치 지급은 0이었다. |
+| AVD의 차량 전원 Suspend 모사·Resume | `cmd car_service suspend --simulate` → `SUSPEND(4)`, `cmd car_service resume` → `ON(1)`을 확인했다. P에 있던 기준 APK의 기존 기록 3건과 경험치가 유지됐다. 실제 IGN OFF와 이동 중 신호 전달은 별도 시험이다. |
+| 별도 NaviHelper 3.0.5 진단 APK | 서비스 연결 및 `NAVI_ROUTE`·`NAVI_ROUTE_SEARCH` 부여, 목적지·경로 상태 콜백을 확인했다. 공식 예시 목적지 경로 요청 뒤 `remainDistance` 원값은 0에서 50으로 바뀌었다. SDK 단위·거리 정확도는 미확인이다. 동일 목적지 GPS 주입을 시도했으나, 관측 구간에 `onDestinationArrived`가 없었다. |
+
+NaviHelper의 SDK 값은 목적지·경로 이벤트와 연결해 검증한다. 0 단독으로 도착을 확정하지 않는다. 게임 카테고리의 주행 중 기록·음성 허용은 공개 안내에서 명시적으로 확인되지 않았고 실차 검증은 미수행이다. 기능별 권한·정책과 미지원 대안은 [차량 API 조사](contest/03_VEHICLE_API.md), 구현 경계는 [공통 계약](02_SYSTEM_ARCHITECTURE.md)을 따른다. [NaviHelper 이벤트 명세](https://document.pleos.ai/en/api-reference/connect-sdk-pleos/NaviHelper/event-listeners)
+
 ## 제출 상태
 
 공식 일정·양식은 [공모전 자료](contest/README.md)를 따른다. 1차 접수 마감은 2026-11-15 23:59 KST이며, 앱 개발 산출물은 공식 필수 기획서와 별도로 준비한다.
