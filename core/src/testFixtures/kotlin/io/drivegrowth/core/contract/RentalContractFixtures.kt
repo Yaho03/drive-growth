@@ -1,5 +1,6 @@
 package io.drivegrowth.core.contract
 
+import io.drivegrowth.core.Gear
 import kotlin.random.Random
 
 object RentalContractFixtures {
@@ -11,6 +12,15 @@ object RentalContractFixtures {
     val secondVehicle = firstVehicle.copy(ownedVehicleId = OwnedVehicleId("v2"))
 
     fun random() = Random(33)
+
+    fun parkedVehicle() = VehicleObservation(
+        source = InputSource.VEHICLE,
+        receivedElapsedMs = 100,
+        receivedAt = time,
+        speedMps = Observation.Available(0.0),
+        gear = Observation.Available(Gear.PARK),
+        uxRestricted = Observation.Available(false),
+    )
 
     fun distanceInput() = DeliveryDistanceInput(
         observed = Observation.Available(ObservedDistance(30_000, InputSource.VEHICLE)),
