@@ -101,7 +101,7 @@ APK는 `app/build/outputs/apk/debug/app-debug.apk`, 크기 2,564,962 bytes, SHA-
 | 허용된 음성 재생 중 포커스 거부·상실, 통화·Gleo·안내 개입 | 현재 오디오 정책에 맞게 재생·중단·음량 처리. 승인되지 않은 우선순위로 강제 출력하지 않음. Speech Service와 앱의 처리 책임·이벤트·실제 소리를 대조 |
 | 기록·음성 사용 중 IGN OFF/Suspend → Resume | 앱 숨김과 구분해 기록 전달·중단 구간 확인. 일반 오디오 중단·포커스 반납, Suspend 중 새 재생 없음. Resume 후 현재 허용 상태를 확인하고 누락 구간을 정상 데이터로 채우지 않음 |
 
-정책 문의는 [차량 자료 6.1절](contest/03_VEHICLE_API.md), 음성별 판단은 [개발 자료 9.1절](contest/02_PLEOS_DEVELOPMENT.md)을 따른다. 위 추가 시나리오는 실행하지 않았다. 공식 답변·정책 적합성과 에뮬레이터의 기술적 동작을 별도 증거로 남긴다.
+정책 문의는 [차량 자료 6.1절](contest/03_VEHICLE_API.md), 음성별 판단은 [개발 자료 9.1절](contest/02_PLEOS_DEVELOPMENT.md)을 따른다. 계획 이후 실행한 범위는 [#13 차량 입력 실행 검증](#13-차량-입력-실행-검증)에 기록한다. 공식 답변·정책 적합성과 에뮬레이터의 기술적 동작을 별도 증거로 남긴다.
 
 시험 전 Virtual Console 입력과 앱 데이터의 대응을 확인한다. 크루즈 목표 속도를 실제 차량 속도로 사용하지 않으며, SDK 초기화 메시지만으로 연결·콜백 수신·값 반영을 통과시키지 않는다. 상세 해석은 [공식 시험 자료](contest/04_OFFICIAL_RESOURCES.md) 6절을 따른다.
 
@@ -116,6 +116,7 @@ APK는 `app/build/outputs/apk/debug/app-debug.apk`, 크기 2,564,962 bytes, SHA-
 | 활성 사용자에서 속도 권한 철회 | 진단 빌드에서 권한 없음 경로를 6회 연속 확인했다. 이 경로는 속도·UX 누락, 기어 UNKNOWN, 무효 표본을 전달한다. 시스템 권한 대화상자 종료 후의 앱 화면은 미확인이다. 시험 뒤 속도 권한을 복원했다. |
 | 다른 Pleos 화면이 전면인 동안 P → D·0 km/h | 같은 앱 프로세스에서 기어 변경을 읽고 D 표본 11개를 약 1초 간격으로 수신했다. |
 | Virtual Console에서 D → 가속 → 제동 → P | 콘솔 속도 61 km/h, 앱 유효 속도 표본 3.33–17.50 m/s, 주차 후 차량 출처 기록 1건(101.17 m, 14.35초, 경험치 0)을 확인했다. 시험 도중 Pleos DrivingView와 앱 사이에서 전면 창이 바뀌었다. 전체 이동 구간의 백그라운드 수신은 별도로 확인해야 한다. |
+| 기록 완료 후 기준 APK로 재실행 | 진단 APK를 기준 APK로 교체하고 앱을 강제 종료한 뒤 실행했다. 저장된 101.17 m 기록 1건과 경험치 0을 다시 읽었다. |
 | 앱 응답 지연 | 진단 시작 중 ANR을 관측했다. AVD 재시작 후 위 신호 수신을 재현했으며 ANR 원인과 장시간 안정성은 미확인이다. |
 
 차량 속도와 기어는 Android Automotive `CarPropertyManager`, 조작 제한은 `CarUxRestrictionsManager`에서 읽는다. 앱의 표본 시각은 수신 시각이다. 실제 차량 도착은 주차와 별개이며, NaviHelper의 목적지·경로 상태 API는 문서에서 확인했다. 현재 앱의 NaviHelper 연결과 예상 거리·도착 이벤트 수신은 미검증이다. [Pleos 속도 조회 FAQ](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/vehicle-app-faq#클러스터-속도-조회-방법), [NaviHelper API](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/NaviHelper/navi-helper/ai.pleos.playground.navi.helper/navi-helper/entry)
