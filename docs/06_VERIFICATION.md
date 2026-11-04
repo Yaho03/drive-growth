@@ -238,3 +238,31 @@ Pleos API 34 기준 APK와 시험 환경이 필요하다. 이전 실행 결과�
 ## 공통 소스 최초 CI 확인
 
 PR #32 최초 Android CI는 앱 컴파일 전 `setup-android@v3`의 기본 `tools` 패키지를 찾지 못해 실패했다. 액션의 공식 `packages` 입력으로 필요한 `platform-tools`만 요청하도록 수정했다. API35·Build Tools35 설치 및 실제 Gradle 검사는 그대로 유지하며 실패를 생략 처리하지 않는다. [액션 입력 근거](https://github.com/android-actions/setup-android/blob/v3/action.yml). 재실행 결과는 PR 검사에서 확인한다.
+
+
+## #34 거래 원장 SQLite v1 본인 검증 (2026-11-04, 경민 작업 환경)
+
+`SqliteGameChangeStore`를 공통 `GameChangeStore` 계약의 영속 어댑터로 추가했다. 앱 조립·화면·렌트 계산에 연결하기 전의 저장 기반 검증이며, #34 전체 종료나 #62 교차 검증 완료를 의미하지 않는다. 별도 메모리 원장을 제품에 추가하지 않고 #33 fixture와 같은 계약을 소비한다.
+
+- 환경: macOS arm64, Temurin JDK 17.0.21, 프로젝트 Gradle 8.11.1·API 35·Build Tools 35.0.0, Pleos Connect 2.1.0 / Android 14 / `emulator-5554`.
+- 기본 검사: `:core:test :app:assembleDebug :app:lintDebug`, 핵심 테스트 39개 실패 0, APK 빌드·Lint 성공.
+- 기기 검사: `:app:connectedDebugAndroidTest`, 총 20개 실패 0(기존 SnapshotStore 8개 + 새 거래 원장 12개).
+- 저장소 검사: `python3 scripts/check_repository.py`, 필수 파일 19개·문서 20개·로컬 링크 150개 통과. `git diff --check` 통과.
+
+| 입력·시험 | 기대·실제 결과 |
+|---|---|
+| r1에 100 지급, 반복·DB 재개방, 같은 r1에 200 지급 | 원래 정산 ID·시각·잔액 100 반환, 결과 한 개, 다른 명령은 충돌 |
+| 종류·규칙 버전·금액 생략·차량 변경으로 요청 ID 재사용 | 모든 변형 거절, 명령 전체 비교 |
+| 두 DB 연결에서 같은 요청 동시 전달 | 두 응답의 정산 일치, 지급 100·결과 한 개 |
+| 같은 차량 revision의 갱신·판매 동시 요청 | 하나만 성공, 다른 하나 충돌, 잔액·차량·정산 함께 확정 |
+| 잔액·차량·결과 INSERT 후 COMMIT 이전 SQLite 예외 주입 | 재개방 시 잔액 0·차량/결과 없음, 같은 요청 재시도 성공 |
+| COMMIT 결과를 사용하지 않고 닫은 뒤 재시도 | 원래 결과를 반환하고 중복 지급 없음(응답 유실 모사) |
+| 재화 부족·Long 오버플로·없는 차량·중복 차량 ID | 실패, 부분 차감·부분 개체 생성 없음 |
+| 차량만 추가, 이후 차감과 판매, 재개방 | 잔액 150·revision 1 유지, 보유 목록에서 판매 차량 제외 |
+| 결과 반복 조회·열람 처리·재개방 | 잔액 불변, 열람 상태만 유지, 없는 정산은 DATA_UNAVAILABLE |
+| 실제/모의 출처를 같은 DB 또는 명령으로 혼용 | 거절, 원래 원장 유지 |
+| 미래 스키마 99·알 수 없는 버전 0·손상 파일 | STORAGE_FAILURE, 파일 바이트 보존, 자동 초기화·삭제 없음 |
+
+한글 프로젝트 경로의 기본 빌드에서는 core 타입을 소비 모듈이 찾지 못했다. 같은 소스를 영문 산출물 경로로 설정하면 통과했다. 이번 검사는 로컬 전용 init script에서 모든 프로젝트의 `layout.buildDirectory`를 `/tmp/drive-growth-build/<project.name>`으로 지정하고 JDK 17로 실행했다. 재현 시 같은 내용의 init script를 만든 뒤 `./gradlew -I <init-script> :core:test :app:assembleDebug :app:lintDebug :app:connectedDebugAndroidTest`를 사용한다. init script·SDK 경로·IDE가 추가한 `gradle.properties` 변경·임시 로그/산출물은 게시하지 않는다. 일반 영문 경로에서는 저장소 기본 명령을 사용하며, Android Studio의 한글 경로 일반 빌드 문제는 해결됐다고 표시하지 않는다.
+
+미검증·인계: 위 실패 시험은 DB 연결 재개방·예외 주입이며 OS 강제 종료/전원 차단·실제 디스크 용량 부족·실차 시험이 아니다. 지원하는 이전 스키마가 없으므로 자동 이전·자동 백업은 미제공이며 수동 원본 보존 정책을 구조 문서에 기록했다. 다중 차량 소비·의뢰·대여·시간 구간·재추첨 방지 상태는 v0 계약 밖이다. D의 공통 앱 조립과 결과 화면 연결, #62에서 지정된 다른 팀원의 교차 검증이 남아 있다. #34 체크박스나 후속 차단 관계를 본인 시험만으로 일괄 완료 처리하지 않는다.
