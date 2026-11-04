@@ -1,5 +1,16 @@
 # 드라이브 키우기
 
+## 팀 작업 현황 (임시)
+
+| 담당 | 지금 할 일 | 막고 있는 이슈 | 해제 조건 |
+|---|---|---|---|
+| 정원 | [#36 차량 입력·조작 제한](https://github.com/Yaho03/drive-growth/issues/36) | 없음 | 조작 허용·제한·확인 불가 상태를 #51에 인계 |
+| 환석 | [#51 화면 시험](https://github.com/Yaho03/drive-growth/issues/51) | 정원 #36 (최종 연동) | #36 신호를 받으면 #51에 연결 |
+| 호열 | 대기 | 정원 [#63](https://github.com/Yaho03/drive-growth/issues/63), 전원 [#24](https://github.com/Yaho03/drive-growth/issues/24) | #63 주행 제한 검증 통과 → [#46 보유 차량 조회](https://github.com/Yaho03/drive-growth/issues/46). #24 차량별 게임 값 확정 → [#35 콘텐츠 표](https://github.com/Yaho03/drive-growth/issues/35) |
+| 경민 | 대기 | 호열 #46, 호열 [#64](https://github.com/Yaho03/drive-growth/issues/64) | #46 차량 조회 인계 → [#71 조회 검증](https://github.com/Yaho03/drive-growth/issues/71). #46 조회와 #64 탁송 검증 완료 → [#41 대여 배정](https://github.com/Yaho03/drive-growth/issues/41) |
+
+이슈를 완료로 닫을 때 이 표의 관련 행도 갱신한다. 팀 구현이 끝나면 이 섹션을 삭제한다.
+
 평소 이동을 탁송·차량 영입으로 연결하고, 주차 후 차량을 모으고 렌터카 가게를 확장하는 Pleos Connect 차량용 게임을 기획하고 있습니다.
 
 **현재는 렌터카 게임의 설계·공통 개발 기반 준비 단계입니다.** 기존 기술 검증용 소스로 빌드·저장 시험을 재현할 수 있지만 새 탁송·렌터카 게임은 아직 구현하지 않았습니다. Debug APK는 로컬 시험 산출물이며 제출 Release APK·실제 게임 시연 영상은 준비 전입니다.
