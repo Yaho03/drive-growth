@@ -243,6 +243,15 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 `core/src/testFixtures`의 `RentalContractFixtures`에서 시험 차량 v1/v2, 관측 30,000m·예상 20,000m, 고정 시각·규칙 버전·seed 33, 성공·실패 카탈로그와 메모리 저장소를 얻는다. `:core:test --tests '*RentalContractConsumerTest'`로 소비 예제를 실행한다. 다른 모듈의 테스트에서는 필요할 때 `testFixtures(project(":core"))`를 테스트 의존성으로 사용한다.
 
+#35의 첫 로더는 `io.drivegrowth.core.content.GameContentLoader.load(사실 CSV, 게임 콘텐츠)`다. 사실 CSV에서는 `vehicle_id`·`model_name`만 읽는다. 이미지·로고·3D 열은 읽지 않는다. 게임 콘텐츠는 별도 파일이다. 머리 메타에는 콘텐츠·규칙 버전, 시험값 여부, 가챠 천분율 가중치(합 1000)·천장·보장 희귀도가 들어간다. 본문에는 차량별 게임 가격·희귀도·해금 가게 레벨이 들어간다. 다음 경우에는 `ContractError.INVALID_INPUT`으로 거절하고 기본값을 넣지 않는다.
+
+- 사실 CSV에 없는 ID 또는 중복 ID
+- 0 이하·비정수 금액
+- 확률 합 오류
+- 첫 해금 레벨에 보장 희귀도 차량이 없음
+
+성공 시 `GameContentSnapshot`을 돌려주고, `asVehicleCatalog()`로 위 `VehicleCatalog` 계약을 제공한다. 시험 입력은 testFixtures의 `GameContentFixtures`다. 실제 게임용 가격표와 가게 레벨별 해금표는 PRD 결정 대기다.
+
 이 첫 버전은 한 요청에서 재화 변화와 보유 개체 한 대의 변경을 표현한다. 다중 개체 소비, 의뢰·대여·시간 구간·열람 상태의 거래 모델은 후속 계약 범위다. 메모리 fixture는 그 정책이나 실제 저장을 대체하지 않는다.
 
 구체 구현 인계: [공통 모델·fixture #33](https://github.com/Yaho03/drive-growth/issues/33), [원자적 저장 #34](https://github.com/Yaho03/drive-growth/issues/34), [콘텐츠 로딩 #35](https://github.com/Yaho03/drive-growth/issues/35). #27은 논리 계약과 담당 간 경계 확인을 추적하며 이 세 이슈의 코드 완료를 대신하지 않는다.
