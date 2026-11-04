@@ -266,3 +266,10 @@ PR #32 최초 Android CI는 앱 컴파일 전 `setup-android@v3`의 기본 `tool
 한글 프로젝트 경로의 기본 빌드에서는 core 타입을 소비 모듈이 찾지 못했다. 같은 소스를 영문 산출물 경로로 설정하면 통과했다. 이번 검사는 로컬 전용 init script에서 모든 프로젝트의 `layout.buildDirectory`를 `/tmp/drive-growth-build/<project.name>`으로 지정하고 JDK 17로 실행했다. 재현 시 같은 내용의 init script를 만든 뒤 `./gradlew -I <init-script> :core:test :app:assembleDebug :app:lintDebug :app:connectedDebugAndroidTest`를 사용한다. init script·SDK 경로·IDE가 추가한 `gradle.properties` 변경·임시 로그/산출물은 게시하지 않는다. 일반 영문 경로에서는 저장소 기본 명령을 사용하며, Android Studio의 한글 경로 일반 빌드 문제는 해결됐다고 표시하지 않는다.
 
 미검증·인계: 위 실패 시험은 DB 연결 재개방·예외 주입이며 OS 강제 종료/전원 차단·실제 디스크 용량 부족·실차 시험이 아니다. 지원하는 이전 스키마가 없으므로 자동 이전·자동 백업은 미제공이며 수동 원본 보존 정책을 구조 문서에 기록했다. 다중 차량 소비·의뢰·대여·시간 구간·재추첨 방지 상태는 v0 계약 밖이다. D의 공통 앱 조립과 결과 화면 연결, #62에서 지정된 다른 팀원의 교차 검증이 남아 있다. #34 체크박스나 후속 차단 관계를 본인 시험만으로 일괄 완료 처리하지 않는다.
+
+## #51 공통 화면과 콘텐츠 연결
+
+- 기준 소스는 `main`의 `8f7e83a`다. Android Views 화면에서 가게 잔액, 보유 차량, 미확인 정산을 모의 SQLite 원장에서 조회한다. `app/src/main/assets/content/`의 차량 사실·게임 정의 파일은 #35의 5대 시험 입력을 패키징한 것이다. 콘텐츠 버전은 `fixture-content-v0`이며 화면에 모의 원장과 시험용 콘텐츠를 표시한다.
+- 전경 차량 표본에서 P·정차·UX 허용을 연속 확인한 경우에만 화면을 연다. 오래된 표본, 알 수 없는 UX, 모의 표본, Activity 일시 정지에서 제한 상태를 유지한다. 제한이 걸린 뒤 반환된 조회 결과는 버린다. 콘텐츠 읽기나 원장 조회 실패는 다시 시도할 수 있는 오류로 표시한다. 조회 중 중복 요청을 막으며, 페이지 선택은 Activity 저장 상태로 복원한다.
+- 로컬 `./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` 통과. 코어 50개·앱 단위 2개를 확인했다. Pleos ARM64 `emulator-5556`에서 앱/시험 APK를 설치해 기기 시험 21개를 통과했다. 새 기기 시험은 패키징 콘텐츠의 재조회와 버전 일치를 검증한다.
+- 실제 앱 Activity의 실행은 확인했으나 전면 UI 덤프가 내비게이션 창을 반환해 화면 조작 증거를 확보하지 못했다. #36의 최종 조작 허용 관측 연동, D 정차/P 복귀 화면 확인, Back·CCP·좁은 창·Activity 재생성의 실제 화면 검증은 #51 후속 및 #63 묶음 검증에 남긴다. 차량 주행 기록은 이 화면에서 시작하지 않으며 원장 변경 명령은 개별 기능 구현에서 연결한다.
