@@ -208,7 +208,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 | 저장 확정 직전 실패 → 동일 요청 재시도 | 전체 이전 상태 또는 전체 확정 상태 중 하나. 부분 지급·중복 개체 없음 |
 | 결과 조회·열람 처리 반복 | 결과·잔액 불변, 열람 여부만 변경 |
 
-실제 공유 fixture·가짜 구현 코드는 별도 공통 기반 구현 작업에서 제공한다. 현재 문서 예제만으로 독립 빌드·테스트가 준비됐다고 판정하지 않는다.
+위 표 중 공통 계약 첫 인계에서 실행할 수 있는 범위는 아래 구현 경계에 기록한다. 재실행·실제 저장·도착 판정은 해당 구현 이슈의 검증으로 이어간다.
 
 ### 데이터 취급·변경과 첫 합의 범위
 
@@ -228,6 +228,22 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 - 시계 역행은 음수 수익·같은 구간 재지급으로 처리하지 않는다. 같은 부팅 내 경과 시간과 영속 시각을 구분하고 재부팅·시간 변경 시 확정할 수 없는 구간의 처리는 #24 결정에 연결한다.
 - 로그에는 원시 목적지 좌표·차량 식별자·프로필 개인정보를 남기지 않는 기본안을 사용한다. 첫 계약 자체에는 외부 전송이 없다. 실제 위치 보관 필요·기간·삭제와 온라인 계약은 채택 기능별로 추가한다.
 
-공통 코드/저장의 작성 담당, 정확한 시그니처, 실행 fixture, 저장 엔진 선택이 끝난 것으로 보고하지 않는다. 이 네 항목이 필요한 소비 기능은 해당 구현 이슈 결과를 선행조건으로 기다리고, 관련 없는 문서·순수 입력 예제·와이어프레임은 계속 작업한다.
+#### 공통 타입과 fixture의 첫 구현 경계
+
+패키지는 `io.drivegrowth.core.contract`이고 계약 식별값은 `RENTAL_CONTRACT_VERSION`이다. #33의 첫 인계는 #34 거래 저장과 #35 콘텐츠 로딩이 함께 사용할 아래 경계를 제공한다. 교차 확인은 #61에서 진행한다.
+
+| 소비 작업 | 첫 시그니처와 필드 |
+|---|---|
+| #34 거래 | `GameChangeStore.commitGameChange(change: GameChange): ContractResult<Settlement>`. 요청 ID, 종류, 출처, 규칙 버전은 필수다. 재화 변화와 개체 쓰기는 각각 생략할 수 있으며 최소 하나는 필요하다. 신규 개체는 `VehicleWrite.Add`, 기존 개체는 기대 revision을 받는 `VehicleWrite.Update`로 표현한다. 결과는 정산 ID·거래·잔액·시각과, 개체 변경이 있을 때 갱신된 개체를 포함한다. |
+| 보유 조회 | `GameChangeStore.listOwnedVehicles(): ContractResult<List<OwnedVehicle>>`. 차종 ID와 보유 개체 ID를 구분한다. 개체는 레벨·revision·생명주기 상태를 가진다. |
+| #35 콘텐츠 | `VehicleCatalog.load(): ContractResult<VehicleCatalogSnapshot>`. 스냅샷이 하나의 `ContentVersion`을 가지고, 각 차종에는 ID와 표시 이름을 둔다. |
+| 차량·화면 입력 | `DeliveryDistanceInput`에서 `ObservedDistance`와 `EstimatedRouteDistance`를 별도 타입과 출처로 받는다. `Observation.Missing`에는 누락 사유가 필수다. |
+| 공통 실패 | `ContractResult.Failure`에 `ContractError`를 제공한다. 권한 거부와 데이터 없음, 정책 미정, 충돌, 저장 실패를 구분한다. |
+
+거리 m와 게임머니 최소 단위는 0 이상 `Long`, UTC Unix ms는 `Long`, revision은 0 이상 `Int`다. 재화 방향은 별도 필드로 전달한다. 공통 계약은 정수 결과를 받고, 소수 거리 환산과 경제 산식의 반올림은 값을 계산하는 호출 측 정책에서 정한다. 저장 구현은 범위 초과를 저장 전에 실패 처리한다.
+
+`core/src/testFixtures`의 `RentalContractFixtures`에서 시험 차량 v1/v2, 관측 30,000m·예상 20,000m, 고정 시각·규칙 버전·seed 33, 성공·실패 카탈로그와 메모리 저장소를 얻는다. `:core:test --tests '*RentalContractConsumerTest'`로 소비 예제를 실행한다. 다른 모듈의 테스트에서는 필요할 때 `testFixtures(project(":core"))`를 테스트 의존성으로 사용한다.
+
+이 첫 버전은 한 요청에서 재화 변화와 보유 개체 한 대의 변경을 표현한다. 다중 개체 소비, 의뢰·대여·시간 구간·열람 상태의 거래 모델과 실제 영속 저장·복원·동시 처리 방식은 후속 계약과 구현 범위다. 메모리 fixture는 그 정책이나 실제 저장을 대체하지 않는다.
 
 구체 구현 인계: [공통 모델·fixture #33](https://github.com/Yaho03/drive-growth/issues/33), [원자적 저장 #34](https://github.com/Yaho03/drive-growth/issues/34), [콘텐츠 로딩 #35](https://github.com/Yaho03/drive-growth/issues/35). #27은 논리 계약과 담당 간 경계 확인을 추적하며 이 세 이슈의 코드 완료를 대신하지 않는다.
