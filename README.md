@@ -23,7 +23,7 @@
 | 기존 순수 Kotlin 엔진 | 테스트 13개 통과. 새 탁송·영업 규칙은 미구현 |
 | 기존 Android 저장 | Pleos 에뮬레이터에서 저장 테스트 8개 통과. 새 게임 거래 저장은 미구현 |
 | 개발 도구·APK | 공통 조합 빌드·Lint, Debug 설치·Activity 기본 실행 확인 |
-| 새 화면 | 가게·차고·탁송·정산 [와이어프레임](docs/design-assets/wireframes.svg)과 2D Views 설계. 앱 적용 전 |
+| 새 화면 | 가게·차고·탁송·정산 [와이어프레임](docs/design-assets/wireframes.svg), #24 반영 [UI 시안 v3](docs/design-assets/ui-v3/)(세로 20·가로 10)과 2D Views 설계. 앱 적용 전 |
 | 렌터카 게임·추가 기능 | 상세 구현 이슈로 진행. 정책·수치·일부 동작은 결정 대기 |
 | 최종 APK·시연·실차 | 제출 산출물 미준비, 실차 미검증 |
 
