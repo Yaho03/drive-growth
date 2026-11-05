@@ -135,6 +135,26 @@ APK는 `app/build/outputs/apk/debug/app-debug.apk`, 크기 2,564,962 bytes, SHA-
 
 NaviHelper의 SDK 값은 목적지·경로 이벤트와 연결해 검증한다. 0 단독으로 도착을 확정하지 않는다. 게임 카테고리의 주행 중 기록·음성 허용은 공개 안내에서 명시적으로 확인되지 않았고 실차 검증은 미수행이다. 기능별 권한·정책과 미지원 대안은 [차량 API 조사](contest/03_VEHICLE_API.md), 구현 경계는 [공통 계약](02_SYSTEM_ARCHITECTURE.md)을 따른다. [NaviHelper 이벤트 명세](https://document.pleos.ai/en/api-reference/connect-sdk-pleos/NaviHelper/event-listeners)
 
+### #36 차량 입력 본인 검증
+
+2026-11-05, 작업 브랜치 `core/36-vehicle-input`(기준 `ab0c2d6`)의 미커밋 변경을 Windows 11 x64, Pleos Connect Emulator 2.1.0 / API 34 x86_64, 창 없는 실행, RAM 설정 3GB에서 시험했다. Debug APK SHA-256은 `4dee94082c9d2f5d904084da8c5bc6c441b6b9a62c4f1ba3c561387ed9cace5a`다. 차량 입력은 Virtual Console의 로컬 API(`PUT /vehicle/gear`, `/vehicle/controls`)로 넣었다. 에뮬레이터 입력이며 실차 신호가 아니다. 사람의 교차 검증은 #63에 남아 있다.
+
+| 검사·절차 | 확인 결과 |
+|---|---|
+| `:core:test`, `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:lintDebug` | 모두 성공. 코어 71개(#36 추가 21개 포함), 앱 단위 4개 |
+| `am instrument --user 10` | 21개 성공. 저장 복원 시험 포함 |
+| P 시작 | `gear=PARK ux=false`, 게임 화면 표시 |
+| D·0 km/h 10초 유지, D·36 km/h | `gear=DRIVE ux=true`, 제한 화면 유지 |
+| 주행 중 앱 강제 종료 후 재진입 | 제한 화면 |
+| D → P | `gear=PARK ux=true`가 먼저 수신되고 약 1초 뒤 `ux=false`로 바뀐 후 게임 화면 복귀 |
+| 속도 권한 거부 | `speed=PERMISSION_DENIED gear=PARK ux=false`, 제한 화면. 나머지 신호는 유지. 시험 후 권한 복원 |
+| 앱 숨김 후 복귀 | `observation_gap kind=APP_HIDDEN`, 게임 화면 복귀 |
+| 차량 전원 Suspend 모사·Resume | 복귀 후 `speed=OK gear=PARK ux=false` 수신. 화면 덤프는 실패해 화면은 미확인. 모사에서 `DEVICE_SLEEP`은 발생하지 않음 |
+
+3초 연속 주차 대기, 신호 만료, 역순·중복·긴 간격, 출처 혼합, `DEVICE_SLEEP` 분류는 단위 시험으로만 확인했다. 시험 PC는 외장 GPU가 없어 공식 최소 사양에 못 미치고 에뮬레이터 부하(load average)가 28–50까지 올랐다. 첫 부팅에서는 `car_service`가 반복 재시작되어 재부팅했다. 메인 스레드가 2.5초 넘게 지연되면 표본이 만료되어 게임 화면이 제한 화면으로 바뀌는 것을 1회 관측했다. 안전 쪽 동작이지만 정상 사양 PC에서의 재현 여부는 미확인이다. 같은 APK를 창 모드로 실행해 구현자(정원)가 Virtual Console 웹 화면에서 D를 누르면 제한 화면, P를 누르면 몇 초 뒤 게임 화면으로 돌아오는 것을 직접 확인했다. 이는 본인 검증이며 교차 검증이 아니다. 실제 IGN OFF, 실차, 주행 중 백그라운드 기록은 시험하지 않았다.
+
+`inject-vhal-event`는 이 이미지에서 `requires non-user build`로 거절되어 신호가 바뀌지 않는다. D 시험에는 Virtual Console을 사용하고, 입력이 앱에 도달했는지 `DriveGrowthVehicle` 로그로 먼저 확인한다.
+
 ### 플랫폼 검증 인계
 
 [#13](https://github.com/Yaho03/drive-growth/issues/13)은 위 에뮬레이터 실행 근거를 관리한다. [#80](https://github.com/Yaho03/drive-growth/issues/80)은 실제 내비 거리·도착 확인의 선행조건, [#81](https://github.com/Yaho03/drive-growth/issues/81)은 주행 중 기록·음성 등 해당 기능 활성화의 선행조건, [#82](https://github.com/Yaho03/drive-growth/issues/82)는 실차·실제 전원 전환 검증의 선행조건이다. 모의 입력과 뼈대 검증의 착수 조건은 진행 계획을 따른다.
