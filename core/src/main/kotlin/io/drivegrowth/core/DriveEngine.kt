@@ -4,7 +4,7 @@ import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.abs
 
-enum class InputSource { VEHICLE, SIMULATION }
+typealias InputSource = io.drivegrowth.core.contract.InputSource
 enum class Gear { PARK, DRIVE, REVERSE, NEUTRAL, UNKNOWN }
 enum class DriveState { READY, RECORDING, WAITING_FOR_PARK, DATA_UNAVAILABLE, SETTLED }
 data class Sample(val source: InputSource, val elapsedMs: Long, val epochMs: Long, val speedMps: Double?, val gear: Gear, val uxRestricted: Boolean?, val valid: Boolean = true)
