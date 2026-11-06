@@ -25,10 +25,8 @@
     <string name="garage_rarity_advanced">고급</string>
     <string name="garage_rarity_rare">희귀</string>
     <string name="garage_rarity_legend">전설</string>
-    <string name="garage_rarity_missing">희귀도 확인 불가</string>
     <string name="garage_level">Lv.%1$d</string>
     <string name="garage_progress">레벨 진행량 · %1$s</string>
-    <string name="garage_progress_missing">레벨 진행량 확인 불가</string>
     <string name="garage_idle">대기</string>
     <string name="garage_rented">대여 중</string>
     <string name="garage_returning">반납 이동 중</string>
@@ -37,7 +35,6 @@
     <string name="garage_accidents">게임 내 사고 이력 · %1$s</string>
     <string name="garage_accidents_missing">게임 내 사고 이력 확인 불가</string>
     <string name="garage_acquisition">취득 기준액 · %1$s</string>
-    <string name="garage_acquisition_missing">취득 기준액 확인 불가</string>
     <string name="garage_model_price">게임 차종 가격 · %1$s</string>
     <string name="garage_model_price_missing">게임 차종 가격 확인 불가</string>
     <string name="garage_action_level">레벨업 조건 확인</string>

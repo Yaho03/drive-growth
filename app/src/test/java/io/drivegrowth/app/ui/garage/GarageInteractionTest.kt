@@ -7,7 +7,9 @@ import org.junit.Test
 
 class GarageInteractionTest {
     private val first = VehiclePresentation(
-        OwnedVehicle(OwnedVehicleId("first"), VehicleId("hyundai_casper"), 3, Revision(7), VehicleLifecycle.OWNED),
+        OwnedVehicle(OwnedVehicleId("first"), VehicleId("hyundai_casper"), 3, Revision(7), VehicleLifecycle.OWNED,
+            rarity = Rarity.COMMON, levelProgressPercent = 25, acquisitionCost = GameMoney(500),
+            acquisitionSource = VehicleAcquisitionSource.GACHA),
         "캐스퍼", "#1", actions = mapOf(VehicleAction.SELL to ActionPresentation(true, "예상 지급액 확인 중")),
     )
     private val second = first.copy(vehicle = first.vehicle.copy(ownedVehicleId = OwnedVehicleId("second")), instanceLabel = "#2")

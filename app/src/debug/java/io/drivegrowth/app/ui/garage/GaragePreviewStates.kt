@@ -16,10 +16,11 @@ object GaragePreviewStates {
         "hyundai_ioniq9" to "아이오닉 9", "genesis_g90" to "G90", "genesis_gv80" to "GV80",
     )
     private fun vehicle(index: Int, activity: VehicleActivity?) = VehiclePresentation(
-        vehicle = OwnedVehicle(OwnedVehicleId("preview-$index"), VehicleId("hyundai_casper"), index + 2, Revision(index), VehicleLifecycle.OWNED),
-        name = "캐스퍼", instanceLabel = "#${index + 1}", rarity = Rarity.entries[index % 4],
-        progressLabel = "${index * 25}%", activity = activity, accidentLabel = "${index}회 · 고정 시험값",
-        acquisitionLabel = "500 게임머니 · 고정 시험값", modelPriceLabel = null,
+        vehicle = OwnedVehicle(OwnedVehicleId("preview-$index"), VehicleId("hyundai_casper"), listOf(2, 3, 4, 5, 7)[index], Revision(index), VehicleLifecycle.OWNED,
+            rarity = Rarity.entries[index % 4], levelProgressPercent = listOf(0, 25, 50, 75, 0)[index],
+            acquisitionCost = GameMoney(500), acquisitionSource = VehicleAcquisitionSource.GACHA),
+        name = "캐스퍼", instanceLabel = "#${index + 1}",
+        activity = activity, accidentLabel = "${index}회 · 고정 시험값", modelPriceLabel = null,
         // 아래 허용/불가도 규칙 계산이 아닌 고정 UI 시험 입력이다.
         actions = VehicleAction.entries.associateWith {
             ActionPresentation(
@@ -36,9 +37,9 @@ object GaragePreviewStates {
             vehicle(0, VehicleActivity.IDLE), vehicle(1, VehicleActivity.RENTED),
             vehicle(2, VehicleActivity.RETURNING).copy(activityDetail = "반납 시각 확인 불가"),
             vehicle(3, VehicleActivity.NEEDS_REPAIR),
-            vehicle(4, null).copy(name = "긴 차종명 배치 시험용 캐스퍼 일렉트릭 추가 설명", rarity = null,
-                progressLabel = null, accidentLabel = null, acquisitionLabel = null, actions = emptyMap(),
-                informationNote = "일부 차량 정보 미지원 · 현재 연결에서 제공하지 않아요"),
+            vehicle(4, null).copy(name = "긴 차종명 배치 시험용 캐스퍼 일렉트릭 추가 설명",
+                accidentLabel = null, actions = emptyMap(),
+                informationNote = "활동·사고 이력·차종 가격 미지원 · 현재 연결에서 제공하지 않아요"),
         ), "보유 5대 / 공간 8칸 · 고정 시험값", "고정 시험 데이터 · 저장·차량 입력 아님",
     ))
     val empty = GarageScreenState.Content(GarageContent(emptyList(), "보유 0대 / 공간 3칸 · 고정 시험값", "고정 시험 데이터"))

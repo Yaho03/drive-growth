@@ -10,7 +10,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.ScrollView
 import io.drivegrowth.app.R
-import io.drivegrowth.core.progression.Rarity
+import io.drivegrowth.core.contract.Rarity
 
 /** ui-v3의 배경·카드·버튼 색과 모서리를 공유한다. 크기는 09 명세의 초기 기준이다. */
 internal class GarageStyle(val context: Context) {
@@ -54,15 +54,14 @@ internal class GarageStyle(val context: Context) {
             if (restoreOnLayout) { restoreOnLayout = false; scrollTo(0, restoreY) }
         }
     }
-    fun rarity(value: Rarity?) = context.getString(when (value) {
+    fun rarity(value: Rarity) = context.getString(when (value) {
         Rarity.COMMON -> R.string.garage_rarity_common
         Rarity.ADVANCED -> R.string.garage_rarity_advanced
         Rarity.RARE -> R.string.garage_rarity_rare
         Rarity.LEGEND -> R.string.garage_rarity_legend
-        null -> R.string.garage_rarity_missing
     })
-    fun rarityColor(value: Rarity?) = when (value) {
-        Rarity.COMMON, null -> muted
+    fun rarityColor(value: Rarity) = when (value) {
+        Rarity.COMMON -> muted
         Rarity.ADVANCED -> Color.rgb(137, 186, 255)
         Rarity.RARE -> Color.rgb(196, 169, 255)
         Rarity.LEGEND -> Color.rgb(245, 207, 119)

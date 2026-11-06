@@ -4,7 +4,6 @@ import io.drivegrowth.core.contract.OwnedVehicle
 import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.contract.Revision
 import io.drivegrowth.core.garage.CollectionEntry
-import io.drivegrowth.core.progression.Rarity
 import io.drivegrowth.core.progression.VehicleAction
 import io.drivegrowth.core.progression.VehicleActivity
 
@@ -13,12 +12,9 @@ data class VehiclePresentation(
     val vehicle: OwnedVehicle,
     val name: String,
     val instanceLabel: String,
-    val rarity: Rarity? = null,
-    val progressLabel: String? = null,
     val activity: VehicleActivity? = null,
     val activityDetail: String? = null,
     val accidentLabel: String? = null,
-    val acquisitionLabel: String? = null,
     val modelPriceLabel: String? = null,
     val actions: Map<VehicleAction, ActionPresentation> = emptyMap(),
     val informationNote: String? = null,

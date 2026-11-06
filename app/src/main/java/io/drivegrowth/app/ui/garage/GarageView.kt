@@ -112,7 +112,7 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
     private fun vehicleCard(value: VehiclePresentation): LinearLayout = with(style) {
         val selected = interaction.selectedId == value.vehicle.ownedVehicleId
         card(selected).apply {
-            addView(text(rarity(value.rarity), color = rarityColor(value.rarity), bold = true))
+            addView(text(rarity(value.vehicle.rarity), color = rarityColor(value.vehicle.rarity), bold = true))
             addView(placeholder(76))
             addView(text("${value.name} ${value.instanceLabel}", 24, bold = true))
             addView(text(context.getString(R.string.garage_level, value.vehicle.level), 24))
@@ -141,7 +141,7 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
                 return@apply
             }
             add(this, card(true).apply {
-                addView(text(rarity(value.rarity), color = rarityColor(value.rarity), bold = true))
+                addView(text(rarity(value.vehicle.rarity), color = rarityColor(value.vehicle.rarity), bold = true))
                 addView(text(activity(value), 24, bold = true))
                 if (value.activityDetail != null) addView(text(value.activityDetail, color = muted))
                 if (value.informationNote != null) addView(text(value.informationNote, color = muted))
@@ -153,8 +153,7 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
                     ?: s(R.string.garage_accidents_missing)))
                 addView(text(value.modelPriceLabel?.let { context.getString(R.string.garage_model_price, it) }
                     ?: s(R.string.garage_model_price_missing), color = muted))
-                addView(text(value.acquisitionLabel?.let { context.getString(R.string.garage_acquisition, it) }
-                    ?: s(R.string.garage_acquisition_missing), color = muted))
+                addView(text(context.getString(R.string.garage_acquisition, "${value.vehicle.acquisitionCost.units} 게임머니"), color = muted))
             })
             if (interaction.requestPending) add(this, text(s(R.string.garage_pending), 24, bold = true))
             add(this, text(s(R.string.garage_action_note), color = muted))
@@ -188,9 +187,8 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
         })
     }
 
-    private fun progress(value: VehiclePresentation) = value.progressLabel?.let {
-        context.getString(R.string.garage_progress, it)
-    } ?: s(R.string.garage_progress_missing)
+    private fun progress(value: VehiclePresentation) =
+        context.getString(R.string.garage_progress, "${value.vehicle.levelProgressPercent}%")
 
     private fun activity(value: VehiclePresentation) = s(when (value.activity) {
         VehicleActivity.IDLE -> R.string.garage_idle
