@@ -44,6 +44,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - run: ./gradlew :core:test :app:assembleDebug :app:lintDebug --stacktrace
+      - name: 내비 진단 도구 검사
+        run: ./gradlew :navi-diagnostic:testDebugUnitTest :navi-diagnostic:assembleDebug :navi-diagnostic:assembleNoNaviPermission :navi-diagnostic:lintDebug --stacktrace
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -51,3 +53,5 @@ jobs:
           path: |
             core/build/reports/tests/
             app/build/reports/lint-results-debug.html
+            navi-diagnostic/build/reports/tests/
+            navi-diagnostic/build/reports/lint-results-debug.html

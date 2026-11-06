@@ -165,6 +165,76 @@ D 상태 `suspend --real`에서 에뮬레이터가 복귀하지 않아 확인하
 
 [#13](https://github.com/Yaho03/drive-growth/issues/13)은 위 에뮬레이터 실행 근거를 관리한다. [#80](https://github.com/Yaho03/drive-growth/issues/80)은 실제 내비 거리·도착 확인의 선행조건, [#81](https://github.com/Yaho03/drive-growth/issues/81)은 주행 중 기록·음성 등 해당 기능 활성화의 선행조건, [#82](https://github.com/Yaho03/drive-growth/issues/82)는 미완료 에뮬레이터 실제 절전·복귀와 실차·실제 전원 전환을 구분해 추적한다. 해당 실제 전원·실차 동작을 검증 완료로 표시할 때는 대응 시험 근거가 필요하다. 모의 입력과 뼈대 검증의 착수 조건은 진행 계획을 따른다.
 
+## #80 내비 모의주행·권한·재탐색·렌더링 추가 검증 — 2026-11-06
+
+이 절은 앞선 도착 미수신·GPS 실패 기록을 보존한 후속 결과다. 입력은 **내비 내장 모의주행**이며 실제 NaviHelper 콜백을 관측했다. 실차·Android GPS 연동 성공·제품 탁송 정산 성공으로 해석하지 않는다. #80은 담당자가 남은 검증을 마무리할 수 있도록 열린 상태를 유지한다. 이 변경은 진단 도구·재현 방법·실행 근거를 제공하는 지원 자료다.
+
+### 환경과 원본 대응
+
+- Pleos Connect 2.1.0 / API 34 ARM64, Emulator 37.2.13.0, 내비 `3.3.2-rc5-hotfix.3`, NaviService 3.0.4, NaviHelper 3.0.5. 사용자 10 / `emulator-5556` / ADB 서버 포트 5038 / RAM 4GB.
+- 제품 패키지는 `io.drivegrowth.app`, 별도 진단 패키지는 `io.drivegrowth.navidiagnostic`이다. 제품 APK·데이터·게임 기능은 변경하지 않았다.
+- 기존 검증 APK SHA-256: `32fe31a755321534ba4978d852f0b0200651a9561cc933b597b6d919d56bc585`. 진단 사본과 실제 시험본의 해시 일치를 직접 확인했다.
+- 기존 원본 `diagnostic-final-check.jsonl`은 로컬에 보존하며 1,599행이다. 1,598건 보고 이후 `activityStopped` 1건이 추가됐다. SHA-256 `d2b510f94a9f51cee1702ff5f13ee7b8fe2f400ad1c47be335422ae8df73efdf`.
+- 공개 이벤트 선별본·화면과 원본/공개본 해시는 [시험 증거](../navi-diagnostic/evidence/README.md)에 보관한다. 설치·재현·APK 다운로드는 [진단 도구 안내](../navi-diagnostic/README.md)를 따른다. SDK·OEM APK·서명키·전체 시스템 로그는 게시하지 않는다.
+
+### 도착과 취소: 기존 원본 직접 대조
+
+| 이벤트 | 확인한 증거 | 한계 |
+|---|---|---|
+| 첫 도착 | 18:19:03.235 KST, seq155, `DestinationArrivedInfo(duration=3, distance=50, name=42dot, address=수정구 시흥동)` | 도착 당시 마지막 위치·목적지 조회 표본은 약56초 전으로 오래됐다. 경로 연결 증거는 두 번째보다 약함 |
+| 두 번째 도착 | 18:21:29.051 KST, seq746, duration3·distance49. 두 도착 모두 `source=SDK_CALLBACK`, `staleConnection=false` | `DestinationArrivedInfo` 자체에는 routeId가 없음 |
+| 두 번째의 경로 대조 | 직전 SDK routeId `506c7c27-d9c3-11f1-86b4-72e3ec72fa29`, currentRouteIndex 0→1→2와 위치 이동, `remainDistance` 50→30→10, `SIMULATION_GUIDING`, 도착 뒤 `FREE_DRIVE` | SDK가 보증한 요청-응답 ID가 아닌 시각·활성 경로·목적지의 교차 근거 |
+| 취소 | 18:22:29.577 KST, seq1097, `onRouteCancelled`; +17ms `FREE_DRIVE`, +42ms `SAFE_GUIDING`, 목적지 초기화 | 취소 뒤 마지막 SDK 수신까지 **103.449초**, SDK 콜백240건·위치43건·추가 도착0. 리스너 해제 뒤 구간을 무도착 관측시간에 더하지 않음 |
+
+기존 요청의 좌표·주소는 강남 `37.48544722,127.03636666`였지만, 동일 요청의 poiId를 서버가 시흥 `37.41289678,127.09383464`의 42dot으로 채택했다. 이는 요청 목적지 일치 성공이 아니다. 후속 진단 입력은 실제 POI 좌표·주소에 맞췄고, 원래 잘못된 요청과 당시 APK·로그는 보존했다. `50`이라는 원값만으로 모의 응답이라고 단정하지 않는다.
+
+일반 모의주행 재현 순서는 SDK 연결 → 실제 목적지·안내 상태 확인 → 안내 중 설정 톱니바퀴 길게 누르기 → 일반 주행 시뮬레이션 패널의 시작이다. 1080×600에서 톱니는 약(1006,440), 시작은 약(768,334)이었으며 매번 현재 화면으로 대조했다. 비밀번호 개발자 메뉴는 사용하지 않았다.
+
+### 후속 실제 시험
+
+| 시험 | 입력과 기대 | 직접 관측한 결과 |
+|---|---|---|
+| 거리 단위와 화면 | 공식 `DestinationInfo.remainDistance` 명세 m, 내비 표시값과 대조 | 실제 목적지 조회50과 내비 `50m` 표시 일치. 도착 payload distance·duration의 공식 단위는 m·s. 정밀 거리 정확도·다른 거리 구간까지 검증한 것은 아님 |
+| Android GPS: 모의주행 성공 이후 | 경로 없는 상태에서 `geo fix 127.094400 37.412800 0 12 0`; 내장 주행 성공 뒤에도 GPS 전달 경계가 남는지 확인 | Android 위치 `37.412798,127.094398`으로 변경. 약8초 동안 SDK 위치4회는 `37.4127212,127.094681` 고정. 도착·내비 이동 성공 아님. 기존 GSA 주입을 의미 없이 반복하지 않음 |
+| 권한 미선언 | 같은 진단 패키지의 별도 빌드에서 두 Navi 권한 선언 제거. 실제 병합 Manifest·설치 상태 확인 | 두 권한 검사 -1. `onConnected`는 수신했으나 목적지·경로·위치 조회 각각 `NAVI_ROUTE` 요구 `SecurityException`, 경로 요청은 `NAVI_ROUTE_SEARCH` 요구 `SecurityException`. 오류는 `TOOL_ERROR`이고 가짜 `onError`로 기록하지 않음 |
+| 권한 복원 | 데이터 삭제 없이 같은 패키지의 정상 선언 APK로 교체 | 두 권한 검사0, 조회 콜백·`onRouteStarted`·`ROUTE_DRIVE` 및 내비50m 안내 확인. 두 권한은 normal이므로 사용자 런타임 거부 대화상자 시험과 구분 |
+| 공개 수동 재탐색 | `ROUTE_GUIDING`과 routeId·목적지가 있는 상태에서 `requestReRoute()` 1회 | 요청·반환과 내비 `OnReRouteRequest`, `reRouteManualRequest called` 확인. 30.760초 관측창의 `onReRouteEnded`·`onRoutingCompleted`는0. 목적지는 유지되고 SDK routeId `9b4c1381-d9c6-11f1-87a8-72e3ec72fa29`도 유지. 실제 탐색 성공으로 기록하지 않음 |
+| 좌표일치 입력의 추가 도착 | 정상 권한·실제 POI에 맞춘 입력, host GPU의 일반 내장 모의주행 | 18:59:16.820 KST, run `689e4e83-fa18-4bab-8a6b-45bb1d79ffcc`, seq244, `SDK_CALLBACK/onDestinationArrived`, staleConnection=false, duration3·distance50·42dot·수정구 시흥동; 이어 `FREE_DRIVE`. 해당 실행은 주기 조회가 켜지지 않아 이동 전체의 신선한 SDK 좌표 열은 확보하지 못함 |
+
+후속 진단 수정은 기존 모듈의 시흥 POI 좌표·주소, 수동 재탐색 버튼, 권한 미선언 빌드에 한정했다. 정상 APK SHA-256은 `e67c2580dd75ba23780c0544fe12fadbd8ee5d0854bdf6d81b7fa0d60286ab1f`, 권한 미선언 APK는 `8c5faa0802c1b67be4622b9cd7e6e2d3167a47bf5f33b6ae4661da0a87554a95`다. `:navi-diagnostic:testDebugUnitTest :navi-diagnostic:assembleDebug :navi-diagnostic:assembleNoNaviPermission :navi-diagnostic:lintDebug` 성공, 단위시험1개 통과·Lint 오류0/경고19. SDK 실행 결과와 빌드 결과는 별도다.
+
+### 설치 버전의 API 불일치와 지도 렌더링
+
+- **isRouting:** 활성 `ROUTE_DRIVE`·`ROUTE_GUIDING`·routeId·잔여거리에도 false를 반복 관측했다. 같은 버전 이미지의 읽기 전용 추출본 `NavigationUseCase.routeStateInfoRequest`에서 false 상수를 생성자에 넣고 Provider까지 전달하는 경로를 확인했다. 해당 필드를 활성 안내 판정에 단독 사용하지 않는다. 모든 SDK 버전의 의미를 재정의하지 않는다.
+- **수동 재탐색:** 추출본은 `ManualReroute`를 채널에 전달하지만 소비부 명령 분기에 해당 처리가 없고 `ReRouteRequest.None`으로 실제 탐색을 건너뛴다. 요청 전달 뒤 완료가 없는 실행 결과와 부합한다. 상태변수나 모의주행을 바꿔 해결된 것으로 만들지 않으며, 시스템 APK를 패치하지 않았다. 실제 설치 APK 직접 해시는 일반 adb shell 읽기 권한이 없어 대조하지 못했으므로, 정적 근거는 같은 버전 시스템 이미지 추출본에 한정한다.
+- **지도 자료:** 실제 선택 URL `https://a.tile.static.maps-coral.umos.ai/styles/42dot/connect_empty`의 공개 JSON을 TLS 검증을 유지한 curl로 읽었다. coastline 소스1개와 background·coastline·slot 레이어만 있고 도로·건물 소스 및 imports는 없다. 배경색은 명시적 검정이 아니다. `metadata is nil`은 last_info의 맵매칭 저장 문맥이며 지도 타일 실패로 동일시하지 않는다.
+- **지도 설정 UI:** coral에서 설정 짧은 클릭은 차량 설정의 내비게이션 카테고리로 이동한다. 일반·위성·지형 팝업의 공개 진입으로 확인되지 않았다. 길게 누르기는 모의주행이며 지도 스타일 변경으로 취급하지 않는다.
+- **그래픽 통제:** 같은 AVD·이미지·RAM·앱·해상도를 유지하고 실행 인수 `-gpu swiftshader`만 공식 `-gpu host`로 변경해 cold boot했다. 기존은 swangle/SwiftShader·GLES3.1, host는 Apple M1 Pro OpenGL ES Translator·GLES3.0으로 실제 선택됐다. GLES3.2 제공으로 주장하지 않는다.
+- **host 결과:** 검정이던 지도 영역에 실제 스타일의 밝은 바탕, 위치·목적지 마커·경로 오버레이가 나타났고 안내·모의주행 화면에서도 유지됐다. 바탕색·스타일·시스템 APK는 수정하지 않았다. 수집한 host 로그 구간에서는 DrivingView 반복 종료가 없었다. 도로 기본 지도가 제공된 결과는 아니며 장시간 안정성·다른 장비 재현은 미검증이다.
+
+공식 GPU 근거: [Android Emulator 그래픽 가속](https://developer.android.com/studio/run/emulator-acceleration#accel-graphics), [Pleos 설치·실행](https://document.pleos.ai/docs/connect/guide/getting-started/application-development/setup-connect-sdk-emulator). 기존 소프트웨어 조건에서는 DrivingView의 `no ES 3.2 support`·반복 종료와 화면 정체가 있었다. 데이터 삭제 없는 Android 재부팅은 UI를 복구했지만 검정 지도는 그대로였으며, host GPU 전환의 결과와 구분한다. 중간 진단 프로세스의 `REMOVE TASK` 종료 이후 무수신은 SDK 무응답 증거에서 제외한다.
+
+### #80 완료 조건과 게임 연결 경계
+
+| 완료 조건 | 현재 판정 |
+|---|---|
+| 버전·권한·거리 단위 | 지정 환경과 공식 m·s 단위 근거·화면50m 대조 확보. 다른 환경·거리 정확도는 범위 밖 |
+| 활성 경로 도착·경로 식별·재탐색·취소·권한 거부 | 도착·취소·권한 미선언/복원 결과 확보. 수동 재탐색은 미완료/설치 버전 구현 제한으로 남음. 도착 payload에 routeId가 없는 한계 유지 |
+| 증거 부족·P/거리0 경계 및 #39·#64 대조 | 계약 대조 완료, 게임 실행 검증 아님. 취소 직후에도 거리0이 있어 도착으로 만들면 안 됨. SDK 출처 표시를 실차/VEHICLE 입력 증거로 바꾸지 않음 |
+| 환경·기대·실측·미수행 문서 | 이 절과 진단 도구 안내·공개 시험 증거에 반영. 지원 PR은 #80에 연결하며 전체 완료 판정은 담당자의 후속 검토로 남김 |
+
+`DeliveryArrivalEvidence`는 앱 내부 경로 세대와 출처가 맞을 때만 생성하는 계약이다. 현재 HEAD의 제품 `app/core`에는 NaviHelper 도착 어댑터가 없고, 계약의 `matches`만으로 오래된 콜백·목적지 불일치·취소/재탐색 뒤 세대 변경을 처리한 것은 아니다. #39·#64의 정산·지급·저장·복원까지 구현하거나 완료 처리하지 않는다. 목적지·출처·유효시각·활성 세대 연결이 부족하면 확인 불가로 전달한다.
+
+### 시험 종료와 복원
+
+- 원래 실행 인수의 `-gpu swiftshader`·RAM4096·포트5556·headless·no-snapshot-save 조건으로 다시 cold boot했다. AVD 설정 파일·시스템 이미지·ADB 서버 설정은 수정하지 않았다. 복원 뒤 지도 검정이 다시 나타나 host 전환의 렌더링 개선과 구분된다. host는 검증된 대안 실행 조건이며 현재 실행 조건으로 남겨두지 않았다.
+- 진단 앱을 원본 `0.1.0-issue80`으로 데이터 유지 설치했다. 복원 중 Activity 등록을 재확인할 필요가 있어 같은 원본을 다시 설치한 뒤 resolve-activity·COLD 실행을 확인했다. **설치된 base.apk SHA-256도 원본의 `32fe31a755321534ba4978d852f0b0200651a9561cc933b597b6d919d56bc585`와 일치**했다. 사용자10의 두 Navi 권한 granted=true, 기존 ceDataInode492447 및 로그 파일 보존을 확인했다.
+- 후속 host 실행의 seq371 `removeListenerReturned`·seq372 `releaseReturned`를 확인했다. 복원 앱의 새 run은 시작·단위·출처 이벤트만 있으며 연결·주기 조회·경로 요청을 실행하지 않았다.
+- Android GPS는 본 세션 시작 시 좌표 `39.237255,-123.150032`로 복원됐고 마지막 dumpsys location으로 확인했다. 내비는 경로·모의주행이 없는 기본 화면 전면, 사용자10·car_service:found다. 기존 제품 앱·데이터는 변경하지 않았다.
+- 시험 담당 세션은 독립 사본에서 작업했으며 제품 코드와 다른 작업자의 파일을 변경하지 않았다. 이후 사용자 승인으로 진단 소스·APK·재현 방법·공개 증거를 지원 PR로 게시한다. 별도 외부 문의는 보내지 않았다.
+
+남은 일은 지정 설치 버전의 수동 재탐색 지원, Android GPS 입력 연동, 도로 기본 지도 제공 조건 확인과 제품의 안전한 도착 어댑터 연결이다. 지도 렌더링은 host라는 재현 가능한 대안 조건을 확보했지만 원래 조건의 오류가 없어진 것으로 기록하지 않는다. 이번 지원 PR 게시는 사용자의 후속 명시적 요청에 따른다. 내비 오류 전체 해결을 주장하는 PR이나 #80 자동 종료로 해석하지 않는다.
+
 ## 제출 상태
 
 공식 일정·양식은 [공모전 자료](contest/README.md)를 따른다. 1차 접수 마감은 2026-11-15 23:59 KST이며, 앱 개발 산출물은 공식 필수 기획서와 별도로 준비한다.
