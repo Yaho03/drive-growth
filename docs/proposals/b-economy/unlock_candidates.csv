@@ -1,0 +1,21 @@
+vehicle_id,display_name,unlock_shop_level,game_role,status
+hyundai_casper,캐스퍼,1,소형,PROPOSAL_NOT_APPROVED
+hyundai_avante,아반떼,1,세단,PROPOSAL_NOT_APPROVED
+hyundai_sonata,쏘나타,1,세단,PROPOSAL_NOT_APPROVED
+hyundai_venue,베뉴,1,SUV,PROPOSAL_NOT_APPROVED
+hyundai_kona,코나,1,SUV,PROPOSAL_NOT_APPROVED
+hyundai_tucson,투싼,1,SUV,PROPOSAL_NOT_APPROVED
+hyundai_ioniq5,아이오닉 5,1,친환경,PROPOSAL_NOT_APPROVED
+hyundai_staria_tourer,스타리아 투어러,1,승합,PROPOSAL_NOT_APPROVED
+hyundai_grandeur,그랜저,2,세단,PROPOSAL_NOT_APPROVED
+hyundai_santafe,싼타페,2,SUV,PROPOSAL_NOT_APPROVED
+hyundai_casper_electric,캐스퍼 일렉트릭,2,친환경,PROPOSAL_NOT_APPROVED
+hyundai_nexo,넥쏘,2,친환경,PROPOSAL_NOT_APPROVED
+hyundai_ioniq6,아이오닉 6,2,친환경,PROPOSAL_NOT_APPROVED
+hyundai_staria_lounge,스타리아 라운지,2,승합,PROPOSAL_NOT_APPROVED
+hyundai_palisade,팰리세이드,3,SUV,PROPOSAL_NOT_APPROVED
+hyundai_ioniq9,아이오닉 9,3,친환경,PROPOSAL_NOT_APPROVED
+genesis_g70,G70,3,세단,PROPOSAL_NOT_APPROVED
+genesis_gv60,GV60,3,친환경,PROPOSAL_NOT_APPROVED
+genesis_g80,G80,4,세단,PROPOSAL_NOT_APPROVED
+genesis_gv70,GV70,4,SUV,PROPOSAL_NOT_APPROVED
