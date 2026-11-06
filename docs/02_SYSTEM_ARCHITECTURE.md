@@ -175,7 +175,7 @@ OwnedVehicle의 `lifecycle` 초안은 OWNED/SOLD/SCRAPPED/CONSUMED다. 대여·�
 
 | 호출 | 호출자 → 책임 | 입력 → 결과 |
 |---|---|---|
-| listOwnedVehicles | A/B/D → C 차량 조회 | 조회 조건 → 개체별 현재 revision·대여 가능 판단 근거. 실제 예약은 별도 거래 |
+| listOwnedVehicles | A/B/D → C 차량 조회 | 조회 조건 → 개체별 현재 revision·대여 가능 판단 근거. 실제 예약은 별도 거래. #46 첫 구현은 `io.drivegrowth.core.garage.Garage`(`owned`·`find`·`availableForRental`·차종×희귀도 `collection`)이며 저장소 목록을 받아 조회만 한다. 콘텐츠에 없는 차종·중복 개체 ID는 `INVALID_INPUT`, 없거나 처분된 개체는 `DATA_UNAVAILABLE` |
 | proposeDelivery / changeDelivery | D 화면 → A 탁송 | 목적지/거리 근거·선택 요청 → 후보/활성 의뢰 또는 결정·데이터 부족 오류 |
 | calculateRentalResult | B 영업 | 확정 규칙·차량 스냅샷·대여 입력 → 계산 결과안. 잔액을 직접 저장하지 않음 |
 | prepareVehicleChange | C 차량 | 강화/수리/처분 요청·개체 revision → 변화 결과안. 다른 기능의 원장을 직접 수정하지 않음 |
@@ -183,6 +183,16 @@ OwnedVehicle의 `lifecycle` 초안은 OWNED/SOLD/SCRAPPED/CONSUMED다. 대여·�
 | listPendingResults / markResultViewed | D → 공통 조회/표시 | settlementId → 미확인 결과 조회/열람 처리. 열람으로 재지급하지 않음 |
 
 A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생성과 금액·의뢰 상태의 확정은 공통 거래 경로를 사용한다. B가 차량을 배정할 때 조회 결과만 믿고 대여를 시작하지 않고 revision을 검사하는 동일 경로에서 점유를 확정한다. D는 저장 파일·잔액·게임 DB를 직접 변경하지 않는다. 공통 저장 코드의 작성 담당은 #25에서 별도 확정하며 #27의 설계 담당과 자동으로 같다고 보지 않는다.
+
+#### #46 Garage 조회의 부분 인계 범위
+
+2026-11-07 PR #100 검토에서 확인한 카탈로그 원본 변경과 활동 조회 실패 경계를 보완한다. `Garage`는 생성 당시 차종 ID 목록을 복사해 개체 검증과 도감 계산에 같은 기준을 사용한다. `availableForRental(vehicles, activityOf)`의 공급자는 개체 ID를 받아 `ContractResult<VehicleActivity>`를 반환하며 조회 중 거래·점유 등 상태 변경을 수행하지 않는다. 활동 정보 누락은 `DATA_UNAVAILABLE`, 저장 조회 실패는 `STORAGE_FAILURE` 등 실제 실패로 전달한다. Garage는 실패 이유를 그대로 반환하고 후보 일부를 성공으로 반환하지 않으며, 누락을 `IDLE`로 채우거나 예상하지 못한 예외를 일괄 변환하지 않는다.
+
+- `availableForRental`은 현재 `OWNED`·`IDLE` 후보를 거르는 조회다. 영업 쉬기는 아직 반영하지 않는다. 최종 자동 배정 가능 여부·점유·최신 revision과 동시 상태 변경 검사는 #41의 공통 거래 연결에서 별도로 확인한다.
+- `owned`는 사용 중·수리 필요 개체도 포함하므로 강화 가능 목록으로 그대로 사용하지 않는다. 대여 후보 목록도 수리·판매·폐차 가능 목록으로 재사용하지 않는다. 수리 필요 차량의 수리·판매·폐차는 PRD에서 허용하므로 각 명령의 활동 제한을 별도로 검사한다.
+- `collection`의 `OWNED`는 한 번이라도 소유한 기록이다. 호출자는 처분 뒤에도 유지되는 `(vehicleId, rarity)` 획득 이력을 `everOwned`로, 탁송 목록·가챠 결과에서 본 기록을 `discovered`로 제공해야 한다. 도감 키를 직접 주입한 계산 시험은 실제 저장·재실행 시험과 다르다.
+
+현재 `GameChangeStore.listOwnedVehicles()`는 현재 보유 개체 조회의 입력만 제공한다. 개별 희귀도·레벨 진행량·취득 기준액, 처분 포함 이력·발견 기록, 실제 활동·영업 쉬기의 저장 입력은 아직 제공하지 않는다. 필요한 공통 필드·명령은 #33 담당, 조회·SQLite 형식·요청 동일성·정산 재생·기존 데이터 처리는 #34 담당과 아래 공통 계약 인계 기준에 따라 조율한다. #46은 이 조회·계산 부분의 인계이며 저장·재실행을 포함한 전체 완료가 아니다. 기능별 본인 검증과 #28 통합 검증은 유지한다.
 
 ### 원자성·오류·재시도
 
