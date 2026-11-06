@@ -67,7 +67,10 @@ class SqliteGameChangeStore(
                         val previous = findVehicle(db, write.ownedVehicleId) ?: return@storage failure(ContractError.DATA_UNAVAILABLE)
                         if (previous.revision != write.expectedRevision || previous.lifecycle != VehicleLifecycle.OWNED) return@storage failure(ContractError.STATE_CONFLICT)
                         if (previous.revision.value == Int.MAX_VALUE) return@storage failure(ContractError.INVALID_INPUT)
-                        previous.copy(level = write.level, lifecycle = write.lifecycle, revision = Revision(previous.revision.value + 1))
+                        if (write.lifecycle != VehicleLifecycle.OWNED &&
+                            (write.level != previous.level || write.levelProgressPercent != previous.levelProgressPercent)) return@storage failure(ContractError.INVALID_INPUT)
+                        previous.copy(level = write.level, lifecycle = write.lifecycle, revision = Revision(previous.revision.value + 1),
+                            levelProgressPercent = write.levelProgressPercent)
                     }
                 }
                 val result = Settlement(
@@ -195,8 +198,24 @@ private class LedgerHelper(context: Context, name: String, private val source: I
 private object LedgerJson {
     fun vehicle(v: OwnedVehicle) = JSONObject().put("id", v.ownedVehicleId.value).put("vehicle", v.vehicleId.value)
         .put("level", v.level).put("revision", v.revision.value).put("lifecycle", v.lifecycle.name)
+        .put("rarity", v.rarity.name).put("levelProgressPercent", v.levelProgressPercent)
+        .put("acquisitionCost", v.acquisitionCost.units).put("acquisitionSource", v.acquisitionSource.name)
     fun vehicle(j: JSONObject) = OwnedVehicle(OwnedVehicleId(j.getString("id")), VehicleId(j.getString("vehicle")),
-        j.getInt("level"), Revision(j.getInt("revision")), VehicleLifecycle.valueOf(j.getString("lifecycle")))
+        integer(j, "level", 1, MAX_VEHICLE_LEVEL.toLong()).toInt(),
+        Revision(integer(j, "revision", 0, Int.MAX_VALUE.toLong()).toInt()), VehicleLifecycle.valueOf(j.getString("lifecycle")),
+        Rarity.valueOf(j.getString("rarity")), integer(j, "levelProgressPercent", 0, 99).toInt(),
+        GameMoney(integer(j, "acquisitionCost", 0, Long.MAX_VALUE)),
+        VehicleAcquisitionSource.valueOf(j.getString("acquisitionSource")))
+    // writer의 JSON 정수만 허용한다. 좁은 타입 변환 전에 형식과 범위를 검사한다.
+    private fun integer(j: JSONObject, key: String, min: Long, max: Long): Long {
+        val value = when (val raw = j.get(key)) {
+            is Int -> raw.toLong()
+            is Long -> raw
+            else -> throw JSONException("$key 정수 형식 오류")
+        }
+        if (value !in min..max) throw JSONException("$key 정수 범위 오류")
+        return value
+    }
     private fun money(m: MoneyChange?) = m?.let { JSONObject().put("direction", it.direction.name).put("amount", it.amount.units) }
     private fun money(j: JSONObject?): MoneyChange? = j?.let { MoneyChange(MoneyDirection.valueOf(it.getString("direction")), GameMoney(it.getLong("amount"))) }
     fun command(c: GameChange): JSONObject {
@@ -205,6 +224,7 @@ private object LedgerJson {
             is VehicleWrite.Add -> JSONObject().put("type", "add").put("vehicle", vehicle(v.vehicle))
             is VehicleWrite.Update -> JSONObject().put("type", "update").put("id", v.ownedVehicleId.value)
                 .put("revision", v.expectedRevision.value).put("level", v.level).put("lifecycle", v.lifecycle.name)
+                .put("levelProgressPercent", v.levelProgressPercent)
         }
         return JSONObject().put("request", c.requestId.value).put("kind", c.kind.name).put("source", c.source.name)
             .put("rule", c.ruleVersion.value).put("money", money(c.money) ?: JSONObject.NULL).put("write", write ?: JSONObject.NULL)

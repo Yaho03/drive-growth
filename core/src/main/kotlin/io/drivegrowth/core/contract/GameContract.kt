@@ -1,6 +1,6 @@
 package io.drivegrowth.core.contract
 
-const val RENTAL_CONTRACT_VERSION = "rental-contract-v0"
+const val RENTAL_CONTRACT_VERSION = "rental-contract-v1"
 
 @JvmInline
 value class VehicleId(val value: String) {
@@ -101,7 +101,18 @@ fun interface VehicleCatalog {
     fun load(): ContractResult<VehicleCatalogSnapshot>
 }
 
+// 차종이 아닌 보유 개체의 희귀도. 순서가 비교 순서다(COMMON < ... < LEGEND).
+enum class Rarity { COMMON, ADVANCED, RARE, LEGEND }
+enum class VehicleAcquisitionSource { INITIAL_GRANT, GACHA, PURCHASE_DELIVERY }
 enum class VehicleLifecycle { OWNED, SOLD, SCRAPPED, CONSUMED }
+
+const val MAX_VEHICLE_LEVEL = 20
+
+private fun requireVehicleProgress(level: Int, progressPercent: Int) {
+    require(level in 1..MAX_VEHICLE_LEVEL) { "레벨은 1..$MAX_VEHICLE_LEVEL" }
+    require(progressPercent in 0..99) { "레벨 진행량은 0..99 퍼센트포인트" }
+    require(level < MAX_VEHICLE_LEVEL || progressPercent == 0) { "최대 레벨의 진행량은 0" }
+}
 
 data class OwnedVehicle(
     val ownedVehicleId: OwnedVehicleId,
@@ -109,8 +120,18 @@ data class OwnedVehicle(
     val level: Int,
     val revision: Revision,
     val lifecycle: VehicleLifecycle,
+    val rarity: Rarity,
+    val levelProgressPercent: Int,
+    /** 실제 취득 때 지출한 게임머니. 무료 획득의 0은 정보 누락과 다르다. */
+    val acquisitionCost: GameMoney,
+    val acquisitionSource: VehicleAcquisitionSource,
 ) {
-    init { require(level >= 1) }
+    init {
+        requireVehicleProgress(level, levelProgressPercent)
+        if (acquisitionSource == VehicleAcquisitionSource.INITIAL_GRANT) {
+            require(rarity == Rarity.COMMON && acquisitionCost == GameMoney(0)) { "첫 지급은 일반 희귀도·취득 기준액 0" }
+        }
+    }
 }
 
 enum class MoneyDirection { CREDIT, DEBIT }
@@ -123,13 +144,15 @@ data class MoneyChange(
 
 sealed interface VehicleWrite {
     data class Add(val vehicle: OwnedVehicle) : VehicleWrite
+    /** 레벨·진행량을 함께 명시한다. 처분에서는 저장된 성장값을 보존하며 취득 정보는 변경하지 않는다. */
     data class Update(
         val ownedVehicleId: OwnedVehicleId,
         val expectedRevision: Revision,
         val level: Int,
         val lifecycle: VehicleLifecycle,
+        val levelProgressPercent: Int,
     ) : VehicleWrite {
-        init { require(level >= 1) }
+        init { requireVehicleProgress(level, levelProgressPercent) }
     }
 }
 

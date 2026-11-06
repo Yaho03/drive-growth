@@ -7,7 +7,7 @@ import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.contract.VehicleCatalogSnapshot
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.contract.VehicleLifecycle
-import io.drivegrowth.core.progression.Rarity
+import io.drivegrowth.core.contract.Rarity
 import io.drivegrowth.core.progression.VehicleActivity
 import java.util.Collections
 
@@ -63,7 +63,7 @@ class Garage(catalog: VehicleCatalogSnapshot) {
 
     /**
      * 콘텐츠 차종 × 모든 희귀도의 도감 상태. 보유했던 칸은 처분 후에도 OWNED로 남는다.
-     * everOwned·discovered는 저장된 획득·발견 기록에서 호출자가 만든다(개체 희귀도 필드·발견 기록 저장은 #33·#34 조율).
+     * everOwned·discovered는 저장된 획득·발견 기록에서 호출자가 만든다. 현재 보유 목록만으로 처분 포함 획득 이력을 대체하지 않는다.
      */
     fun collection(everOwned: Set<CollectionKey>, discovered: Set<CollectionKey>): ContractResult<List<CollectionEntry>> {
         if ((everOwned + discovered).any { it.vehicleId !in known }) return ContractResult.Failure(ContractError.INVALID_INPUT)
