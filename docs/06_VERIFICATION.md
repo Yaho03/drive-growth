@@ -410,3 +410,19 @@ PR #32 최초 Android CI는 앱 컴파일 전 `setup-android@v3`의 기본 `tool
 | 미확인 정산에서 화면 크기를 800×480으로 변경 | `wm_relaunch_resume_activity` 로그에서 Activity 재생성을 확인했다. 선택한 화면과 콘텐츠 버전 `fixture-content-v0`이 유지됐다. 시험 후 크기 설정을 원복했다. |
 
 이 시험 당시의 #36 신호 미연결과 #51·#63 인계는 과거 기록이다. 현재 main에는 PR #93의 차량 신호 소비 경로가 반영됐다. 같은 버전의 D 정차·제한 중 재진입·P 복귀, CCP와 실제 분할 창의 남은 실행 결과는 #51 본인 검증·PR 검토와 #28 통합 검증에서 확인한다. 이 과거 APK 시험만으로 최신 연결 빌드의 전체 검증을 완료 처리하지 않는다.
+
+
+## #52 차고·도감 표시 UI 부분 검증
+
+2026-11-07, `codex/52-garage-display` 독립 worktree에서 `origin/main`의 `e7a1bcc`를 기준으로 구현했다. #52 최신 본문과 댓글(없음), 당시 열린 PR(없음)을 확인했다. 이 절은 표시 UI와 고정 입력의 자동 검사 기록이며 #51 연결이나 #52 전체 완료 보고가 아니다.
+
+- 소스: `app/src/main/java/io/drivegrowth/app/ui/garage/`의 차고·상세·도감 View, 표시 모델·입력 제어, `garage_` 문자열·중립 vector. debug 전용 `GaragePreviewStates`는 PRD의 차종 ID/이름 목록에 고정 상태·수치를 직접 주입한다. DB/실차를 읽거나 실제 지급·차감을 실행하지 않는다.
+- 환경: JDK 17, 기존 Android SDK Platform 35, Gradle 8.11.1. 영문 worktree `/private/tmp/drive-growth-garage-ui-20261107`에서 기존 SDK 경로를 환경 변수로 지정했다. Gradle·CI·Manifest·공통 계약·Activity 파일 변경은 없다.
+- `python3 scripts/check_repository.py`, `./gradlew :app:testDebugUnitTest`, `./gradlew :app:assembleDebug :app:lintDebug`, `./gradlew :app:assembleDebugAndroidTest`, `git diff --check`를 실행했다. 모두 통과했다. 추가로 `:core:test` 86개, 앱 단위 시험 전체 11개(차고 신규 7개)의 실패·오류 0건을 확인했다. Lint는 오류 0건·경고 13건이며 기존 대상 API/백업/그리기/아이콘/커스텀 View 생성자 경고와 새 프로그램 생성 View 2개의 `ViewConstructor` 경고를 포함한다. callback을 받는 View는 XML 인플레이션용이 아니다. instrumentation의 기존 플랫폼 시험 API 사용 중단 경고도 남는다. 추가 기기 시험 APK 빌드는 테스트 컴파일 확인이며 기기 실행 성공이 아니다.
+- 새 JVM 시험 7개는 동일 차종의 정확한 개체/revision 선택, 반복 요청 차단과 외부 결과 해제, 불가·제한·누락·개체 소멸 차단, 오류 재시도 중복 방지, 상세 닫기 뒤 미확정 요청 유지, 오래된 버튼의 대상/revision 불일치 차단, 외부 선택 복원을 확인한다. callback 전송으로 목록을 삭제하거나 완료로 바꾸지 않는 것도 확인한다.
+- Android 기기 시험 5개는 개체 선택/중복 클릭, 선택 소멸/제한 콘텐츠 제거, 빈 목록/로딩/읽기 실패/재시도, 도감 3상태·해금 분리, 도감 스크롤 재표시 보존을 준비했다. **컴파일만 수행, 실행하지 않았다.** 공유 에뮬레이터·adb 사용 금지 요청을 지켰으며 AVD 실행·설치·크기·권한 변경이 없다.
+- AI 코드 검토에서 지적한 스크롤·포커스 초기화와 호스트 선택 복원 진입점을 보완했다. 사람 리뷰나 실제 화면 검증으로 간주하지 않는다. 실제 Android 스크린샷은 확보하지 못했으며 시안 PNG·HTML을 앱 실행 증거로 사용하지 않는다.
+
+#51/메인 세션 인계: 공유 장치 사용이 가능한 시간에 약 15~20분을 확보해 `GaragePreviewStates`를 허용된 공통 탐색에 연결하고, 준비한 기기 시험과 세로 840×1184dp·가로 1360×948dp·좁은 창·긴 텍스트·글꼴 확대·선택 복원·Back/CCP를 확인해야 한다. 해당 크기는 공식 가이드의 예시 테스트 화면이며 모든 장치의 합격 기준이 아니다. 동기 callback 재표시 후 스크롤·포커스와 처리 중 화면 재생성도 확인한다. 이 세션이 공유 장치 사용을 예약하거나 시작한 것은 아니다.
+
+실제 데이터 공급자는 09 명세의 [표시 UI 연결점](09_UI_UX_SPEC.md#52-차고도감-표시-ui-연결점)에 개별 희귀도·진행량·취득액·활동·행동 허용/설명과 영속 도감 키를 매핑한다. #47~#49 실제 준비/확정 명령, 비용 확인, 요청 ID, 실패 복구·저장/재실행·주행 제한 통합은 남아 있다. #52 완료 체크·담당·Blocked by·ready는 변경하지 않는다. 원격 CI와 정확한 커밋은 게시 PR의 실제 결과로 확인한다.
