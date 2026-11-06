@@ -87,3 +87,7 @@ Debug 산출물은 `app/build/outputs/apk/debug/app-debug.apk`입니다. 설치�
 차량 목록의 기준 데이터는 [vehicles.csv](docs/data/vehicles.csv)입니다. PDF 기획서 원본은 로컬에만 보관하며 GitHub에 올리지 않습니다. 조사 문서의 제안은 팀이 결정하기 전까지 확정 기획이나 구현 완료를 의미하지 않습니다.
 
 외부 이미지·캐릭터·로고의 사용 조건은 별도 확인 대상입니다. 현재 화면의 차량 도형은 임시 표현이며 실제 차종으로 주장하지 않습니다. 원격 저장소는 [Yaho03/drive-growth](https://github.com/Yaho03/drive-growth)입니다. 보호 규칙·CI·게시 상태는 [검증 기록](docs/06_VERIFICATION.md)에서 구분해 관리합니다.
+
+## B 담당 검토 제안
+
+[경제·해금·인계 검토 자료](docs/proposals/b-economy/README.md)는 미확정 시험안과 비교 실험이다. 확정 제품 규칙이나 기능 완료 상태는 기존 PRD·검증 문서를 따른다.
