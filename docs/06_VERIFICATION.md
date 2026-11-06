@@ -15,6 +15,30 @@ PR #100의 두 결함을 최신 main `c57cb32`와 통합한 전용 worktree에�
 
 입력은 시험용 콘텐츠·메모리 저장소·직접 주입한 활동/도감 키다. 로컬 앱·에뮬레이터·SQLite·실차 시험은 수행하지 않았다. 영업 쉬기·실제 활동 저장·도감 영속 입력·새 공통 개체 필드는 연결하지 않았으며 #46 전체 완료 근거가 아니다. 기능 간 연결은 #28, 플랫폼 시험은 #80·#81·#82의 기존 범위를 따른다.
 
+## #46 공통 개체 정보 계약 확장 — 2026-11-07
+
+PR #100이 포함된 main `e7a1bcca218f89f870e9c342ecb56c39cafa48bf`에서 전용 worktree를 만들었다. #46의 공통 계약 조율 댓글과 PRD의 개별 희귀도·진행량·실제 취득액 결정을 대조했고, 타입·명령·fixture 및 필요한 소비자만 변경했다. 필드·단위·오류·호환과 저장 담당 연결점은 [기술 문서](02_SYSTEM_ARCHITECTURE.md#46-개체-정보-v1과-공통-소비-예제)에서 관리한다. Garage 전체·가챠/강화/영업 기능 완료가 아니다.
+
+환경은 macOS arm64·Temurin JDK17·프로젝트 Gradle8.11.1·기존 Android SDK35/Build Tools35이며 SDK 경로는 환경변수로만 전달했다. 에뮬레이터·adb·기존 앱/DB 데이터는 사용하거나 변경하지 않았다.
+
+| 검사·입력 | 실제 결과와 적용 범위 |
+|---|---|
+| 변경 전 `:core:test :app:testDebugUnitTest` | core86개·app4개 통과. 기존 Garage15개 포함 |
+| 회귀 테스트 선실행 | 신규2개 모두 실패: fixture 반환 목록 외부 수정, 처분 중 레벨 변경 허용을 재현 |
+| 필드·명령·메모리 fixture 및 소비 예제 | core97개 통과, 실패·오류·생략0. 기존86개 유지+`OwnedVehicleContractTest`11개. Garage15개 유지 |
+| 경계값 | 레벨1..20·진행량0..99·최대레벨진행량0, 음수금액과 잘못된 첫 지급 거절. 무료0·할인250·유료500·구매탁송800 및 같은 차종의 서로 다른 희귀도/성장값 확인 |
+| 생성·성장·처분·재시도 | Garage 조회에 새 필드 보존, 각 취득 필드/진행량만 다른 같은 request 충돌, 오래된 revision 거절, 성장/처분 뒤 과거 정산 snapshot 재생, 처분 중 성장값 변경은 금액·차량 모두 미반영 |
+| 입력·반환 방어 | fixture 원본 목록 변경 격리와 반환 목록 수정 거절. 불변 차량·정산 값 보존 |
+| app 단위 테스트 | 4개 통과, 실패·오류·생략0. SQLite 기기 실행 시험은 아님 |
+| `:app:assembleDebug :app:lintDebug` | 성공. Lint 오류0·경고11(기존 대상API·백업/아이콘·View 생성자·draw 할당 관련) |
+| `:app:assembleDebugAndroidTest` | SQLite 장치 시험8개 추가를 포함해 시험 APK 컴파일 성공. 재개방/동일성/당시 정산 재생/legacy 누락·명령 차이·원본 보존 사례는 **실행하지 않음** |
+
+실제 최종 명령은 `./gradlew --offline --no-daemon :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`다. 근거는 `core/build/test-results/test/`, `app/build/test-results/testDebugUnitTest/`, `app/build/reports/lint-results-debug.txt`다. 저장소·공백 검사는 `python3 scripts/check_repository.py`, `git diff --check`로 확인한다.
+
+SQLite에는 새 필드를 손실시키지 않는 최소 JSON/Update 대응만 반영했다. 기존 schema1 차량 JSON은 새 필드가 없으면 `STORAGE_FAILURE`/내부 `INVALID_RECORD`, 옛 차량 명령의 새 필드 포함 재시도는 `STATE_CONFLICT`가 될 수 있다. 없는 희귀도·취득액을 COMMON·0으로 보정하지 않으며 DB 버전 증가·자동 이전·자동 초기화·삭제를 제공하지 않는다. 처분 이력/발견 기록 조회·저장과 이전 전략은 저장 담당의 후속 구현·실제 재개방 검증이 필요하다.
+
+**검증 구분:** 공통 계약·메모리 동작과 기존 소비자 컴파일은 확인했다. SQLite 장치 실행·앱 재실행·실제 지급/활동·다중 차량 강화·도감 영속 일치는 미검증이다. 기존 #33·#34와 PR #100의 과거 완료를 이 새 확장의 실제 저장 성공으로 바꾸지 않는다. 구현자 본인 검증 → PR 검토 → #28 기능 간 통합 검증의 현행 절차를 유지하며 #46 전체 종료·후속 라벨·차단 관계를 변경하지 않는다.
+
 ## 현재 공통 개발 기반 검증 — 2026-11-04
 
 사용자가 준비 작업을 진행하도록 요청한 범위에서 KGP 2.2.21·AGP 8.10.1·Gradle Wrapper 8.11.1(공식 배포 SHA-256 포함)·JDK 17 조합을 실제 설정에 적용했다. 검증 대상은 기존 로컬 선행 소스이며 렌터카 제품 기능 완성본이 아니다. 아래 결과는 이전 실패·단독 컴파일 기록을 지우지 않고 현재 상태를 갱신한다.

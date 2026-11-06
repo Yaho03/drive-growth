@@ -1,5 +1,7 @@
 package io.drivegrowth.core.progression
 
+import io.drivegrowth.core.contract.Rarity
+
 import org.junit.Assert.*
 import org.junit.Test
 import kotlin.random.Random
