@@ -503,6 +503,39 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w \
 공식 근거: [Pleos CCP](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/ccp-rotary-controller-development), [폼 팩터](https://document.pleos.ai/docs/pleos-only/app-test-guide/form-factor-test-guide), [Android 창 표시 API](https://developer.android.com/reference/android/app/Activity#setVisible(boolean)), [API34 display 선택](https://android.googlesource.com/platform/packages/services/Car/+/f9a252f4a3b621daabd330531fce555300a1d4c0/car-lib/src/android/car/drivingstate/CarUxRestrictionsManager.java#422), [미구성 display의 제한](https://android.googlesource.com/platform/packages/services/Car/+/f9a252f4a3b621daabd330531fce555300a1d4c0/service/src/com/android/car/CarUxRestrictionsManagerService.java#549).
 
 
+### #105 차량 동기 조회 멈춤 수정 — 2026-11-07
+
+사용자 요청으로 기존 PR #105의 `92d343a239102eaa3169f849c0b21362c6620c4e`에서 차량 입력 동기 경계를 수정했다. **기존 main부터 있는 UI-thread IPC 취약점**이며 #105가 새로 만든 회귀로 바꾸지 않는다. 검증 C가 제공한 `/private/tmp/pr105-session3-evidence/`의 JDWP·CarService 스택·metadata·동일 APK 재부팅 후22개 결과를 직접 읽었다. 앱 main은 `VehicleInput.read → getProperty → BinderProxy.transactNative`, 시험 thread는 `startActivitySync`를 기다렸고 시스템 속성 lock 소유자는 VHAL unsubscribe를 기다렸다. [앱 스택](evidence/pr105-vehicle-input-stall/before-main-blocked.txt)·[시스템 스택](evidence/pr105-vehicle-input-stall/before-carservice-lock.txt)을 발췌 보존했다. 환경 정체와 앱의 동기 호출 책임을 구분한다.
+
+구현은 `56986ba`다. 단일 SDK worker·진행 중 작업 하나·세션/revision 폐기·시작 시각 보존과 실패/해제 처리는 [02의 입력 경계](02_SYSTEM_ARCHITECTURE.md#36-차량-입력-구현-경계)를 따른다. 기존 gate 수치·경제·UI 구조·SDK 버전·의존성은 바꾸지 않았다. 09의 사용자 화면 기준도 바꾸지 않았다. 실제 SDK가 계속 반환하는 센서 AVAILABLE 값의 나이 문제와 SDK 미응답 문제는 별개다.
+
+게시 전 최신 main `3b547e52bcc7cdb0b513e8c19236f7ea66306fee`와 README·06 충돌을 확인했다. 메인에서 이미 머지한 #103·#104·#106을 `c9cb569`의 일반 merge로 통합했고 최신 README 담당표와 양쪽 검증 이력을 보존했다. 그 PR의 코드·계약을 별도로 수정하거나 임의 cherry-pick하지 않았다. 다음 결과는 통합 전/후 APK를 구분한다.
+
+| 검사·입력 | 실제 결과·근거 |
+|---|---|
+| 수정 전 근거 | 위 검증 C의 실제 SDK 정체를 참조. 제어 가능한 입력 경계에서 만료 응답과 해제 대기 중 폐기 세션 open 경합의 [수정 전 실패](evidence/pr105-vehicle-input-stall/regressions-before.txt)를 확인한 뒤 수정했다. 새 클래스의 최초 컴파일 미구현 실패와 행동 실패를 혼동하지 않는다. |
+| 제어 가능한 JVM 지연·실패 | `VehicleInputQueueTest`14개 통과. 막힌 read/close 중 main 작업·gate 만료, 2500/2501ms 경계·예약 시각, 오류/권한 이유, stop/revision/이전 세션 폐기, 1000회 start/stop의 작업 하나·최신 factory만 생성, open/close 오류 후 상태·자원 보존·cleanup 진단을 확인. latch/수동 scheduler/clock 사용, 임의 sleep 없음. |
+| 통합 전 `56986ba` | core86개·app18개, 빌드/Lint 성공. APK `6f09e9daed5dae61f7c9cff5125745e2f65b11c1d410e2fd5ed1fc2d75c8d29a`, [기기23개 통과](evidence/pr105-vehicle-input-stall/instrumentation-before-main-merge-23.txt): 원본22개+지연 경계1개. |
+| 최신 main 통합 `c9cb569` | core97개·app25개, 실패/오류/생략0. `./gradlew --offline :core:test :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug` 성공. Lint 오류0·경고14(통합 main13+기존 #105 API29 callback 제안1), 경고 숨김/새 의존성 없음. |
+| 통합 APK 식별 | 앱 SHA-256 `8774cfc32210502b91ac1aa8f838425c0e49f01c8627affc071076430a243193`, 시험 APK `09cc28008de8e89dc7533db34e041b6aabeb80166338e5651ee41f42a4fb65c2`. 기존 설치 인증서 일치 확인 후 `install -r` 사용. 실제 설치 해시와 최종 대조하며 키 경로/비밀값·APK 원본은 게시하지 않는다. |
+| 통합 기기 전체 | [47개 통과](evidence/pr105-vehicle-input-stall/instrumentation-final-47.txt), 18.574초. 원본22개와 통합 main SQLite/차고 시험·새 지연1개를 포함한다. 새 검증 세션은 만들지 않았다. |
+| Android main 지연 회귀 | 제품 큐+실제 main Looper에서 worker의 가짜 reader를 latch로 막은 채 main의 제한 판정·1000회 poll·stop을 먼저 완료, 결과 폐기·worker 종료 확인. 실제 CarService 지연 보장이 아니라 제어된 입력 경계 시험이다. |
+| 실제 제품 UI의 입력 부재 | 통합 전 APK에서 JDWP로 **SDK worker만** 일시 중지, main 비중지와 [실제 제한·숨김·같은 Activity 복귀](evidence/pr105-vehicle-input-stall/worker-pause.txt)를 확인. 재개·detach 후 P 재수신. 실제 Binder 내부 정체를 주입한 시험은 아니다. 첫 유효기간 전 캡처·다른 창 포커스/앱 목록 오버레이 입력은 성공 근거에서 제외했다. |
+
+기기 환경은 Pleos2.1.0/API34 ARM64·Emulator37.2.13·사용자10·동일 AVD(console5556), 1080×600/120dpi다. 메인에 현재 점유를 확인해 우선 사용 배정을 받았고 active instrumentation/제품 프로세스 없음도 재확인했다. 첫 재시험은 NavigationTest 시작문구 뒤 장치와 qemu가 사라져 **실패/원인 미확정**으로 보존했다. 메인·검증 A/B는 종료 조작을 하지 않았다고 보고했다. 데이터 유지 재기동의 보고창은 자동화 앱 목록에서 접근할 수 없어 사용자가 자동 전송 체크를 해제하고 Don't send를 눌렀다. 외부 충돌 보고·AVD 초기화·앱 삭제·시스템 패치·UX 우회는 하지 않았다.
+
+복구 명령의 첫 AVD 경로 오류는 게스트를 시작하지 않았다. 실제 경로로 기동한 한 번의 게스트 복구는 기본 ADB5037에 등록돼, 기존5038 서버에서 같은 게스트를 `localhost:5557`로 연결했다. 원래5038 서버는 종료하지 않았고 이번 복구가 만든5037 서버는 해당 게스트만 있음을 확인한 뒤 정리했다. 이 별칭과 복구를 새 장치/실차 시험으로 표시하지 않는다. 브리지 복구는 공개 콘솔의8088 포워딩·`/browser/session` heartbeat·`/vehicle/gear`와`/vehicle/controls`를 사용했으며 SDK/시스템 앱은 변경하지 않았다.
+
+통합 전 수동 시험에서는 P 콘텐츠·선택/재생성, 일반/CCP Back·실제 창 숨김/같은 Activity 복귀, 속도 권한 거부/복원과 거부 중 재생성을 확인했다. 콘솔이 처음 `bridge_ready=false/emulator_active=false`였으나 재기동 후 브라우저 세션을 유지한 요청에서 true가 됐고 **앱 SDK `gear=DRIVE·ux=true`** 수신을 확인했다. D 정차, 콘솔30km/h 주행·10km/h/브레이크60% 감속, D 숨김·재진입·재생성에서 게임 콘텐츠가 나타나지 않았고 P 복귀 후 `PARK·ux=false`와 콘텐츠를 확인했다. 속도의 콘솔 설정/표시와 앱의 `speed=OK` 상태는 구분하며 앱 로그에 숫자 속도는 남기지 않았다. 통합 후 핵심 수동 결과와 종료 상태는 아래 최종 기록을 따른다.
+
+
+**최종 통합 APK 수동 결과:** 앱의 권한은 허용 상태였지만 SDK는 `NO_DATA`에 머물렀다. [제한 신호](evidence/pr105-vehicle-input-stall/final-no-data-signals.txt), [Back 후 실제 창 숨김](evidence/pr105-vehicle-input-stall/final-no-data-hidden.png), [복귀·재생성 뒤 제한 화면](evidence/pr105-vehicle-input-stall/final-no-data-recreated.png)을 확인했다. 콘솔 Drive/30/10/P 응답이 성공해도 이 버전의 SDK D/P 수신 성공으로 기록하지 않는다. 앱의 현재 PID 스택 확보는 JDWP handshake 종료·ADB shell 지연으로 실패했고, 이어진 재실행도15초 host timeout이었다. [DrivingView SIGSEGV·호스트 ColorBuffer 오류](evidence/pr105-vehicle-input-stall/environment-after-main-merge.txt)는 관측 근거이며 원인 확정이 아니다. 통합 후의 정상 P 콘텐츠·실제 D/P·권한 거부/복원 전체 수동 회귀는 미완료로 남긴다. 앞의47개 자동 기기 통과와 통합 전의 수동 성공을 이 빈칸에 옮기지 않는다.
+
+**종료·원복:** 콘솔 기어Park·속도/가속/브레이크0 요청, 사용자10 속도 권한granted와 임시user-set/user-fixed 해제, `ceDataInode=491836` 유지, [야간no·1080×600/120dpi·overlay/secure null 원복](evidence/pr105-vehicle-input-stall/final-restoration.txt)을 확인했다. 최종 설치 APK 해시는 위 통합 앱과 일치했다. 마지막 Car UX 서비스 dump는 응답했으나 차량 입력·ADB가 간헐 지연돼 전체 건강 상태를 정상으로 판정하지 않는다. 이번 복구 qemu 실행을 중단하고 offline 별칭·JDWP·heartbeat·8088/8701 forward를 제거했다. 최종 devices/forward는 비었고 qemu/JDWP/heartbeat 프로세스는 없으며 원래5038 서버만 유지했다. 사용자가 해제한 자동 crash 보고 설정은 다시 켜지 않았다. 데이터 삭제 없이 APK 업데이트와 위 한 번의 실제 게스트 복구를 수행했다. [빌드·설치·시험 단계별 메타데이터](evidence/pr105-vehicle-input-stall/verification-metadata.json)를 참조한다.
+
+남은 범위: SDK 내부 main 콜백의 Car.mLock/OEM 정체 전체 제거, 영구 Binder 정체의 강제 취소·해제 완료/자동 복구, 센서 시각 신뢰성, 실제 CarService 지연·단절 주입, 공식 폼팩터/미구성 DISPLAY2의 콘텐츠·API28·실차는 미검증이다. #51 전체 완료·main 머지·Draft 해제·이슈 종료·ready/Blocked by 변경은 하지 않는다. 최종 독립 검증은 결과를 받은 메인이 요청하며 새 검증 세션은 만들지 않았다.
+
+
 ## #52 차고·도감 표시 UI 부분 검증
 
 2026-11-07, `codex/52-garage-display` 독립 worktree에서 `origin/main`의 `e7a1bcc`를 기준으로 구현했다. #52 최신 본문과 댓글(없음), 당시 열린 PR(없음)을 확인했다. 이 절은 표시 UI와 고정 입력의 자동 검사 기록이며 #51 연결이나 #52 전체 완료 보고가 아니다.

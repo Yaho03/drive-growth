@@ -1,0 +1,55 @@
+"main" prio=5 tid=1 Blocked
+  | group="main" sCount=1 ucsCount=0 flags=1 obj=0x71b49e28 self=0xb40000717005e380
+  | sysTid=1030 nice=0 cgrp=foreground sched=0/0 handle=0x728d70a4f8
+  | state=S schedstat=( 305168555 2875095413 4041 ) utm=18 stm=11 core=3 HZ=100
+  | stack=0x7fcb5f9000-0x7fcb5fb000 stackSize=8188KB
+  | held mutexes=
+  at com.android.car.CarPropertyService.dump(CarPropertyService.java:300)
+  - waiting to lock <0x0d57c59a> (a java.lang.Object) held by thread 63
+  at com.android.car.ICarImpl.dumpService(ICarImpl.java:1002)
+  at com.android.car.ICarImpl.dumpAllServices(ICarImpl.java:970)
+  at com.android.car.ICarImpl.dumpAll(ICarImpl.java:832)
+  at com.android.car.ICarImpl.dumpIndenting(ICarImpl.java:752)
+  at com.android.car.ICarImpl.dump(ICarImpl.java:745)
+  at com.android.car.CarServiceImpl.dump(CarServiceImpl.java:119)
+  at com.android.car.internal.ProxiedService.doDump(ProxiedService.java:55)
+  at com.android.car.ServiceProxy.dump(ServiceProxy.java:80)
+  at android.app.ActivityThread.handleDumpService(ActivityThread.java:4771)
+  at android.app.ActivityThread.-$$Nest$mhandleDumpService(unavailable:0)
+  at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2333)
+  at android.os.Handler.dispatchMessage(Handler.java:106)
+  at android.os.Looper.loopOnce(Looper.java:205)
+  at android.os.Looper.loop(Looper.java:294)
+  at android.app.ActivityThread.main(ActivityThread.java:8194)
+  at java.lang.reflect.Method.invoke(Native method)
+  at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+  at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+
+"binder:1030_10" prio=5 tid=63 Native
+  | group="main" sCount=1 ucsCount=0 flags=1 obj=0x12fc01b0 self=0xb40000717005ff50
+  | sysTid=12560 nice=0 cgrp=foreground sched=0/0 handle=0x6f9e019cb0
+  | state=S schedstat=( 1801446844 8892697952 34682 ) utm=73 stm=106 core=0 HZ=100
+  | stack=0x6f9df22000-0x6f9df24000 stackSize=991KB
+  | held mutexes=
+  native: #00 pc 000b7698  /apex/com.android.runtime/lib64/bionic/libc.so (__ioctl+8) (BuildId: a87908b48b368e6282bcc9f34bcfc28c)
+  native: #01 pc 00070668  /apex/com.android.runtime/lib64/bionic/libc.so (ioctl+156) (BuildId: a87908b48b368e6282bcc9f34bcfc28c)
+  native: #02 pc 00061294  /system/lib64/libbinder.so (android::IPCThreadState::talkWithDriver+280) (BuildId: 4982579177a812ffb5fa115c3209c0ba)
+  native: #03 pc 000625f0  /system/lib64/libbinder.so (android::IPCThreadState::waitForResponse+60) (BuildId: 4982579177a812ffb5fa115c3209c0ba)
+  native: #04 pc 00062330  /system/lib64/libbinder.so (android::IPCThreadState::transact+216) (BuildId: 4982579177a812ffb5fa115c3209c0ba)
+  native: #05 pc 00079640  /system/lib64/libbinder.so (android::BpBinder::transact+188) (BuildId: 4982579177a812ffb5fa115c3209c0ba)
+  native: #06 pc 00198574  /system/lib64/libandroid_runtime.so (android_os_BinderProxy_transact+152) (BuildId: eec8216c8b9281e6a4ecdc649e3c55e8)
+  at android.os.BinderProxy.transactNative(Native method)
+  at android.os.BinderProxy.transact(BinderProxy.java:584)
+  at android.hardware.automotive.vehicle.IVehicle$Stub$Proxy.unsubscribe(IVehicle.java:309)
+  at com.android.car.AidlVehicleStub$AidlSubscriptionClient.unsubscribe(AidlVehicleStub.java:630)
+  at com.android.car.hal.VehicleHal.unsubscribeProperty(VehicleHal.java:617)
+  at com.android.car.hal.PropertyHalService.updateSubscriptionRateForHalPropIdLocked(PropertyHalService.java:1246)
+  at com.android.car.hal.PropertyHalService.unsubscribeProperty(PropertyHalService.java:1098)
+  - locked <0x0bb03ecb> (a java.lang.Object)
+  at com.android.car.CarPropertyService.unregisterListenerBinderLocked(CarPropertyService.java:506)
+  at com.android.car.CarPropertyService.unregisterListenerBinderForProps(CarPropertyService.java:531)
+  - locked <0x0d57c59a> (a java.lang.Object)
+  at com.android.car.CarPropertyService.-$$Nest$munregisterListenerBinderForProps(unavailable:0)
+  at com.android.car.CarPropertyService$Client.binderDied(CarPropertyService.java:253)
+  at android.os.IBinder$DeathRecipient.binderDied(IBinder.java:319)
+  at android.os.BinderProxy.sendDeathNotice(BinderProxy.java:704)

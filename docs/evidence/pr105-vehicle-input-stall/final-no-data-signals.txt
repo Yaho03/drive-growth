@@ -1,0 +1,9 @@
+11-06 12:23:47.509  5537  5537 I DriveGrowthVehicle: observation_start firstInProcess=true displayId=0
+11-06 12:23:47.524  5537  5537 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-06 12:23:48.966  5537  5537 I DriveGrowthVehicle: observation_start firstInProcess=false displayId=0
+11-06 12:23:48.988  5537  5537 I DriveGrowthVehicle: observation_gap kind=APP_HIDDEN durationMs=1119
+11-06 12:23:48.988  5537  5537 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-06 12:24:55.402 17168 17168 I DriveGrowthVehicle: observation_start firstInProcess=true displayId=0
+11-06 12:24:55.424 17168 17168 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-06 12:26:43.739 17168 17168 I DriveGrowthVehicle: observation_start firstInProcess=false displayId=0
+11-06 12:26:43.799 17168 17168 I DriveGrowthVehicle: observation_gap kind=APP_HIDDEN durationMs=2712

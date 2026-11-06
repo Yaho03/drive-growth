@@ -1,0 +1,9 @@
+소스56986ba의 실제 앱 프로세스29562에 JDWP 연결. 제품/시스템 서비스를 패치하지 않음.
+threads: main=26821, DriveGrowthVehicle HandlerThread=26826 (하나)
+suspend 26826
+where 26826: MessageQueue.nativePollOnce -> MessageQueue.next -> Looper.loop -> HandlerThread.run
+main은 suspend하지 않았으며 where main 요청은 Current thread isn't suspended를 반환했다.
+SDK worker가 멈춘 동안 시간이 지나자 실제 앱이 Restricted로 바뀌었다. 앱에 포커스를 준 뒤 일반 Back으로 창 숨김, 같은 Task1004542/ActivityRecord1ae941d로 복귀해 Restricted 유지.
+resume 26826; exit (디버거 연결 해제). 이후 SDK PARK/ux=false 재수신 확인.
+이는 SDK worker의 예약/응답 부재를 제어한 시험이며 실제 Binder 호출 내 정체나 실제 CarService 장애 주입이 아니다.
+첫 일시중지 직후 캡처는 유효기간이 지나기 전이고, 포커스가 다른 창에 있던 Back·AppGrid 오버레이 화면은 성공 근거에서 제외했다.
