@@ -18,7 +18,9 @@ import io.drivegrowth.core.contract.TransactionKind
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.contract.VehicleLifecycle
 import io.drivegrowth.core.contract.VehicleWrite
-import io.drivegrowth.core.progression.Rarity
+import io.drivegrowth.core.contract.Rarity
+import io.drivegrowth.core.contract.GameMoney
+import io.drivegrowth.core.contract.VehicleAcquisitionSource
 import io.drivegrowth.core.progression.VehicleActivity
 import org.junit.Assert.*
 import org.junit.Test
@@ -29,7 +31,7 @@ class GarageTest {
     private val g90 = VehicleId("genesis_g90")
 
     private fun vehicle(id: String, vehicleId: VehicleId = casper, lifecycle: VehicleLifecycle = VehicleLifecycle.OWNED) =
-        OwnedVehicle(OwnedVehicleId(id), vehicleId, 1, Revision(0), lifecycle)
+        OwnedVehicle(OwnedVehicleId(id), vehicleId, 1, Revision(0), lifecycle, Rarity.COMMON, 0, GameMoney(100), VehicleAcquisitionSource.GACHA)
 
     private fun <T> ok(result: ContractResult<T>): T = (result as ContractResult.Success).value
 
@@ -40,7 +42,7 @@ class GarageTest {
         assertEquals(setOf(casper), before.map { it.vehicleId }.toSet())
 
         val consume = GameChange(RequestId("r-consume-v1"), TransactionKind.GARAGE, InputSource.SIMULATION, RuleVersion("fixture-rule-v0"),
-            vehicle = VehicleWrite.Update(OwnedVehicleId("v1"), Revision(0), 1, VehicleLifecycle.CONSUMED))
+            vehicle = VehicleWrite.Update(OwnedVehicleId("v1"), Revision(0), 1, VehicleLifecycle.CONSUMED, 0))
         assertTrue(store.commitGameChange(consume) is ContractResult.Success)
 
         val after = ok(garage.owned(ok(store.listOwnedVehicles())))

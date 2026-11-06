@@ -9,7 +9,7 @@ import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.RuleVersion
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.progression.GachaRules
-import io.drivegrowth.core.progression.Rarity
+import io.drivegrowth.core.contract.Rarity
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File

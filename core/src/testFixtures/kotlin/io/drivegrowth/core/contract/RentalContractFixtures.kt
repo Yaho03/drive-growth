@@ -1,6 +1,7 @@
 package io.drivegrowth.core.contract
 
 import io.drivegrowth.core.Gear
+import java.util.Collections
 import kotlin.random.Random
 
 object RentalContractFixtures {
@@ -8,8 +9,32 @@ object RentalContractFixtures {
     val ruleVersion = RuleVersion("fixture-v0")
     val contentVersion = ContentVersion("fixture-catalog-v0")
     val vehicleId = VehicleId("vA")
-    val firstVehicle = OwnedVehicle(OwnedVehicleId("v1"), vehicleId, 1, Revision(3), VehicleLifecycle.OWNED)
-    val secondVehicle = firstVehicle.copy(ownedVehicleId = OwnedVehicleId("v2"))
+    val firstVehicle = OwnedVehicle(
+        OwnedVehicleId("v1"), vehicleId, 1, Revision(3), VehicleLifecycle.OWNED,
+        Rarity.COMMON, 0, GameMoney(0), VehicleAcquisitionSource.INITIAL_GRANT,
+    )
+    val secondVehicle = firstVehicle.copy(
+        ownedVehicleId = OwnedVehicleId("v2"), rarity = Rarity.RARE, level = 4, levelProgressPercent = 50,
+        acquisitionCost = GameMoney(250), acquisitionSource = VehicleAcquisitionSource.GACHA,
+    )
+    val paidGachaVehicle = secondVehicle.copy(
+        ownedVehicleId = OwnedVehicleId("paid-gacha"), rarity = Rarity.ADVANCED,
+        level = 2, levelProgressPercent = 25, revision = Revision(0), acquisitionCost = GameMoney(500),
+    )
+    val freeGachaVehicle = paidGachaVehicle.copy(
+        ownedVehicleId = OwnedVehicleId("free-gacha"), rarity = Rarity.LEGEND,
+        level = 1, levelProgressPercent = 0, acquisitionCost = GameMoney(0),
+    )
+    val deliveryVehicle = paidGachaVehicle.copy(
+        ownedVehicleId = OwnedVehicleId("purchase-delivery"), acquisitionCost = GameMoney(800),
+        acquisitionSource = VehicleAcquisitionSource.PURCHASE_DELIVERY,
+    )
+
+    /** 같은 차종의 revision0 신규 입력. 시험 성장값이며 영구 획득 이력은 아니다. */
+    fun vehicleExamples(): List<OwnedVehicle> = Collections.unmodifiableList(
+        listOf(firstVehicle.copy(revision = Revision(0)), secondVehicle.copy(revision = Revision(0)),
+            paidGachaVehicle, freeGachaVehicle, deliveryVehicle),
+    )
 
     fun random() = Random(33)
 
@@ -51,7 +76,7 @@ class InMemoryGameChangeStore(
 
     @Synchronized
     override fun listOwnedVehicles(): ContractResult<List<OwnedVehicle>> =
-        ContractResult.Success(vehiclesById.values.filter { it.lifecycle == VehicleLifecycle.OWNED })
+        ContractResult.Success(Collections.unmodifiableList(vehiclesById.values.filter { it.lifecycle == VehicleLifecycle.OWNED }))
 
     @Synchronized
     override fun commitGameChange(change: GameChange): ContractResult<Settlement> {
@@ -79,8 +104,13 @@ class InMemoryGameChangeStore(
                     return failure(ContractError.STATE_CONFLICT)
                 }
                 if (previous.revision.value == Int.MAX_VALUE) return failure(ContractError.INVALID_INPUT)
+                if (write.lifecycle != VehicleLifecycle.OWNED &&
+                    (write.level != previous.level || write.levelProgressPercent != previous.levelProgressPercent)) {
+                    return failure(ContractError.INVALID_INPUT)
+                }
                 previous.copy(
                     level = write.level,
+                    levelProgressPercent = write.levelProgressPercent,
                     lifecycle = write.lifecycle,
                     revision = Revision(previous.revision.value + 1),
                 )
