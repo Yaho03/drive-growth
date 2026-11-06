@@ -1,0 +1,13 @@
+Night mode: no
+1
+10
+Physical size: 1080x600
+Physical density: 120
+null
+null
+Night mode: no
+      android.car.permission.CAR_POWERTRAIN: granted=true
+    User 0: ceDataInode=131326 installed=true hidden=false suspended=false distractionFlags=0 stopped=true notLaunched=true enabled=0 instant=false virtual=false
+        android.car.permission.CAR_SPEED: granted=false
+    User 10: ceDataInode=491836 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false
+        android.car.permission.CAR_SPEED: granted=true
