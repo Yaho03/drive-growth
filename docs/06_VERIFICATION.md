@@ -410,3 +410,46 @@ PR #32 최초 Android CI는 앱 컴파일 전 `setup-android@v3`의 기본 `tool
 | 미확인 정산에서 화면 크기를 800×480으로 변경 | `wm_relaunch_resume_activity` 로그에서 Activity 재생성을 확인했다. 선택한 화면과 콘텐츠 버전 `fixture-content-v0`이 유지됐다. 시험 후 크기 설정을 원복했다. |
 
 이 시험 당시의 #36 신호 미연결과 #51·#63 인계는 과거 기록이다. 현재 main에는 PR #93의 차량 신호 소비 경로가 반영됐다. 같은 버전의 D 정차·제한 중 재진입·P 복귀, CCP와 실제 분할 창의 남은 실행 결과는 #51 본인 검증·PR 검토와 #28 통합 검증에서 확인한다. 이 과거 APK 시험만으로 최신 연결 빌드의 전체 검증을 완료 처리하지 않는다.
+
+### #51 Back·창·입력 후속 본인 검증 — 2026-11-07
+
+출발 소스는 `origin/main c57cb32304129124bad97353442f8a51e954b527`이다. 아래는 macOS ARM64에서 직접 실행한 결과이며, [팀원의 Windows/x86_64 보고](https://github.com/Yaho03/drive-growth/issues/51#issuecomment-6689704196)를 이 세션의 재실행으로 표시하지 않는다. #100 Garage·경제·내비·기록 서비스는 수정하지 않았다.
+
+- 환경: Pleos Connect 2.1.0 / API 34 ARM64, Emulator 37.2.13.0, 사용자10, `emulator-5556`, ADB5038. 기존 데이터 유지, 별도 창·host GPU·RAM4096MB·스냅샷 로드/저장 없이 기동했다. 기존 실행 AVD·연결 장치가 없음을 먼저 확인했고 메인 세션과 사용 범위를 조율했다.
+- 기본 표시: 1080×600px / 120dpi. 실제 앱 창은 `(360,57)–(1062,495)`, 702×438px / 936×584dp였다. 플랫폼 신호는 `InputSource.VEHICLE`, 원장·콘텐츠는 화면에 `모의 원장 · 시험용 콘텐츠 · fixture-content-v0`로 표시한다. 에뮬레이터 신호를 실차로 부르지 않는다.
+- 최종 APK SHA-256: `1ba2f47f9dee687f53be3a851d614b6362d1cd76a09d73c7b06fc9863a01f284`. 이 APK에서 창 숨김·복귀·재생성·최종22개 기기 시험을 확인했다. 기존 개발 서명과 일치함을 확인한 뒤 데이터 유지 업데이트했다. 서명키·APK·전체 시스템 로그는 게시하지 않는다.
+- 중간 진단 빌드 SHA-256: `eeac0ed1d52791125ebcac3ab75e23e05143ef91f27751f55d08937bf2b05954`. 창 표시 보완 전의 DISPLAY2·중복 원인·전체 표시/창 크기 시험은 이 단계의 근거다. 원인 진단 자료로 유지하지만 최종 APK에서 다시 실행한 것으로 세지 않는다. 이 중간 APK 파일은 별도로 보존하지 않았고 당시 빌드의 해시와 로그·화면을 보존했다. 최초 수정 전 실패는 출발 main의 근거이며 해당 APK 해시는 별도로 남기지 못했다.
+
+| 항목·입력 | 직접 재현·수정·결과 | 한계·남은 확인 |
+|---|---|---|
+| A. 최상위 Back | 수정 전 Activity1개에서도 일반 Back 후 게임이 남았다. `moveTaskToBack(true)`만으로는 포커스만 이동하고 `RESUMED`·창 표시가 유지됐다. 최상위에서 관측·gate를 정리하고 `setVisible(false)`와 Task 뒤 이동을 함께 수행하도록 보완했다. 일반 Back·CCP `inject-key 4` 후 [실제 게임 창 숨김](evidence/issue51-input-lifecycle/final-ccp-hidden.png), [같은 Activity 복귀](evidence/issue51-input-lifecycle/final-ccp-return.png)를 확인했다. task1003830·Activity `8ed4066` 유지, focus는 홈→앱으로 바뀌었다. | 공개 창 표시 API를 사용한 다중 창 보완이며 Pleos 공식 예제 자체와 구분한다. 다른 Android 버전·에뮬레이터 툴바의 세모 버튼 전달은 미검증이다. |
+| B. 중복 Activity | 깨끗한 `MAIN/LAUNCHER`, flags `0x10200000` 재진입을 반복해 task1003826·Activity `2e4848e` 한 개 유지. `am start -n`만 반복하면 같은 task에3개가 생겼다. 따라서 launchMode는 바꾸지 않았다. | 런처형 Intent와 실제 런처 UI의 버튼 실행은 구분한다. 공개 `ACTION_APP_GRID`로 AppGridActivity 전면 진입은 확인했지만 아이콘 목록이 표시되지 않아 실제 앱 목록 버튼 재진입은 미검증이다. 가상 표시 시험의 `MULTIPLE_TASK`·component task가 후속 시험을 오염시킨 구간은 제외하고 task만 정리해 재시험했다. |
+| C. DISPLAY2 UX | Android 개발자 overlay `800x480/120`에서 [제한 화면](evidence/issue51-input-lifecycle/display2-parked.png), Activity `displayId=2`, `speed=OK gear=PARK ux=true` 재현. 실제 창800×480px / 1067×640dp. 표시 속도0km/h, SDK 속도 숫자 원값은 별도 수집하지 않았다. 시스템 UXR 구성에는 display0만 있고 `DO=false UxR=0`이었다. 조회 대상을 표시하는 로그만 추가했다. | 공식 FormFactorConsole 실행과 구분한 진단이다. 공개 무인자 UXR getter는 연결 Context의 display를 사용한다. 미구성 display는 완전 제한으로 귀결되는 AOSP 경로와 일치하지만 OEM 동일 구현을 확정하지 않는다. display0 허용값으로 대체하거나 P만으로 열지 않았다. |
+| D. 크기·복원 | 기본 앱 창에서 터치로 가게·보유 차량·미확인 정산·새로고침에 접근했다. [정산 선택과 콘텐츠 버전은 Activity 재생성 후 유지](evidence/issue51-input-lifecycle/final-recreated-results.png). 전체 `wm size 800x480`에서는 ARM64도 앱 bounds가1062px까지 남아 [잘림](evidence/issue51-input-lifecycle/whole-display-800x480.png)을 재현했고 [원복](evidence/issue51-input-lifecycle/whole-display-restored.png)했다. `am task resize` 요청도 실제 bounds가 바뀌지 않아 좁은 창 통과로 세지 않았다. | 전체 표시 변경·앱 창·가상 표시·팀원841px 분할 창은 다른 시험이다. Go·Host Display Bridge가 준비되지 않아 공식 FormFactorConsole 프리셋 시험은 미수행. DISPLAY2에서는 제한을 유지하므로 게임 콘텐츠 배치는 미검증이다. |
+| E. CCP 다이얼 | 2026-11-07 사용자 결정대로 `<application>`에 `com.hmg.rotary.ROTARY_SUPPORTED=false` 선언. 필수 탐색은 터치로 시험하고 하위 CCP Back은 가게로, 최상위 CCP Back은 숨김으로 확인했다. | 다이얼 이동·선택 지원 완료가 아니다. 선택 지원 확대는 별도 결정이며 Back·복원·안전 제한은 면제하지 않는다. |
+
+**회귀·자동 검사:** 최상위 Back의 최초 [수정 전 실패](evidence/issue51-input-lifecycle/back-before-fix.txt), 포커스 검사만 통과하던 중간 구현의 [창 가시성 실패](evidence/issue51-input-lifecycle/back-visibility-before.txt)를 보존했다. 최종 `NavigationTest`는 포커스·실제 창 숨김·미종료·숨김 시 Restricted·최근 Task 복귀를 확인한다. 3초 이상 복귀가 지연돼도 정상 P 허용을 실패로 보지 않도록 Restricted는 숨김 시점에 검사한다. gate 초기화 후 연속 주차 재판정은 기존 `AppShellTest`와 연결한다.
+
+- `python3 scripts/check_repository.py`, `git diff --check` 실행 결과는 PR에서 최종 확인한다.
+- `./gradlew --offline :core:test :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug` 성공. core71개·app4개, 실패0. Lint 오류0·경고12개: 기존11개(`DrawAllocation`6·`ViewConstructor`2·`OldTargetApi`·`DataExtractionRules`·`MissingApplicationIcon`)와 새 API29 callback의 `@TargetApi`에 대한 `UseRequiresApi` 제안1개다. 새 의존성으로 경고를 지우거나 미사용 DashboardView·디자인을 정리하지 않았다.
+- `am instrument --user 10 -w io.drivegrowth.app.test/android.test.InstrumentationTestRunner`: [22개 성공](evidence/issue51-input-lifecycle/final-instrumentation.txt). 저장 검사는 격리된 시험 DB를 사용한다. [task·display 발췌](evidence/issue51-input-lifecycle/device-evidence.txt)는 UI와 함께 대조한다.
+
+**미충족·인계:** 현재 Virtual Console `/vehicle/gear?gear=Drive` 요청은 시간 초과했고 SDK·화면에서는 P가 유지됐다. 이를 D 시험 성공으로 세지 않는다. 이번 변경 빌드의 D 정차·주행·감속·제한 중 재진입·D 재생성·P 복귀와 권한 거부/복원의 전체 실행은 미검증이다. 팀원의 `506a38c` 보고는 기존 근거로 유지하되 새 수명주기 보완의 성공으로 확장하지 않는다. user 이미지에서 제한된 VHAL 주입을 root·정책 변경으로 우회하지 않았다. 로컬에서 관측한 긴 표본 간격에도 유효성·3초 연속 주차 기준을 완화하지 않았다.
+
+#51은 **부분 인계**다. 공통 화면·조회·출처·선택 복원, Back 창 숨김·복귀와 다이얼 미지원 범위를 사용할 수 있으나, 새 빌드의 D/P 회귀·지원 폼 팩터·실제 런처 입력 확인이 남아 전체 종료로 판단하지 않는다. 저장 성공 전 완료 연출·중복 명령의 실제 거래 기능 연결은 각 기능과 #28에서 확인한다. 새 원장이나 별도 교차검증 대기는 만들지 않는다. #36·#63은 다시 열지 않는다.
+
+재현 시 중복 시험 task를 구분하고 다음 런처형 Intent를 사용한다. 전용 시험 장치에서 `am force-stop --user 10 io.drivegrowth.app`으로 task를 정리할 수 있지만 앱 데이터 삭제는 하지 않는다.
+
+```sh
+adb -P 5038 -s emulator-5556 shell am start --user 10 \
+  -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
+  -f 0x10200000 -n io.drivegrowth.app/.MainActivity
+adb -P 5038 -s emulator-5556 shell input keyevent KEYCODE_BACK
+adb -P 5038 -s emulator-5556 shell cmd car_service inject-key 4
+adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w \
+  io.drivegrowth.app.test/android.test.InstrumentationTestRunner
+```
+
+시험 표시·야간 모드·입력 연결의 종료 상태는 PR에 최종 원복 확인을 남긴다. `wm size reset`, 원래120dpi, overlay 설정 삭제, 야간 모드 no로 복구했다. 권한은 변경하지 않았다. D·속도 변경 성공 근거는 없으며 마지막 P·0 표시와 SDK P·UX 허용을 확인 대상으로 유지한다.
+
+공식 근거: [Pleos CCP](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/ccp-rotary-controller-development), [폼 팩터](https://document.pleos.ai/docs/pleos-only/app-test-guide/form-factor-test-guide), [Android 창 표시 API](https://developer.android.com/reference/android/app/Activity#setVisible(boolean)), [API34 display 선택](https://android.googlesource.com/platform/packages/services/Car/+/f9a252f4a3b621daabd330531fce555300a1d4c0/car-lib/src/android/car/drivingstate/CarUxRestrictionsManager.java#422), [미구성 display의 제한](https://android.googlesource.com/platform/packages/services/Car/+/f9a252f4a3b621daabd330531fce555300a1d4c0/service/src/com/android/car/CarUxRestrictionsManagerService.java#549).

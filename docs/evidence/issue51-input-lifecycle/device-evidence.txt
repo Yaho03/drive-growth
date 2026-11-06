@@ -1,0 +1,25 @@
+final-ccp-hidden
+    * Hist  #0: ActivityRecord{8ed4066 u10 io.drivegrowth.app/.MainActivity t1003830}
+  mCurrentFocus=Window{90eb821 u10 ai.umos.homescreen/ai.umos.homescreen.HomeActivity}
+
+final-ccp-return
+    * Hist  #0: ActivityRecord{8ed4066 u10 io.drivegrowth.app/.MainActivity t1003830}
+  mCurrentFocus=Window{261c584 u10 io.drivegrowth.app/io.drivegrowth.app.MainActivity}
+
+final-android-hidden
+    * Hist  #0: ActivityRecord{8ed4066 u10 io.drivegrowth.app/.MainActivity t1003830}
+  mCurrentFocus=Window{90eb821 u10 ai.umos.homescreen/ai.umos.homescreen.HomeActivity}
+
+가상 표시: Android overlay. 공식 FormFactorConsole 실행과 구분.
+         1793986194.572  6434  6434 I DriveGrowthVehicle: observation_start firstInProcess=false displayId=2
+         1793986195.971  6434  6434 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=true
+시스템 UXR 구성 display0만 존재: DO=false UxR=0
+DISPLAY2 800x480px / 120dpi / Activity1067x640dp. 표시속도0km/h, SDK speed=OK(숫자 원값 미수집)
+
+clean-launcher-repeat
+    * Hist  #0: ActivityRecord{2e4848e u10 io.drivegrowth.app/.MainActivity t1003826}
+
+baseline-explicit-repeat
+    * Hist  #2: ActivityRecord{cadcca6 u10 io.drivegrowth.app/.MainActivity t1003820}
+    * Hist  #1: ActivityRecord{5a48ffc u10 io.drivegrowth.app/.MainActivity t1003820}
+    * Hist  #0: ActivityRecord{f491023 u10 io.drivegrowth.app/.MainActivity t1003820}

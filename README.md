@@ -5,7 +5,7 @@
 | 담당 | 지금 할 일 | 막고 있는 이슈 | 해제 조건 |
 |---|---|---|---|
 | 정원 | [#80](https://github.com/Yaho03/drive-growth/issues/80), [#37](https://github.com/Yaho03/drive-growth/issues/37) 시험용 후보·규칙 확인, [#40](https://github.com/Yaho03/drive-growth/issues/40) 음성 없는 뼈대 | #38·#39는 정원 #37 | 선택 의뢰의 필요한 결과 검토·main 반영 |
-| 환석 | [#51](https://github.com/Yaho03/drive-growth/issues/51), PR 검토 | #52~#58은 환석 #51의 남은 공통 연결점 확인 | #51 본인 검증·PR 검토로 사용할 화면·제한 범위 확인 |
+| 환석 | [#51](https://github.com/Yaho03/drive-growth/issues/51) Back·창·복원 후속 검토, PR 검토 | #52~#58은 환석 #51의 남은 공통 연결점 확인 | [본인 검증의 사용 가능 범위와 환경 제약](docs/06_VERIFICATION.md#51-back창입력-후속-본인-검증--2026-11-07)을 PR에서 확인. 미검증 D/P·폼 팩터는 #51·#28 유지 |
 | 호열 | [#47](https://github.com/Yaho03/drive-growth/issues/47), [#48](https://github.com/Yaho03/drive-growth/issues/48), [#50](https://github.com/Yaho03/drive-growth/issues/50), #46 잔여 저장 연결·#35 콘텐츠 | #49는 경민 #42 | 확정 사고 결과 인계. 새 개체 필드·저장 확장은 공통 담당과 조율 |
 | 경민 | [#41](https://github.com/Yaho03/drive-growth/issues/41) 조회 후보·자동 배정 구현 | #42는 경민 #41, #43·#44는 경민 #42 | 각 기능이 소비할 결과의 검토·main 반영 |
 

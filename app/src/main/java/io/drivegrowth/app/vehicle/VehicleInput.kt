@@ -13,6 +13,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import android.view.WindowManager
 import io.drivegrowth.core.Gear
 import io.drivegrowth.core.contract.EpochMillis
 import io.drivegrowth.core.contract.InputSource
@@ -63,7 +64,8 @@ class VehicleInput(
     fun start() {
         if (running) return
         running = true
-        Log.i(TAG, "observation_start firstInProcess=$firstInProcess")
+        val displayId = context.getSystemService(WindowManager::class.java)?.defaultDisplay?.displayId
+        Log.i(TAG, "observation_start firstInProcess=$firstInProcess displayId=$displayId")
         firstInProcess = false
         try {
             car = Car.createCar(context, connection, handler)
