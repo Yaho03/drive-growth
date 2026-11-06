@@ -22,8 +22,9 @@ data class CollectionEntry(val key: CollectionKey, val state: CollectionState)
  * 저장소에서 읽은 개체 목록(처분 포함)을 조회 결과로 바꾼다. 상태를 바꾸거나 점유하지 않는다.
  * 손상 데이터(콘텐츠에 없는 차종·중복 개체 ID)는 INVALID_INPUT으로 거절하고 조용히 고치지 않는다.
  */
-class Garage(private val catalog: VehicleCatalogSnapshot) {
-    private val known: Set<VehicleId> = catalog.vehicles.map { it.vehicleId }.toSet()
+class Garage(catalog: VehicleCatalogSnapshot) {
+    private val vehicleIds: List<VehicleId> = catalog.vehicles.map { it.vehicleId }
+    private val known: Set<VehicleId> = vehicleIds.toSet()
 
     /** 현재 보유(OWNED) 개체. SOLD·SCRAPPED·CONSUMED는 빠진다. */
     fun owned(vehicles: List<OwnedVehicle>): ContractResult<List<OwnedVehicle>> =
@@ -38,16 +39,27 @@ class Garage(private val catalog: VehicleCatalogSnapshot) {
         }
 
     /**
-     * 대여 가능: 보유 중이면서 활동 상태가 IDLE. 활동 상태는 대여(#41)·수리(#49) 기록에서 호출자가 넘긴다.
-     * ponytail: 영업 쉬기 스위치는 저장 위치가 정해지면 같은 필터에 추가.
+     * OWNED·IDLE 대여 후보 조회. 영업 쉬기·최종 배정·점유·동시 변경 검사는 별도다.
+     * 공급자는 상태 변경 없이 활동을 읽고, 누락은 DATA_UNAVAILABLE 등 명시 실패로 반환한다.
+     * 활동 조회 실패는 그대로 전파하며 일부 후보를 성공으로 반환하지 않는다.
      */
     fun availableForRental(
         vehicles: List<OwnedVehicle>,
-        activityOf: (OwnedVehicleId) -> VehicleActivity,
-    ): ContractResult<List<OwnedVehicle>> =
-        validated(vehicles) { list ->
-            list.filter { it.lifecycle == VehicleLifecycle.OWNED && activityOf(it.ownedVehicleId) == VehicleActivity.IDLE }
+        activityOf: (OwnedVehicleId) -> ContractResult<VehicleActivity>,
+    ): ContractResult<List<OwnedVehicle>> {
+        val owned = when (val result = owned(vehicles)) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
         }
+        val available = ArrayList<OwnedVehicle>()
+        for (vehicle in owned) {
+            when (val activity = activityOf(vehicle.ownedVehicleId)) {
+                is ContractResult.Failure -> return activity
+                is ContractResult.Success -> if (activity.value == VehicleActivity.IDLE) available.add(vehicle)
+            }
+        }
+        return ContractResult.Success(Collections.unmodifiableList(available))
+    }
 
     /**
      * 콘텐츠 차종 × 모든 희귀도의 도감 상태. 보유했던 칸은 처분 후에도 OWNED로 남는다.
@@ -55,9 +67,9 @@ class Garage(private val catalog: VehicleCatalogSnapshot) {
      */
     fun collection(everOwned: Set<CollectionKey>, discovered: Set<CollectionKey>): ContractResult<List<CollectionEntry>> {
         if ((everOwned + discovered).any { it.vehicleId !in known }) return ContractResult.Failure(ContractError.INVALID_INPUT)
-        val entries = catalog.vehicles.flatMap { definition ->
+        val entries = vehicleIds.flatMap { vehicleId ->
             Rarity.entries.map { rarity ->
-                val key = CollectionKey(definition.vehicleId, rarity)
+                val key = CollectionKey(vehicleId, rarity)
                 val state = when (key) {
                     in everOwned -> CollectionState.OWNED
                     in discovered -> CollectionState.DISCOVERED
