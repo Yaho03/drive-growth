@@ -192,7 +192,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 - `owned`는 사용 중·수리 필요 개체도 포함하므로 강화 가능 목록으로 그대로 사용하지 않는다. 대여 후보 목록도 수리·판매·폐차 가능 목록으로 재사용하지 않는다. 수리 필요 차량의 수리·판매·폐차는 PRD에서 허용하므로 각 명령의 활동 제한을 별도로 검사한다.
 - `collection`의 `OWNED`는 한 번이라도 소유한 기록이다. 호출자는 처분 뒤에도 유지되는 `(vehicleId, rarity)` 획득 이력을 `everOwned`로, 탁송 목록·가챠 결과에서 본 기록을 `discovered`로 제공해야 한다. 도감 키를 직접 주입한 계산 시험은 실제 저장·재실행 시험과 다르다.
 
-현재 `GameChangeStore.listOwnedVehicles()`의 개체 타입은 아래 v1 필드를 포함한다. 메모리 조회·변경 예제와 SQLite의 필드 보존용 최소 codec 대응은 반영했지만 SQLite 실행 검증은 아직 하지 않았다. 처분 포함 이력·발견 기록, 실제 활동·영업 쉬기의 영속 공급은 별도다. 필드·명령은 아래 공통 계약을 사용하고 실제 조회 확장·SQLite 호환·재개방 검증은 #34 담당과 아래 연결점으로 조율한다. #46은 이 조회·계산 부분의 인계이며 저장·재실행을 포함한 전체 완료가 아니다. 기능별 본인 검증과 #28 통합 검증은 유지한다.
+현재 `GameChangeStore.listOwnedVehicles()`의 개체 타입은 아래 v1 필드를 포함한다. 메모리 조회·변경 예제와 SQLite의 필드 보존용 최소 codec 대응은 반영했다. 시험용 DB의 SQLite 실행 범위는 [검증 문서](06_VERIFICATION.md)의 PR #104 숫자 decoder 재검증 기록을 따르며 실제 제품 DB 이전·앱 재실행 검증과 구분한다. 처분 포함 이력·발견 기록, 실제 활동·영업 쉬기의 영속 공급은 별도다. 필드·명령은 아래 공통 계약을 사용하고 실제 조회 확장·SQLite 호환·재개방 검증은 #34 담당과 아래 연결점으로 조율한다. #46은 이 조회·계산 부분의 인계이며 저장·재실행을 포함한 전체 완료가 아니다. 기능별 본인 검증과 #28 통합 검증은 유지한다.
 
 ### 원자성·오류·재시도
 
@@ -309,7 +309,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 | 실패·동일 요청 | 잘못된 개체/명령 생성값은 기존 Kotlin `require`의 IllegalArgumentException으로 거절. 저장소의 처분/추가 조건 위반은 INVALID_INPUT, 오래된 revision·다른 명령의 requestId 재사용은 STATE_CONFLICT |
 | 확정 결과 | 같은 요청은 현재 차량이 아니라 당시 `Settlement.changedVehicle`을 반환. 새 개체 필드 전부와 Update 진행량도 요청 동일성에 포함 |
 
-취득 정보 누락을 무료 획득의0으로 바꾸지 않는다. Kotlin 생성자에 누락 기본값이 없고, SQLite JSON도 새 필드를 필수 읽기한다. enum·레벨·진행량·금액의 잘못된 저장값은 기존 `STORAGE_FAILURE`/내부 `INVALID_RECORD` 경로다. `GameChange`는 여전히 재화와 차량 한 대 변경이며 활동·점유 검사나 다중 차량 강화를 구현한 것이 아니다.
+취득 정보 누락을 무료 획득의0으로 바꾸지 않는다. Kotlin 생성자에 누락 기본값이 없고, SQLite JSON도 새 필드를 필수 읽기한다. enum·레벨·진행량·금액의 잘못된 저장값은 기존 `STORAGE_FAILURE`/내부 `INVALID_RECORD` 경로다. 차량 JSON의 level·revision·levelProgressPercent·acquisitionCost는 writer가 쓰는 JSON 정수(Int/Long)만 허용하며, 범위 검사 후 Int로 좁힌다. 문자열 숫자·실수(1.0 포함)·지수 표기·Long 범위 초과를 절삭/반올림/기본값으로 복구하지 않는다. 같은 decoder를 쓰는 정산의 차량 snapshot에도 적용한다. `GameChange`는 여전히 재화와 차량 한 대 변경이며 활동·점유 검사나 다중 차량 강화를 구현한 것이 아니다.
 
 C 담당은 `RentalContractFixtures.vehicleExamples()`에서 revision0인 같은 차종의 첫 지급(COMMON/1레벨/0%), 할인 가챠(RARE/4레벨/50%/250), 유료 가챠(ADVANCED/2레벨/25%/500), 무료 가챠(LEGEND/0), 구매 탁송(800) 입력을 얻는다. 금액은 시험 입력이며 최종 밸런스가 아니다. 반환 목록은 외부 변경이 금지되고 각 개체도 불변 값이다.
 

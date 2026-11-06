@@ -201,9 +201,21 @@ private object LedgerJson {
         .put("rarity", v.rarity.name).put("levelProgressPercent", v.levelProgressPercent)
         .put("acquisitionCost", v.acquisitionCost.units).put("acquisitionSource", v.acquisitionSource.name)
     fun vehicle(j: JSONObject) = OwnedVehicle(OwnedVehicleId(j.getString("id")), VehicleId(j.getString("vehicle")),
-        j.getInt("level"), Revision(j.getInt("revision")), VehicleLifecycle.valueOf(j.getString("lifecycle")),
-        Rarity.valueOf(j.getString("rarity")), j.getInt("levelProgressPercent"), GameMoney(j.getLong("acquisitionCost")),
+        integer(j, "level", 1, MAX_VEHICLE_LEVEL.toLong()).toInt(),
+        Revision(integer(j, "revision", 0, Int.MAX_VALUE.toLong()).toInt()), VehicleLifecycle.valueOf(j.getString("lifecycle")),
+        Rarity.valueOf(j.getString("rarity")), integer(j, "levelProgressPercent", 0, 99).toInt(),
+        GameMoney(integer(j, "acquisitionCost", 0, Long.MAX_VALUE)),
         VehicleAcquisitionSource.valueOf(j.getString("acquisitionSource")))
+    // writer의 JSON 정수만 허용한다. 좁은 타입 변환 전에 형식과 범위를 검사한다.
+    private fun integer(j: JSONObject, key: String, min: Long, max: Long): Long {
+        val value = when (val raw = j.get(key)) {
+            is Int -> raw.toLong()
+            is Long -> raw
+            else -> throw JSONException("$key 정수 형식 오류")
+        }
+        if (value !in min..max) throw JSONException("$key 정수 범위 오류")
+        return value
+    }
     private fun money(m: MoneyChange?) = m?.let { JSONObject().put("direction", it.direction.name).put("amount", it.amount.units) }
     private fun money(j: JSONObject?): MoneyChange? = j?.let { MoneyChange(MoneyDirection.valueOf(it.getString("direction")), GameMoney(it.getLong("amount"))) }
     fun command(c: GameChange): JSONObject {

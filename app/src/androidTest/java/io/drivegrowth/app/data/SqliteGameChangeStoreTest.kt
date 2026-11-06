@@ -33,6 +33,117 @@ class SqliteGameChangeStoreTest : InstrumentationTestCase() {
     private fun success(result: ContractResult<Settlement>) = (result as ContractResult.Success).value
     private fun failure(error: ContractError) = ContractResult.Failure(error)
 
+    fun testOutOfIntRangeProgressIsRejectedWithoutWrapping() {
+        assertInvalidVehicleNumbers("vehicles", "payload", listOf("levelProgressPercent" to "4294967297"))
+    }
+
+    fun testFractionalAcquisitionCostIsRejectedWithoutTruncation() {
+        assertInvalidVehicleNumbers("vehicles", "payload", listOf("acquisitionCost" to "350.75"))
+    }
+
+    fun testInvalidVehicleNumberFormatsAndRangesPreserveOriginalDatabase() {
+        assertInvalidVehicleNumbers("vehicles", "payload", invalidVehicleNumbers())
+    }
+
+    fun testInvalidSettlementVehicleNumbersFailQueryAndReplayWithoutMutation() {
+        assertInvalidVehicleNumbers("settlements", "result", invalidVehicleNumbers())
+    }
+
+    private fun invalidVehicleNumbers(): List<Pair<String, String>> = listOf(
+        "level" to "4294967297", "level" to "1.5", "level" to "0", "level" to "21",
+        "revision" to "4294967296", "revision" to "0.5", "revision" to "-1",
+        "levelProgressPercent" to "4294967297", "levelProgressPercent" to "1.5",
+        "levelProgressPercent" to "-1", "levelProgressPercent" to "100",
+        "acquisitionCost" to "350.75", "acquisitionCost" to "-1",
+        "acquisitionCost" to "9223372036854775808",
+    ) + listOf("level", "revision", "levelProgressPercent", "acquisitionCost").flatMap { field ->
+        // writer는 JSON 정수만 쓴다. 문자열·실수(정수값 포함)·지수 표기 등은 허용하지 않는다.
+        listOf("\"1\"", "1.0", "1e0", "true", "null", "[]", "{}").map { field to it }
+    }
+
+    private fun assertInvalidVehicleNumbers(table: String, column: String, invalid: List<Pair<String, String>>) {
+        val originalVehicle = vehicle().copy(rarity = Rarity.RARE, acquisitionCost = GameMoney(350),
+            acquisitionSource = VehicleAcquisitionSource.GACHA)
+        val command = credit("add").copy(vehicle = VehicleWrite.Add(originalVehicle))
+        val added = success(store.commitGameChange(command))
+        store.close()
+        val file = context.getDatabasePath(name)
+        val original = SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            db.rawQuery("SELECT $column FROM $table", null).use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                cursor.getString(0)
+            }
+        }
+        invalid.forEach { (field, literal) ->
+            store.close()
+            SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+                // JSON 텍스트를 직접 바꿔 1.0·지수·범위 초과 원문을 재직렬화로 정규화하지 않는다.
+                val malformed = Regex("\\\"$field\\\":-?\\d+").replace(original, "\"$field\":$literal")
+                assertTrue(original != malformed)
+                assertEquals(1, db.update(table, ContentValues().apply { put(column, malformed) }, null, null))
+            }
+            val before = file.readBytes()
+            store = open()
+            val queried = if (table == "vehicles") store.listOwnedVehicles() else store.listUnviewedSettlements()
+            val queryReason = store.lastStorageFailure
+            store.close()
+            assertTrue("$table $field=$literal 조회 후 원본 보존", before.contentEquals(file.readBytes()))
+            assertEquals("$table $field=$literal 조회", failure(ContractError.STORAGE_FAILURE), queried)
+            assertEquals(LedgerFailureReason.INVALID_RECORD, queryReason)
+            store = open()
+            val retried = if (table == "vehicles") store.commitGameChange(credit("grow").copy(
+                vehicle = VehicleWrite.Update(originalVehicle.ownedVehicleId, Revision(0), 2, VehicleLifecycle.OWNED, 0)))
+                else store.commitGameChange(command)
+            val retryReason = store.lastStorageFailure
+            assertEquals(ContractResult.Success(GameMoney(100)), store.balance())
+            if (table == "vehicles") assertEquals(ContractResult.Success(added), store.commitGameChange(command))
+            else assertEquals(ContractResult.Success(listOf(originalVehicle)), store.listOwnedVehicles())
+            store.close()
+            assertTrue("$table $field=$literal 원본 보존", before.contentEquals(file.readBytes()))
+            assertEquals("$table $field=$literal 변경/재생", failure(ContractError.STORAGE_FAILURE), retried)
+            assertEquals(LedgerFailureReason.INVALID_RECORD, retryReason)
+            store = open()
+        }
+    }
+
+    fun testJsonIntegerTypesAndVehicleBoundariesSurviveReopenAndReplay() {
+        val parsed = JSONObject("{\"int\":99,\"long\":9223372036854775807,\"fraction\":350.75,\"wholeDouble\":1.0}")
+        assertTrue(parsed.get("int") is Int)
+        assertTrue(parsed.get("long") is Long)
+        assertTrue(parsed.get("fraction") is Double)
+        assertTrue(parsed.get("wholeDouble") is Double)
+        val vehicles = listOf(vehicle("free").copy(rarity = Rarity.LEGEND, acquisitionSource = VehicleAcquisitionSource.GACHA),
+            vehicle("progress-max").copy(level = 19, levelProgressPercent = 99,
+                acquisitionCost = GameMoney(Long.MAX_VALUE), acquisitionSource = VehicleAcquisitionSource.PURCHASE_DELIVERY),
+            vehicle("level-max").copy(level = MAX_VEHICLE_LEVEL))
+        val commands = vehicles.map { credit(it.ownedVehicleId.value).copy(vehicle = VehicleWrite.Add(it)) }
+        val saved = commands.map { success(store.commitGameChange(it)) }
+        store.close(); store = open()
+        assertEquals(vehicles.sortedBy { it.ownedVehicleId.value }, (store.listOwnedVehicles() as ContractResult.Success).value)
+        assertEquals(ContractResult.Success(saved), store.listUnviewedSettlements())
+        commands.zip(saved).forEach { (command, result) -> assertEquals(ContractResult.Success(result), store.commitGameChange(command)) }
+    }
+
+    fun testFreeGachaGrowthRollbackAndPastAddReplayPreserveAcquisition() {
+        val original = vehicle().copy(rarity = Rarity.LEGEND, levelProgressPercent = 45,
+            acquisitionSource = VehicleAcquisitionSource.GACHA)
+        val add = credit("add").copy(vehicle = VehicleWrite.Add(original))
+        val added = success(store.commitGameChange(add))
+        val grow = credit("grow").copy(vehicle = VehicleWrite.Update(original.ownedVehicleId, Revision(0), 3, VehicleLifecycle.OWNED, 75))
+        store.beforeCommit = { throw SQLiteException("성장 저장 실패 주입") }
+        assertEquals(failure(ContractError.STORAGE_FAILURE), store.commitGameChange(grow))
+        store.close(); store = open()
+        assertEquals(ContractResult.Success(listOf(original)), store.listOwnedVehicles())
+        assertEquals(ContractResult.Success(listOf(added)), store.listUnviewedSettlements())
+        assertEquals(ContractResult.Success(GameMoney(100)), store.balance())
+        val grown = success(store.commitGameChange(grow))
+        store.close(); store = open()
+        assertEquals(ContractResult.Success(added), store.commitGameChange(add))
+        assertEquals(original.copy(level = 3, levelProgressPercent = 75, revision = Revision(1)), grown.changedVehicle)
+        assertEquals(ContractResult.Success(listOf(grown.changedVehicle)), store.listOwnedVehicles())
+        assertEquals(ContractResult.Success(GameMoney(200)), store.balance())
+    }
+
     fun testRetryAndReopenReturnOriginalSettlementAndSingleCredit() {
         val command = credit("r1")
         val original = success(store.commitGameChange(command))
