@@ -428,7 +428,7 @@ PR #32 최초 Android CI는 앱 컴파일 전 `setup-android@v3`의 기본 `tool
 실제 데이터 공급자는 09 명세의 [표시 UI 연결점](09_UI_UX_SPEC.md#52-차고도감-표시-ui-연결점)에 개별 희귀도·진행량·취득액·활동·행동 허용/설명과 영속 도감 키를 매핑한다. #47~#49 실제 준비/확정 명령, 비용 확인, 요청 ID, 실패 복구·저장/재실행·주행 제한 통합은 남아 있다. #52 완료 체크·담당·Blocked by·ready는 변경하지 않는다. 원격 CI와 정확한 커밋은 게시 PR의 실제 결과로 확인한다.
 
 
-### #52 도감 재조회 스크롤 수정 준비
+### #52 도감 재조회 스크롤 수정·재검증
 
 2026-11-07 검증 B가 별도 격리 호스트에서 원본 장치 시험 5/5, 보강 시험 7개 중 6개 통과·1개 실패를 보고했다. 전달받은 `extra-seven-device.txt`의 실패는 Content에서 `scrollY=700`으로 이동한 뒤 Loading의 실제 layout을 거쳐 Content로 돌아오면 0이 되는 조건이다. 이 기록은 구현 세션의 새 장치 실행 결과와 구분한다.
 
@@ -436,4 +436,19 @@ PR #32 최초 Android CI는 앱 컴파일 전 `setup-android@v3`의 기본 `tool
 
 `CollectionScrollDeviceTest`에 실제 debug Activity 부착·중간 상태 layout을 거치는 회귀 5개(Loading, Error, 연속 Content, 제한 복귀, 내용 축소)를 추가했다. 최소 debug 호스트는 제품 탐색·차량 SDK·저장을 호출하지 않고 외부에 export하지 않는다. assertion/예외는 UI 스레드에서 잡아 시험 스레드로 전달한다. 기존 5개 View 시험에도 같은 예외 전달을 적용했다. 제품 main Manifest·MainActivity·Gradle·CI는 수정하지 않았다.
 
-공유 장치 사용 순서는 메인의 검증 C(#105) 종료·복원 → B 구현(#104) 종료 → C 구현(#103) 사용 가능 확인을 따른다. 현재 새 장치 회귀는 미실행이며 adb·설치·AVD·권한·신호·창 설정을 조작하지 않았다. 별도 applicationId의 수정 전/후 APK를 준비했고 승인된 순서에서 같은 정식 시험으로 실패/복구를 확인한다. `python3 scripts/check_repository.py`(21/26/183), 앱 단위 11개, `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`, `git diff --check`는 통과했다. 기존 장치 시험 5개와 새 회귀 5개를 합친 10개는 컴파일 확인이며 수정 후 장치 성공으로 해석하지 않는다. 원격 최신 결과와 #104 임시 통합 패치의 기준은 PR #103에서 실제 결과대로 갱신한다. #51 실제 탐색·주행 제한·Back·경제/저장 연결과 #52 전체 완료는 계속 미완료다.
+장치 준비 당시에는 검증 C(#105) 종료·복원 → B 구현(#104) 종료 → 메인의 사용 가능 전달 순서를 기다렸고, 준비 중 adb/설치/AVD/장치 설정을 조작하지 않았다. `python3 scripts/check_repository.py`(21/26/183), 앱 단위 11개, `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`, `git diff --check`를 통과한 `dad71ec214ef91a16ab9dc0bc37234f86784baa2`를 기존 PR에 일반 push했다. 같은 head의 [CI 42278501355](https://github.com/Yaho03/drive-growth/actions/runs/42278501355)는 두 검사 모두 성공했다.
+
+이후 메인의 장치 사용 가능 전달을 받아 ADB 5038·`emulator-5556`·user 10에서 **격리 패키지 `io.drivegrowth.app.garage103`**만 설치해 같은 정식 시험 APK로 수정 전/후를 비교했다. Gradle applicationIdSuffix는 로컬 init script로만 지정했고 저장소 설정은 바꾸지 않았다.
+
+| 실행 | 소스·실제 결과 |
+|---|---|
+| 수정 전 | `6ed613a` + 동일 정식 시험·debug 호스트. 새 회귀 5개 중 Loading/Error의 실제 layout 경유 2개가 `expected 700 / actual 0` assertion 실패, 나머지 3개 통과, Errors 0. 시험 스레드에서 실패를 보고했고 프로세스 종료가 아니다. |
+| 수정 후 | `dad71ec`의 호스트만 교체. 기존 View 시험 5개와 실제 Activity 부착 회귀 5개, 총 **10개 모두 통과**. Loading/Error 뒤 복원, 연속 render, 제한 중 숨김/복귀, 내용 축소 시 유효 범위 보정을 확인했다. |
+
+시험 APK SHA-256은 전후 동일한 `89e8f957d1f0f4308883aed60f18de70087dc49080356800b2187ee160fdc3cc`다. 수정 전 호스트는 `ccb40a12094e27e1e4d1ca6a0f59ca981ad317c575f85451368b2776d67e5c0d`, 수정 후 호스트는 `56107cf8918565b0dc41cd04c2bad7c90dd7191e2ccdd81a28ea5428e5e5a3c2`이며 설치된 APK 해시와 대조했다. 로그·APK·전후 상태·설치 해시는 로컬 `/private/tmp/pr103-scroll-fix-evidence/`의 `red-device.txt`, `green-device.txt`, `prepared-artifacts.json`, `device-before.json`, `device-after.json`에 보존한다. 로컬 증거 파일·APK는 커밋하지 않는다.
+
+시험 후 이번에 만든 격리 앱/시험 패키지만 제거하고 목록에서 사라짐을 확인했다. 제품 APK 경로·SHA-256 `298d5cf55e846b8495682ae6c1d08e4aa5eb2d2da0f3cab67bd1d85e751e0832`는 전후 동일하다. 제품 데이터·권한·기어·창·서버는 변경하지 않았다. 부팅 완료 1·user 10·1080×600px·120dpi·night no·forward 빈 목록을 확인했고 Activity 프로세스 조회에서 active instrumentation 항목이 없었다. AVD는 켜 둔 채 **장치 사용 종료**를 메인에 전달했다.
+
+기존 인계의 OEMDrivingView 충돌/포커스 경쟁·차량 Console 브리지 문제·CarService dump 지연은 해결했다고 주장하지 않는다. 불필요한 CarService 전체 dump, 차량 신호·브리지 복구, 제품 데이터 삭제·AVD 초기화·다른 프로세스 종료는 하지 않았다. 위 성공은 격리 고정 UI 호스트의 회귀 결과이며 제품의 실제 #51 탐색·주행 제한·Back·경제 명령·DB/저장 연결·실차 검증이 아니다. #52 전체 완료도 계속 미완료다.
+
+#104는 아직 main 미반영이므로 Rarity 위치·공통 개체 필수 필드·표시 일치·유효 fixture·09 설명을 맞춘 호환 변경은 별도 임시 통합 worktree/patch로만 관리한다. 원격 #103에는 합치지 않는다. 최종 #104/통합 기준 head·patch 경로·결합 검사와 최신 #103 CI 결과는 PR에 기록한다. 09의 스크롤 보존 약속은 낮추지 않았다.
