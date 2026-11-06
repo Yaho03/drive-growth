@@ -426,3 +426,14 @@ PR #32 최초 Android CI는 앱 컴파일 전 `setup-android@v3`의 기본 `tool
 #51/메인 세션 인계: 공유 장치 사용이 가능한 시간에 약 15~20분을 확보해 `GaragePreviewStates`를 허용된 공통 탐색에 연결하고, 준비한 기기 시험과 세로 840×1184dp·가로 1360×948dp·좁은 창·긴 텍스트·글꼴 확대·선택 복원·Back/CCP를 확인해야 한다. 해당 크기는 공식 가이드의 예시 테스트 화면이며 모든 장치의 합격 기준이 아니다. 동기 callback 재표시 후 스크롤·포커스와 처리 중 화면 재생성도 확인한다. 이 세션이 공유 장치 사용을 예약하거나 시작한 것은 아니다.
 
 실제 데이터 공급자는 09 명세의 [표시 UI 연결점](09_UI_UX_SPEC.md#52-차고도감-표시-ui-연결점)에 개별 희귀도·진행량·취득액·활동·행동 허용/설명과 영속 도감 키를 매핑한다. #47~#49 실제 준비/확정 명령, 비용 확인, 요청 ID, 실패 복구·저장/재실행·주행 제한 통합은 남아 있다. #52 완료 체크·담당·Blocked by·ready는 변경하지 않는다. 원격 CI와 정확한 커밋은 게시 PR의 실제 결과로 확인한다.
+
+
+### #52 도감 재조회 스크롤 수정 준비
+
+2026-11-07 검증 B가 별도 격리 호스트에서 원본 장치 시험 5/5, 보강 시험 7개 중 6개 통과·1개 실패를 보고했다. 전달받은 `extra-seven-device.txt`의 실패는 Content에서 `scrollY=700`으로 이동한 뒤 Loading의 실제 layout을 거쳐 Content로 돌아오면 0이 되는 조건이다. 이 기록은 구현 세션의 새 장치 실행 결과와 구분한다.
+
+원인은 마지막 ScrollView가 어떤 상태를 표시했는지 구분하지 않고 위치를 저장하던 것이다. `CollectionView`는 이전 Content의 배치된 위치만 저장하도록 수정했다. Loading/Error의 0이 Content 위치를 덮지 않고, Content→Content 연속 재표시·제한 중 콘텐츠 숨김을 유지한다. 내용이 줄면 Android ScrollView가 새 내용의 유효 범위로 복원한다. 09 명세의 스크롤 보존 약속은 유지한다.
+
+`CollectionScrollDeviceTest`에 실제 debug Activity 부착·중간 상태 layout을 거치는 회귀 5개(Loading, Error, 연속 Content, 제한 복귀, 내용 축소)를 추가했다. 최소 debug 호스트는 제품 탐색·차량 SDK·저장을 호출하지 않고 외부에 export하지 않는다. assertion/예외는 UI 스레드에서 잡아 시험 스레드로 전달한다. 기존 5개 View 시험에도 같은 예외 전달을 적용했다. 제품 main Manifest·MainActivity·Gradle·CI는 수정하지 않았다.
+
+공유 장치 사용 순서는 메인의 검증 C(#105) 종료·복원 → B 구현(#104) 종료 → C 구현(#103) 사용 가능 확인을 따른다. 현재 새 장치 회귀는 미실행이며 adb·설치·AVD·권한·신호·창 설정을 조작하지 않았다. 별도 applicationId의 수정 전/후 APK를 준비했고 승인된 순서에서 같은 정식 시험으로 실패/복구를 확인한다. `python3 scripts/check_repository.py`(21/26/183), 앱 단위 11개, `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`, `git diff --check`는 통과했다. 기존 장치 시험 5개와 새 회귀 5개를 합친 10개는 컴파일 확인이며 수정 후 장치 성공으로 해석하지 않는다. 원격 최신 결과와 #104 임시 통합 패치의 기준은 PR #103에서 실제 결과대로 갱신한다. #51 실제 탐색·주행 제한·Back·경제/저장 연결과 #52 전체 완료는 계속 미완료다.

@@ -7,15 +7,22 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.ScrollView
 
-/** 공유 장치를 사용하지 않고 컴파일만 준비한다. 실행은 #51과 장치 사용 조율 후 수행한다. */
+/** 장치 사용 조율 후 실행한다. UI 스레드 실패는 시험 스레드에서 보고한다. */
 @Suppress("DEPRECATION")
 class GarageViewTest : InstrumentationTestCase() {
+    private fun runOnUiTest(block: () -> Unit) {
+        var failure: Throwable? = null
+        instrumentation.runOnMainSync {
+            try { block() } catch (error: Throwable) { failure = error }
+        }
+        failure?.let { throw it }
+    }
     private fun descendants(view: View): List<View> = listOf(view) +
         if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()
     private fun button(view: View, title: String) = descendants(view).filterIsInstance<Button>().first { it.text.toString() == title }
     private fun texts(view: View) = descendants(view).filterIsInstance<TextView>().map { it.text.toString() }
 
-    fun testInstanceSelectionAndDuplicateRequest() = instrumentation.runOnMainSync {
+    fun testInstanceSelectionAndDuplicateRequest() = runOnUiTest {
         val events = mutableListOf<GarageEvent>()
         val view = GarageView(instrumentation.targetContext, events::add)
         view.render(GaragePreviewStates.normal, true)
@@ -30,7 +37,7 @@ class GarageViewTest : InstrumentationTestCase() {
         assertFalse(texts(view).any { it.contains("판매 완료") })
     }
 
-    fun testMissingSelectionAndRestrictedContent() = instrumentation.runOnMainSync {
+    fun testMissingSelectionAndRestrictedContent() = runOnUiTest {
         val view = GarageView(instrumentation.targetContext) {}
         view.render(GaragePreviewStates.normal, true)
         descendants(view).filterIsInstance<Button>().first().performClick()
@@ -41,7 +48,7 @@ class GarageViewTest : InstrumentationTestCase() {
         assertFalse(texts(view).any { it.contains("캐스퍼") })
     }
 
-    fun testEmptyLoadingErrorAndRetry() = instrumentation.runOnMainSync {
+    fun testEmptyLoadingErrorAndRetry() = runOnUiTest {
         var retries = 0
         val view = GarageView(instrumentation.targetContext) { if (it == GarageEvent.Retry) retries++ }
         view.render(GaragePreviewStates.empty, true)
@@ -54,7 +61,7 @@ class GarageViewTest : InstrumentationTestCase() {
         assertEquals(1, retries)
     }
 
-    fun testCollectionKeepsHistoricalOwnershipSeparateFromUnlockAndEmpty() = instrumentation.runOnMainSync {
+    fun testCollectionKeepsHistoricalOwnershipSeparateFromUnlockAndEmpty() = runOnUiTest {
         val view = CollectionView(instrumentation.targetContext) {}
         view.render(GaragePreviewStates.collection, true)
         val text = texts(view)
@@ -65,7 +72,7 @@ class GarageViewTest : InstrumentationTestCase() {
         view.render(GaragePreviewStates.emptyCollection, true)
         assertTrue(texts(view).contains("도감 데이터가 없어요"))
     }
-    fun testCollectionScrollSurvivesRenderAtNarrowAndWideSizes() = instrumentation.runOnMainSync {
+    fun testCollectionScrollSurvivesRenderAtNarrowAndWideSizes() = runOnUiTest {
         val view = CollectionView(instrumentation.targetContext) {}
         fun layout(width: Int) {
             view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),

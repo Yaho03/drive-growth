@@ -16,6 +16,7 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
     private var columns = 1
     private var scroll: ScrollView? = null
     private var savedScrollY = 0
+    private var showingContent = false
 
     init { orientation = VERTICAL; setBackgroundColor(style.base) }
 
@@ -32,7 +33,8 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
 
     private fun s(id: Int) = context.getString(id)
     private fun drawScreen(): Unit = with(style) {
-        scroll?.takeIf { it.isLaidOut }?.let { savedScrollY = it.scrollY }
+        if (showingContent) scroll?.takeIf { it.isLaidOut }?.let { savedScrollY = it.scrollY }
+        showingContent = enabled && state is CollectionScreenState.Content
         removeAllViews(); setPadding(dp(24), dp(16), dp(24), dp(16))
         if (!enabled) {
             addView(text(s(R.string.garage_restricted), 28, bold = true))
