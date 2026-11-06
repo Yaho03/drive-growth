@@ -2,20 +2,26 @@
   "implementation_commit": "56986ba",
   "tested_integrated_source": "c9cb56910c80b0f1a1cd35fb2742de33bf2a7328",
   "main": "3b547e52bcc7cdb0b513e8c19236f7ea66306fee",
-  "app_sha256": "8774cfc32210502b91ac1aa8f838425c0e49f01c8627affc071076430a243193",
   "installed_sha256": "8774cfc32210502b91ac1aa8f838425c0e49f01c8627affc071076430a243193",
-  "test_sha256": "09cc28008de8e89dc7533db34e041b6aabeb80166338e5651ee41f42a4fb65c2",
   "tests": {
     "core": 97,
-    "app_unit": 25,
+    "app_unit": 26,
     "instrumentation": 47,
     "lint_errors": 0,
-    "lint_warnings": 14
+    "lint_warnings": 14,
+    "app_unit_before_receipt_correction": 25,
+    "instrumentation_scope": "47 before receipt-time correction; final APK not run"
   },
   "device": "Pleos2.1.0/API34 ARM64/user10/same AVD console5556; adb5038 localhost:5557 after recovery",
   "integrated_manual": "NO_DATA Restricted remained; Back hide/return and recreation progressed. Final P/D/permission recovery full manual regression incomplete; do not promote earlier 56986ba device success.",
   "before_main_merge_manual": "actual SDK DRIVE ux=true and PARK ux=false, console30/10kmh phases; permission denied/restore/recreation, normal/CCP Back, selection recreation; JDWP SDK-worker pause distinguished from CarService stall",
   "end": "qemu/JDWP/heartbeat stopped; devices/forward empty; only original adb5038 server retained",
   "restoration": "Park/control speed0 accelerator0 brake0 via console; last SDK read ended NO_DATA; nightno/1080x600/120dpi/overlaynull/securenull/speedpermissiongranted flags cleared; ceDataInode491836 preserved",
-  "data": "no clear, uninstall, AVD wipe, system patch, UX bypass, external crash report or SDK modification"
+  "data": "no clear, uninstall, AVD wipe, system patch, UX bypass, external crash report or SDK modification",
+  "device_tested_app_sha256": "8774cfc32210502b91ac1aa8f838425c0e49f01c8627affc071076430a243193",
+  "device_tested_test_sha256": "09cc28008de8e89dc7533db34e041b6aabeb80166338e5651ee41f42a4fb65c2",
+  "final_code_commit": "9e7ebbc1fdcb00d4ebcfb9eea36bfd216ad4e21d",
+  "final_app_sha256": "793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9",
+  "final_test_sha256": "09cc28008de8e89dc7533db34e041b6aabeb80166338e5651ee41f42a4fb65c2",
+  "final_device_execution": "NOT_INSTALLED/NOT_RUN after receipt-time correction; earlier 47 are for8774 APK"
 }

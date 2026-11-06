@@ -272,7 +272,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 | 소비 작업 | 입력과 반환 기준 |
 |---|---|
-| #36 차량 입력 | `VehicleObservation`은 입력 출처, 동일 부팅 내 단조 기준 시각(ms), UTC Unix 기준 시각(ms), 속도(m/s), 기어와 UX 제한을 전달한다. #105의 AAOS 조회는 지연을 새 값으로 만들지 않도록 예약 시작 시각을 보존하며 센서 측정 시각과 구분한다. |
+| #36 차량 입력 | `VehicleObservation`은 입력 출처, 동일 부팅 내 단조 수신 시각(ms), UTC Unix 수신 시각(ms), 속도(m/s), 기어와 UX 제한을 전달한다. AAOS 조회 완료의 수신 시각은 센서 측정 시각과 구분한다. |
 | #51 화면 조립 | `Observation<VehicleInteraction>`을 받는다. `ALLOWED`일 때만 게임 조작을 열고, `RESTRICTED` 또는 `Missing`이면 제한을 유지한다. |
 | #37·#38·#39·#53 탁송 | 관측 이동 거리와 내비 예상 경로 거리에는 기존의 별도 거리 타입을 사용한다. 도착은 활성 경로의 앱 내부 `RouteId`, 입력 출처, UTC 수신 시각을 가진 `DeliveryArrivalEvidence`로 전달한다. |
 
@@ -294,7 +294,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 진행 중 작업은 하나이며 busy tick과 반복 start/stop은 추가 작업을 적재하지 않는다. stop/교체는 수신 callback을 즉시 해제하고 세대를 무효화한다. 실행 전과 이전 source 해제 뒤 open 직전에 폐기 세션을 검사한다. idle stop은 cleanup 하나를 예약하며, 이미 막힌 호출이 반환되면 이전 자원을 정리한 뒤 최신 세션만 시작한다. close가 실패하면 이전 reader를 보존해 새 연결을 막고 소유자가 없어도 operation·예외 종류를 기록한다. Binder를 interrupt/timeout으로 실제 종료했다고 가정하거나 대체 thread를 계속 만들지 않는다. worker는 프로세스 수명에 하나 유지하며, IPC가 영구 정체되면 해제·재연결도 기다리지만 화면 조작과 제한 판정은 기다리지 않는다.
 
-표본은 조회 예약 시작의 elapsed/UTC를 보존하고 main 전달 시에도 기존 2.5초 유효기간을 검사한다. 연결 revision 변경·늦은 완료·stop 뒤·이전 세션 결과는 전달하지 않는다. SDK 미응답 중 busy는 새 정상값이나 NO_DATA로 반복 치환하지 않고 기존 gate/watchdog이 만료를 제한한다. 알려진 연결 변경·오류·권한 거부·미지원은 기존 Missing 규칙을 유지한다. 주차3초·속도0.1m/s·UX·연속 표본 조건은 바꾸지 않는다. 이는 앱 요청/응답의 나이 제한이며 SDK가 오래된 센서 AVAILABLE 값을 반복 반환하는 문제나 센서 시각의 신뢰성을 해결한 것이 아니다.
+표본은 SDK 조회 완료의 elapsed/UTC 수신 시각을 그대로 보존하고, 요청 시작 elapsed는 main 전달까지 기존 2.5초 이내인지 판단하는 deadline에만 사용한다. 요청 시작 시각으로 수신 시각을 덮으면 첫 조회가 느리고 다음 조회가 빠를 때 연속 주차를 실제 수신보다 일찍 누적하므로 덮지 않는다. gate는 수신 이후의 기존 유효기간·연속 주차 기준을 그대로 적용한다. 연결 revision 변경·늦은 완료·stop 뒤·이전 세션 결과는 전달하지 않는다. SDK 미응답 중 busy는 새 정상값이나 NO_DATA로 반복 치환하지 않고 기존 gate/watchdog이 만료를 제한한다. 알려진 연결 변경·오류·권한 거부·미지원은 기존 Missing 규칙을 유지한다. 주차3초·속도0.1m/s·UX·연속 표본 조건은 바꾸지 않는다. 이는 앱 요청/응답의 나이 제한이며 SDK가 오래된 센서 AVAILABLE 값을 반복 반환하는 문제나 센서 시각의 신뢰성을 해결한 것이 아니다.
 
 공식 [getProperty 참조](https://developer.android.com/reference/android/car/hardware/property/CarPropertyManager#getProperty(java.lang.Class%3CE%3E,%20int,%20int))와 [Android14 Car 연결/해제 소스](https://android.googlesource.com/platform/packages/services/Car/+/f9a252f4a3b621daabd330531fce555300a1d4c0/car-lib/src/android/car/Car.java)는 동기 호출·main 연결 callback을 구분한다. SDK 내부 main 콜백의 `Car.mLock` 경합까지 제거하거나 OEM 구현을 바꾼다는 보장은 아니다. 기존 관측 공백 로그는 main 예약 공백을 측정하며, worker 응답 정체의 안전 판정은 gate의 표본 만료를 따른다. 실제 SDK와 제어된 지연 시험, 복구·남은 범위는 [#105 실행 근거](06_VERIFICATION.md#105-차량-동기-조회-멈춤-수정--2026-11-07)를 따른다.
 
