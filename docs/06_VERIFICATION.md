@@ -162,7 +162,22 @@ NaviHelper의 SDK 값은 목적지·경로 이벤트와 연결해 검증한다. 
 
 ### #36 절전·복귀 검증 범위
 
-2026-11-06 사용자 승인으로 #36은 전경 입력과 에뮬레이터에서 확보한 절전·복귀 결과의 근거 확인·문서 반영·연결 PR과 #28 인계를 담당한다. 담당자는 P/D 모사 절전, P의 `suspend --real`, 화면 끄기·켜기 결과를 보고했으며, 추가 결과 PR·원본 로그·화면은 검토 전이다. 게임 화면 허용까지 3초 대기는 정밀 실측하지 못했으므로 기존 단위 시험 근거만 유지한다. 상세 결과와 인계 조건은 [#36](https://github.com/Yaho03/drive-growth/issues/36)에서 관리한다.
+2026-11-06 사용자 승인으로 #36은 전경 입력과 에뮬레이터에서 확보한 절전·복귀 결과의 근거 확인·문서 반영·연결 PR과 #28 인계를 담당한다. 게임 화면 허용까지 3초 대기는 정밀 실측하지 못했으므로 기존 단위 시험 근거만 유지한다. 인계 조건은 [#36](https://github.com/Yaho03/drive-growth/issues/36)에서 관리한다.
+
+`main` `506a38c`의 Debug APK(SHA-256 `b62238f243ba9d60a97b25c943b69f96b8ab253783ba959d437025d9c31e3ca2`)를 Windows 11 x64, Pleos Connect Emulator 2.1.0 / API 34 x86_64, 창 없는 실행에서 시험한 구현자 본인 검증이다. 기대 결과는 시험 전에 정했다. 차량 입력은 Virtual Console의 모의 입력이고, 화면은 `uiautomator` 문구로 확인했다. 검토 기록은 [PR #96](https://github.com/Yaho03/drive-growth/pull/96)에서 관리하고, 기능 간 통합 검증은 [#28](https://github.com/Yaho03/drive-growth/issues/28)에 남아 있다.
+
+| 시험 | 기대 | 실제 |
+|---|---|---|
+| 1. P, `suspend --simulate --skip-garagemode` 약 20초, `resume` | 복귀 후 신호 재수신, 게임 화면 | 절전 중 `SUSPEND(4)`, 앱 일시정지. 복귀 후 `observation_gap kind=APP_HIDDEN durationMs=20480`, `gear=PARK ux=false`, 게임 화면. 통과 |
+| 2. P, `suspend --real --skip-garagemode` | `DEVICE_SLEEP`, 복귀 후 게임 화면 | 약 20초 뒤 입력 없이 복귀. `kind=DEVICE_SLEEP durationMs=28167`, [게임 화면](evidence/issue36-suspend/real-suspend-parked.png). 첫 절전 시도는 실패 후 재시도됐다. 통과 |
+| 3. D·36 km/h, 모사 절전 중 P로 변경, `resume` | 복귀 직후 열리지 않고 P 지속 후 게임 화면 | 복귀 0.7초 후 제한 화면, `kind=APP_HIDDEN durationMs=23967`, 11.6초 후 확인에서 게임 화면. 통과 |
+| 4. D·36 km/h, 모사 절전, D 유지로 `resume`, 이후 P | 제한 유지, P 후 게임 화면 | 복귀 후 `gear=DRIVE ux=true`, [제한 화면 유지](evidence/issue36-suspend/simulated-suspend-drive.png). `gear=PARK ux=false` 수신 약 3.3초 후 확인에서 게임 화면. 통과 |
+| 5. P, `KEYCODE_SLEEP` 약 23초, `KEYCODE_WAKEUP` | 공백 기록, 복귀 후 재판정 | 꺼진 동안 `Asleep`. `kind=APP_HIDDEN durationMs=26504`, 게임 화면. 통과 |
+| 6. D·36 km/h, `suspend --real` | 복귀 후 제한 유지 | **미검증.** D와 제한 화면을 확인한 뒤 절전에 들어갔으나 약 8분 동안 adb 응답이 없었고 전원 키 입력에도 복귀하지 않아 강제 종료했다. 시험 2 뒤의 `--real` 1회도 같은 이유로 결과를 얻지 못했다. |
+
+- 공백 종류는 시계 차이로 나뉜다. 커널 절전이 일어난 `--real`만 `DEVICE_SLEEP`이고, 모사 절전과 화면 끄기는 `APP_HIDDEN`이다. 이 값은 현재 로그에만 쓰이며 조작 허용 판정은 공백 종류와 무관하게 `onPause`에서 초기화된다.
+- 실제 절전 3회 중 1회만 복귀했다. 복귀 후 `adb forward`가 사라졌다. 부팅 직후에는 내비 앱이 늦게 실행되어 앱을 가릴 수 있어, 입력 전에 전면 창과 `DriveGrowthVehicle` 로그를 먼저 확인한다.
+- `DriveEngine`이 5초를 넘는 표본 간격을 거리에 더하지 않는 것은 단위 시험 근거다. 이번 시험은 거리와 저장 기록을 다루지 않았다.
 
 D 상태 `suspend --real`에서 에뮬레이터가 복귀하지 않아 확인하지 못한 앱 동작과 실제 절전의 안정성은 [#82](https://github.com/Yaho03/drive-growth/issues/82)로 이관한다. 이는 미검증 범위의 이관이며 시험 통과나 앱 결함 확정이 아니다. 에뮬레이터의 실제 절전과 실차 IGN OFF 결과는 구분한다. #82 종료를 #36의 결과 인계나 기존 #51 화면 작업의 조건으로 요구하지 않는다. 현재 경로에서 시작되지 않는 `DriveRuntime`·`RecordingService`의 기록 시험은 수행하지 않았으며 기능 연결·활성화는 기존 담당 이슈와 #81을 따른다.
 
