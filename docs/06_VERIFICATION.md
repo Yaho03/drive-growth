@@ -155,9 +155,15 @@ NaviHelper의 SDK 값은 목적지·경로 이벤트와 연결해 검증한다. 
 
 `inject-vhal-event`는 이 이미지에서 `requires non-user build`로 거절되어 신호가 바뀌지 않는다. D 시험에는 Virtual Console을 사용하고, 입력이 앱에 도달했는지 `DriveGrowthVehicle` 로그로 먼저 확인한다.
 
+### #36 절전·복귀 검증 범위
+
+2026-11-06 사용자 승인으로 #36은 전경 입력과 에뮬레이터에서 확보한 절전·복귀 결과의 근거 확인·문서 반영·#63 인계를 담당한다. 담당자는 P/D 모사 절전, P의 `suspend --real`, 화면 끄기·켜기 결과를 보고했으며, 추가 결과 PR·원본 로그·화면은 검토 전이다. 게임 화면 허용까지 3초 대기는 정밀 실측하지 못했으므로 기존 단위 시험 근거만 유지한다. 상세 결과와 인계 조건은 [#36](https://github.com/Yaho03/drive-growth/issues/36)에서 관리한다.
+
+D 상태 `suspend --real`에서 에뮬레이터가 복귀하지 않아 확인하지 못한 앱 동작과 실제 절전의 안정성은 [#82](https://github.com/Yaho03/drive-growth/issues/82)로 이관한다. 이는 미검증 범위의 이관이며 시험 통과나 앱 결함 확정이 아니다. 에뮬레이터의 실제 절전과 실차 IGN OFF 결과는 구분한다. #82 종료를 #36의 결과 인계나 기존 #51·#63 뼈대 작업의 조건으로 요구하지 않는다. 현재 경로에서 시작되지 않는 `DriveRuntime`·`RecordingService`의 기록 시험은 수행하지 않았으며 기능 연결·활성화는 기존 담당 이슈와 #81을 따른다.
+
 ### 플랫폼 검증 인계
 
-[#13](https://github.com/Yaho03/drive-growth/issues/13)은 위 에뮬레이터 실행 근거를 관리한다. [#80](https://github.com/Yaho03/drive-growth/issues/80)은 실제 내비 거리·도착 확인의 선행조건, [#81](https://github.com/Yaho03/drive-growth/issues/81)은 주행 중 기록·음성 등 해당 기능 활성화의 선행조건, [#82](https://github.com/Yaho03/drive-growth/issues/82)는 실차·실제 전원 전환 검증의 선행조건이다. 모의 입력과 뼈대 검증의 착수 조건은 진행 계획을 따른다.
+[#13](https://github.com/Yaho03/drive-growth/issues/13)은 위 에뮬레이터 실행 근거를 관리한다. [#80](https://github.com/Yaho03/drive-growth/issues/80)은 실제 내비 거리·도착 확인의 선행조건, [#81](https://github.com/Yaho03/drive-growth/issues/81)은 주행 중 기록·음성 등 해당 기능 활성화의 선행조건, [#82](https://github.com/Yaho03/drive-growth/issues/82)는 미완료 에뮬레이터 실제 절전·복귀와 실차·실제 전원 전환을 구분해 추적한다. 해당 실제 전원·실차 동작을 검증 완료로 표시할 때는 대응 시험 근거가 필요하다. 모의 입력과 뼈대 검증의 착수 조건은 진행 계획을 따른다.
 
 ## 제출 상태
 
