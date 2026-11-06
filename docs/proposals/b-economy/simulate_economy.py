@@ -51,7 +51,7 @@ for risk in [.03, .13]:
                             'gross_ratio':round(gross/base_gross,4),'net_ratio':round(net/base_net,4),
                             'utilization':round(mean(x['utilization'] for x in trials),4)})
 with (OUT/'economy_results.csv').open('w',newline='',encoding='utf-8-sig') as f:
-    w=csv.DictWriter(f,fieldnames=list(results[0]));w.writeheader();w.writerows(results)
+    w=csv.DictWriter(f,fieldnames=list(results[0]),lineterminator="\n");w.writeheader();w.writerows(results)
 json.dump({'seed_count':len(SEEDS),'normalized_hours_per_seed':HORIZON,
            'input_status':'UNAPPROVED_PROPOSAL', 'results':results},
           (OUT/'economy_results.json').open('w',encoding='utf-8'),ensure_ascii=False,indent=2)
