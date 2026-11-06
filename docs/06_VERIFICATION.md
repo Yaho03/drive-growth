@@ -417,7 +417,8 @@ PR #32 최초 Android CI는 앱 컴파일 전 `setup-android@v3`의 기본 `tool
 
 - 환경: Pleos Connect 2.1.0 / API 34 ARM64, Emulator 37.2.13.0, 사용자10, `emulator-5556`, ADB5038. 기존 데이터 유지, 별도 창·host GPU·RAM4096MB·스냅샷 로드/저장 없이 기동했다. 기존 실행 AVD·연결 장치가 없음을 먼저 확인했고 메인 세션과 사용 범위를 조율했다.
 - 기본 표시: 1080×600px / 120dpi. 실제 앱 창은 `(360,57)–(1062,495)`, 702×438px / 936×584dp였다. 플랫폼 신호는 `InputSource.VEHICLE`, 원장·콘텐츠는 화면에 `모의 원장 · 시험용 콘텐츠 · fixture-content-v0`로 표시한다. 에뮬레이터 신호를 실차로 부르지 않는다.
-- 최종 APK SHA-256: `1ba2f47f9dee687f53be3a851d614b6362d1cd76a09d73c7b06fc9863a01f284`. 이 APK에서 창 숨김·복귀·재생성·최종22개 기기 시험을 확인했다. 기존 개발 서명과 일치함을 확인한 뒤 데이터 유지 업데이트했다. 서명키·APK·전체 시스템 로그는 게시하지 않는다.
+- **기기 검증 APK** SHA-256: `1ba2f47f9dee687f53be3a851d614b6362d1cd76a09d73c7b06fc9863a01f284`. 출발 main에 이번 앱 코드를 적용한 이 APK에서 창 숨김·복귀·재생성·22개 기기 시험을 확인했다. 표 A의 화면·task와 재생성 화면은 이 버전의 근거다. 기존 개발 서명과 일치함을 확인한 뒤 데이터 유지 업데이트했다. 서명키·APK·전체 시스템 로그는 게시하지 않는다.
+- **최신 main 통합 APK** SHA-256: `30b294f4107cf209657f42b49edd6b752aaeef3a46175877e4b1be8e17e1fb37`. main `e7a1bcca218f89f870e9c342ecb56c39cafa48bf`의 #100·#102 결과를 보존해 rebase 후 빌드했다. 앱 코드 변경은 동일하지만 core가 달라져 APK가 바뀌었다. 이 버전의 [기기 재검사는 시험 시작 전 Process crashed로 중단](evidence/issue51-input-lifecycle/rebased-instrumentation.txt)됐으며, 앞의22개 통과를 이 APK 성공으로 옮기지 않는다. 최신 통합 APK의 기기 재검증은 남아 있다.
 - 중간 진단 빌드 SHA-256: `eeac0ed1d52791125ebcac3ab75e23e05143ef91f27751f55d08937bf2b05954`. 창 표시 보완 전의 DISPLAY2·중복 원인·전체 표시/창 크기 시험은 이 단계의 근거다. 원인 진단 자료로 유지하지만 최종 APK에서 다시 실행한 것으로 세지 않는다. 이 중간 APK 파일은 별도로 보존하지 않았고 당시 빌드의 해시와 로그·화면을 보존했다. 최초 수정 전 실패는 출발 main의 근거이며 해당 APK 해시는 별도로 남기지 못했다.
 
 | 항목·입력 | 직접 재현·수정·결과 | 한계·남은 확인 |
@@ -431,8 +432,9 @@ PR #32 최초 Android CI는 앱 컴파일 전 `setup-android@v3`의 기본 `tool
 **회귀·자동 검사:** 최상위 Back의 최초 [수정 전 실패](evidence/issue51-input-lifecycle/back-before-fix.txt), 포커스 검사만 통과하던 중간 구현의 [창 가시성 실패](evidence/issue51-input-lifecycle/back-visibility-before.txt)를 보존했다. 최종 `NavigationTest`는 포커스·실제 창 숨김·미종료·숨김 시 Restricted·최근 Task 복귀를 확인한다. 3초 이상 복귀가 지연돼도 정상 P 허용을 실패로 보지 않도록 Restricted는 숨김 시점에 검사한다. gate 초기화 후 연속 주차 재판정은 기존 `AppShellTest`와 연결한다.
 
 - `python3 scripts/check_repository.py`, `git diff --check` 실행 결과는 PR에서 최종 확인한다.
-- `./gradlew --offline :core:test :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug` 성공. core71개·app4개, 실패0. Lint 오류0·경고12개: 기존11개(`DrawAllocation`6·`ViewConstructor`2·`OldTargetApi`·`DataExtractionRules`·`MissingApplicationIcon`)와 새 API29 callback의 `@TargetApi`에 대한 `UseRequiresApi` 제안1개다. 새 의존성으로 경고를 지우거나 미사용 DashboardView·디자인을 정리하지 않았다.
-- `am instrument --user 10 -w io.drivegrowth.app.test/android.test.InstrumentationTestRunner`: [22개 성공](evidence/issue51-input-lifecycle/final-instrumentation.txt). 저장 검사는 격리된 시험 DB를 사용한다. [task·display 발췌](evidence/issue51-input-lifecycle/device-evidence.txt)는 UI와 함께 대조한다.
+- `./gradlew --offline :core:test :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug` 성공. 출발 main 기준 core71개·app4개, 최신 main 통합 후 **core86개·app4개**, 실패0. Lint 오류0·경고12개: 기존11개(`DrawAllocation`6·`ViewConstructor`2·`OldTargetApi`·`DataExtractionRules`·`MissingApplicationIcon`)와 새 API29 callback의 `@TargetApi`에 대한 `UseRequiresApi` 제안1개다. 새 의존성으로 경고를 지우거나 미사용 DashboardView·디자인을 정리하지 않았다.
+- `am instrument --user 10 -w io.drivegrowth.app.test/android.test.InstrumentationTestRunner`: 기기 검증 APK에서 [22개 성공](evidence/issue51-input-lifecycle/final-instrumentation.txt). 저장 검사는 격리된 시험 DB를 사용한다. [task·display 발췌](evidence/issue51-input-lifecycle/device-evidence.txt)는 빌드 구분 및 UI와 함께 대조한다.
+- 최신 통합 APK 재검사가 종료된 뒤 확인한 로그에는 OEM 오디오 SIGABRT·CarService `registerAudioPolicy failed -1`가 있었고 emulator 실행도 종료코드139로 끝났다. [선별 환경 기록](evidence/issue51-input-lifecycle/recovery-evidence.txt)을 보존했다. 앱 코드가 원인이라고 확정하지 않는다. 데이터 삭제 없는 재기동은 이전 crash 보고 동의창에서 멈췄고 `-no-metrics` 옵션도 확인했지만 장치에 연결되지 않았다. 외부 보고를 보내거나 crash 저장소·AVD 데이터를 삭제하지 않고 이번 실행만 중단했다. 장시간 emulator 안정성과 최신 APK 재실행 성공은 미검증이다.
 
 **미충족·인계:** 현재 Virtual Console `/vehicle/gear?gear=Drive` 요청은 시간 초과했고 SDK·화면에서는 P가 유지됐다. 이를 D 시험 성공으로 세지 않는다. 이번 변경 빌드의 D 정차·주행·감속·제한 중 재진입·D 재생성·P 복귀와 권한 거부/복원의 전체 실행은 미검증이다. 팀원의 `506a38c` 보고는 기존 근거로 유지하되 새 수명주기 보완의 성공으로 확장하지 않는다. user 이미지에서 제한된 VHAL 주입을 root·정책 변경으로 우회하지 않았다. 로컬에서 관측한 긴 표본 간격에도 유효성·3초 연속 주차 기준을 완화하지 않았다.
 
@@ -450,6 +452,6 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w \
   io.drivegrowth.app.test/android.test.InstrumentationTestRunner
 ```
 
-시험 표시·야간 모드·입력 연결의 종료 상태는 PR에 최종 원복 확인을 남긴다. `wm size reset`, 원래120dpi, overlay 설정 삭제, 야간 모드 no로 복구했다. 권한은 변경하지 않았다. D·속도 변경 성공 근거는 없으며 마지막 P·0 표시와 SDK P·UX 허용을 확인 대상으로 유지한다.
+시험 종료 전 `wm size reset` 후1080×600·원래120dpi, overlay 설정 null, 야간 모드 no·원래 secure 설정 null, `car_service:found`, 사용자10 속도 권한 granted를 확인했다. 권한은 변경하지 않았다. D·속도 변경 성공 근거는 없고 마지막 화면은 P·0km/h였다. 실제 설치 APK 해시도 기기 검증 APK 값과 대조했다. 이후 최신 main APK 업데이트·재검사에서 위 환경 실패가 발생해 정상 기기 종료 상태를 새 성공으로 만들지 않는다. 처음 실행 AVD가 없어 이번에 기동했던 실행들은 모두 중단했고, 마지막 `adb -P 5038 devices -l`은 장치 없음·추가 forward 없음이었다. adb 서버는 종료하거나 포트를 바꾸지 않았다. 최종 APK·시험 로그는 로컬에 보존한다.
 
 공식 근거: [Pleos CCP](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/ccp-rotary-controller-development), [폼 팩터](https://document.pleos.ai/docs/pleos-only/app-test-guide/form-factor-test-guide), [Android 창 표시 API](https://developer.android.com/reference/android/app/Activity#setVisible(boolean)), [API34 display 선택](https://android.googlesource.com/platform/packages/services/Car/+/f9a252f4a3b621daabd330531fce555300a1d4c0/car-lib/src/android/car/drivingstate/CarUxRestrictionsManager.java#422), [미구성 display의 제한](https://android.googlesource.com/platform/packages/services/Car/+/f9a252f4a3b621daabd330531fce555300a1d4c0/service/src/com/android/car/CarUxRestrictionsManagerService.java#549).
