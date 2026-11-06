@@ -4,12 +4,12 @@
 
 | 담당 | 지금 할 일 | 막고 있는 이슈 | 해제 조건 |
 |---|---|---|---|
-| 정원 | [#36 차량 입력·조작 제한](https://github.com/Yaho03/drive-growth/issues/36) | 없음 | 조작 허용·제한·확인 불가 상태를 #51에 인계 |
-| 환석 | [#51 화면 시험](https://github.com/Yaho03/drive-growth/issues/51) | 정원 #36 (최종 연동) | #36 신호를 받으면 #51에 연결 |
-| 호열 | 대기 | 정원 [#63](https://github.com/Yaho03/drive-growth/issues/63), 전원 [#24](https://github.com/Yaho03/drive-growth/issues/24) | #63 주행 제한 검증 통과 → [#46 보유 차량 조회](https://github.com/Yaho03/drive-growth/issues/46). #24 차량별 게임 값 확정 → [#35 콘텐츠 표](https://github.com/Yaho03/drive-growth/issues/35) |
-| 경민 | 대기 | 호열 #46, 호열 [#64](https://github.com/Yaho03/drive-growth/issues/64) | #46 차량 조회 인계 → [#71 조회 검증](https://github.com/Yaho03/drive-growth/issues/71). #46 조회와 #64 탁송 검증 완료 → [#41 대여 배정](https://github.com/Yaho03/drive-growth/issues/41) |
+| 정원 | [#36](https://github.com/Yaho03/drive-growth/issues/36), [#80](https://github.com/Yaho03/drive-growth/issues/80), [#37](https://github.com/Yaho03/drive-growth/issues/37) 시험용 후보·규칙 확인, [#40](https://github.com/Yaho03/drive-growth/issues/40) 음성 없는 뼈대 | #38은 정원 #37, #39는 정원 #37·호열 #46 | 선택 의뢰·보유 차량 조회의 필요한 결과 검토·main 반영 |
+| 환석 | [#51](https://github.com/Yaho03/drive-growth/issues/51), PR 검토 | #52~#58은 환석 #51의 남은 공통 연결점 확인 | #51 본인 검증·PR 검토로 사용할 화면·제한 범위 확인 |
+| 호열 | [#46](https://github.com/Yaho03/drive-growth/issues/46), [#35](https://github.com/Yaho03/drive-growth/issues/35) 합의된 콘텐츠 | #47·#48·#50은 호열 #46, #49는 경민 #42도 필요 | 필요한 조회·명령 결과 검토·main 반영. 최종 콘텐츠 결정은 #24 |
+| 경민 | #41에 필요한 #46 조회 계약 확인·준비 | #41은 호열 #46, #42는 경민 #41, #43·#44는 경민 #42 | 각 기능이 소비할 결과의 검토·main 반영 |
 
-이슈를 완료로 닫을 때 이 표의 관련 행도 갱신한다. 팀 구현이 끝나면 이 섹션을 삭제한다.
+선행 결과가 검토·머지되거나 이슈를 완료로 닫으면 이 표도 갱신한다. 세부 정책·실제 연결 조건은 각 이슈를 따른다. 팀 구현이 끝나면 이 섹션을 삭제한다.
 
 평소 이동을 탁송·차량 영입으로 연결하고, 주차 후 차량을 모으고 렌터카 가게를 확장하는 Pleos Connect 차량용 게임을 기획하고 있습니다.
 
@@ -33,7 +33,7 @@
 |---|---|
 | 기존 순수 Kotlin 엔진 | 테스트 13개 통과. 새 탁송·영업 규칙은 미구현 |
 | 기존 Android 저장 | Pleos 에뮬레이터에서 주행 스냅샷 저장 테스트 8개 통과 |
-| 공통 거래 원장 | SQLite v1 어댑터·디스크 테스트 12개 통과. 게임 기능·화면 연결과 교차 검증은 미완료 |
+| 공통 거래 원장 | SQLite v1 어댑터·디스크 테스트 12개 통과. 기존 #62에서 공통 저장·콘텐츠 연결 시험 확인. 새 게임 기능·화면의 실제 연결은 진행 중 |
 | 개발 도구·APK | 공통 조합 빌드·Lint, Debug 설치·Activity 기본 실행 확인 |
 | 새 화면 | 가게·차고·탁송·정산 [와이어프레임](docs/design-assets/wireframes.svg), #24 반영 [UI 시안 v3](docs/design-assets/ui-v3/)(세로 20·가로 10)과 2D Views 설계. 앱 적용 전 |
 | 렌터카 게임·추가 기능 | 상세 구현 이슈로 진행. 정책·수치·일부 동작은 결정 대기 |
