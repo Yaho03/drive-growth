@@ -270,6 +270,18 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 #34·#35의 기존 거래·콘텐츠 타입, 저장 형식과 식별값은 유지한다. 실제 어댑터와 화면 연결은 #36·#51에서 검증하고, #62는 거래·콘텐츠 뼈대와 기존 소비 경계를 검증한다. 플랫폼 지원과 정책 확인은 #13·#24에서 추적한다.
 
+#### #36 차량 입력 구현 경계
+
+`app/vehicle/VehicleInput`은 속도·기어·UX를 신호별로 읽어 `VehicleObservation`을 전달한다. 한 신호의 조회 실패가 다른 신호를 지우지 않는다. `SecurityException`은 `PERMISSION_DENIED`, `IllegalArgumentException`은 `UNSUPPORTED`, 그 밖의 실행 오류와 서비스 미연결은 `NO_DATA`다.
+
+`core/driving/VehicleInteractionGate`가 `Observation<VehicleInteraction>`을 정한다. 표본이 없거나 멈추면 `Missing`, 신호 하나라도 누락되면 원인을 담은 `Missing`이다. 차량 출처가 아닌 표본은 `Missing(NO_DATA)`이며 모의 입력은 게임 조작을 열지 않는다. 그 외에는 연속 주차 조건을 채울 때만 `ALLOWED`, 나머지는 `RESTRICTED`다. 역순·중복 표본은 버린다. 판정 기준은 `InteractionPolicy`로 호출자가 전달하며, 앱의 `TRIAL_INTERACTION_POLICY`(정차 0.1 m/s, 연속 주차 3초, 신호 유효 2.5초, 표본 간격 2.5초)는 기존 어댑터 값을 옮긴 시험값이다.
+
+`VehicleObservation.toSample()`은 기존 `DriveEngine` 입력으로 변환한다. 누락이 있으면 무효 표본이다. `io.drivegrowth.core.InputSource`는 공통 계약 `InputSource`의 별칭으로 바꿔 저장값(`VEHICLE`, `SIMULATION`)을 유지했다.
+
+`ObservationCoverage`는 관측 공백을 앱 숨김, 기기 절전(`elapsedRealtime`와 `uptimeMillis`의 차이), 수신 중단으로 나눠 `DriveGrowthVehicle` 로그에 남긴다. 수신 중단에는 메인 스레드 지연도 포함된다. 프로세스 재시작은 `firstInProcess=true`로 구분하며 이전 구간의 원인은 추정하지 않는다. 로그에 속도 값은 남기지 않는다.
+
+이 구현은 앱이 전면에 있는 동안의 관측까지다. 주행 중 백그라운드 기록은 #81의 근거 없이 활성화하지 않는다. `RecordingService`는 시작하지 않으며 게임 수익 계산은 #39에서 다룬다.
+
 ### 거래 원장 영속 저장
 
 #34의 첫 영속 어댑터는 앱 내부의 SQLite 데이터베이스 하나를 `SQLiteOpenHelper`로 관리한다. 초기 스키마는 v1이다. Android 기본 API로 잔액·보유 차량·거래 결과를 한 트랜잭션에서 확정하고, 요청 ID의 유일성을 DB에서 강제한다. 기존 `SnapshotStore`는 출처별 주행 기록과 경험치를 한 파일로 저장한다. `AtomicFile`의 파일 교체는 해당 용도에 적합하며, 거래 원장에 그대로 적용하면 중복 키·동시 갱신 규칙을 직접 구현해야 한다. 기존 파일은 유지하고 과거 경험치를 게임머니로 변환하지 않는다. [SQLiteDatabase](https://developer.android.com/reference/android/database/sqlite/SQLiteDatabase), [SQLiteOpenHelper](https://developer.android.com/reference/android/database/sqlite/SQLiteOpenHelper), [AtomicFile](https://developer.android.com/reference/android/util/AtomicFile)

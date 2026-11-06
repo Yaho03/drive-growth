@@ -8,6 +8,7 @@ import io.drivegrowth.app.data.SnapshotStore
 import io.drivegrowth.app.ui.UiModel
 import io.drivegrowth.app.vehicle.VehicleInput
 import io.drivegrowth.core.*
+import io.drivegrowth.core.driving.toSample
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -46,7 +47,8 @@ class DriveRuntime(private val context: Context) {
         if (started) return
         started = true
         try {
-            input = VehicleInput(context, { sample ->
+            input = VehicleInput(context, { observation ->
+                val sample = observation.toSample()
                 val previous = lastVehicle
                 lastVehicle = sample
                 val parked = sample.valid && sample.gear == Gear.PARK && sample.uxRestricted == false &&
