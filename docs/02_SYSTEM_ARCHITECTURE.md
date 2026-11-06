@@ -158,7 +158,7 @@ Manifest의 `distractionOptimized=true`와 `dataSync` Foreground Service 선언,
 | 레코드 | 필수 정보 | 관계·제약 |
 |---|---|---|
 | VehicleDefinition | vehicleId, displayName, contentVersion | 사실 CSV 참조. 게임 가격·희귀도·효과는 검증된 별도 콘텐츠로 관리 |
-| OwnedVehicle | ownedVehicleId, vehicleId, level, revision, lifecycle | 동일 vehicleId 여러 개 허용. SOLD/SCRAPPED/CONSUMED는 재대여·재소비 불가 |
+| OwnedVehicle | ownedVehicleId, vehicleId, rarity, level, levelProgressPercent, acquisitionCost, acquisitionSource, revision, lifecycle | 동일 차종의 희귀도·성장·취득 정보를 개체별로 보존. 처분 개체는 재대여·재소비 불가 |
 | VehicleCondition | ownedVehicleId, 사고 이력 참조, 현재 수리 상태 | 사고 이력과 수리 후 회복 상태를 분리. 손상/대여/수리의 동시 허용 정책은 #24 |
 | Delivery | deliveryId, type, status, revision, ruleVersion, 출처 | INCOME/PURCHASE 구분. 목적지 참조·선택 제안·결제 거래·변경 사용 여부 보존. 원시 목적지 위치 저장은 별도 데이터 정책 필요 |
 | DriveRecord | driveId, source, 실제 관측 구간, 누락 구간, 거리·시간 | 센서 입력의 측정/수신 시각 구분. 미관측 구간 보간으로 지급하지 않음 |
@@ -192,7 +192,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 - `owned`는 사용 중·수리 필요 개체도 포함하므로 강화 가능 목록으로 그대로 사용하지 않는다. 대여 후보 목록도 수리·판매·폐차 가능 목록으로 재사용하지 않는다. 수리 필요 차량의 수리·판매·폐차는 PRD에서 허용하므로 각 명령의 활동 제한을 별도로 검사한다.
 - `collection`의 `OWNED`는 한 번이라도 소유한 기록이다. 호출자는 처분 뒤에도 유지되는 `(vehicleId, rarity)` 획득 이력을 `everOwned`로, 탁송 목록·가챠 결과에서 본 기록을 `discovered`로 제공해야 한다. 도감 키를 직접 주입한 계산 시험은 실제 저장·재실행 시험과 다르다.
 
-현재 `GameChangeStore.listOwnedVehicles()`는 현재 보유 개체 조회의 입력만 제공한다. 개별 희귀도·레벨 진행량·취득 기준액, 처분 포함 이력·발견 기록, 실제 활동·영업 쉬기의 저장 입력은 아직 제공하지 않는다. 필요한 공통 필드·명령은 #33 담당, 조회·SQLite 형식·요청 동일성·정산 재생·기존 데이터 처리는 #34 담당과 아래 공통 계약 인계 기준에 따라 조율한다. #46은 이 조회·계산 부분의 인계이며 저장·재실행을 포함한 전체 완료가 아니다. 기능별 본인 검증과 #28 통합 검증은 유지한다.
+현재 `GameChangeStore.listOwnedVehicles()`의 개체 타입은 아래 v1 필드를 포함한다. 메모리 조회·변경 예제와 SQLite의 필드 보존용 최소 codec 대응은 반영했다. 시험용 DB의 SQLite 실행 범위는 [검증 문서](06_VERIFICATION.md)의 PR #104 숫자 decoder 재검증 기록을 따르며 실제 제품 DB 이전·앱 재실행 검증과 구분한다. 처분 포함 이력·발견 기록, 실제 활동·영업 쉬기의 영속 공급은 별도다. 필드·명령은 아래 공통 계약을 사용하고 실제 조회 확장·SQLite 호환·재개방 검증은 #34 담당과 아래 연결점으로 조율한다. #46은 이 조회·계산 부분의 인계이며 저장·재실행을 포함한 전체 완료가 아니다. 기능별 본인 검증과 #28 통합 검증은 유지한다.
 
 ### 원자성·오류·재시도
 
@@ -228,7 +228,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 ### 첫 계약의 구현 인계 조건
 
-논리 계약 기준은 `rental-contract-v0`다. 이는 코드 배포 버전이나 팀 전원 승인 기록이 아니라 이번 문서 초안을 식별하는 값이다. 공통 모델 이슈에서 다음 항목을 구체 타입으로 고정하고 소비자가 같은 타입을 import하도록 만든다.
+첫 논리 계약 기준은 `rental-contract-v0`였으며, 2026-11-07 필수 개체 정보 확장부터 구현 식별값은 `rental-contract-v1`이다. DB 스키마 버전·규칙 버전·콘텐츠 버전과 구분하며 팀 전원 승인 기록으로 해석하지 않는다. 공통 모델 이슈에서 다음 항목을 구체 타입으로 고정하고 소비자가 같은 타입을 import하도록 만든다.
 
 - ID는 비어 있지 않은 String 기반이며 차종/개체/요청 ID를 혼용하지 않는다. 거리·시각·금액은 Long, revision·schemaVersion은 정수로 시작하는 안을 검증한다. 범위 초과는 오류이며 오버플로를 보상으로 저장하지 않는다.
 - nullable 값은 `Missing(reason)` 또는 동등한 명시적 누락 표현과 함께 정의한다. 센서 시각 없음, 권한 거부, 미지원, 오래된 입력을 값 0으로 바꾸지 않는다.
@@ -244,7 +244,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 | 소비 작업 | 첫 시그니처와 필드 |
 |---|---|
 | #34 거래 | `GameChangeStore.commitGameChange(change: GameChange): ContractResult<Settlement>`. 요청 ID, 종류, 출처, 규칙 버전은 필수다. 재화 변화와 개체 쓰기는 각각 생략할 수 있으며 최소 하나는 필요하다. 신규 개체는 `VehicleWrite.Add`, 기존 개체는 기대 revision을 받는 `VehicleWrite.Update`로 표현한다. 결과는 정산 ID·거래·잔액·시각과, 개체 변경이 있을 때 갱신된 개체를 포함한다. |
-| 보유 조회 | `GameChangeStore.listOwnedVehicles(): ContractResult<List<OwnedVehicle>>`. 차종 ID와 보유 개체 ID를 구분한다. 개체는 레벨·revision·생명주기 상태를 가진다. |
+| 보유 조회 | `GameChangeStore.listOwnedVehicles(): ContractResult<List<OwnedVehicle>>`. 차종 ID와 보유 개체 ID를 구분한다. 개체는 희귀도·레벨·진행량·실제 취득 기준액·취득 출처·revision·생명주기를 가진다. |
 | #35 콘텐츠 | `VehicleCatalog.load(): ContractResult<VehicleCatalogSnapshot>`. 스냅샷이 하나의 `ContentVersion`을 가지고, 각 차종에는 ID와 표시 이름을 둔다. |
 | 차량·화면 입력 | `DeliveryDistanceInput`에서 `ObservedDistance`와 `EstimatedRouteDistance`를 별도 타입과 출처로 받는다. `Observation.Missing`에는 누락 사유가 필수다. |
 | 공통 실패 | `ContractResult.Failure`에 `ContractError`를 제공한다. 권한 거부와 데이터 없음, 정책 미정, 충돌, 저장 실패를 구분한다. |
@@ -260,7 +260,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 - 확률 합 오류
 - 보장 희귀도가 RARE 미만이거나, 첫 해금 레벨에 가중치가 양수인 보장 대상 차량이 없음
 
-**2026-11-05 PRD에서 희귀도가 개별 차량 단위로 바뀌었다.** 콘텐츠 본문의 희귀도 열과 첫 레벨 보장 대상 검사는 #35 후속 수정에서 제거·대체하고, 개별 차량의 희귀도·레벨 진행량 필드는 #33 담당과 조율해 `OwnedVehicle` 계약에 추가한다. 그 전까지 아래 설명은 현재 코드 기준이다. 새 개체 필드와 획득 기준액을 반영할 때는 #35·#48·#49의 공통 계약 조정에서 #34 저장 어댑터의 개체 읽기/쓰기, 갱신 명령, 요청 동일성 비교, 정산 결과 재생, 기존 데이터 보존·버전 처리를 함께 확인한다. #34의 과거 완료 근거를 새 필드의 저장 검증으로 간주하지 않으며 담당은 #34의 경민과 조율한다. 차종별 희귀도 검사를 대체해도 확률 합·보장 등급·양수 가중치 등 추첨 가능한 보장 설정의 검증은 #35·#47에 유지한다. 성공 시 읽기 전용 목록·확률을 가진 `GameContentSnapshot`을 돌려주고, `asVehicleCatalog()`로 위 `VehicleCatalog` 계약을 제공한다. 시험 입력은 testFixtures의 `GameContentFixtures`다. 1차 차종·가격 비율·해금 배치는 [PRD의 차량 표](01_PRD.md#1차-차종가격-비율해금-배치)를 따른다. 남은 결정은 실제 금액을 정할 수익 단위와 가게 레벨별 해금 조건·배치 조정(#44)이며, 합의한 표의 버전 있는 콘텐츠 적용은 #35의 후속 구현이다.
+**2026-11-05 PRD에서 희귀도가 개별 차량 단위로 바뀌었다.** 콘텐츠 본문의 희귀도 열과 첫 레벨 보장 대상 검사는 #35의 남은 수정에서 제거·대체한다. 개별 차량의 희귀도·레벨 진행량·취득 정보는 PR #104의 `OwnedVehicle` v1 계약과 단일 개체 저장에 반영됐다. 아래 설명은 아직 대체하지 않은 콘텐츠 구현 기준이며, 공통 개체 필드의 미구현을 뜻하지 않는다. 각 기능은 아래 v1 계약의 읽기/쓰기·갱신·요청 동일성·당시 정산 재생을 소비하고, #35·#48·#49의 실제 명령 연결과 구형 데이터 보존·이전·다중 개체 거래 등 남은 저장 확장은 #34 담당과 조율한다. #34의 과거 완료 근거를 새 필드의 저장 검증으로 간주하지 않으며 담당은 #34의 경민과 조율한다. 차종별 희귀도 검사를 대체해도 확률 합·보장 등급·양수 가중치 등 추첨 가능한 보장 설정의 검증은 #35·#47에 유지한다. 성공 시 읽기 전용 목록·확률을 가진 `GameContentSnapshot`을 돌려주고, `asVehicleCatalog()`로 위 `VehicleCatalog` 계약을 제공한다. 시험 입력은 testFixtures의 `GameContentFixtures`다. 1차 차종·가격 비율·해금 배치는 [PRD의 차량 표](01_PRD.md#1차-차종가격-비율해금-배치)를 따른다. 남은 결정은 실제 금액을 정할 수익 단위와 가게 레벨별 해금 조건·배치 조정(#44)이며, 합의한 표의 버전 있는 콘텐츠 적용은 #35의 후속 구현이다.
 
 2026-11-07 PRD 결정에 따라 취득 기준액은 실제 지불액을 보존하고 무료 뽑기권·첫 지급 차량은 0, 할인 뽑기권은 실제 할인가를 사용한다. 차종 가격, 판매·폐차의 취득 기준액, 현재 보유 차량으로 계산하는 최고가 랭킹 평가액은 서로 구분한다. 최고가 산식과 첫 지급 희귀도는 [PRD의 시작 경험·주요 기능](01_PRD.md#시작-경험과-주요-기능)을 따른다. 이 결정만으로 `OwnedVehicle` 필드·SQLite 저장·요청 동일성·정산 재생이 구현된 것은 아니며 위 공통 계약·저장 조율에서 함께 검증한다. B 경제 제안의 금액을 확정값으로 결합하지 않는다.
 
@@ -296,6 +296,59 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 이 구현은 앱이 전면에 있는 동안의 관측까지다. 주행 중 백그라운드 기록은 #81의 근거 없이 활성화하지 않는다. `RecordingService`는 시작하지 않으며 게임 수익 계산은 #39에서 다룬다.
 
+#### #46 개체 정보 v1과 공통 소비 예제
+
+2026-11-07, #46 공통 계약 조율 댓글과 최신 PRD의 개별 희귀도·재료 진행량·실제 취득액 결정을 코드 계약에 반영한다. 제품 규칙 추가가 아니라 기존 결정의 타입화다. `Rarity`는 `core.progression`에서 `core.contract`로 이동하며 enum은 하나만 둔다. 기존 소비자는 공통 위치를 import한다. 호환 alias는 두지 않는다. `VehicleGameData.rarity`는 아직 남아 있는 #35의 과거 시험 콘텐츠 필드이며 개체 희귀도의 생성 근거로 자동 복사하지 않는다. 콘텐츠 형식·1차 차종 연결은 #35 후속 범위다.
+
+| 필드·명령 | 단위와 유효 범위·보존 조건 |
+|---|---|
+| `OwnedVehicle.rarity` | 개별 차량의 `COMMON/ADVANCED/RARE/LEGEND`. 동일 차종에 서로 다른 값 가능. 차종 정의·랭킹 평가액과 별개 |
+| `level`, `levelProgressPercent` | 레벨1..20, 진행량은 정수 퍼센트포인트0..99이며 100은 한 레벨. 레벨20은 진행량0만 허용. #48 계산이 이월·상한 초과분 버림을 끝낸 값을 전달하며 공통 저장소가 자동 정규화하지 않음 |
+| `acquisitionCost` | 실제 취득 기준액인 `GameMoney` 최소 단위 Long 0..Long.MAX_VALUE. 무료·첫 지급은 실제0, 할인 티켓은 실제 할인 지출액. 차종 기준가·강화/수리비·랭킹 평가액이 아님 |
+| `acquisitionSource` | `INITIAL_GRANT`, `GACHA`, `PURCHASE_DELIVERY`만 정의. 첫 지급은 COMMON·취득액0. GACHA는 유료·할인·무료 티켓을 모두 포함하며 실제 금액으로 구분 |
+| `VehicleWrite.Add(vehicle)` | 새 필드는 전부 필수이며 기본값 없음. revision0·OWNED만 새 개체로 수락. 선불 티켓일 수 있어 취득액을 이번 `MoneyChange.amount`로 자동 계산하지 않음 |
+| `VehicleWrite.Update` | 기대revision·새레벨·새진행량·lifecycle를 명시. 희귀도·취득액·취득출처는 명령에 없어 이전 값을 보존. 처분(SOLD/SCRAPPED/CONSUMED)에서는 기존 레벨·진행량도 보존하며 함께 바꾸면 INVALID_INPUT |
+| 실패·동일 요청 | 잘못된 개체/명령 생성값은 기존 Kotlin `require`의 IllegalArgumentException으로 거절. 저장소의 처분/추가 조건 위반은 INVALID_INPUT, 오래된 revision·다른 명령의 requestId 재사용은 STATE_CONFLICT |
+| 확정 결과 | 같은 요청은 현재 차량이 아니라 당시 `Settlement.changedVehicle`을 반환. 새 개체 필드 전부와 Update 진행량도 요청 동일성에 포함 |
+
+취득 정보 누락을 무료 획득의0으로 바꾸지 않는다. Kotlin 생성자에 누락 기본값이 없고, SQLite JSON도 새 필드를 필수 읽기한다. enum·레벨·진행량·금액의 잘못된 저장값은 기존 `STORAGE_FAILURE`/내부 `INVALID_RECORD` 경로다. 차량 JSON의 level·revision·levelProgressPercent·acquisitionCost는 writer가 쓰는 JSON 정수(Int/Long)만 허용하며, 범위 검사 후 Int로 좁힌다. 문자열 숫자·실수(1.0 포함)·지수 표기·Long 범위 초과를 절삭/반올림/기본값으로 복구하지 않는다. 같은 decoder를 쓰는 정산의 차량 snapshot에도 적용한다. `GameChange`는 여전히 재화와 차량 한 대 변경이며 활동·점유 검사나 다중 차량 강화를 구현한 것이 아니다.
+
+C 담당은 `RentalContractFixtures.vehicleExamples()`에서 revision0인 같은 차종의 첫 지급(COMMON/1레벨/0%), 할인 가챠(RARE/4레벨/50%/250), 유료 가챠(ADVANCED/2레벨/25%/500), 무료 가챠(LEGEND/0), 구매 탁송(800) 입력을 얻는다. 금액은 시험 입력이며 최종 밸런스가 아니다. 반환 목록은 외부 변경이 금지되고 각 개체도 불변 값이다.
+
+```kotlin
+val vehicle = RentalContractFixtures.paidGachaVehicle // revision0, 실제 취득액500
+val store: GameChangeStore = InMemoryGameChangeStore(emptyList())
+val add = GameChange(RequestId("example-add"), TransactionKind.GARAGE,
+    InputSource.SIMULATION, RentalContractFixtures.ruleVersion,
+    vehicle = VehicleWrite.Add(vehicle))
+val issued = store.commitGameChange(add)
+val growth = add.copy(requestId = RequestId("example-growth"), vehicle =
+    VehicleWrite.Update(vehicle.ownedVehicleId, Revision(0), 3, VehicleLifecycle.OWNED, 75))
+val grown = store.commitGameChange(growth) // 취득액500과 희귀도·출처 보존
+val original = store.commitGameChange(add) // 성장 전 issued와 같은 정산
+val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
+```
+
+`OwnedVehicleContractTest`는 위 호출을 실제 실행하며 생성→조회→성장→처분→원래 정산 재생, 필드 하나만 다른 같은 요청의 충돌과 무료0·잘못된 값 거절을 확인한다. 실행은 `./gradlew :core:test --tests '*OwnedVehicleContractTest'`다. 도감 입력은 검증된 획득 이력에서 `CollectionKey(it.vehicleId, it.rarity)`를 만들어 공급한다. 현재 `listOwnedVehicles()`만으로 처분 후 영구 보유 이력을 만들지 않는다.
+
+#### #34 저장 확장의 연결점과 기존 데이터 조건
+
+이번 SQLite 대응은 새 필드를 손실시키지 않기 위한 `LedgerJson.vehicle` 양방향, Update 명령 JSON·copy, 처분 성장값 보존 조건에 한정했다. 테이블·DB 이름·스키마 버전1·원자성·revision 책임은 바꾸지 않았다. 코드 반영·컴파일과 실제 저장/재실행 검증을 구분한다.
+
+| 기존 코드 위치 | 필요한 입력·출력과 후속 검증 |
+|---|---|
+| `LedgerJson.vehicle` / `vehicles.payload` | rarity, levelProgressPercent, acquisitionCost, acquisitionSource 필수. 비기본 값 Add→재개방→보유 조회가 같아야 함 |
+| `LedgerJson.command` / `settlements.command` | Add의 전체 개체·Update 진행량 포함. 각 필드 하나만 다른 같은 requestId는 STATE_CONFLICT, 원장 추가 변경 없음 |
+| `LedgerJson.settlement` / `settlements.result` | 당시 차량 snapshot 보존. 성장·처분 후 DB 재개방 및 과거 Add/Update 재시도도 당시 snapshot과 정산ID·잔액 반환 |
+| `listOwnedVehicles` / `findVehicle` | 현재 보유와 처분 포함 이력은 다른 조회. #34는 모든 lifecycle의 개체 또는 영구 `(vehicleId, rarity)` 획득 키를 반환하는 조회를 연결해야 함. 처분 후에도 도감의 과거 보유 칸 유지 검증 |
+| 발견 기록: 현재 저장 API 없음 | 입력 `(vehicleId, rarity)`를 중복 없이 저장하고 재개방 뒤 같은 발견 키 집합 반환. 콘텐츠 참조 검증·출처별 원장 경계와 실패를 보존하며 `Garage.collection`의 discovered로 공급. 새 테이블/서명은 저장 담당과 후속 확정 |
+| 기존 schema1 JSON | 새 필드 누락 시 기본값/자동 삭제 없이 실패. 처분 개체 한 건의 누락도 현재 조회가 모든 payload를 먼저 읽으므로 전체 보유 조회를 실패시킬 수 있음. 미확인 정산의 차량 snapshot 누락도 전체 정산 조회 실패 |
+| 과거 명령 재시도 | 옛 차량 Add/Update 명령은 새 명령과 JSON이 달라 result 읽기 전 STATE_CONFLICT. 차량 없는 과거 금액 명령은 동일 표현의 재생 경로 유지. 이 차이를 기기에서 검증해야 함 |
+
+이미 운영한 schema1 데이터가 새 필드를 가진 것으로 간주하지 않는다. 같은 DB 버전 안에서 payload 의미가 확장되므로 저장 담당이 실제 구버전 자료와 호환 전략을 검증해야 한다. 근거 있는 취득 기록 없이 COMMON·0·현재 차종가로 복구하거나, 새 DB/기존 데이터 삭제로 통과시키지 않는다. 확정 결과의 과거 값도 현재 개체로 재구성하지 않는다. 자동 이전은 이번에 제공하지 않는다.
+
+#48 후속 거래는 대상ID/revision·재료ID/revision·활동·차종/희귀도·규칙 버전에서 계산한 새 레벨/진행량과 필요한 재화 변경을 입력으로 받아야 한다. 한 정산에서 대상 성장 snapshot과 재료 CONSUMED snapshot을 함께 확정하고 취득 정보는 각각 보존해야 한다. 같은 개체 중복·활동 제한·revision 충돌·금액 부족이면 전부 미반영이어야 한다. 현재 단일 `GameChange` 두 번 호출로 이를 흉내 내지 않는다. 다중 개체 명령·결과 구조 자체는 #48·#34의 후속 연결이며 이번에는 구현하지 않는다. 가챠 티켓/보장 이력·초기 지급 이력·사고/활동·도감 영속 입력도 각 기존 담당의 범위다. 기존 `VehicleCare.levelAfterMaterial`의 +3레벨 시험 로직을 이번에 희귀도별 진행량 계산으로 바꾼 것은 아니며 #48이 최신 PRD와 새 필드로 연결해야 한다.
+
 ### 거래 원장 영속 저장
 
 #34의 첫 영속 어댑터는 앱 내부의 SQLite 데이터베이스 하나를 `SQLiteOpenHelper`로 관리한다. 초기 스키마는 v1이다. Android 기본 API로 잔액·보유 차량·거래 결과를 한 트랜잭션에서 확정하고, 요청 ID의 유일성을 DB에서 강제한다. 기존 `SnapshotStore`는 출처별 주행 기록과 경험치를 한 파일로 저장한다. `AtomicFile`의 파일 교체는 해당 용도에 적합하며, 거래 원장에 그대로 적용하면 중복 키·동시 갱신 규칙을 직접 구현해야 한다. 기존 파일은 유지하고 과거 경험치를 게임머니로 변환하지 않는다. [SQLiteDatabase](https://developer.android.com/reference/android/database/sqlite/SQLiteDatabase), [SQLiteOpenHelper](https://developer.android.com/reference/android/database/sqlite/SQLiteOpenHelper), [AtomicFile](https://developer.android.com/reference/android/util/AtomicFile)
@@ -314,4 +367,4 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알 수 없는 테이블, 이후 버전, 파일 손상은 원본을 삭제·초기화하지 않고 `STORAGE_FAILURE`로 거절한다. 자동 백업·자동 복구·자동 버전 이전은 제공하지 않는다. 복구는 모든 연결을 닫은 뒤 원본과 남은 SQLite 부속 파일을 별도로 보존하고 지원 버전과 무결성을 조사하는 수동 절차로 남긴다. 새 게임으로 덮어쓰거나 과거 규칙 버전을 현재 규칙으로 바꾸지 않는다. `ContentVersion`은 콘텐츠 카탈로그의 버전이며 v0 거래 명령에는 포함되지 않는다.
 
-이번 구현은 v0 계약의 재화·차량 한 대 변경·확정 정산·열람 상태까지다. 다중 차량 소비, 의뢰/대여/시간 구간, 가챠의 재추첨 방지 결과 모델은 해당 후속 계약과 구현이 필요하다. #34를 전체 게임 저장 완료로 해석하지 않는다.
+최초 구현은 v0 계약의 재화·차량 한 대 변경·확정 정산·열람 상태까지다. 개체 v1 필드의 후속 최소 대응과 기존 payload 조건은 위 「#34 저장 확장의 연결점과 기존 데이터 조건」을 따른다. 다중 차량 소비, 의뢰/대여/시간 구간, 가챠의 재추첨 방지 결과 모델은 해당 후속 계약과 구현이 필요하다. #34를 전체 게임 저장 완료로 해석하지 않는다.

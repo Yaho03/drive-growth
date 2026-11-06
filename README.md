@@ -5,15 +5,15 @@
 | 담당 | 지금 할 일 | 막고 있는 이슈 | 해제 조건 |
 |---|---|---|---|
 | 정원 | [#80](https://github.com/Yaho03/drive-growth/issues/80), [#37](https://github.com/Yaho03/drive-growth/issues/37) 시험용 후보·규칙 확인, [#40](https://github.com/Yaho03/drive-growth/issues/40) 음성 없는 뼈대 | #38·#39는 정원 #37 | 선택 의뢰의 필요한 결과 검토·main 반영 |
-| 환석 | [#51](https://github.com/Yaho03/drive-growth/issues/51) Back·창·복원 후속 검토, PR 검토 | #52~#58은 환석 #51의 남은 공통 연결점 확인 | [본인 검증의 사용 가능 범위와 환경 제약](docs/06_VERIFICATION.md#51-back창입력-후속-본인-검증--2026-11-07)을 PR에서 확인. 미검증 D/P·폼 팩터는 #51·#28 유지 |
-| 호열 | [#47](https://github.com/Yaho03/drive-growth/issues/47), [#48](https://github.com/Yaho03/drive-growth/issues/48), [#50](https://github.com/Yaho03/drive-growth/issues/50), #46 잔여 저장 연결·#35 콘텐츠 | #49는 경민 #42 | 확정 사고 결과 인계. 새 개체 필드·저장 확장은 공통 담당과 조율 |
+| 환석 | [#51](https://github.com/Yaho03/drive-growth/issues/51), [#52](https://github.com/Yaho03/drive-growth/issues/52) 표시 UI의 실제 연결 준비 | #52~#58 실제 연결은 환석 #51의 필요한 공통 연결점 | #103 차고·도감 표시 UI를 사용하고, #51 화면·제한 연결 후 실제 기능 검증 |
+| 호열 | [#47](https://github.com/Yaho03/drive-growth/issues/47), [#48](https://github.com/Yaho03/drive-growth/issues/48), [#50](https://github.com/Yaho03/drive-growth/issues/50), #46 활동·영속 도감 연결·#35 콘텐츠 | #49는 경민 #42 | #104 개체 필드·단일 개체 저장 사용 가능. 확정 사고 결과 인계와 다중 개체 거래는 별도 확인 |
 | 경민 | [#41](https://github.com/Yaho03/drive-growth/issues/41) 조회 후보·자동 배정 구현 | #42는 경민 #41, #43·#44는 경민 #42 | 각 기능이 소비할 결과의 검토·main 반영 |
 
 선행 결과가 검토·머지되거나 이슈를 완료로 닫으면 이 표도 갱신한다. 세부 정책·실제 연결 조건은 각 이슈를 따른다. 팀 구현이 끝나면 이 섹션을 삭제한다.
 
 평소 이동을 탁송·차량 영입으로 연결하고, 주차 후 차량을 모으고 렌터카 가게를 확장하는 Pleos Connect 차량용 게임을 기획하고 있습니다.
 
-**현재는 렌터카 게임의 설계·공통 개발 기반 준비 단계입니다.** 기존 기술 검증용 소스로 빌드·저장 시험을 재현할 수 있지만 새 탁송·렌터카 게임은 아직 구현하지 않았습니다. Debug APK는 로컬 시험 산출물이며 제출 Release APK·실제 게임 시연 영상은 준비 전입니다.
+**공통 차량 계약·단일 개체 저장과 차고·상세·도감 표시 UI를 구현했고, 실제 게임 기능과 화면의 연결을 진행 중입니다.** 표시 UI의 고정 입력·격리 Activity 시험은 실제 지급·경제 명령·앱 전체 흐름 완료와 구분합니다. Debug APK는 로컬 시험 산출물이며 제출 Release APK·실제 게임 시연 영상은 준비 전입니다.
 
 처음 참여한다면 [4인 구현 시작 안내와 책임표](docs/08_PROJECT_PLAN.md)를 확인하세요. 기능 이슈 → 해당 PRD 항목 → 공통 데이터 계약 → 화면 명세 → 검증 명령 순서로 진행합니다. 공통 타입·거래 저장·fixture 구현은 기능 연결의 선행 작업입니다.
 
@@ -33,9 +33,9 @@
 |---|---|
 | 기존 순수 Kotlin 엔진 | 테스트 13개 통과. 새 탁송·영업 규칙은 미구현 |
 | 기존 Android 저장 | Pleos 에뮬레이터에서 주행 스냅샷 저장 테스트 8개 통과 |
-| 공통 거래 원장 | SQLite v1 어댑터·디스크 테스트 12개 통과. 기존 #62에서 공통 저장·콘텐츠 연결 시험 확인. 새 게임 기능·화면의 실제 연결은 진행 중 |
+| 공통 거래 원장 | #104에서 개체 희귀도·진행량·취득 정보와 단일 개체 저장 확장. SQLite 시험 26개 통과. 구형 데이터 migration·영속 도감·다중 개체 거래·제품 앱 재실행은 남음 |
 | 개발 도구·APK | 공통 조합 빌드·Lint, Debug 설치·Activity 기본 실행 확인 |
-| 새 화면 | 가게·차고·탁송·정산 [와이어프레임](docs/design-assets/wireframes.svg), #24 반영 [UI 시안 v3](docs/design-assets/ui-v3/)(세로 20·가로 10)과 2D Views 설계. 앱 적용 전 |
+| 새 화면 | [UI 시안 v3](docs/design-assets/ui-v3/)를 반영한 #103 차고·개체 상세·도감 Android Views 구현. 격리 Activity 장치 시험 10개 통과. #51 탐색·주행 제한 및 실제 데이터·명령 연결은 남음 |
 | 렌터카 게임·추가 기능 | 상세 구현 이슈로 진행. 정책·수치·일부 동작은 결정 대기 |
 | 최종 APK·시연·실차 | 제출 산출물 미준비, 실차 미검증 |
 
@@ -77,7 +77,7 @@ Debug 산출물은 `app/build/outputs/apk/debug/app-debug.apk`입니다. 설치�
 | [06_VERIFICATION.md](docs/06_VERIFICATION.md) | 검증·완료 상태 | 실행한 검사, 실패·미검증 사항, 시연 조건·제출 준비 상태. PR·머지·제출 전 확인 |
 | [07_REFERENCES.md](docs/07_REFERENCES.md) | 외부 참고 근거 | 유명·수상 레포에서 채택한 특징과 AI 지침 로딩 근거. 협업·구조를 바꿀 때 참고 |
 | [08_PROJECT_PLAN.md](docs/08_PROJECT_PLAN.md) | 프로젝트 진행 계획 | 지금 할 일·선행조건·통합 회의와 M0–M3 단계 안내. 담당·목표일은 회의 후 확정 |
-| [09_UI_UX_SPEC.md](docs/09_UI_UX_SPEC.md) | 화면 흐름·디자인 명세 | 주행 시 숨김·주차 후 복귀·실패 상태·디자인 제약 정리. 4화면 와이어프레임·초기 스타일 작성, 앱 적용·기기 검증은 미완료 |
+| [09_UI_UX_SPEC.md](docs/09_UI_UX_SPEC.md) | 화면 흐름·디자인 명세 | 화면·상태·입력과 실제 코드 연결점. 차고·상세·도감 표시 구현, 실제 탐색·명령·저장 연결은 미완료 |
 | [10_SUBMISSION_DRAFT.md](docs/10_SUBMISSION_DRAFT.md) | 공식 양식용 제출 초안 | 심사용 1–8번 항목에 맞춘 문안, 미확정·실제 자료 상태. 최종 제출본 아님 |
 | [공모전 자료 안내](docs/contest/README.md) | 공식 공모전 자료 목차 | 일정·심사·접수, Pleos 개발자료, 차량 API와 공식 자료·다운로드 보관 기록 |
 | [OT 전체 요약](docs/contest/05_ORIENTATION_NOTES.md) | 온라인 설명회·질의응답 | 전체 35개 구간의 핵심 내용, 시각별 영상 링크, 기존 안내와의 차이. 기획·제출·SDK 조건 확인 시 참고 |

@@ -10,7 +10,7 @@ import io.drivegrowth.core.contract.VehicleCatalogSnapshot
 import io.drivegrowth.core.contract.VehicleDefinition
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.progression.GachaRules
-import io.drivegrowth.core.progression.Rarity
+import io.drivegrowth.core.contract.Rarity
 import java.util.Collections
 import java.util.EnumMap
 

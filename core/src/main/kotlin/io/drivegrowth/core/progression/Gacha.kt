@@ -1,9 +1,7 @@
 package io.drivegrowth.core.progression
 
+import io.drivegrowth.core.contract.Rarity
 import kotlin.random.Random
-
-// 희귀도 순서가 곧 비교 순서다(COMMON < ... < LEGEND).
-enum class Rarity { COMMON, ADVANCED, RARE, LEGEND }
 
 // 확률은 천분율 가중치(74.7% → 747). 수치는 PRD "가챠"의 시험값.
 data class GachaRules(

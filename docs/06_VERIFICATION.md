@@ -15,6 +15,52 @@ PR #100의 두 결함을 최신 main `c57cb32`와 통합한 전용 worktree에�
 
 입력은 시험용 콘텐츠·메모리 저장소·직접 주입한 활동/도감 키다. 로컬 앱·에뮬레이터·SQLite·실차 시험은 수행하지 않았다. 영업 쉬기·실제 활동 저장·도감 영속 입력·새 공통 개체 필드는 연결하지 않았으며 #46 전체 완료 근거가 아니다. 기능 간 연결은 #28, 플랫폼 시험은 #80·#81·#82의 기존 범위를 따른다.
 
+## #46 공통 개체 정보 계약 확장 — 2026-11-07
+
+PR #100이 포함된 main `e7a1bcca218f89f870e9c342ecb56c39cafa48bf`에서 전용 worktree를 만들었다. #46의 공통 계약 조율 댓글과 PRD의 개별 희귀도·진행량·실제 취득액 결정을 대조했고, 타입·명령·fixture 및 필요한 소비자만 변경했다. 필드·단위·오류·호환과 저장 담당 연결점은 [기술 문서](02_SYSTEM_ARCHITECTURE.md#46-개체-정보-v1과-공통-소비-예제)에서 관리한다. Garage 전체·가챠/강화/영업 기능 완료가 아니다.
+
+환경은 macOS arm64·Temurin JDK17·프로젝트 Gradle8.11.1·기존 Android SDK35/Build Tools35이며 SDK 경로는 환경변수로만 전달했다. 에뮬레이터·adb·기존 앱/DB 데이터는 사용하거나 변경하지 않았다.
+
+| 검사·입력 | 실제 결과와 적용 범위 |
+|---|---|
+| 변경 전 `:core:test :app:testDebugUnitTest` | core86개·app4개 통과. 기존 Garage15개 포함 |
+| 회귀 테스트 선실행 | 신규2개 모두 실패: fixture 반환 목록 외부 수정, 처분 중 레벨 변경 허용을 재현 |
+| 필드·명령·메모리 fixture 및 소비 예제 | core97개 통과, 실패·오류·생략0. 기존86개 유지+`OwnedVehicleContractTest`11개. Garage15개 유지 |
+| 경계값 | 레벨1..20·진행량0..99·최대레벨진행량0, 음수금액과 잘못된 첫 지급 거절. 무료0·할인250·유료500·구매탁송800 및 같은 차종의 서로 다른 희귀도/성장값 확인 |
+| 생성·성장·처분·재시도 | Garage 조회에 새 필드 보존, 각 취득 필드/진행량만 다른 같은 request 충돌, 오래된 revision 거절, 성장/처분 뒤 과거 정산 snapshot 재생, 처분 중 성장값 변경은 금액·차량 모두 미반영 |
+| 입력·반환 방어 | fixture 원본 목록 변경 격리와 반환 목록 수정 거절. 불변 차량·정산 값 보존 |
+| app 단위 테스트 | 4개 통과, 실패·오류·생략0. SQLite 기기 실행 시험은 아님 |
+| `:app:assembleDebug :app:lintDebug` | 성공. Lint 오류0·경고11(기존 대상API·백업/아이콘·View 생성자·draw 할당 관련) |
+| `:app:assembleDebugAndroidTest` | SQLite 장치 시험8개 추가를 포함해 시험 APK 컴파일 성공. 재개방/동일성/당시 정산 재생/legacy 누락·명령 차이·원본 보존 사례는 **실행하지 않음** |
+
+실제 최종 명령은 `./gradlew --offline --no-daemon :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`다. 근거는 `core/build/test-results/test/`, `app/build/test-results/testDebugUnitTest/`, `app/build/reports/lint-results-debug.txt`다. 저장소·공백 검사는 `python3 scripts/check_repository.py`, `git diff --check`로 확인한다.
+
+SQLite에는 새 필드를 손실시키지 않는 최소 JSON/Update 대응만 반영했다. 기존 schema1 차량 JSON은 새 필드가 없으면 `STORAGE_FAILURE`/내부 `INVALID_RECORD`, 옛 차량 명령의 새 필드 포함 재시도는 `STATE_CONFLICT`가 될 수 있다. 없는 희귀도·취득액을 COMMON·0으로 보정하지 않으며 DB 버전 증가·자동 이전·자동 초기화·삭제를 제공하지 않는다. 처분 이력/발견 기록 조회·저장과 이전 전략은 저장 담당의 후속 구현·실제 재개방 검증이 필요하다.
+
+**최초 인계 시점의 검증 구분:** 공통 계약·메모리 동작과 기존 소비자 컴파일은 확인했다. SQLite 장치 실행·앱 재실행·실제 지급/활동·다중 차량 강화·도감 영속 일치는 미검증이다. 기존 #33·#34와 PR #100의 과거 완료를 이 새 확장의 실제 저장 성공으로 바꾸지 않는다. 구현자 본인 검증 → PR 검토 → #28 기능 간 통합 검증의 현행 절차를 유지하며 #46 전체 종료·후속 라벨·차단 관계를 변경하지 않는다.
+
+### PR #104 차량 숫자 decoder 수정 — 2026-11-07
+
+검증 A가 기존 head `d157bb9`에서 원본 SQLite20개 통과, 보완5개 중2개 실패를 보고했다. 실제 실패 로그와 시험 코드를 직접 대조했다. `levelProgressPercent=4294967297`은 getInt에서1로 래핑되고 `acquisitionCost=350.75`는 getLong에서350으로 절삭되어 모델 검증을 통과했다. 이 보고는 위 최초 구현자의 컴파일 확인과 구분한다.
+
+차량의 level·revision·진행량·취득액을 원시 JSON Int/Long에서 범위 검사한 뒤 변환하도록 고쳤다. 정산의 차량 snapshot도 같은 decoder다. 문자열·실수(1.0 포함)·지수 표기·범위 초과를 정상값으로 보정하지 않는다. 기존 무료0과 정상 정수는 유지한다. 정식 `SqliteGameChangeStoreTest`에 회귀6개를 추가했다. 원시 JSON 텍스트를 직접 주입하여 재직렬화의 정규화를 피하고 차량/정산의 조회·변경/재시도 실패, 원본 바이트 보존, 정상 경계·무료0·롤백·과거 정산 재생을 확인한다.
+
+로컬 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`는 성공했다. core97개·app4개 실패/오류/생략0, Lint오류0·기존경고11이다. 저장소 검사와 `git diff --check`도 통과했다. JDK17·기존 SDK 사용, 임시 독립 사본의 장치 패키지만 격리했으며 제품 applicationId·서명 설정은 변경하지 않았다.
+
+메인의 #105 장치 종료·순서 확인 후 ADB5038/emulator-5556/user10에서 실행했다. 제품 패키지는 유지하고 임시 독립 사본의 `io.drivegrowth.verify104numeric`만 설치했다. red는 기존 decoder+정식 신규 시험, green은 수정 decoder+동일 시험이며 소스 해시와 설치 APK SHA-256을 대조했다.
+
+| 실제 장치 실행 | 결과 |
+|---|---|
+| 수정 전 두 재현 시험 | 2개 실행·실패2·오류0. 진행량4294967297→1, 취득액350.75→350으로 잘못 수용됨을 재현 |
+| 수정 후 `SqliteGameChangeStoreTest` | 기존20+신규6, **26개 통과**, 3.61초. 실제 Android JSON의 Int/Long/Double 형식 확인 |
+| 손상 숫자 경계 | 차량/정산 각각 42종 원시 숫자·형식 입력의 조회 및 변경/재생 거절, INVALID_RECORD와 원본 DB 바이트 보존 |
+| 정상·기존 동작 | 무료0·Long.MAX_VALUE·진행99·최대레벨, 재개방 후 조회·이전 정산 재생·revision충돌·동시성·원자성·무료 개체 성장 실패 롤백 유지 |
+| 종료·보존 | 새 격리 앱/시험 패키지 제거, 고유 시험DB 정리. 제품 설치 APK 해시·경로 유지, 제품 데이터 삭제 없음. user10·1080×600·120dpi·night no·forward빈목록 유지. active instrumentation 없음·AVD 켜둠 |
+
+장치 앱 APK SHA-256은 red `d6ea954a4ed8a42c7ca4ff35287d9d7bbe75e22bca5039bb788cc04f2b31b0cb`, green `70902dfb3c7d8a3efa59f81a78c3a1685b272a7dab60b2a711d0b5b04a3f8881`이고 공통 시험 APK는 `f26a03df9d267e51c5befa8051cdab41a8e46edd2f8e607232e57ded15e06b0b`이다. 근거 로그는 `red-two.log`, `green-all-26.log`, 소스·APK 대조는 `build-metadata.json`으로 보존했다. 메인에 장치 사용 종료를 전달했다.
+
+환경 한계도 분리한다. CarService 존재 조회는 성공했으나 종료 시 전체 dump 말미에 `DUMP TIMEOUT (10000ms)`가 관측됐다. SQLite26개는 정상 종료했으며 이를 CarService·차량 입력 환경 정상으로 해석하지 않는다. 차량 브리지 복구·기어/권한/창/포워딩 변경·재부팅은 하지 않았다. 이 시험은 고유 시험DB의 재개방 검증이며 **기존 제품 DB migration·제품 앱 재실행·도감 영속·다중 개체 거래는 여전히 미검증/미구현**이다. 위 최초 인계 기록과 후속 범위를 전체 완료로 바꾸지 않는다.
+
 ## 현재 공통 개발 기반 검증 — 2026-11-04
 
 사용자가 준비 작업을 진행하도록 요청한 범위에서 KGP 2.2.21·AGP 8.10.1·Gradle Wrapper 8.11.1(공식 배포 SHA-256 포함)·JDK 17 조합을 실제 설정에 적용했다. 검증 대상은 기존 로컬 선행 소스이며 렌터카 제품 기능 완성본이 아니다. 아래 결과는 이전 실패·단독 컴파일 기록을 지우지 않고 현재 상태를 갱신한다.
@@ -455,3 +501,53 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w \
 시험 종료 전 `wm size reset` 후1080×600·원래120dpi, overlay 설정 null, 야간 모드 no·원래 secure 설정 null, `car_service:found`, 사용자10 속도 권한 granted를 확인했다. 권한은 변경하지 않았다. D·속도 변경 성공 근거는 없고 마지막 화면은 P·0km/h였다. 실제 설치 APK 해시도 기기 검증 APK 값과 대조했다. 이후 최신 main APK 업데이트·재검사에서 위 환경 실패가 발생해 정상 기기 종료 상태를 새 성공으로 만들지 않는다. 처음 실행 AVD가 없어 이번에 기동했던 실행들은 모두 중단했고, 마지막 `adb -P 5038 devices -l`은 장치 없음·추가 forward 없음이었다. adb 서버는 종료하거나 포트를 바꾸지 않았다. 최종 APK·시험 로그는 로컬에 보존한다.
 
 공식 근거: [Pleos CCP](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/ccp-rotary-controller-development), [폼 팩터](https://document.pleos.ai/docs/pleos-only/app-test-guide/form-factor-test-guide), [Android 창 표시 API](https://developer.android.com/reference/android/app/Activity#setVisible(boolean)), [API34 display 선택](https://android.googlesource.com/platform/packages/services/Car/+/f9a252f4a3b621daabd330531fce555300a1d4c0/car-lib/src/android/car/drivingstate/CarUxRestrictionsManager.java#422), [미구성 display의 제한](https://android.googlesource.com/platform/packages/services/Car/+/f9a252f4a3b621daabd330531fce555300a1d4c0/service/src/com/android/car/CarUxRestrictionsManagerService.java#549).
+
+
+## #52 차고·도감 표시 UI 부분 검증
+
+2026-11-07, `codex/52-garage-display` 독립 worktree에서 `origin/main`의 `e7a1bcc`를 기준으로 구현했다. #52 최신 본문과 댓글(없음), 당시 열린 PR(없음)을 확인했다. 이 절은 표시 UI와 고정 입력의 자동 검사 기록이며 #51 연결이나 #52 전체 완료 보고가 아니다.
+
+- 소스: `app/src/main/java/io/drivegrowth/app/ui/garage/`의 차고·상세·도감 View, 표시 모델·입력 제어, `garage_` 문자열·중립 vector. debug 전용 `GaragePreviewStates`는 PRD의 차종 ID/이름 목록에 고정 상태·수치를 직접 주입한다. DB/실차를 읽거나 실제 지급·차감을 실행하지 않는다.
+- 환경: JDK 17, 기존 Android SDK Platform 35, Gradle 8.11.1. 영문 worktree `/private/tmp/drive-growth-garage-ui-20261107`에서 기존 SDK 경로를 환경 변수로 지정했다. Gradle·CI·Manifest·공통 계약·Activity 파일 변경은 없다.
+- `python3 scripts/check_repository.py`, `./gradlew :app:testDebugUnitTest`, `./gradlew :app:assembleDebug :app:lintDebug`, `./gradlew :app:assembleDebugAndroidTest`, `git diff --check`를 실행했다. 모두 통과했다. 추가로 `:core:test` 86개, 앱 단위 시험 전체 11개(차고 신규 7개)의 실패·오류 0건을 확인했다. Lint는 오류 0건·경고 13건이며 기존 대상 API/백업/그리기/아이콘/커스텀 View 생성자 경고와 새 프로그램 생성 View 2개의 `ViewConstructor` 경고를 포함한다. callback을 받는 View는 XML 인플레이션용이 아니다. instrumentation의 기존 플랫폼 시험 API 사용 중단 경고도 남는다. 추가 기기 시험 APK 빌드는 테스트 컴파일 확인이며 기기 실행 성공이 아니다.
+- 새 JVM 시험 7개는 동일 차종의 정확한 개체/revision 선택, 반복 요청 차단과 외부 결과 해제, 불가·제한·누락·개체 소멸 차단, 오류 재시도 중복 방지, 상세 닫기 뒤 미확정 요청 유지, 오래된 버튼의 대상/revision 불일치 차단, 외부 선택 복원을 확인한다. callback 전송으로 목록을 삭제하거나 완료로 바꾸지 않는 것도 확인한다.
+- Android 기기 시험 5개는 개체 선택/중복 클릭, 선택 소멸/제한 콘텐츠 제거, 빈 목록/로딩/읽기 실패/재시도, 도감 3상태·해금 분리, 도감 스크롤 재표시 보존을 준비했다. **컴파일만 수행, 실행하지 않았다.** 공유 에뮬레이터·adb 사용 금지 요청을 지켰으며 AVD 실행·설치·크기·권한 변경이 없다.
+- AI 코드 검토에서 지적한 스크롤·포커스 초기화와 호스트 선택 복원 진입점을 보완했다. 사람 리뷰나 실제 화면 검증으로 간주하지 않는다. 실제 Android 스크린샷은 확보하지 못했으며 시안 PNG·HTML을 앱 실행 증거로 사용하지 않는다.
+
+#51/메인 세션 인계: 공유 장치 사용이 가능한 시간에 약 15~20분을 확보해 `GaragePreviewStates`를 허용된 공통 탐색에 연결하고, 준비한 기기 시험과 세로 840×1184dp·가로 1360×948dp·좁은 창·긴 텍스트·글꼴 확대·선택 복원·Back/CCP를 확인해야 한다. 해당 크기는 공식 가이드의 예시 테스트 화면이며 모든 장치의 합격 기준이 아니다. 동기 callback 재표시 후 스크롤·포커스와 처리 중 화면 재생성도 확인한다. 이 세션이 공유 장치 사용을 예약하거나 시작한 것은 아니다.
+
+실제 데이터 공급자는 09 명세의 [표시 UI 연결점](09_UI_UX_SPEC.md#52-차고도감-표시-ui-연결점)에 개별 희귀도·진행량·취득액·활동·행동 허용/설명과 영속 도감 키를 매핑한다. #47~#49 실제 준비/확정 명령, 비용 확인, 요청 ID, 실패 복구·저장/재실행·주행 제한 통합은 남아 있다. #52 완료 체크·담당·Blocked by·ready는 변경하지 않는다. 원격 CI와 정확한 커밋은 게시 PR의 실제 결과로 확인한다.
+
+
+### #52 도감 재조회 스크롤 수정·재검증
+
+2026-11-07 검증 B가 별도 격리 호스트에서 원본 장치 시험 5/5, 보강 시험 7개 중 6개 통과·1개 실패를 보고했다. 전달받은 `extra-seven-device.txt`의 실패는 Content에서 `scrollY=700`으로 이동한 뒤 Loading의 실제 layout을 거쳐 Content로 돌아오면 0이 되는 조건이다. 이 기록은 구현 세션의 새 장치 실행 결과와 구분한다.
+
+원인은 마지막 ScrollView가 어떤 상태를 표시했는지 구분하지 않고 위치를 저장하던 것이다. `CollectionView`는 이전 Content의 배치된 위치만 저장하도록 수정했다. Loading/Error의 0이 Content 위치를 덮지 않고, Content→Content 연속 재표시·제한 중 콘텐츠 숨김을 유지한다. 내용이 줄면 Android ScrollView가 새 내용의 유효 범위로 복원한다. 09 명세의 스크롤 보존 약속은 유지한다.
+
+`CollectionScrollDeviceTest`에 실제 debug Activity 부착·중간 상태 layout을 거치는 회귀 5개(Loading, Error, 연속 Content, 제한 복귀, 내용 축소)를 추가했다. 최소 debug 호스트는 제품 탐색·차량 SDK·저장을 호출하지 않고 외부에 export하지 않는다. assertion/예외는 UI 스레드에서 잡아 시험 스레드로 전달한다. 기존 5개 View 시험에도 같은 예외 전달을 적용했다. 제품 main Manifest·MainActivity·Gradle·CI는 수정하지 않았다.
+
+장치 준비 당시에는 검증 C(#105) 종료·복원 → B 구현(#104) 종료 → 메인의 사용 가능 전달 순서를 기다렸고, 준비 중 adb/설치/AVD/장치 설정을 조작하지 않았다. `python3 scripts/check_repository.py`(21/26/183), 앱 단위 11개, `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`, `git diff --check`를 통과한 `dad71ec214ef91a16ab9dc0bc37234f86784baa2`를 기존 PR에 일반 push했다. 같은 head의 [CI 42278501355](https://github.com/Yaho03/drive-growth/actions/runs/42278501355)는 두 검사 모두 성공했다.
+
+이후 메인의 장치 사용 가능 전달을 받아 ADB 5038·`emulator-5556`·user 10에서 **격리 패키지 `io.drivegrowth.app.garage103`**만 설치해 같은 정식 시험 APK로 수정 전/후를 비교했다. Gradle applicationIdSuffix는 로컬 init script로만 지정했고 저장소 설정은 바꾸지 않았다.
+
+| 실행 | 소스·실제 결과 |
+|---|---|
+| 수정 전 | `6ed613a` + 동일 정식 시험·debug 호스트. 새 회귀 5개 중 Loading/Error의 실제 layout 경유 2개가 `expected 700 / actual 0` assertion 실패, 나머지 3개 통과, Errors 0. 시험 스레드에서 실패를 보고했고 프로세스 종료가 아니다. |
+| 수정 후 | `dad71ec`의 호스트만 교체. 기존 View 시험 5개와 실제 Activity 부착 회귀 5개, 총 **10개 모두 통과**. Loading/Error 뒤 복원, 연속 render, 제한 중 숨김/복귀, 내용 축소 시 유효 범위 보정을 확인했다. |
+
+시험 APK SHA-256은 전후 동일한 `89e8f957d1f0f4308883aed60f18de70087dc49080356800b2187ee160fdc3cc`다. 수정 전 호스트는 `ccb40a12094e27e1e4d1ca6a0f59ca981ad317c575f85451368b2776d67e5c0d`, 수정 후 호스트는 `56107cf8918565b0dc41cd04c2bad7c90dd7191e2ccdd81a28ea5428e5e5a3c2`이며 설치된 APK 해시와 대조했다. 로그·APK·전후 상태·설치 해시는 로컬 `/private/tmp/pr103-scroll-fix-evidence/`의 `red-device.txt`, `green-device.txt`, `prepared-artifacts.json`, `device-before.json`, `device-after.json`에 보존한다. 로컬 증거 파일·APK는 커밋하지 않는다.
+
+시험 후 이번에 만든 격리 앱/시험 패키지만 제거하고 목록에서 사라짐을 확인했다. 제품 APK 경로·SHA-256 `298d5cf55e846b8495682ae6c1d08e4aa5eb2d2da0f3cab67bd1d85e751e0832`는 전후 동일하다. 제품 데이터·권한·기어·창·서버는 변경하지 않았다. 부팅 완료 1·user 10·1080×600px·120dpi·night no·forward 빈 목록을 확인했고 Activity 프로세스 조회에서 active instrumentation 항목이 없었다. AVD는 켜 둔 채 **장치 사용 종료**를 메인에 전달했다.
+
+기존 인계의 OEMDrivingView 충돌/포커스 경쟁·차량 Console 브리지 문제·CarService dump 지연은 해결했다고 주장하지 않는다. 불필요한 CarService 전체 dump, 차량 신호·브리지 복구, 제품 데이터 삭제·AVD 초기화·다른 프로세스 종료는 하지 않았다. 위 성공은 격리 고정 UI 호스트의 회귀 결과이며 제품의 실제 #51 탐색·주행 제한·Back·경제 명령·DB/저장 연결·실차 검증이 아니다. #52 전체 완료도 계속 미완료다.
+
+위 장치 시험 인계 당시 #104는 main 미반영이어서 Rarity 위치·공통 개체 필수 필드·표시 일치·유효 fixture·09 설명을 맞춘 호환 변경을 별도 임시 통합 worktree/patch로 관리했다. 당시 원격 #103에는 포함하지 않았다. 이후 실제 통합 결과는 아래에 기록한다. 09의 스크롤 보존 약속은 낮추지 않았다.
+
+### PR #103·#104 계약 호환 통합 — 2026-11-07
+
+#104 최종 `9c32bb38c93b4f219a2cfcc4113c0cd1c8776db8`를 main `ba5ede1a4a184eb22001fec600e51742601e57c1`에 반영한 뒤, #103 최종 `e8bd7cd8c7c12c89393bf64cf81a82ebc6d4097b`의 전용 통합 worktree에 최신 main과 검증 B가 확인한 호환 패치를 적용했다. 패치 SHA-256은 `8506b995267ade06eca484e4f82293eb9568ab323d14be8262e319f72c3b7697`이다. 공통 Rarity·필수 개체 필드를 연결하고 희귀도·진행량·취득액을 공통 개체에서 직접 표시한다. 활동·사고·차종 가격의 누락 표현은 유지하며, 100% 예시는 Lv7·0%의 유효 입력으로 바꿨다. 패치의 코드·리소스·단위 시험 6개 파일이 검증 B의 통합본과 동일함을 대조했다.
+
+메인 통합 worktree에서 JDK17·기존 SDK로 `./gradlew --offline --no-daemon :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`를 실행했다. core97개·app11개가 실패·오류·생략0으로 통과했고 앱·시험 APK 빌드 및 Lint(오류0·경고13)가 성공했다. 저장소 검사와 `git diff --check`도 통과했다. 기존 02·06 기록을 보존하고 09 연결 설명과 README의 구현 범위를 맞췄다. 실제 최종 커밋과 원격 CI 결과는 PR #103에서 확인한다.
+
+이번 통합은 adb·에뮬레이터를 사용하지 않았다. 위 SQLite26개·격리 UI10개의 실제 장치 근거를 새 조합의 제품 앱·경제 명령·저장/재실행 시험으로 확대하지 않는다. #46의 활동·영속 도감·migration·다중 개체 거래, #52의 #51 탐색·주행 제한·실제 명령 연결과 #28 통합 흐름은 남아 있다. #105 차량 입력·Back 변경은 이 통합에 포함하지 않는다.

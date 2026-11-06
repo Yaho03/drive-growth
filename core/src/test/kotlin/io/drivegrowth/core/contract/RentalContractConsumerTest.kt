@@ -35,7 +35,7 @@ class RentalContractConsumerTest {
         val store: GameChangeStore = fixtures.store()
         val initial = (store.listOwnedVehicles() as ContractResult.Success).value
         assertEquals(listOf(fixtures.firstVehicle, fixtures.secondVehicle), initial)
-        val update = VehicleWrite.Update(fixtures.firstVehicle.ownedVehicleId, Revision(3), 2, VehicleLifecycle.OWNED)
+        val update = VehicleWrite.Update(fixtures.firstVehicle.ownedVehicleId, Revision(3), 2, VehicleLifecycle.OWNED, 0)
         val change = credit("first").copy(vehicle = update)
         val saved = (store.commitGameChange(change) as ContractResult.Success).value
         assertEquals(fixtures.firstVehicle.copy(level = 2, revision = Revision(4)), saved.changedVehicle)

@@ -1,0 +1,6 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="160dp" android:height="88dp" android:viewportWidth="160" android:viewportHeight="88">
+    <!-- 프로젝트 자체 중립 차량 도형. 특정 차종 외형이 아니다. -->
+    <path android:fillColor="#9CA3AD" android:pathData="M38,24 L106,24 L124,45 L140,49 L140,66 L20,66 L20,48 L30,43 Z" />
+    <path android:fillColor="#282C34" android:pathData="M43,30 L100,30 L112,44 L36,44 Z" />
+    <path android:fillColor="#0E1014" android:pathData="M33,65 a11,11 0,1 0,22 0 a11,11 0,1 0,-22 0 M109,65 a11,11 0,1 0,22 0 a11,11 0,1 0,-22 0" />
+</vector>
