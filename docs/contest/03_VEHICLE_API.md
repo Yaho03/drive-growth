@@ -165,6 +165,17 @@ NaviHelper는 차량의 Navigation 서비스에 요청을 전달하고 이벤트
 
 단순히 `addWaypoint`가 있다는 이유로 위 기능까지 제공된다고 가정하지 않는다. 반대로 조사 범위에서 검색 메서드를 발견하지 못했다는 이유로 아이디어를 삭제하지도 않는다.
 
+
+### 4.4 거리·도착 단위와 설치 버전 검증 경계
+
+2026-11-06 공식 클래스 본문 대조: `DestinationInfo.remainDistance`는 m, `remainTime`은 s, `DestinationArrivedInfo.distance`와 `duration`은 각각 m·s다. `CurrentLocationInfo`의 위도·경도는 degree이며 heading의 단위는 확인하지 못해 원값을 유지한다. `DrivingState.distance`는 명세상 출발점부터 지점까지의 거리이므로 남은 거리로 바꾸어 부르지 않는다.
+
+출처: [DestinationInfo](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/NaviHelper/navi-helper/ai.pleos.playground.navi.data/destination-info/entry), [DestinationArrivedInfo](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/NaviHelper/navi-helper/ai.pleos.playground.navi.data/destination-arrived-info/entry), [CurrentLocationInfo](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/NaviHelper/navi-helper/ai.pleos.playground.navi.data/current-location-info/entry), [DrivingState](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/NaviHelper/navi-helper/ai.pleos.playground.navi.data/driving-state/entry).
+
+`requestReRoute`는 활성 경로에서 사용하는 `NAVI_ROUTE_SEARCH` normal 권한 API다. 정상 반환과 실제 재탐색 완료 이벤트는 별개이며, routeId 유지·변경은 명세에서 보장한 것으로 확인하지 못했다. [공식 요청 명세](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/NaviHelper/navi-helper/ai.pleos.playground.navi.helper/navi-helper/request-re-route).
+
+내장 모의주행의 실제 도착 수신, 요청 좌표와 서버 채택 POI의 불일치, 지정 설치 버전의 isRouting·수동 재탐색 제한, 권한 미선언과 복원 및 그래픽 결과는 [#80 추가 실행 검증](../06_VERIFICATION.md#80-내비-모의주행권한재탐색렌더링-추가-검증--2026-11-06)에서 관리한다. 문서상 API와 특정 버전의 실행 결과를 구분한다.
+
 ## 5. 차량 앱의 설계 조건
 
 ### 5.1 주행 제한 상태

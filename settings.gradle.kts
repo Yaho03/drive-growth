@@ -5,3 +5,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "DriveGrowth"
 include(":app", ":core")
+include(":navi-diagnostic")

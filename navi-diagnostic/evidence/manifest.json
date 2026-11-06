@@ -1,0 +1,72 @@
+{
+  "description": "시험 로그의 모든 행에서 공통 이벤트 필드만 선별. payloadRaw·시각·이벤트를 변조하지 않았으며 중복된 관측 스냅샷·요청 문맥·로컬 객체 식별 필드는 제외했다. 원본 전체는 로컬 보존한다. 공개 좌표는 에뮬레이터·시험용 POI다.",
+  "fields": [
+    "runId",
+    "sequence",
+    "receivedEpochMs",
+    "receivedElapsedMs",
+    "recordedEpochMs",
+    "source",
+    "event",
+    "payloadRaw",
+    "staleConnection"
+  ],
+  "files": [
+    {
+      "file": "original-events.jsonl",
+      "sourceFileName": "diagnostic-final-check.jsonl",
+      "sourceRecords": 1599,
+      "sourceSha256": "d2b510f94a9f51cee1702ff5f13ee7b8fe2f400ad1c47be335422ae8df73efdf",
+      "publishedRecords": 1599,
+      "publishedSha256": "e95eb19cff255d76c78e2b30204b65868e7ba3718ca6a4dc495a33781052c290"
+    },
+    {
+      "file": "followup-arrival-events.jsonl",
+      "sourceFileName": "host-arrival-after.jsonl",
+      "sourceRecords": 254,
+      "sourceSha256": "4904f5ca8b22032c247cb594f0ce1c6894f03d3e65d1b6679fc2d1c01b7cf01f",
+      "publishedRecords": 254,
+      "publishedSha256": "75419e428ff6820fccdf11be9e58054f025e87c355f2b03ae9e07b73f0646118"
+    },
+    {
+      "file": "permission-denied-events.jsonl",
+      "sourceFileName": "permission-denied-final.jsonl",
+      "sourceRecords": 86,
+      "sourceSha256": "ec7c2d5fe06a7f86a236f19ea3c46d64dbba95f334b3a38fb8abcedc63645a18",
+      "publishedRecords": 86,
+      "publishedSha256": "7c90fbef7bda5e652c18defb22a926c9d356a2947c22d6ef0171527008751f87"
+    },
+    {
+      "file": "permission-restored-events.jsonl",
+      "sourceFileName": "permitted-route-created.jsonl",
+      "sourceRecords": 47,
+      "sourceSha256": "89cf749a51642f1eef74b4c2d7da3fb4bab7e0a553193445d552b199f661da17",
+      "publishedRecords": 47,
+      "publishedSha256": "c1113c894ef0fb64f81db7f80e0393be127ad5a40c1910e54a761de645c2e0ab"
+    },
+    {
+      "file": "reroute-events.jsonl",
+      "sourceFileName": "reroute-waited.jsonl",
+      "sourceRecords": 482,
+      "sourceSha256": "d09a0749c50dd358f1fc902c4b48feb001e6f6289a14f67f81cb17571b861dee",
+      "publishedRecords": 482,
+      "publishedSha256": "7d1d8decefff6ff3720dc41b91dd6e383fba72aa90589ffab133b826e767ad7c"
+    },
+    {
+      "file": "gps-before-events.jsonl",
+      "sourceFileName": "gps-postsimulation-before.jsonl",
+      "sourceRecords": 1724,
+      "sourceSha256": "cb111a04e56e085e08fa981ecd535cf6d372965239bf0e39df4a8cdcdb610bc4",
+      "publishedRecords": 1724,
+      "publishedSha256": "9aff73c5150ef9fe533156c7b66edb57fb43e70ddb827f9cccf17552b9a87cec"
+    },
+    {
+      "file": "gps-after-events.jsonl",
+      "sourceFileName": "gps-postsimulation-after.jsonl",
+      "sourceRecords": 1769,
+      "sourceSha256": "fe03ecf7ce60fe5fcf0d006b5135b50f972b1548c33abf6f1ae710b147b563c1",
+      "publishedRecords": 1769,
+      "publishedSha256": "e07acd8e119d71e241e3c68a9e0c94eda9771c611c097b4eecc66f15545f5b55"
+    }
+  ]
+}

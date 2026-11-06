@@ -16,12 +16,14 @@ REQUIRED = (
     "gradlew", "gradle/wrapper/gradle-wrapper.jar",
     "gradle/wrapper/gradle-wrapper.properties", "settings.gradle.kts",
     "app/build.gradle.kts", "core/build.gradle.kts",
+    "navi-diagnostic/README.md", "navi-diagnostic/evidence/README.md",
 )
 
 
 def main():
     errors = [f"필수 파일 없음: {name}" for name in REQUIRED if not (ROOT / name).is_file()]
-    documents = list(ROOT.glob("*.md")) + list((ROOT / "docs").rglob("*.md"))
+    documents = (list(ROOT.glob("*.md")) + list((ROOT / "docs").rglob("*.md"))
+                 + list((ROOT / "navi-diagnostic").rglob("README.md")))
     checked = 0
     for document in documents:
         # 코드 예제 안의 링크 문법은 검사 대상에서 제외한다.

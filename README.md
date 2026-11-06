@@ -4,12 +4,12 @@
 
 | 담당 | 지금 할 일 | 막고 있는 이슈 | 해제 조건 |
 |---|---|---|---|
-| 정원 | [#36 차량 입력·조작 제한](https://github.com/Yaho03/drive-growth/issues/36) | 없음 | 조작 허용·제한·확인 불가 상태를 #51에 인계 |
-| 환석 | [#51 화면 시험](https://github.com/Yaho03/drive-growth/issues/51) | 정원 #36 (최종 연동) | #36 신호를 받으면 #51에 연결 |
-| 호열 | 대기 | 정원 [#63](https://github.com/Yaho03/drive-growth/issues/63), 전원 [#24](https://github.com/Yaho03/drive-growth/issues/24) | #63 주행 제한 검증 통과 → [#46 보유 차량 조회](https://github.com/Yaho03/drive-growth/issues/46). #24 차량별 게임 값 확정 → [#35 콘텐츠 표](https://github.com/Yaho03/drive-growth/issues/35) |
-| 경민 | 대기 | 호열 #46, 호열 [#64](https://github.com/Yaho03/drive-growth/issues/64) | #46 차량 조회 인계 → [#71 조회 검증](https://github.com/Yaho03/drive-growth/issues/71). #46 조회와 #64 탁송 검증 완료 → [#41 대여 배정](https://github.com/Yaho03/drive-growth/issues/41) |
+| 정원 | [#36](https://github.com/Yaho03/drive-growth/issues/36), [#80](https://github.com/Yaho03/drive-growth/issues/80), [#37](https://github.com/Yaho03/drive-growth/issues/37) 시험용 후보·규칙 확인, [#40](https://github.com/Yaho03/drive-growth/issues/40) 음성 없는 뼈대 | #38은 정원 #37, #39는 정원 #37·호열 #46 | 선택 의뢰·보유 차량 조회의 필요한 결과 검토·main 반영 |
+| 환석 | [#51](https://github.com/Yaho03/drive-growth/issues/51), PR 검토 | #52~#58은 환석 #51의 남은 공통 연결점 확인 | #51 본인 검증·PR 검토로 사용할 화면·제한 범위 확인 |
+| 호열 | [#46](https://github.com/Yaho03/drive-growth/issues/46), [#35](https://github.com/Yaho03/drive-growth/issues/35) 합의된 콘텐츠 | #47·#48·#50은 호열 #46, #49는 경민 #42도 필요 | 필요한 조회·명령 결과 검토·main 반영. 최종 콘텐츠 결정은 #24 |
+| 경민 | #41에 필요한 #46 조회 계약 확인·준비 | #41은 호열 #46, #42는 경민 #41, #43·#44는 경민 #42 | 각 기능이 소비할 결과의 검토·main 반영 |
 
-이슈를 완료로 닫을 때 이 표의 관련 행도 갱신한다. 팀 구현이 끝나면 이 섹션을 삭제한다.
+선행 결과가 검토·머지되거나 이슈를 완료로 닫으면 이 표도 갱신한다. 세부 정책·실제 연결 조건은 각 이슈를 따른다. 팀 구현이 끝나면 이 섹션을 삭제한다.
 
 평소 이동을 탁송·차량 영입으로 연결하고, 주차 후 차량을 모으고 렌터카 가게를 확장하는 Pleos Connect 차량용 게임을 기획하고 있습니다.
 
@@ -33,7 +33,7 @@
 |---|---|
 | 기존 순수 Kotlin 엔진 | 테스트 13개 통과. 새 탁송·영업 규칙은 미구현 |
 | 기존 Android 저장 | Pleos 에뮬레이터에서 주행 스냅샷 저장 테스트 8개 통과 |
-| 공통 거래 원장 | SQLite v1 어댑터·디스크 테스트 12개 통과. 게임 기능·화면 연결과 교차 검증은 미완료 |
+| 공통 거래 원장 | SQLite v1 어댑터·디스크 테스트 12개 통과. 기존 #62에서 공통 저장·콘텐츠 연결 시험 확인. 새 게임 기능·화면의 실제 연결은 진행 중 |
 | 개발 도구·APK | 공통 조합 빌드·Lint, Debug 설치·Activity 기본 실행 확인 |
 | 새 화면 | 가게·차고·탁송·정산 [와이어프레임](docs/design-assets/wireframes.svg), #24 반영 [UI 시안 v3](docs/design-assets/ui-v3/)(세로 20·가로 10)과 2D Views 설계. 앱 적용 전 |
 | 렌터카 게임·추가 기능 | 상세 구현 이슈로 진행. 정책·수치·일부 동작은 결정 대기 |
@@ -81,6 +81,7 @@ Debug 산출물은 `app/build/outputs/apk/debug/app-debug.apk`입니다. 설치�
 | [10_SUBMISSION_DRAFT.md](docs/10_SUBMISSION_DRAFT.md) | 공식 양식용 제출 초안 | 심사용 1–8번 항목에 맞춘 문안, 미확정·실제 자료 상태. 최종 제출본 아님 |
 | [공모전 자료 안내](docs/contest/README.md) | 공식 공모전 자료 목차 | 일정·심사·접수, Pleos 개발자료, 차량 API와 공식 자료·다운로드 보관 기록 |
 | [OT 전체 요약](docs/contest/05_ORIENTATION_NOTES.md) | 온라인 설명회·질의응답 | 전체 35개 구간의 핵심 내용, 시각별 영상 링크, 기존 안내와의 차이. 기획·제출·SDK 조건 확인 시 참고 |
+| [내비 콜백 진단 도구](navi-diagnostic/README.md) | #80 지원용 별도 APK | 다운로드·설치·내장 모의주행 재현·시험 증거·남은 제한. 제품 앱·전체 오류 해결과 구분 |
 | [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md) | AI 작업 진입점 | 같은 협업·제품·기술·검증 문서를 읽게 하는 지침. 공통 규칙을 중복 작성하지 않음 |
 
 차량 목록의 기준 데이터는 [vehicles.csv](docs/data/vehicles.csv)입니다. PDF 기획서 원본은 로컬에만 보관하며 GitHub에 올리지 않습니다. 조사 문서의 제안은 팀이 결정하기 전까지 확정 기획이나 구현 완료를 의미하지 않습니다.
