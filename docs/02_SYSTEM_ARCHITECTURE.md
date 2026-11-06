@@ -175,7 +175,7 @@ OwnedVehicle의 `lifecycle` 초안은 OWNED/SOLD/SCRAPPED/CONSUMED다. 대여·�
 
 | 호출 | 호출자 → 책임 | 입력 → 결과 |
 |---|---|---|
-| listOwnedVehicles | A/B/D → C 차량 조회 | 조회 조건 → 개체별 현재 revision·대여 가능 판단 근거. 실제 예약은 별도 거래 |
+| listOwnedVehicles | A/B/D → C 차량 조회 | 조회 조건 → 개체별 현재 revision·대여 가능 판단 근거. 실제 예약은 별도 거래. #46 첫 구현은 `io.drivegrowth.core.garage.Garage`(`owned`·`find`·`availableForRental`·차종×희귀도 `collection`)이며 저장소 목록을 받아 조회만 한다. 콘텐츠에 없는 차종·중복 개체 ID는 `INVALID_INPUT`, 없거나 처분된 개체는 `DATA_UNAVAILABLE` |
 | proposeDelivery / changeDelivery | D 화면 → A 탁송 | 목적지/거리 근거·선택 요청 → 후보/활성 의뢰 또는 결정·데이터 부족 오류 |
 | calculateRentalResult | B 영업 | 확정 규칙·차량 스냅샷·대여 입력 → 계산 결과안. 잔액을 직접 저장하지 않음 |
 | prepareVehicleChange | C 차량 | 강화/수리/처분 요청·개체 revision → 변화 결과안. 다른 기능의 원장을 직접 수정하지 않음 |
