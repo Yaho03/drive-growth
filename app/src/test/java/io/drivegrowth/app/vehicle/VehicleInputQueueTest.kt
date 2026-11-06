@@ -174,13 +174,14 @@ class VehicleInputQueueTest {
         assertEquals(2, received.size)
     }
 
-    @Test fun responseUsesRequestTimeAndExpiresAtExistingBoundary() {
+    @Test fun responseKeepsReceiptTimeAndRequestStillExpires() {
         val session = queue.start({ Reader { sample() } }, received::add)
         now = 1000
         work.runNext()
         now = 2500
         ui.runNext()
-        assertEquals(0L, received.single().getOrThrow().receivedElapsedMs)
+        assertEquals(1000L, received.single().getOrThrow().receivedElapsedMs)
+        assertEquals(EpochMillis(1000), received.single().getOrThrow().receivedAt)
         queue.poll(session)
         work.runNext()
         now = 5001
@@ -207,6 +208,18 @@ class VehicleInputQueueTest {
         queue.poll(second)
         finish()
         assertEquals(1, opens)
+    }
+
+    @Test fun variableReadLatencyCannotShortenContinuousParking() {
+        val gate = ForegroundInteraction()
+        val session = queue.start({ Reader { sample() } }) { gate.accept(it.getOrThrow()) }
+        now = 1500
+        finish()
+        for (time in listOf(2000L, 3000L)) { now = time; queue.poll(session); finish() }
+        assertNotEquals(Observation.Available(VehicleInteraction.ALLOWED), gate.state(now))
+        now = 4500
+        queue.poll(session); finish()
+        assertEquals(Observation.Available(VehicleInteraction.ALLOWED), gate.state(now))
     }
 
     @Test fun cleanupFailureIsReportedWithoutAnActivityReceiver() {

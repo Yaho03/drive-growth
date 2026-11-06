@@ -1,6 +1,5 @@
 package io.drivegrowth.app.vehicle
 
-import io.drivegrowth.core.contract.EpochMillis
 import io.drivegrowth.core.contract.VehicleObservation
 import java.util.concurrent.Executor
 
@@ -59,7 +58,6 @@ internal class VehicleInputQueue(
         val target = current
         val revision = target?.revision
         val started = elapsed()
-        val epoch = EpochMillis(System.currentTimeMillis())
         busy = true
         worker.execute {
             var result: Result<VehicleObservation>? = null
@@ -79,8 +77,7 @@ internal class VehicleInputQueue(
                 }
                 operation = "read"
                 if (target?.active == true) {
-                    result = reader?.read()?.copy(receivedElapsedMs = started, receivedAt = epoch)
-                        ?.let { Result.success(it) }
+                    result = reader?.read()?.let { Result.success(it) }
                 }
             } catch (error: RuntimeException) {
                 result = Result.failure(error)
