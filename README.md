@@ -4,10 +4,10 @@
 
 | 담당 | 지금 할 일 | 막고 있는 이슈 | 해제 조건 |
 |---|---|---|---|
-| 정원 | [#80](https://github.com/Yaho03/drive-growth/issues/80), [#37](https://github.com/Yaho03/drive-growth/issues/37) 시험용 후보·규칙 확인, [#40](https://github.com/Yaho03/drive-growth/issues/40) 음성 없는 뼈대 | #38은 정원 #37, #39는 정원 #37·호열 #46 | 선택 의뢰·보유 차량 조회의 필요한 결과 검토·main 반영 |
+| 정원 | [#80](https://github.com/Yaho03/drive-growth/issues/80), [#37](https://github.com/Yaho03/drive-growth/issues/37) 시험용 후보·규칙 확인, [#40](https://github.com/Yaho03/drive-growth/issues/40) 음성 없는 뼈대 | #38·#39는 정원 #37 | 선택 의뢰의 필요한 결과 검토·main 반영 |
 | 환석 | [#51](https://github.com/Yaho03/drive-growth/issues/51), PR 검토 | #52~#58은 환석 #51의 남은 공통 연결점 확인 | #51 본인 검증·PR 검토로 사용할 화면·제한 범위 확인 |
-| 호열 | [#46](https://github.com/Yaho03/drive-growth/issues/46), [#35](https://github.com/Yaho03/drive-growth/issues/35) 합의된 콘텐츠 | #47·#48·#50은 호열 #46, #49는 경민 #42도 필요 | 필요한 조회·명령 결과 검토·main 반영. 최종 콘텐츠 결정은 #24 |
-| 경민 | #41에 필요한 #46 조회 계약 확인·준비 | #41은 호열 #46, #42는 경민 #41, #43·#44는 경민 #42 | 각 기능이 소비할 결과의 검토·main 반영 |
+| 호열 | [#47](https://github.com/Yaho03/drive-growth/issues/47), [#48](https://github.com/Yaho03/drive-growth/issues/48), [#50](https://github.com/Yaho03/drive-growth/issues/50), #46 잔여 저장 연결·#35 콘텐츠 | #49는 경민 #42 | 확정 사고 결과 인계. 새 개체 필드·저장 확장은 공통 담당과 조율 |
+| 경민 | [#41](https://github.com/Yaho03/drive-growth/issues/41) 조회 후보·자동 배정 구현 | #42는 경민 #41, #43·#44는 경민 #42 | 각 기능이 소비할 결과의 검토·main 반영 |
 
 선행 결과가 검토·머지되거나 이슈를 완료로 닫으면 이 표도 갱신한다. 세부 정책·실제 연결 조건은 각 이슈를 따른다. 팀 구현이 끝나면 이 섹션을 삭제한다.
 
