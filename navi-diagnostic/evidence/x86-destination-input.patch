@@ -1,0 +1,27 @@
+diff --git a/navi-diagnostic/src/main/java/io/drivegrowth/navidiagnostic/MainActivity.kt b/navi-diagnostic/src/main/java/io/drivegrowth/navidiagnostic/MainActivity.kt
+index b658301..37c441a 100644
+--- a/navi-diagnostic/src/main/java/io/drivegrowth/navidiagnostic/MainActivity.kt
++++ b/navi-diagnostic/src/main/java/io/drivegrowth/navidiagnostic/MainActivity.kt
+@@ -41,12 +41,16 @@ class MainActivity : Activity() {
+     private lateinit var recent: TextView
+     private lateinit var logFile: File
+     private val recentLines = ArrayDeque<String>()
+-    private val destination = RouteInfo(
+-        latitude = 37.41289678, longitude = 127.09383464,
+-        displayLongitude = null, displayLatitude = null, poiName = "42dot",
+-        poiId = "36khp37hh8gqcm5nqhe5", poiSubId = "0",
+-        address = "수정구 시흥동",
+-    )
++    private val destination by lazy {
++        RouteInfo(
++            latitude = intent.getStringExtra("lat")?.toDouble() ?: 37.41289678,
++            longitude = intent.getStringExtra("lng")?.toDouble() ?: 127.09383464,
++            displayLongitude = null, displayLatitude = null,
++            poiName = intent.getStringExtra("name") ?: "42dot",
++            poiId = intent.getStringExtra("poi") ?: "36khp37hh8gqcm5nqhe5", poiSubId = "0",
++            address = intent.getStringExtra("addr") ?: "수정구 시흥동",
++        )
++    }
+     private val poll = object : Runnable {
+         override fun run() {
+             if (!polling || destroyed) return
