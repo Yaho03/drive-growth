@@ -999,3 +999,17 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w -e class io.driveg
 
 
 게시 직후 main에 추가된 #124 탁송 표시 UI(`1a0499099006d4644e12527505eaf62f80e18d7e`)를 `688ed7d`의 일반 병합으로 보존했다. 추가 app/core 변경은 main의 탁송 파일이며 검토 원코드 `6144ac8` 대비 Shop 제품/정식 시험/리소스 차이는0이다. 양쪽09/06과 공개 증거를 보존했다. 통합 후 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`는31초에 성공했고 core191·app96(각 실패/오류/생략0), Lint오류0·경고18이다. 추가 경고는 main에서 합쳐진 프로그램 생성 DeliveryView의 도구용 생성자 안내이며 Shop 코드 변경은 없다. 저장소21/26/277·diff검사·공개 증거8개 해시도 통과했다. 이 통합 조합의 기기 시험을 다시 실행한 것은 아니다. 원격 정확head/CI 결과는 연결 PR에 기록한다.
+
+
+### #55 새 View 첫 복원 순서의 Content 일관성 수정 — 2026-11-07
+
+이미 머지된 #125 이후 독립 A가 main `fbbf98e`에서 계약 안의 첫 복원 순서 결함을 재현했다. 새 View에 Content revision3을 먼저 표시한 뒤 이전 View의 정상 최신 이력5를 처음 복원하면, 이력은5지만 현재 표시/옵션은3으로 남아 Submit이 허용됐다. 실제 DB 중복 과금 재현이 아니며 같은 활성 View의 과거 상태 반복 복원은 기존 지원 범위 밖으로 유지한다.
+
+새 `app/55-restore-consistency` worktree에서 제품 코드3줄만 추가했다. 첫 복원 뒤 현재 Content가 병합한 최신 이력보다 낮으면 행동 없는 Loading으로 무효화하고, 선택 조회도 최신 기준을 검사한다. 복원된 Pending·requestIds·retryPending·현재 gate는 보존하며 이력만으로 성공·취소·새 요청을 만들지 않는다. #52 가챠 WIP와 기존 #55 브랜치/다른 작업자의 소스는 보존했다.
+
+- 정식 `ShopFirstRestoreTest`3개를 먼저 추가해 수정 전2개 실패·1개 통과, 오류/생략0을 확인했다. 수정 후 기존Shop12+신규3=15개 전부 통과, 실패/오류/생략0이다.
+- `:app:testDebugUnitTest --tests '*Shop*Test' :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest --offline --no-daemon` 성공(30초), Lint오류0·경고18. 기존 core/다른 기능 전체 시험은 반복하지 않았다.
+- `ShopViewTest.testFirstRestoreAfterRenderInvalidatesOldContentAndButtons`를 추가해 옛 내용/옛 확인 버튼·낮은 재전달·제한·최신 복귀를 준비하고 시험 APK 컴파일을 확인했다. 실제 기기 실행은 미수행이며 기존8개 장치 근거로 대체하지 않는다. 배정 후 이 메서드1개 표적 실행을 요청하며 예상 점유1분 이내다.
+- 저장소·diff 검사를 실행했다. red/green 원본 로그는 로컬 `/private/tmp/shop55-first-restore-red.log`, `/private/tmp/shop55-first-restore-green.log`다. 현재 기기 미배정으로 adb/AVD/제품 앱·데이터·설정을 조작하지 않았다.
+
+09의 새 View 첫 복원 양순서와 미지원 반복 복원 경계를 명시했다. 실제 호스트/Activity·프로세스 저장, #44 경제/꾸미기 저장·탐색은 여전히 미연결이다. 고정 수정 커밋을 A 독립 재검토에 인계하며 PR은 검증 전 게시하지 않는다. 사용자 동결 지시대로 이 결함과 이미 착수한 #52 가챠 UI 외 새 작업은 시작하지 않는다.
