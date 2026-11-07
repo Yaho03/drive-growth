@@ -611,25 +611,40 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w \
 
 이번 입력·수명주기 변경에서 차단 결함은 발견되지 않았다. PR 검토·사용자 머지 지시와 최종 원격 커밋/CI는 PR #105에서 관리하며 AI 검토를 사람 승인으로 표시하지 않는다. 위 SDK 내부 잠금·실제 서비스 장애 주입·센서 시각·공식 폼 팩터·실차 한계는 유지한다. 실제 명령 중복·저장 성공 경계, #103 표시 UI의 제품 탐색 연결과 후속 기능 통합은 #51·#52·#28에 남긴다. README의 화면 병렬 작업표는 같은 인계를 반영한다.
 
-## #54 결과·기록 독립 표시 UI 본인 검증 — 2026-11-07
 
-새 `app/54-results-ui` worktree를 main `3b547e5`에서 시작하고 게시 전 #105가 머지된 main `6adf357b6d568067f60d0e0982fbfc015856a35c`를 정상 통합했다. #54의 독립 표시 구간만 구현했으며 #51 직접 차단 관계나 #54 전체 완료 상태를 바꾸지 않는다. 입력·이벤트·복원·미지원 범위는 [화면 명세의 #54 절](09_UI_UX_SPEC.md#54-결과기록-독립-표시-ui-연결점)을 따른다.
 
-시안 `4m-settlement.png`, `4n-settlement-detail.png`, `4y-landscape-settlement.png`와 차고 `4v-landscape-garage.png`를 직접 열어 대조했다. 기존 Views 스타일과 시스템 글꼴만 사용하고 시안의 이미지·로고·캐릭터·예시 경제값을 앱 자산/제품 규칙으로 넣지 않았다. 확정 잔액은 이번 수익과 구분한다. 전체 history와 세부 수익/리뷰/가상 사고가 현재 Settlement에 없음을 명시한다.
 
-| 본인 검사 | 실제 결과·범위 |
+## #56 첫 실행·차량 선택 독립 표시 UI 검증
+
+2026-11-07, 새 `app/56-onboarding-ui`·`/private/tmp/drive-growth-onboarding-ui-20261107`에서 구현했다. 시작 main3b547e5와 #56 최신 본문/댓글(없음)을 대조했고 게시 전 #105가 머지된 main `6adf357b6d568067f60d0e0982fbfc015856a35c`를 정상 통합해 README/02/06/09·공통 입력 변경을 보존했다. 실제 #51 연결 전 독립 표시 구간을 진행하라는 사용자 배정이며 이슈 차단/담당/완료 체크를 변경하지 않는다.
+
+코드 `f975c8051b456c3a94b0e983cb989311bd9a8d16`은 `ui/onboarding/`의 View·상태/입력 제어, onboarding 문자열, debug 고정 fixture, JVM/정식 View 시험을 추가한다. 실제 지급·프로필·원장·마커를 만들지 않는다. 최초 상태 확인 미지원은 Unavailable이며 보유 수 0으로 신규 프로필을 추정하지 않는다. 사용 시안/연결점은 [09의 해당 절](09_UI_UX_SPEC.md#56-첫-실행-독립-표시-ui-연결점)을 따른다. 첫 성장의 순서/비용은 정하지 않았다.
+
+### 로컬 검사와 요청 회귀
+
+JDK17·기존 SDK Platform35·Gradle에서 코어97개·앱 단위 전체39개(새 OnboardingInteractionTest 13개), `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`, 저장소 검사·diff 검사를 수행했다. 최종 게시 검사/CI는 PR에 같은 최종 head로 기록한다. Lint는 오류0·경고15이며 기존14개와 프로그램에서 생성하는 새 View의 ViewConstructor 경고1개를 포함한다. 공유 Gradle/CI·제품 Manifest는 바꾸지 않았다.
+
+새 단위 시험은 정확한 VehicleId 선택/복원, 선택·검토가 지급 완료가 아님, 반복 확인과 처리 중 Back 차단, 다른 선택의 늦은 응답/완료 후 역행 거절, 실패 뒤 기존 요청 복구, 이미 지급/미확인 프로필의 무지급, 동기 callback, 단계 전환과 단순 표시 갱신의 구분을 확인한다. 코드 검토에서 동일 상태 재표시로 복구/탐색 잠금이 풀리는 경계를 찾아 회귀2개로 실패를 재현했고, 오류 문구/출처만 갱신하는 조건도 실패를 재현한 뒤 실제 단계 변화로만 해제하도록 보완했다. 최종 재검토에서 추가 blocker 없음 응답을 받았으며 사람 승인으로 표시하지 않는다.
+
+### 격리 기기 실행·화면·장치 인계
+
+메인의 #54 장치 사용 종료 후 사용 가능 전달을 받고 ADB5038·emulator-5556·user10에서 진행했다. 제품 Manifest에는 등록하지 않고 **별도 임시 사본** `/private/tmp/drive-growth-onboarding-device-20261107`에서만 비공개 debug Activity·부착 시험·로컬 applicationIdSuffix를 추가했다. `io.drivegrowth.app.onboarding56`의 제품/fixture/정식시험/문자열 6파일이 원본과 동일함을 SHA-256으로 대조했다. 앱은 고정 입력만 사용하고 #50·실제 프로필/지급/저장·차량 SDK를 호출하지 않는다.
+
+- 정식 View 시험6개와 임시 실제 Activity 시험6개, 총 **12개 통과**: 안내→아반떼 선택→확인→명시적 고정 완료, 다른 차량 결과 거절, 이미 지급/미확인, 실패 복구·처리 중 Activity 재생성, 제한·복귀, 좁은 본문/큰 글꼴을 확인했다. assertion/예외는 시험 스레드에서 보고했다.
+- 별도 추가 시험 **1개 통과**: 440dp 본문·글꼴1.5에서 버튼 전체 높이가 보이도록 native ScrollView로 이동하고 실제 포인터 입력으로 안내→차량 선택→확인→지급 대기까지 진행했다. confirm1회·확정 결과 전 완료 문구 없음도 확인했다. 위젯 performClick 시험과 실제 터치 시험을 구분한다.
+- 최초 캡처 일부는 전환 직전 화면/OEM 내비 창을 담아 로컬 first-pass-captures로 분리하고 성공 화면으로 쓰지 않았다. 제품 코드 변경 없이 임시 캡처에 합성 프레임 대기·phase/focus/크기를 기록하고 12개를 재실행해 통과했다. 아래 실제 디스플레이 캡처는 안정된 재확인/터치 실행의 결과다.
+
+실제 가로 기기 내 앱 영역은 702×419px, 좁은 본문은 330×419px(120dpi에서 폭440dp)였다. 전역 wm/폰트 설정을 바꾸지 않고 격리 호스트의 콘텐츠 폭·리소스 fontScale만 사용했다. 공식 세로/가로 폼 팩터 전체 시험이나 실제 #51 입력/CCP 검증으로 확대하지 않는다. 주변 차량/시스템 그림은 OEM 셸이며 앱 자산이 아니다.
+
+| 실제 화면 | 조건 |
 |---|---|
-| 상태·동작 단위 회귀 | API 구현 전 미구현 참조의 compile 실패를 확인한 후 `ResultsInteractionTest`12개 통과. exact/stale ID, 재렌더/닫기 후 중복 방지, 동기 응답, 실패→재요청→성공, 제한, 재조회 명시 해제, 외부 보존/복원·입력 변경 격리 확인 |
-| 최신 main 기반 `:core:test :app:testDebugUnitTest` | core97개·app38개 통과, 실패·오류·생략0. app에는 신규12개 포함 |
-| `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` | 성공. Lint오류0·경고15(신규 ResultsView의 callback 필수 생성자에 대한 ViewConstructor1개 포함). 장치 시험 APK 컴파일 성공 |
-| 정식 `ResultsViewTest` 장치 실행 | **6개 통과**, 1.415초. 실제 위젯에서 금액/잔액·취득액0·출처/ID, 명시적 열람 응답·재시도, 제한/이전버튼 차단, Loading/빈/Missing/Unsupported/Error, 복원/없는선택, 긴텍스트·스크롤 확인 |
-| 임시 실제 window 부착 시험 | **1개 통과**, 1.039초. Activity에 부착한 480dp 결과 View의 Loading/제한 전환 후 스크롤700 유지와 상세 선택·폭 복귀 후 ID 유지 확인. 시험 host/Manifest 추가는 독립 사본에만 존재 |
-| 실제 Android 화면 | [기본 목록](evidence/issue54-results-ui/default-window.png), [480dp 상세](evidence/issue54-results-ui/narrow-detail.png), [제한](evidence/issue54-results-ui/restricted.png)을 캡처하고 직접 확인. 고정 시험 입력임을 표시. HTML/시안 렌더가 아님 |
+| [첫 안내](evidence/issue56-onboarding-ui/intro.png) | 고정 시험 출처·지급 예정 안내, 실제 잔액/지급과 구분 |
+| [확정 결과](evidence/issue56-onboarding-ui/completed.png) | 호스트가 공급한 고정 Completed 뒤 아반떼·일반·취득액0 표시, 실제 #50 성공이 아님 |
+| [좁은 본문의 확인 버튼](evidence/issue56-onboarding-ui/narrow-confirm-action.png) | 폭440dp·글꼴1.5, 스크롤 후 버튼 전체가 보이고 실제 터치로 처리 중 진입 |
+| [조작 제한](evidence/issue56-onboarding-ui/restricted.png) | controlsEnabled=false 고정 입력, 차량 선택·게임 버튼 제거 |
 
-환경은 JDK17·기존 SDK35/Build Tools35·API34 ARM64 Pleos AVD다. 메인이 #105 종료와 B 사용 순서를 확인한 뒤, 기존 AVD가 꺼진 상태에서 데이터 보존·host GPU·RAM4096·기존 port5556/ADB5038로 1회 기동했다. user10·1080×600·120dpi에서 새 격리 패키지 `io.drivegrowth.verify54results`를 사용했다. 기본 앱 창 약936×584dp와 내부480dp 뷰포트의 실제 화면 확인을 **물리 디스플레이 폼 팩터 전체 검증으로 확대하지 않는다**. 1360dp 두 영역은 정식 시험의 미부착 위젯 layout 검사이며, 실제 넓은 window/preset 검증은 남아 있다.
+[12개 실행 로그](evidence/issue56-onboarding-ui/device-tests.txt), [실제 터치 로그](evidence/issue56-onboarding-ui/native-touch-test.txt), [소스·APK·프레임 metadata](evidence/issue56-onboarding-ui/metadata.json)를 보존한다. 앱 실제 설치 SHA-256은 `8b22597d76abd691024a0e1db25b6e680b58e5dcf055c777b6a591da509bd8da`이며 정식12개 시험 APK도 설치본과 대조했다. 이후 추가 터치용 임시 시험 APK 변경은 metadata의 별도 해시로 구분한다. APK·로컬 SDK·임시 호스트 소스는 커밋하지 않으며 임시 시험 원본/원시 초기 로그는 `/private/tmp/onboarding56-evidence/`와 해당 사본에 남긴다.
 
-[장치 실행 로그6개](evidence/issue54-results-ui/view-tests-6.txt), [부착 시험 로그](evidence/issue54-results-ui/attached-window-test.txt), [소스·APK 대응](evidence/issue54-results-ui/source-apk-metadata.json)을 보존했다. 장치 앱 APK는 `bfc4fe7c06c696901a89c897fb4dc04eadd619a496fd29f4e9f93a005624d92c`, 시험 APK는 `563614bfa7f592eb59d986f1571d0f8d0c3e013ce6c1478fdfe9afdf15f9abb3`이며 설치본 해시도 대조했다. 원격 제품 Manifest/applicationId/서명·공통 탐색·core·SQLite는 바꾸지 않았다.
+종료 시 이번에 만든 격리 앱/.test만 제거하고 패키지 없음, boot1/user10/1080×600/120dpi/night no/forward빈목록/Activity프로세스 조회 instrumentation항목없음을 확인했다. 제품 APK 경로·SHA-256 `793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9`는 전후 동일하고 제품 데이터·권한·기어·전역창·서버를 변경하지 않았다. AVD는 켜 두고 **장치 사용 종료**를 메인에 전달했다. 재부팅/AVD 재생성/초기화·다른 프로세스 종료·차량 브리지 복구는 하지 않았다.
 
-장치 사용 종료를 메인에 전달했다. 자기 격리 앱/시험 패키지와 임시 XML만 제거했다. 제품 APK 경로·SHA `793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9` 전후 동일, 제품 데이터 삭제/앱 삭제/AVD 초기화 없음. user10·크기·밀도·night no·빈 forward 목록 유지, active instrumentation 없음·boot_completed1·car_service found, AVD 켜둠. 기어·권한·전역 창/글꼴·서버 설정을 변경하지 않았다. 이후 다른 세션의 장치 사용을 위해 adb 조작을 중단했다.
-
-**남은 연결:** 실제 HostSnapshot/SQLite 미확인 조회·markViewed 응답·Activity 재생성과 프로세스 재시작을 잇는 제품 호스트 연결, 전체 과거 기록 API, #39/#42/#43의 실제 확정 수익/상세, 실제 넓은 창·플랫폼 gate·실차 검증은 이번 독립 표시 시험의 완료 범위가 아니다. View가 지급·수익 계산·원장 쓰기를 하지 않으므로 fixture 표시 성공을 실제 영업·저장/재실행 성공으로 바꾸지 않는다.
+남은 범위: A의 실제 호스트/탐색 연결, 명시적 신규·이미 지급 상태 조회, #50의 프로필당1회 지급·requestId/마커·원장 저장/실패 복구·앱 재실행, 같은 차종 이전 응답의 호스트 정합성, 실제 주행 전환/CCP·공식 폼 팩터·실차와 첫 성장 규칙/화면. 이 부분 구현으로 #56 전체를 닫거나 #51 차단을 해제하지 않는다.
