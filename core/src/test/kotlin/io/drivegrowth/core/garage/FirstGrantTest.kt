@@ -85,4 +85,17 @@ class FirstGrantTest {
         // 실패는 확정이 아니므로 다른 후보도 고를 수 있다
         assertEquals(casper, ok(firstGrant.grant(store, casper, src)).changedVehicle!!.vehicleId)
     }
+
+    @Test fun `공개 후보 목록은 외부에서 바꿀 수 없고 후보 밖 차종은 계속 거절한다`() {
+        @Suppress("UNCHECKED_CAST")
+        val exposed = FirstGrant.CANDIDATES as MutableList<VehicleId>
+        assertThrows(UnsupportedOperationException::class.java) { exposed[0] = VehicleId("hyundai_sonata") }
+        assertThrows(UnsupportedOperationException::class.java) { exposed.add(VehicleId("hyundai_sonata")) }
+        assertEquals(listOf(casper, avante), FirstGrant.CANDIDATES)
+
+        val store = newStore()
+        assertEquals(fail(ContractError.INVALID_INPUT), firstGrant.grant(store, VehicleId("hyundai_sonata"), src))
+        val first = ok(firstGrant.grant(store, casper, src))
+        assertEquals(first, ok(firstGrant.grant(store, casper, src)))
+    }
 }
