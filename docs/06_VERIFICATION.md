@@ -1018,3 +1018,13 @@ main `085786a`의 독립 core 브랜치에서 GachaChangeStore·전체 명령/�
 가챠 게시 브랜치는 #125가 포함된 main `fbbf98e`에 rebase하며 06 충돌에서 기존 #55 설계/시험/실제 기기 기록과 이 가챠 기록을 모두 보존했다. 검토된 공통3개 파일은 원본과 바이트 동일하다. SQLite·무료권 지급·#111 실제 소비·초기화는 제공하지 않는다. 이미 착수한 다중 재료의 독립 타입/순수 검증은 별도 고정 커밋으로 인계하며 공유 fixture 결합·새 묶음으로 확대하지 않는다. 사용자 지시에 따라 현재 작업의 검증/PR/main 정리 후 후속 작업을 시작하지 않는다.
 
 main `fbbf98e` 조합의 직접 소비 통합 명령 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --offline --no-daemon`은28초에 성공했다. core212·app96 실패/오류/생략0, APK/Lint성공(오류0·경고18), 저장소21/26/280·diff검사 통과다. #53/#55 제품 소스·09/06·기기 증거를 유지했고 새 장치 시험은 하지 않았다. 기존 독립 검토 원본과 공통3개 파일의 blob 동일성은 게시 전 다시 확인했다. 정확한 게시 head·원격 CI는 연결 PR에서 관리한다.
+## #121 재료 강화 타입·순수 검증 준비 — 2026-11-07
+
+가챠 검토 커밋 `08eb3c4` 기반 별도 브랜치에서 MaterialContract 타입/순수 검증과 MaterialContractTest 소비 예제를 추가했다. 기존 계산이 만든 두 Update를 명령에 넣고, 역할·현재 revision/활동·취득/재료 성장 보존·비용과 예정 두 snapshot을 검증한다. 처음 시험 소스의 콘텐츠 버전 경로 컴파일 오류를 교정한 뒤 stub의 성공 기대 assertion 실패1건을 확인하고 구현했다.
+
+검토 중인 GachaContract·공유 RentalContractFixtures와 원작업 폴더는 변경하지 않았다. 메모리 commitMaterial 구현·실제 원자 경쟁·과거 결과 재생·SQLite·앱 프로세스 시험은 없다. 시험의 MaterialSettlement는 후속 결과 DTO의 형태 예시이며 저장을 실행한 결과가 아니다. 로컬 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug` 성공, core225개(재료 표적13개)·app84개 실패/오류/생략0, Lint오류0·경고17이다. 독립 코드 검토 APPROVE·구조 CLEAR는 이 타입/순수 검증 범위의 AI 보조 결과이며 사람 승인·실제 거래 검증이 아니다. 저장소/링크·diff 검사와 정확한 인계 커밋은 #121에서 구분한다.
+
+
+재료 준비 원본 `fbd93c448e88aa0dc76e7a26438ba25c8d0dc898`은 별도 A 검토에서 코드 APPROVE·구조 CLEAR, 정식13+독립3=표적16개와 기존 planMaterial 소비152조합 확인 결과를 회수했다. 이 독립 결과는 AI 보조 검증이며 이 세션의 재실행이 아니다. 가챠 #126 병합 main `1089926f7815bf49d3c5a6f233b06f28d5ee5c49`에 준비4파일만 rebase하고 양쪽06 기록을 유지했다. MaterialContract 제품/정식 시험2파일은 원검토 커밋과 바이트 동일하고 GachaContract/공유 fixture/기존 UI는 변경하지 않았다.
+
+통합 후 직접 실행한 `:core:test --tests '*MaterialContractTest' :app:compileDebugKotlin :app:compileDebugUnitTestKotlin --offline --no-daemon`은8초에 성공했다. 재료13개 실패/오류/생략0과 기존 앱/시험 소비 컴파일을 확인했다. 기존 전체225/84·APK/Lint 근거는 원본 기준으로 보존하고 전체/장치 검사를 무조건 반복하지 않았다. 저장소21/26/280·diff검사 통과, 정확한 게시head/원격CI는 연결PR에서 기록한다. 초기화·공유 재료 store·SQLite 등 새 묶음은 시작하지 않고 현재 준비 범위를 인계한다.
