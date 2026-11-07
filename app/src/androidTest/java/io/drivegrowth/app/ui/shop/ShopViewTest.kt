@@ -125,4 +125,22 @@ class ShopViewTest : InstrumentationTestCase() {
             assertFalse(view.handleBack()); assertTrue(events.isEmpty())
         }
     }
+    fun testFirstRestoreAfterRenderInvalidatesOldContentAndButtons() = onUi {
+        val events = mutableListOf<ShopEvent>()
+        val old = ShopPreviewStates.normal().copy(revision = Revision(3))
+        val latest = old.copy(revision = Revision(5),capacity = 7,balance = GameMoney(900))
+        val saved = ShopInteraction({}).apply { render(latest,true) }.uiState
+        val view = ShopView(instrumentation.targetContext,events::add)
+        view.render(old,true); button(view,"shop:preview:expand").performClick()
+        val stale = button(view,"shop:confirm")
+        view.restoreUiState(saved)
+        assertTrue(text(view).contains("불러오는 중")); assertFalse(text(view).contains("2,400"))
+        stale.performClick(); assertTrue(events.isEmpty())
+        view.render(old,true); assertFalse(text(view).contains("2,400"))
+        view.render(latest,false); assertTrue(views(view).none { it is Button })
+        view.render(latest,true); assertTrue(text(view).contains("900 게임머니"))
+        button(view,"shop:preview:expand").performClick(); button(view,"shop:confirm").performClick()
+        assertEquals(Revision(5),(events.single() as ShopEvent.Submit).request.selection.revision)
+    }
+
 }

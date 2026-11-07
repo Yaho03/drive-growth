@@ -1000,6 +1000,21 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w -e class io.driveg
 
 게시 직후 main에 추가된 #124 탁송 표시 UI(`1a0499099006d4644e12527505eaf62f80e18d7e`)를 `688ed7d`의 일반 병합으로 보존했다. 추가 app/core 변경은 main의 탁송 파일이며 검토 원코드 `6144ac8` 대비 Shop 제품/정식 시험/리소스 차이는0이다. 양쪽09/06과 공개 증거를 보존했다. 통합 후 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`는31초에 성공했고 core191·app96(각 실패/오류/생략0), Lint오류0·경고18이다. 추가 경고는 main에서 합쳐진 프로그램 생성 DeliveryView의 도구용 생성자 안내이며 Shop 코드 변경은 없다. 저장소21/26/277·diff검사·공개 증거8개 해시도 통과했다. 이 통합 조합의 기기 시험을 다시 실행한 것은 아니다. 원격 정확head/CI 결과는 연결 PR에 기록한다.
 
+
+### #55 새 View 첫 복원 순서의 Content 일관성 수정 — 2026-11-07
+
+이미 머지된 #125 이후 독립 A가 main `fbbf98e`에서 계약 안의 첫 복원 순서 결함을 재현했다. 새 View에 Content revision3을 먼저 표시한 뒤 이전 View의 정상 최신 이력5를 처음 복원하면, 이력은5지만 현재 표시/옵션은3으로 남아 Submit이 허용됐다. 실제 DB 중복 과금 재현이 아니며 같은 활성 View의 과거 상태 반복 복원은 기존 지원 범위 밖으로 유지한다.
+
+새 `app/55-restore-consistency` worktree에서 제품 코드3줄만 추가했다. 첫 복원 뒤 현재 Content가 병합한 최신 이력보다 낮으면 행동 없는 Loading으로 무효화하고, 선택 조회도 최신 기준을 검사한다. 복원된 Pending·requestIds·retryPending·현재 gate는 보존하며 이력만으로 성공·취소·새 요청을 만들지 않는다. #52 가챠 WIP와 기존 #55 브랜치/다른 작업자의 소스는 보존했다.
+
+- 정식 `ShopFirstRestoreTest`3개를 먼저 추가해 수정 전2개 실패·1개 통과, 오류/생략0을 확인했다. 수정 후 기존Shop12+신규3=15개 전부 통과, 실패/오류/생략0이다.
+- `:app:testDebugUnitTest --tests '*Shop*Test' :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest --offline --no-daemon` 성공(30초), Lint오류0·경고18. 기존 core/다른 기능 전체 시험은 반복하지 않았다.
+- `ShopViewTest.testFirstRestoreAfterRenderInvalidatesOldContentAndButtons`를 추가해 옛 내용/옛 확인 버튼·낮은 재전달·제한·최신 복귀를 준비하고 시험 APK 컴파일을 확인했다. 실제 기기 실행은 미수행이며 기존8개 장치 근거로 대체하지 않는다. 배정 후 이 메서드1개 표적 실행을 요청하며 예상 점유1분 이내다.
+- 저장소·diff 검사를 실행했다. red/green 원본 로그는 로컬 `/private/tmp/shop55-first-restore-red.log`, `/private/tmp/shop55-first-restore-green.log`다. 현재 기기 미배정으로 adb/AVD/제품 앱·데이터·설정을 조작하지 않았다.
+
+09의 새 View 첫 복원 양순서와 미지원 반복 복원 경계를 명시했다. 실제 호스트/Activity·프로세스 저장, #44 경제/꾸미기 저장·탐색은 여전히 미연결이다. 고정 수정 커밋을 A 독립 재검토에 인계하며 PR은 검증 전 게시하지 않는다. 사용자 동결 지시대로 이 결함과 이미 착수한 #52 가챠 UI 외 새 작업은 시작하지 않는다.
+
+
 ## #121 가챠 공통 계약 첫 부분의 메모리 검증 — 2026-11-07
 
 main `085786a`의 독립 core 브랜치에서 GachaChangeStore·전체 명령/결과·권위 상태와 기존 메모리 원장 공유를 구현했다. 첫 성공 기대 시험을 stub에서 실행해 AssertionError 1건으로 실패를 확인한 뒤 구현했다. 제품 GachaPull/VehicleCare/FirstGrant·SQLite/RentalLedger·UI·SDK·Gradle/CI는 수정하지 않았다. 이 기록은 메모리 참조 구현/소비 예제이며 SQLite·프로세스 재시작 시험이 아니다.
@@ -1029,6 +1044,21 @@ main `fbbf98e` 조합의 직접 소비 통합 명령 `:core:test :app:testDebugU
 
 통합 후 직접 실행한 `:core:test --tests '*MaterialContractTest' :app:compileDebugKotlin :app:compileDebugUnitTestKotlin --offline --no-daemon`은8초에 성공했다. 재료13개 실패/오류/생략0과 기존 앱/시험 소비 컴파일을 확인했다. 기존 전체225/84·APK/Lint 근거는 원본 기준으로 보존하고 전체/장치 검사를 무조건 반복하지 않았다. 저장소21/26/280·diff검사 통과, 정확한 게시head/원격CI는 연결PR에서 기록한다. 초기화·공유 재료 store·SQLite 등 새 묶음은 시작하지 않고 현재 준비 범위를 인계한다.
 
+
+### #55 첫 복원 수정의 독립 검토·장치 근거 회수
+
+A의 독립 재검토는 원코드 `515507cac01ae15445c323836c07366edb5a063e`에서 코드 APPROVE·구조 CLEAR·Shop 표적16개 전부 통과였다. 이어 C가 같은 고정 코드의 격리 패키지 `io.drivegrowth.app.shop55restorec`에서 `ShopViewTest#testFirstRestoreAfterRenderInvalidatesOldContentAndButtons` **1개 통과, 실패0, 0.284초**를 확인했다([원본 표적 로그](evidence/issue55-shop-ui/first-restore/targeted-device.txt)). 작성자가 이 독립 JVM/기기 시험을 다시 수행한 것으로 표시하지 않는다.
+
+C의 임시 실제 Activity도 revision3 표시→이력5 첫 복원→옛 버튼/낮은 내용 차단에서 `staleSubmit=0, oldBalanceHidden=true`, 최신5의 잔액900 복귀를 확인했다([호스트 로그](evidence/issue55-shop-ui/first-restore/host-log.txt), [조회 대기 화면](evidence/issue55-shop-ui/first-restore/loading.png), [최신 복귀 화면](evidence/issue55-shop-ui/first-restore/latest.png)). Android View 경계의 고정 입력이며 실제 #44 거래/꾸미기 저장·Activity/프로세스 영속 복원이나 실차 시험이 아니다. 주변 차량/제어 그림은 OEM 셸이다.
+
+격리 앱 SHA-256 `5da60557549cb743bfe063765d4c1464bd4e027637f8cf686a28fed072083581`, 시험 APK `7d5bc78bcf066298bd9aa56809f48dd6af881cc99bd209b2780c12a525bcc835`다. 작성자가 전달받은 두 APK의 해시와 검토 원코드의 Shop 제품/정식 시험/리소스10개 Git blob, 임시 Activity SHA를 대조했다([metadata](evidence/issue55-shop-ui/first-restore/metadata.json)). 재현 호스트는 증거 폴더의 Activity/Manifest/init-script를 별도 임시 사본에서만 사용한다. init-script의 임시 소스 경로를 해당 격리 호스트 경로에 맞추며 제품/다른 작업자 폴더에 적용하지 않는다.
+
+C는 자기 격리2패키지 제거, 제품 APK·파일6개 해시 동일, 기존 내비 복귀·user10·1080×600/120dpi·font null·활성 instrumentation/추가forward 없음으로 반환했다. 권한/기어/차량서비스/전역창/글꼴 변경·제품/DB 삭제·AVD 초기화가 없었다는 C 보고와 전달된 전후 APK/파일/상태 텍스트의 동일성을 확인했다. 작성자는 기기 배정이 없어 adb/AVD 명령을 실행하지 않았다.
+
+최신 main `50b856d`의 #126 가챠·#127 재료 공통 계약/fixture·기존 UI를 일반 병합했고 06 충돌에서 양쪽 검증 기록을 모두 보존했다. 별도 #52 가챠 UI 브랜치는 변경하지 않았다. 현재 first-restore의 Shop 제품/정식 시험은 검토 원코드와 동일하며 추가 내용은 main의 공통 코드와 문서/증거다. Refs #55 범위의 수정이고 실제 경제·탐색·전체 이슈 완료로 확대하지 않는다.
+
+
+첫 복원 수정의 최신 공통 코드 통합 후 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest --offline --no-daemon`은28초에 성공했다. core225·app99는 실패/오류/생략0, Lint오류0·경고18이다. 저장소21/26/286·diff검사 및 검토/장치 기준 Shop10개 blob·전달 APK2개·임시호스트/공개증거 해시를 확인했다. 이 통합 조합에서 장치 시험을 다시 실행한 것은 아니다. 원격 정확head·CI는 새 연결 PR에 기록한다.
 ## #57 퀘스트·업적·휴식 표시 UI 부분 검증
 
 2026-11-07, main `b6631a44e80e56a6b86ea9bfc1790cefc4ea82c0`에서 독립 worktree와 `app/57-progress-ui` 브랜치를 만들었다. #57 본문/댓글(댓글 없음), PR #60, PRD의 거리 퀘스트·거리 업적/시즌·주말 이벤트 제외와 휴식 규칙, 기존 #119 `RestBonus` 계산 경계를 직접 대조했다. 표시·호출 계약은 [09 명세의 해당 절](09_UI_UX_SPEC.md#57-퀘스트업적휴식-독립-표시-ui)에 둔다. 계산·공통 저장·호스트·탐색·차량 gate는 수정하지 않았다.
@@ -1117,3 +1147,6 @@ A가 최종 검토 head `4f64ffc01ad14e922c1fe181e47cf64db849feb4`에 대해 코
 통합 조합에서 `:core:test --tests '*RestBonusTest' :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest --offline`를 직접 실행해 **휴식15·앱116개 통과(실패/오류/생략0), APK/Lint/시험APK 성공**을 확인했다. Lint오류0·경고19는 합쳐진 기존 UI/SDK 경고를 포함한다. 저장소21/26/319·diff검사도 통과했다. 무관한 전체core와 기기 시험을 중복 반복하지 않았다. 새 원격 head/CI와 main 머지는 연결 PR에서 관리하며 #57 전체 종료 없이 메인 조율을 따른다.
 
 게시 직전 #127 재료 계약이 main `50b856d1c5aef61fe838bf3310d5908fca6035bd`에 반영돼 이를 다시 일반 병합했다. 충돌은06의 추가 절만 있었고 main 파일 전체와 #57 원문을 모두 보존했다. 재료 계약/정식 시험·02/06도 그대로 유지했다. 진행 UI 제품·리소스·정식 시험은 검토 `4f64ffc`와 계속 동일하다. 새 계약은 UI에서 호출하지 않으므로 전체 core/기기를 반복하지 않고 `:app:testDebugUnitTest --tests '*ProgressInteractionTest' :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest --offline`를 실행해 진행20개·APK/시험APK/Lint성공(오류0·경고19)을 확인했다. 이전 통합의 앱116개 결과와 구분하며 로그는 `/private/tmp/progress-material-main-validation.txt`다.
+
+
+메인이 지정한 최신 main `94a8ee39b7d6c5724d6dfb46515837ef635b1290`(#129 진행 UI)을 추가 일반 병합했다. 06의 모든 main 문단과 양쪽 검증 기록, 09의 #57 절을 보존했고 기존 #55 첫 복원 계약 문단만 의도한 수정으로 유지했다. 검토/장치 원본 `515507c`의 Shop 제품·정식 시험·리소스10개 Git blob과 공개 증거 해시는 계속 동일하다. `:app:compileDebugKotlin :app:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin --offline --no-daemon`은9초에 성공했다. 전체/기기 시험은 반복하지 않았으며 앞의225/99는 main50b 조합의 실제 결과로 보존한다. 최종 저장소21/26/325·PR 전체 diff 검사 통과다. 작성자 원격 게시가 자동 승인 검토에서 거절되어 재시도하지 않고 clean 고정 head·범위·본문을 메인에 인계한다. 원격 push/PR/CI 성공으로 기록하지 않는다.
