@@ -894,3 +894,25 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w -e class io.driveg
 이번 격리 앱/.test만 제거하고 원래 제품 APK `793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9`로 데이터 보존 복원했다. 제품 DB와 기존 파일6개의 해시는 전후 모두 동일하다. 속도 권한·임시 flag, P/속도0·페달0·조향0·night no를 원복했다. boot1/user10/1080×600/120dpi/fontScale설정null, forward·격리 패키지·active instrumentation 없음, 기존 AVD/ADB5038 유지 상태를 확인하고 메인에 장치 사용 종료를 한 번 전달했다. 이후 장치 명령은 실행하지 않는다.
 
 #51에는 실제 Results/Onboarding View·gate/Back·비동기 저장/복원 연결, #54에는 현재 공통 정산의 실제 열람/재조회·반복/프로세스 재실행 불변·미확인 수 일치 근거를 인계할 수 있다. #56은 실제 미지원 상태·탐색/제한 연결까지이며 실제 #50 지급/튜토리얼 완료 체크는 유지한다. 이슈 본문 체크·담당·ready/Blocked by·종료는 변경하지 않고 메인이 증거 범위에 맞춰 판단하도록 전달한다. #28 전체 게임 흐름·후속 거래·공식 폼 팩터/실차를 완료로 표시하지 않는다. 원본 APK/DB·임시 script·전체 로그는 로컬 `/private/tmp/results-onboarding-evidence/`에 보존하고 커밋하지 않는다.
+
+
+## #55 가게·시설·꾸미기 독립 표시 UI — 2026-11-07
+
+기준 main `b6631a44e80e56a6b86ea9bfc1790cefc4ea82c0`에서 새 worktree/`app/55-shop-ui` 브랜치로 구현했다. 범위는 `app/ui/shop/**`·`shop_` 리소스·관련 시험·09/06의 이번 절이다. MainActivity·공통 탐색/gate·차량 입력·Manifest·Gradle·공통 타입/fixture·DB·경제 코드는 변경하지 않았다. 입력·명령·미리보기·미연결 조건은 [09의 연결점](09_UI_UX_SPEC.md#55-가게시설꾸미기-표시-ui-연결점)을 따른다.
+
+| 실행한 검사 | 실제 결과 |
+|---|---|
+| `python3 scripts/check_repository.py` | 필수21·문서26·로컬 링크251 통과(09/06 추가 전). 최종 문서 수정 후 재검사도 수행 |
+| `:core:test :app:testDebugUnitTest` | core191·app78 통과, 각 실패/오류/생략0. app 중 신규 ShopInteraction7개 포함 |
+| 추가 `:app:testDebugUnitTest --tests '*ShopInteractionTest'` | 시설 payload 보존/표시 금액·규칙 불일치 거절 1개 추가 후 ShopInteraction 총8개 통과. 위 전체 검사와 구분 |
+| `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` | 성공. Lint오류0·경고17(기존16 + 프로그램 생성 ShopView의 XML 도구용 생성자 안내1) |
+| 최초 View 컴파일 | 재그리기 callback 순환의 Kotlin 반환형 추론 오류로 실패. `drawScreen(): Unit` 명시 후 위 전체 빌드 성공 |
+| `git diff --check` | 통과 |
+
+환경은 macOS arm64·Temurin JDK17·기존 Android SDK35·프로젝트 Gradle Wrapper8.11.1이며 `--offline --no-daemon`을 사용했다. 별도 worktree의 빌드 출력만 생성했다. 단위 시험은 미리보기/취소/실패/성공 응답에서 확정 snapshot 보존, 같은 명령 재시도 requestId 유지와 시도별 늦은 응답 무시, Pending 복원·중복 방지, 오래된 revision/가격/허용 상태 거절, 제한·동기 응답·입력 방어 복사·조회 재시도를 다룬다.
+
+`io.drivegrowth.app.ui.shop.ShopViewTest` 6개를 시험 APK로 컴파일했다. 대상은 840×1184·1360×948·480×500dp의 세차장 레벨3 문구/차량/공간 표시, 미리보기·취소·실패 보존, 제한 및 stale 버튼, Pending 복원/다른 요청 응답, 성공 응답 후 외부 확정 조회 필요, 누락·Loading/Empty/Failure/Unsupported·잠금·모드 전환·Back이다. 장치 배정 후 해당 클래스만 instrumentation 실행하며 제품 패키지를 덮어쓰지 않는 격리 사본에서 실행해야 한다. 예상 점유 5분 이내다.
+
+**실제 기기 시험은 수행하지 않았다.** 기기는 다른 세션이 단독 사용하므로 adb/AVD/설치/실행/설정/차량 신호를 조작하지 않았다. 세차장 문구의 실제 화면 가독성·터치/스크롤·Activity 재생성·프로세스 종료/재실행은 미검증이다. 위젯 시험 컴파일을 장치 성공으로 표시하지 않는다. 현재 제품에는 진입 호스트를 연결하지 않았고 #44 실제 구매/확장 저장·꾸미기 영속화·실제 잔액/시설/배치 일치도 미검증이다. #55 전체 완료·통합 검증 #28 완료가 아니다.
+
+로컬 구현 커밋을 PR 게시 전 독립 검토에 인계한다. PR 게시/CI/main 머지는 메인이 검토 결과와 함께 조율하며 이 절을 이슈 종료·라벨/차단 관계 변경 근거로 사용하지 않는다.
