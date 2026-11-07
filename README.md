@@ -52,11 +52,13 @@ python3 scripts/check_repository.py
 ./gradlew :core:test :app:assembleDebug :app:lintDebug
 ```
 
-Android 저장 시험은 Pleos 시험 장치를 연결한 뒤 실행합니다.
+기존 SQLite 저장 시험은 Pleos 시험 장치를 연결한 뒤 대상 클래스를 지정합니다.
 
 ```sh
-./gradlew :app:connectedDebugAndroidTest
+./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.drivegrowth.app.data.SqliteGameChangeStoreTest
 ```
+
+실제 호스트의 기본 원장에 시험 정산을 만드는 새 `ResultsHostStorageTest`·`ResultsHostActivityTest`는 제품 데이터 보호를 위해 **격리 패키지에서만 실행**하며 제품 패키지에서는 쓰기 전에 실패합니다. 이 시험까지 포함한 전체 계측 시험을 제품 앱에 무조건 실행하지 않습니다. 격리 빌드·설치·권한·표적 실행 명령은 [실제 연결 검증의 재현 절차](docs/06_VERIFICATION.md#격리-표적-시험-재현)를 따릅니다. 장치 점유를 먼저 조율하고 실제 P·정차·UX 허용 조건을 준비합니다.
 
 Debug 산출물은 `app/build/outputs/apk/debug/app-debug.apk`입니다. 설치·로그 수집은 개발환경 문서를 따릅니다. CI는 소스 포함 시 `repository-checks`와 `android-checks`를 실행합니다. 실제 로컬·CI 결과와 경고는 [검증 기록](docs/06_VERIFICATION.md)을 확인합니다.
 

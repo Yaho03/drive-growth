@@ -717,6 +717,27 @@ JDK17·기존 SDK/Wrapper로 `:core:test :app:testDebugUnitTest :app:assembleDeb
 
 실제 격리 프로세스 PID9171에 HOME 키를 보낸 뒤 종료하고 PID12603으로 다시 실행했다. HOME 뒤에도 앱의 제한 문구가 남는 Pleos 부분 표시 상태였으므로 정상적인 백그라운드 회수로 확대하지 않는다. 재실행은 HOME의 새 조회였고 상세 선택은 유지되지 않았다. 결과 화면의 미확인2건은 SQLite와 일치했으며 전후 격리 DB **바이트 해시 전체가 동일**하다. Android 저장 Bundle 전달 여부는 계측하지 않았다. [선택 유지 기대와 실제 HOME의 차이](evidence/issue51-results-onboarding-integration/process-selection-not-restored.txt)를 보존하고, 저장 Bundle을 받은 재생성 선택 복원·Bundle Pending의 확인 불가 처리와 구분한다. [프로세스 이벤트](evidence/issue51-results-onboarding-integration/process-events.txt)·[metadata](evidence/issue51-results-onboarding-integration/metadata.json)를 따른다.
 
+### 격리 표적 시험 재현
+
+새 host 시험은 기본 원장에 고정 정산을 쓰므로 `io.drivegrowth.app.integration51` 외의 패키지에서는 쓰기 전에 실패하도록 제한했다. 기존 저장 시험의 고유 DB와 구분한다. 장치 점유/설정을 확인하고 실제 P·정차·UX 허용을 준비한 뒤, 기존 SDK 환경에서 다음 명령으로 같은 격리 표적 시험을 실행할 수 있다. 공유 Gradle 파일은 수정하지 않는다. 이 명령은 시험 재현 안내이며 장치 사용 종료 뒤 새로 실행한 기록이 아니다.
+
+```sh
+cat > /tmp/drive-growth-host-isolate.gradle <<'EOF'
+gradle.beforeProject { p ->
+    p.plugins.withId('com.android.application') {
+        p.android.buildTypes.getByName('debug').applicationIdSuffix = '.integration51'
+    }
+}
+EOF
+./gradlew --init-script /tmp/drive-growth-host-isolate.gradle :app:assembleDebug :app:assembleDebugAndroidTest
+adb -P 5038 -s emulator-5556 install --user 10 -r app/build/outputs/apk/debug/app-debug.apk
+adb -P 5038 -s emulator-5556 install --user 10 -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb -P 5038 -s emulator-5556 shell pm grant --user 10 io.drivegrowth.app.integration51 android.car.permission.CAR_SPEED
+adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w -e class io.drivegrowth.app.host.ResultsHostStorageTest,io.drivegrowth.app.host.ResultsHostActivityTest io.drivegrowth.app.integration51.test/android.test.InstrumentationTestRunner
+```
+
+시험 후에는 자기 시험에서 생성한 격리 앱/시험 패키지만 정리하고 변경한 설정을 원복한다. 위 전체 새 host 시험을 제품 패키지의 `connectedDebugAndroidTest` 기본 전체 실행으로 대체하지 않는다. 원본 실제 실행·APK 해시는 위 표와 metadata를 따른다.
+
 ### 실제 SDK·화면과 한계
 
 기존 Virtual Console 포워딩을 이번 슬롯에서만 만들고 browser session heartbeat로 브리지를 활성화했다. 서비스/시스템 앱 패치·직접 VHAL 쓰기·UX 제한 우회·재부팅/초기화는 하지 않았다. [제품 SDK 로그](evidence/issue51-results-onboarding-integration/product-sdk.txt)와 [화면 단계 기록](evidence/issue51-results-onboarding-integration/product-sdk-ui-boundaries.txt)에서 D 정차, 콘솔36km/h 요청, D 숨김/재진입·야간 설정에 의한 실제 재생성, D 감속 제한과 P 복귀를 확인했다. SDK는 DRIVE·속도 AVAILABLE·UX true를 수신했다. 숫자36은 콘솔 입력이며 SDK 로그가 실제 속도 숫자를 기록한 것으로 확대하지 않는다.
