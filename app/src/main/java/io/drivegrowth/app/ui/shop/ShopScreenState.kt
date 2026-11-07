@@ -126,11 +126,14 @@ class ShopInteraction(
     fun restoreUiState(value: ShopUiState) {
         val latest = listOfNotNull(uiState.latestRevision, value.latestRevision).maxByOrNull { it.value }
         uiState = value.copy(latestRevision = latest, requestIds = immutableMap(value.requestIds))
+        val shown = state as? ShopScreenState.Content
+        if (shown != null && latest != null && shown.revision.value < latest.value) state = ShopScreenState.Loading
     }
     fun mode(value: ShopMode) { if (controlsEnabled) uiState = uiState.copy(mode = value) }
     private fun options(c: ShopScreenState.Content) = listOfNotNull(c.expansion) + c.facilities.map { it.option } + c.decorations
     private fun current(selection: ShopSelection): ShopOption? {
         val c = state as? ShopScreenState.Content ?: return null
+        if (c.revision.value < (uiState.latestRevision?.value ?: -1)) return null
         return options(c).find { c.revision == selection.revision && it == selection.option }
     }
     fun canSelect(selection: ShopSelection): Boolean = controlsEnabled && uiState.pending == null &&

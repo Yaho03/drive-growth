@@ -1,0 +1,9 @@
+gradle.afterProject { project, state ->
+    if (project.path == ':app') {
+        def android = project.extensions.getByName('android')
+        android.defaultConfig.applicationId = 'io.drivegrowth.app.shop55restorec'
+        android.defaultConfig.testApplicationId = 'io.drivegrowth.app.shop55restorec.test'
+        android.sourceSets.getByName('debug').java.srcDir('/private/tmp/shop55-restore-host-c/java')
+        android.sourceSets.getByName('debug').manifest.srcFile('/private/tmp/shop55-restore-host-c/AndroidManifest.xml')
+    }
+}
