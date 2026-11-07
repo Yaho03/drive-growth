@@ -9,7 +9,6 @@ import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.RuleVersion
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.progression.GachaRules
-import io.drivegrowth.core.contract.Rarity
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
@@ -32,7 +31,7 @@ class GameContentLoaderTest {
         assertTrue(snapshot.trial)
         assertEquals(listOf("캐스퍼", "아반떼", "쏘나타", "그랜저", "G90"), snapshot.catalog.vehicles.map { it.displayName })
         val g90 = snapshot.vehicles.single { it.vehicleId == VehicleId("genesis_g90") }
-        assertEquals(VehicleGameData(VehicleId("genesis_g90"), GameMoney(60000), Rarity.LEGEND, 2), g90)
+        assertEquals(VehicleGameData(VehicleId("genesis_g90"), GameMoney(24_000), 2), g90) // 8,000 × 300%
         assertEquals(GachaRules(), snapshot.gacha)
         assertEquals(4, snapshot.unlockedAt(1).size)
         assertEquals(5, snapshot.unlockedAt(2).size)
@@ -51,18 +50,47 @@ class GameContentLoaderTest {
         assertEquals(listOf("캐스퍼", "아반떼", "쏘나타", "그랜저", "G90"), snapshot.catalog.vehicles.map { it.displayName })
     }
 
+    @Test fun `앱에 넣는 20종 콘텐츠는 PRD 해금 배치와 가격 비율대로 읽힌다`() {
+        // ponytail: app 모듈의 assets를 경로로 읽는다. 앱 장치 시험(PackagedContentTest)과 같은 파일을 로컬에서도 검증하기 위함.
+        val dir = File("../app/src/main/assets/content")
+        val snapshot = (GameContentLoader.load(File(dir, "vehicle-facts.csv").readText(), File(dir, "game-content.csv").readText())
+            as ContentLoad.Loaded).snapshot
+        assertTrue(snapshot.trial)
+        assertEquals(listOf(8, 14, 18, 20), (1..4).map { snapshot.unlockedAt(it).size })
+        val prices = snapshot.vehicles.associate { it.vehicleId.value to it.price.units }
+        assertEquals(8_000L, prices["hyundai_casper"])      // 1.0
+        assertEquals(13_600L, prices["hyundai_staria_tourer"]) // 1.7
+        assertEquals(24_000L, prices["genesis_g90"])        // 3.0, 최고가 = 최저가의 3배
+        assertEquals(prices.values.max(), prices.values.min() * 3)
+        // 첫 지급 후보(캐스퍼·아반떼)는 Lv1에 있다
+        assertTrue(snapshot.unlockedAt(1).map { it.vehicleId.value }.containsAll(listOf("hyundai_casper", "hyundai_avante")))
+        // 앱 사실 CSV 이름은 저장소 원본 vehicles.csv와 같다
+        val real = (GameContentLoader.load(File("../docs/data/vehicles.csv").readText(), File(dir, "game-content.csv").readText())
+            as ContentLoad.Loaded).snapshot
+        assertEquals(real.catalog, snapshot.catalog)
+    }
+
     @Test fun `사실 CSV에 없는 차량과 중복 ID는 거절한다`() {
-        assertTrue(rejected(content = contentWith("hyundai_casper,8000", "hyundai_unknown,8000")).contains("hyundai_unknown"))
-        assertTrue(rejected(content = contentWith("hyundai_avante,10000", "hyundai_casper,10000")).contains("중복"))
+        assertTrue(rejected(content = contentWith("hyundai_casper,100", "hyundai_unknown,100")).contains("hyundai_unknown"))
+        assertTrue(rejected(content = contentWith("hyundai_avante,120", "hyundai_casper,120")).contains("중복"))
         assertTrue(rejected(facts = "$facts\nhyundai_casper,캐스퍼2").contains("중복"))
     }
 
-    @Test fun `음수·0·비유한·소수 금액과 잘못된 레벨·희귀도는 거절한다`() {
-        listOf("-8000", "0", "NaN", "Infinity", "8000.5", "").forEach { price ->
-            rejected(content = contentWith("hyundai_casper,8000,", "hyundai_casper,$price,"))
+    @Test fun `음수·0·소수 가격 비율과 가격 단위, 잘못된 레벨은 거절한다`() {
+        listOf("-100", "0", "NaN", "Infinity", "100.5", "").forEach { ratio ->
+            rejected(content = contentWith("hyundai_casper,100,", "hyundai_casper,$ratio,"))
         }
-        rejected(content = contentWith("COMMON,1\nhyundai_avante", "COMMON,0\nhyundai_avante"))
-        rejected(content = contentWith("hyundai_casper,8000,COMMON", "hyundai_casper,8000,SUPER"))
+        listOf("0", "-8000", "8000.5", "").forEach { unit -> rejected(content = contentWith("price_unit=8000", "price_unit=$unit")) }
+        rejected(content = contentWith("hyundai_casper,100,1", "hyundai_casper,100,0"))
+        rejected(content = contentWith("hyundai_casper,100,1", "hyundai_casper,100,COMMON,1")) // 옛 희귀도 열
+    }
+
+    @Test fun `차종 가격은 가격 단위에 비율을 곱한다`() {
+        val prices = GameContentFixtures.loaded().vehicles.associate { it.vehicleId.value to it.price.units }
+        assertEquals(mapOf("hyundai_casper" to 8_000L, "hyundai_avante" to 9_600L, "hyundai_sonata" to 12_000L,
+            "hyundai_grandeur" to 16_000L, "genesis_g90" to 24_000L), prices)
+        val doubled = (GameContentLoader.load(facts, contentWith("price_unit=8000", "price_unit=16000")) as ContentLoad.Loaded).snapshot
+        assertEquals(GameMoney(16_000), doubled.vehicles.first().price) // 수익 단위만 바꾸면 전체 가격이 따라 바뀐다
     }
 
     @Test fun `가챠 확률 합·누락 희귀도·보장 조건 오류는 거절한다`() {
@@ -74,27 +102,13 @@ class GameContentLoaderTest {
         rejected(content = contentWith("gacha_guaranteed_from=RARE", "gacha_guaranteed_from=EPIC"))
     }
 
-    @Test fun `가챠가 열리는 첫 레벨에 희귀 이상 차량이 없으면 거절한다`() {
-        val reason = rejected(content = contentWith("hyundai_grandeur,25000,RARE,1", "hyundai_grandeur,25000,RARE,2"))
-        assertTrue(reason.contains("가게 레벨 1"))
-        // 첫 해금 레벨이 2로 올라가도 그 레벨에 희귀 이상이 있으면 통과한다.
-        val shifted = content.replace(",1\n", ",2\n").replace(Regex(",1$"), ",2")
+    @Test fun `보장 후보는 해금 차종이 있으면 충분하고 보장 기준을 RARE 아래로 내리면 거절한다`() {
+        // 모든 차종이 모든 희귀도로 나오므로 첫 해금 레벨이 2여도 그 레벨부터 보장 후보가 있다.
+        val shifted = content.replace(",1\n", ",2\n")
         val snapshot = (GameContentLoader.load(facts, shifted) as ContentLoad.Loaded).snapshot
         assertTrue(snapshot.unlockedAt(1).isEmpty())
         assertEquals(5, snapshot.unlockedAt(2).size)
-    }
-
-    @Test fun `보장 기준을 RARE 아래로 내리면 거절한다`() {
         rejected(content = contentWith("gacha_guaranteed_from=RARE", "gacha_guaranteed_from=ADVANCED"))
-        // 리뷰 재현: 보장 기준과 그랜저를 모두 ADVANCED로 내려 1레벨에 희귀 이상이 없는 경우
-        rejected(content = contentWith("gacha_guaranteed_from=RARE", "gacha_guaranteed_from=ADVANCED")
-            .replace("25000,RARE", "25000,ADVANCED"))
-    }
-
-    @Test fun `첫 레벨의 보장 후보가 가중치 0이면 거절한다`() {
-        // 리뷰 재현: 1레벨 RARE는 가중치 0, 가중치가 있는 LEGEND는 2레벨에서만 해금
-        val reason = rejected(content = contentWith("RARE:50,LEGEND:3", "RARE:0,LEGEND:53"))
-        assertTrue(reason.contains("가중치"))
     }
 
     @Test fun `검증된 스냅샷의 목록과 확률은 외부에서 바꿀 수 없다`() {
@@ -115,8 +129,8 @@ class GameContentLoaderTest {
         rejected(content = contentWith("# trial=true", "# trial=yes"))
         rejected(content = contentWith("# trial=true", "# trial=true\n# trial=false"))
         rejected(content = contentWith("# trial=true", "# trial=true\n# bonus=2"))
-        rejected(content = contentWith("vehicle_id,game_price", "id,game_price"))
-        rejected(content = contentWith("hyundai_casper,8000,COMMON,1", "hyundai_casper,8000,COMMON,1,extra"))
+        rejected(content = contentWith("vehicle_id,price_ratio_percent", "id,price_ratio_percent"))
+        rejected(content = contentWith("hyundai_casper,100,1", "hyundai_casper,100,1,extra"))
         rejected(content = content.lines().takeWhile { !it.startsWith("hyundai") }.joinToString("\n")) // 차량 없음
         rejected(facts = "$facts\n\"hyundai_x\",엑스")
         rejected(facts = "")
