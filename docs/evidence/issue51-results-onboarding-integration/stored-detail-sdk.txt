@@ -1,0 +1,6 @@
+--------- beginning of main
+11-07 00:08:33.761 12603 12603 I DriveGrowthVehicle: observation_start firstInProcess=true displayId=0
+11-07 00:08:33.788 12603 12603 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-07 00:08:34.799 12603 12603 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false
+11-07 00:14:08.083 12603 12603 I DriveGrowthVehicle: signal_state speed=OK gear=DRIVE ux=true
+11-07 00:14:11.091 12603 12603 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false

@@ -86,7 +86,7 @@ flowchart LR
 
 2026-11-07 `app/ui/onboarding/OnboardingView`를 Android Views로 구현했다. `4q-first-run.png`·`5b-landscape-first-run.png`를 직접 열어 어두운 카드·보라색 주요 버튼을 참고하고, 기존 `GarageStyle`과 자체 중립 차량 vector를 재사용했다. 시안의 첫 뽑기·건너뛰기 흐름은 최신 PRD의 캐스퍼/아반떼 선택·한 번 확인·지급 확정 흐름으로 맞췄다. 3D 가게/캐릭터/실차 이미지는 넣지 않았다. 첫 성장 순서·비용을 새로 정하지 않는다.
 
-- 진입점은 `OnboardingView(context, onEvent)`, `render(OnboardingScreenState, controlsEnabled): Boolean`, `handleBack(): Boolean`, `restoreSelection(VehicleId?)`다. 호스트는 프로필당 인스턴스를 유지하고 프로필이 바뀌면 새 View를 만든다. `controlsEnabled`만 소비하며 차량 신호·허용 판정·DB를 직접 읽지 않는다. false이면 게임 콘텐츠·선택·버튼을 제거한다.
+- 진입점은 `OnboardingView(context, onEvent)`, `render(OnboardingScreenState, controlsEnabled): Boolean`, `handleBack(): Boolean`, `restoreSelection(VehicleId?)`다. 호스트는 프로필당 인스턴스를 유지하고 프로필이 바뀌면 새 View를 만든다. 후보·예정 혜택·완료 요약 목록은 호출자가 소유하는 표시 snapshot이며 다음 render 전까지 변경하지 않는다. 변경은 새 목록을 다음 render에 전달한다. `controlsEnabled`만 소비하며 차량 신호·허용 판정·DB를 직접 읽지 않는다. false이면 게임 콘텐츠·선택·버튼을 제거한다.
 - 상태는 `Loading`, `Unavailable`, `Intro`, `Choosing`(빈 후보 포함), `Confirming`, `Submitting`, `LoadError`, `GrantError`, `Completed`다. 호스트가 신규 프로필임을 확인한 때만 Intro/Choosing을 공급한다. **빈 보유 목록·보유 수 0으로 신규 프로필을 추정하지 않는다.** 초기화 조회 API 미지원/미확인은 무행동 `Unavailable(message)`로, 읽기 실패는 재시도 가능 여부를 가진 LoadError로 구분한다.
 - 후보는 공통 `VehicleDefinition`과 선택 허용·비교 설명/불가 사유를 공급받는다. 누락된 비교 설명·초기 재화/공간/선물 안내는 확인 불가로 표시한다. `plannedBenefits`는 **지급 예정 안내**이며 실제 잔액·보유·지급 완료가 아니다. 초기 1,000·3칸은 PRD 시험값이고 선물 1장도 실제 #50 지급과 구분한다. 화면이 계산하거나 지급하지 않는다.
 - 이벤트는 `StartChoosing`, `SelectVehicle(vehicleId)`, `ReviewSelection(vehicleId)`, `ConfirmSelection(vehicleId)`, `Previous`, `Retry(vehicleId?)`, `GoToShop`이다. Select/Review는 지급 명령이 아니다. ConfirmSelection은 선택 ID와 확인 의사를 전달할 뿐이며 호스트가 #50·공통 저장 경로의 프로필/requestId·지급 마커·재시도 동일성을 관리한다.
@@ -94,7 +94,7 @@ flowchart LR
 - 확인/복구 요청을 수신하면 호스트는 먼저 `Submitting(vehicleId, vehicleName?, sourceLabel)`을 render하고 실제 결과를 기다린다. `Retry(null)`은 초기/후보 재조회로 `Loading → 결과`를, ID가 있는 Retry는 **기존 지급 요청의 조회·복구**로 `Submitting → GrantError/Completed`를 사용한다. 같은 오류의 문구/출처 재표시만으로 잠금을 해제하지 않는다. 실제 실패가 같은 문구여도 중간 처리 상태를 거쳐 응답했음을 명시한다.
 - Completed에는 호스트가 확정 저장을 확인한 공통 `OwnedVehicle`, 표시 이름·확정 요약·`alreadyGranted`·출처를 제공한다. 이미 지급된 프로필도 재선택을 열지 않고 가게 이동만 요청한다. View는 전달받은 개체의 희귀도·레벨·취득액을 표시하며 프로필 초기화·재화/차량·튜토리얼 완료를 자체 생성하지 않는다. 같은 완료 화면의 재표시/요약 갱신으로 가게 이동을 중복 요청하지 않는다.
 - `render`가 false이면 다른 선택의 늦은 응답이나 완료 뒤 역행을 무시한 것이다. 제한 입력은 이 경우에도 적용한다. 이 ID 방어는 호스트의 프로필·requestId·시도 순서 검증을 대체하지 않는다. 특히 같은 차종의 이전 시도 응답은 호스트가 거른다. 저장된 UI 단계만으로 지급 성공을 추정하지 않는다.
-- 호스트는 `selectedVehicleId`와 `pendingVehicleId`, 현재 단계·실제 requestId/프로필을 자신의 기존 복원 경계에 보존한다. 재생성 시 지급 여부를 확인하기 전에는 Loading/Unavailable, 확인 중 요청은 Submitting을 공급한다. `restoreSelection`은 선택 가능한 단계의 ID만 복원하며 확인/처리/완료의 확정 입력을 덮지 않는다. 처리 중 Back은 소비하고, Intro/오류/완료의 최상위 Back은 공통 호스트에 맡긴다. 실제 Activity/CCP 정책은 #51 소유다.
+- 호스트는 `selectedVehicleId`와 `pendingVehicleId`, 현재 단계·실제 requestId/프로필을 자신의 기존 복원 경계에 보존한다. 재생성 시 지급 여부를 확인하기 전에는 Loading/Unavailable, 확인 중 요청은 Submitting을 공급한다. `restoreSelection`은 선택 가능한 단계의 ID만 복원하며 확인/처리/완료의 확정 입력을 덮지 않는다. 처리 중 Back은 소비한다. 조회 오류 `LoadError`의 Back은 공통 호스트에 맡기며, 지급 오류 `GrantError`는 `changeAllowed=true`일 때 Previous를 보내고 false일 때 소비한다. Intro/Unavailable/Completed에서 내부 Back이 소비되지 않으면 공통 호스트의 부모 화면/최상위 정책을 따른다. 실제 Activity/CCP 정책은 #51 소유다.
 - 사용 가능 폭 760dp 이상은 후보 2열, 그 미만은 1열로 줄인다. 이는 초기 구현 분기값이며 공식 규격이 아니다. 긴 문구는 줄바꿈하고 본문을 스크롤한다. 제한·선택·비활성은 문구와 버튼 상태로 함께 표현한다. 기기의 가로 앱 영역과 440dp 본문/큰 글꼴의 격리 검증은 06의 해당 절을 따른다.
 
 호스트 연결 예시(아래 함수는 호스트가 구현할 연결 책임이다):
@@ -169,4 +169,17 @@ collection.render(mappedCollectionState, controlsEnabled = allowedByCommonShell)
 - 선택 개체 ID·페이지·미완료 준비 요청의 대상 ID/revision/action을 Activity 저장 상태로 복원한다. 선택 개체가 새 조회에서 사라져도 기존 View의 소멸 안내를 유지한다. 준비 요청 복원은 실행·성공을 뜻하지 않으며 미연결 사유와 닫기만 제공한다. Back은 준비 요청 닫기→차고 상세 닫기→가게→앱 숨김 순서다.
 - 제한·숨김·재생성 때 이전 조회 세대를 무효화하고 새 차량 허용 판정을 기다린다. 조회 작업은 호스트당 한 개만 실행하며 반복 요청은 최신 한 건으로 합친다. 구성 변경에서는 `HostSession`의 기존 조회 작업만 유지하고 Activity/View callback은 분리한다. 새 화면은 제한 상태로 연결하며 실제 종료에서 worker를 해제한다. 이 작업은 #105의 차량 입력 큐·정책 임계값·SDK 호출 방식을 바꾸지 않는다.
 
-구현·자동 검사와 실제 기기 시험의 상태는 [06 검증 문서](06_VERIFICATION.md#51-차고도감-호스트-연결-본인-검증)를 따른다. 정산·온보딩의 정식 View는 각 담당 코드의 실제 API를 확인한 뒤 연결하며, 별도의 초기 지급·관리 거래를 이 호스트에서 만들지 않는다.
+이 절은 PR #109의 차고 연결 범위다. 해당 구현·시험은 [06 검증 문서](06_VERIFICATION.md#51-차고도감-호스트-연결-본인-검증)를 따르며 정산·온보딩의 후속 실제 연결은 아래 절에서 관리한다. 별도의 초기 지급·관리 거래를 호스트에서 만들지 않는다.
+
+### 정산·첫 실행 실제 호스트 연결
+
+2026-11-07, PR #108·#109·#110을 합친 main `4e8ab1a`를 기준으로 기존 ResultsView·OnboardingView를 MainActivity의 실제 탐색에 연결한다. 두 View는 Activity 수명 동안 같은 인스턴스를 사용하고 공통 gate의 현재 허용만 전달받는다. 시안의 새 장면이나 경제 규칙은 추가하지 않는다.
+
+- 결과는 `HostSnapshot.unviewedSettlements`의 원본 Settlement·SettlementId와 **정산 당시** 차량/잔액을 전달한다. 현재 보유 개체·계정 잔액으로 바꾸지 않는다. 표시 목록은 복사한 읽기 전용 snapshot이며 저장된 모의 원장은 `STORED`와 거래의 `SIMULATION`을 함께 표시한다. 빈 목록, 조회 중, 확인 불가, 저장 실패와 전체 과거 기록/세부 수익 미지원을 구분한다. 중복 ID·원장과 다른 출처는 오류로 거절한다.
+- 열람 요청은 기존 worker에서 SQLite `markViewed(id)`에 전달한다. 실제 성공/실패만 `completeMarkViewed(id, result)`로 전달하고 성공 뒤 미확인 목록을 다시 읽는다. 같은 ID의 중복과 다른 ID의 동시 열람 요청을 막으며 실패 후 현재 미확인 ID로 재시도한다. 이 쓰기는 열람 표시만 바꾸며 재화·차량·정산을 지급/재계산하지 않는다.
+- 클릭 직전 gate가 제한되면 저장 작업을 제출하지 않고 View가 먼저 만든 Pending을 호스트의 실제 요청 상태로 복원한다. 실제 진행 중인 Pending은 보존한다. 제한·페이지 이동·숨김 중 응답은 원래 ID의 상태만 바꾸며 화면을 자동 전환하지 않는다.
+- 구성 변경은 기존 HostSession과 진행 중 작업을 유지하고 새 View에 ResultsUiState를 복원한다. 프로세스가 새로 시작돼 저장 응답을 이어 받을 수 없는 Pending은 확인 불가 실패로 복원하며 자동 재전송/완료하지 않는다. 이후 실제 미확인 목록을 조회한다. Android가 저장 Bundle을 제공하지 않은 강제 종료/새 실행은 HOME에서 새 gate·저장 조회로 시작한다. 이 경로의 상세 선택 유지를 보장하지 않는다.
+- 결과의 Back은 상세→목록→가게→앱 숨김이다. 열람 쓰기가 진행 중이어도 탐색/숨김은 가능하며 응답을 기다리지 않는다. 온보딩은 `handleBack()`을 먼저 적용하고 소비하지 않으면 부모/앱 숨김 정책을 적용한다. GoToShop은 가게 탐색에 연결하지만 현재 제품에는 확정 지급 상태를 만드는 API가 없다.
+- 기준 main에는 #50의 프로필 초기화 조회·지급 확정/마커 API가 없으므로 온보딩은 무행동 `Unavailable`만 공급한다. 보유 0대·저장된 선택/진행 ID로 Intro/후보/Completed를 만들지 않는다. 선택/진행 ID가 Android 저장 상태에 있으면 보존하되 지급 여부 미확인을 안내한다. Retry의 단계 계약·프로필/requestId/같은 차종 이전 시도 검사는 위 #56 계약이며 실제 #50 연결/재실행 검증은 남아 있다.
+
+실제 실행 범위와 미검증 항목은 [호스트 연결 검증](06_VERIFICATION.md#정산첫-실행-실제-호스트-연결-검증--2026-11-07)을 따른다.
