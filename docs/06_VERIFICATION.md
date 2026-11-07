@@ -916,3 +916,18 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w -e class io.driveg
 **실제 기기 시험은 수행하지 않았다.** 기기는 다른 세션이 단독 사용하므로 adb/AVD/설치/실행/설정/차량 신호를 조작하지 않았다. 세차장 문구의 실제 화면 가독성·터치/스크롤·Activity 재생성·프로세스 종료/재실행은 미검증이다. 위젯 시험 컴파일을 장치 성공으로 표시하지 않는다. 현재 제품에는 진입 호스트를 연결하지 않았고 #44 실제 구매/확장 저장·꾸미기 영속화·실제 잔액/시설/배치 일치도 미검증이다. #55 전체 완료·통합 검증 #28 완료가 아니다.
 
 로컬 구현 커밋을 PR 게시 전 독립 검토에 인계한다. PR 게시/CI/main 머지는 메인이 검토 결과와 함께 조율하며 이 절을 이슈 종료·라벨/차단 관계 변경 근거로 사용하지 않는다.
+
+
+### #55 독립 검토 P2 수정과 기기 시험 구분
+
+독립 검토가 최초 head `52703ba6e82c016bc9aabd34d22acd803dafc2ed`에서 두 P2를 재현했다. 최신 revision13의 공간7/잔액900 뒤 늦은 revision12를 render하면 이전 값으로 되돌아갔고, 같은 snapshot에서 A실패→B실패→A재시도 시 A의 원래 거래 requestId가 사라졌다. 실제 DB 중복 과금 재현은 아니다.
+
+`ShopFreshnessTest` 정식 회귀를 추가해 **수정 전3개 전부 실패**(두 P2 및 Loading/재생성 신선도)를 먼저 확인했다. 최근 수락 revision을 uiState에 보존하고 낮은 Content를 거절하되 false gate는 적용하도록 수정했다. 선택별 거래 requestId 맵을 보존·방어 복사해 옵션 전환·취소·제한·View 재생성 뒤에도 동일 요청을 이어가고, 새로운 revision에서 이전 키를 제거한다. 시도별 attemptId와 늦은 응답 거절은 유지한다. 추가 불변성/성공 뒤 중복 완료/새 revision 시험을 포함한 정식 Shop 시험은 기존8+신규4=12개다. 수정 전후 로그는 로컬 `/private/tmp/shop55-freshness-red.log`, `shop55-freshness-green.log`, 전체 검사는 `shop55-fixed-all.log`에 남겼다.
+
+기기 시험은 수정 **전** head와 구분한다. 메인의 단독 배정 뒤 Pleos/API34·ADB5038·user10에서 고정 head의 격리 사본 `io.drivegrowth.verify55b`로 기존 `ShopViewTest`6개와 임시 네이티브 호스트1개가 통과했다(12.187초). 격리 앱 SHA-256 `c570ca1c6311096be9bc4e3cccf196c0f0c363b9c6adfd3838ae86249e591672`, 시험 APK `5a2a001af1f3148494bd92714e75bbc1efd1779f07ba8bf5c3bb4a518124359d`를 실제 설치본과 대조했다. 미리보기/취소/실패·제한·Pending 수동 복원·터치를 확인했으나 이번 두 P2는 그 시험에 포함되지 않았다. 최초 임시 호스트의 큰 폭 요청은 실제 CCP 영역을 넘었으므로 그 넓은 화면 가독성을 통과로 판단하지 않는다. 같은 점유 시간의 #53 독립 검증과 #55 작성자 시험은 서로 다른 소스/패키지/로그다.
+
+기기 사용 후 본인이 설치한 격리4패키지만 제거하고 제품 APK `793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9`·제품 파일6개·권한·user10·boot23·1080×600/120dpi·font null·night no·빈forward의 전후 동일, 내비 전면·활성 instrumentation 없음을 확인해 반환했다. 제품/DB 삭제·기어·GPS·AVD/서버·전역창/글꼴 설정 변경은 없었다. 근거는 로컬 `/private/tmp/b-ui-device-20261107/`의 source-comparison·53/55별 APK metadata·원본 시험 로그·화면·return-checks다. 반환 뒤 추가 adb 명령은 실행하지 않는다.
+
+**P2 수정본의 실제 기기 시험은 미수행**이며 독립 C 재검토에 인계한다. 위 최초 기기7개 통과를 수정본 검증·독립 승인·제품 저장/프로세스 복원 성공으로 바꾸지 않는다.
+
+수정 후 최종 로컬 명령 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest --offline --no-daemon`은 BUILD SUCCESSFUL(26초)로 종료했다. core191·app83(Shop12 포함) 실패/오류/생략0, Lint오류0·경고17, 저장소21/26/252·diff 검사 통과다. 수정본 제품 APK SHA-256은 `61b75c6c29f8879fa70bff5fa8025215d32f941b1fa5a9c76a76c6c7cb83e01e`, 시험 APK는 `b3a83a21130df630b81e007f17844f1842381c8eba1e6410fc71564d9c1af439`다. 이 값은 격리 패키지의 수정 전 장치 시험 APK와 다르며 설치하지 않았다. PR·push·main 머지·이슈 변경 없이 수정본을 독립 재검토에 인계한다.

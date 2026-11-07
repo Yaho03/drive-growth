@@ -82,7 +82,8 @@ data class ShopUiState(
     val selection: ShopSelection? = null,
     val pending: ShopRequest? = null,
     val acknowledged: ShopSelection? = null,
-    val retryRequest: ShopRequest? = null,
+    val requestIds: Map<ShopSelection, RequestId> = emptyMap(),
+    val latestRevision: Revision? = null,
     val message: String? = null,
     val retryPending: Boolean = false,
 )
@@ -104,6 +105,13 @@ class ShopInteraction(
         private set
 
     fun render(value: ShopScreenState, enabled: Boolean) {
+        // 오래된 허용 입력으로 제한을 풀지 않는다. Loading/Failure 뒤에도 기준을 보존한다.
+        if (!enabled) controlsEnabled = false
+        if (value is ShopScreenState.Content) {
+            if (value.revision.value < (uiState.latestRevision?.value ?: -1)) return
+            uiState = uiState.copy(latestRevision = value.revision,
+                requestIds = immutableMap(uiState.requestIds.filterKeys { it.revision == value.revision }))
+        }
         state = if (value is ShopScreenState.Content) value.copy(
             vehicles = immutable(value.vehicles), facilities = immutable(value.facilities), decorations = immutable(value.decorations),
         ) else value
@@ -115,7 +123,10 @@ class ShopInteraction(
 
     val selection: ShopSelection? get() = uiState.selection?.takeIf { current(it) != null }
 
-    fun restoreUiState(value: ShopUiState) { uiState = value }
+    fun restoreUiState(value: ShopUiState) {
+        val latest = listOfNotNull(uiState.latestRevision, value.latestRevision).maxByOrNull { it.value }
+        uiState = value.copy(latestRevision = latest, requestIds = immutableMap(value.requestIds))
+    }
     fun mode(value: ShopMode) { if (controlsEnabled) uiState = uiState.copy(mode = value) }
     private fun options(c: ShopScreenState.Content) = listOfNotNull(c.expansion) + c.facilities.map { it.option } + c.decorations
     private fun current(selection: ShopSelection): ShopOption? {
@@ -137,9 +148,10 @@ class ShopInteraction(
     }
     fun confirm(selection: ShopSelection): Boolean {
         if (uiState.selection != selection || !canSelect(selection)) return false
-        val requestId = uiState.retryRequest?.takeIf { it.selection == selection }?.requestId ?: nextRequestId()
+        val requestId = uiState.requestIds[selection] ?: nextRequestId()
         val request = ShopRequest(requestId, selection, UUID.randomUUID().toString())
-        uiState = uiState.copy(pending = request, message = null)
+        uiState = uiState.copy(pending = request, message = null,
+            requestIds = immutableMap(uiState.requestIds + (selection to requestId)))
         onEvent(ShopEvent.Submit(request))
         return true
     }
@@ -147,9 +159,9 @@ class ShopInteraction(
     fun complete(request: ShopRequest, result: ContractResult<Unit>) {
         val pending = uiState.pending?.takeIf { it == request } ?: return
         uiState = when (result) {
-            is ContractResult.Success -> uiState.copy(pending = null, selection = null, acknowledged = pending.selection, retryRequest = null,
+            is ContractResult.Success -> uiState.copy(pending = null, selection = null, acknowledged = pending.selection,
                 message = "처리 응답을 받았습니다. 확정 상태 재조회를 기다립니다")
-            is ContractResult.Failure -> uiState.copy(pending = null, selection = null, retryRequest = pending, message = "요청 실패: ${result.error}. 확정 상태를 확인하고 다시 선택해 주세요")
+            is ContractResult.Failure -> uiState.copy(pending = null, selection = null, message = "요청 실패: ${result.error}. 확정 상태를 확인하고 다시 선택해 주세요")
         }
     }
     fun retry() {
@@ -158,5 +170,6 @@ class ShopInteraction(
         onEvent(ShopEvent.Retry)
     }
     fun completeRetry() { uiState = uiState.copy(retryPending = false) }
+    private fun <K, V> immutableMap(values: Map<K, V>): Map<K, V> = Collections.unmodifiableMap(LinkedHashMap(values))
     private fun <T> immutable(values: List<T>): List<T> = Collections.unmodifiableList(ArrayList(values))
 }
