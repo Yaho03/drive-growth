@@ -29,7 +29,7 @@
   "evidenceSha256": {
     "ShopRestoreDeviceActivity.kt": "717d7f81a679c6606e72f825cf1bcedd26faa1f4b6786a45334092d3d6c01930",
     "AndroidManifest.xml": "6a45c23a86cb9c61e6d34bf99f98c05dd820c38b3bc38d2267c8e5d45415feac",
-    "targeted-device.txt": "152b248e1c396332ecc27f33e15678da22557a06ad77bf82e3ee2c91222cc987",
+    "targeted-device.txt": "9a40b52e7bd807e47522630da45449c0e2690f76d4c869e428512354524072b1",
     "latest.png": "f760619ce2d73665a3274e1b244e8141adce6b60c6b8c550d1fbc8a6156975c2",
     "isolate.gradle": "71b0f20735c7dca803e708d7aa28f8c6ae2daf76419aec13b31e05d369f2b6c9",
     "host-log.txt": "a5885436e4d9eef52bed9aab7144ea13103eb350b0d94c0f9daf16f727347ba2",
@@ -37,5 +37,7 @@
   },
   "sourceBlobsVerifiedByAuthor": true,
   "localApksVerifiedByAuthor": true,
-  "providedDeviceEvidence": "C가 실행/원복한 독립 표적 근거를 작성자가 파일·해시 대조. 작성자가 기기 명령을 재실행한 결과 아님"
+  "providedDeviceEvidence": "C가 실행/원복한 독립 표적 근거를 작성자가 파일·해시 대조. 작성자가 기기 명령을 재실행한 결과 아님",
+  "originalTargetedDeviceSha256": "152b248e1c396332ecc27f33e15678da22557a06ad77bf82e3ee2c91222cc987",
+  "publicLogNormalization": "공개 발췌 마지막 빈줄만 정리. 원본 로그는 C 로컬 증거 폴더에 보존. 결과/명령 내용 동일."
 }
