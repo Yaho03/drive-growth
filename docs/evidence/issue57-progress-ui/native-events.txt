@@ -1,0 +1,7 @@
+--------- beginning of main
+11-07 02:55:33.096 30250 30250 I Progress57Host: Select(key=ProgressKey(id=result-check, periodId=fixture-day))
+11-07 02:55:33.648 30250 30250 I Progress57Host: ClaimReward(key=ProgressKey(id=result-check, periodId=fixture-day), revision=1, requestKey=fixture-result-check)
+11-07 02:56:36.964 11923 11923 I Progress57Host: created restored=false
+11-07 02:56:37.765 11923 11923 I Progress57Host: Select(key=ProgressKey(id=result-check, periodId=fixture-day))
+11-07 02:56:38.413 11923 11923 I Progress57Host: ClaimReward(key=ProgressKey(id=result-check, periodId=fixture-day), revision=1, requestKey=fixture-result-check)
+11-07 02:56:38.431 11923 11923 I Progress57Host: created restored=true

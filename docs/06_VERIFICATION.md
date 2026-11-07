@@ -894,3 +894,44 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w -e class io.driveg
 이번 격리 앱/.test만 제거하고 원래 제품 APK `793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9`로 데이터 보존 복원했다. 제품 DB와 기존 파일6개의 해시는 전후 모두 동일하다. 속도 권한·임시 flag, P/속도0·페달0·조향0·night no를 원복했다. boot1/user10/1080×600/120dpi/fontScale설정null, forward·격리 패키지·active instrumentation 없음, 기존 AVD/ADB5038 유지 상태를 확인하고 메인에 장치 사용 종료를 한 번 전달했다. 이후 장치 명령은 실행하지 않는다.
 
 #51에는 실제 Results/Onboarding View·gate/Back·비동기 저장/복원 연결, #54에는 현재 공통 정산의 실제 열람/재조회·반복/프로세스 재실행 불변·미확인 수 일치 근거를 인계할 수 있다. #56은 실제 미지원 상태·탐색/제한 연결까지이며 실제 #50 지급/튜토리얼 완료 체크는 유지한다. 이슈 본문 체크·담당·ready/Blocked by·종료는 변경하지 않고 메인이 증거 범위에 맞춰 판단하도록 전달한다. #28 전체 게임 흐름·후속 거래·공식 폼 팩터/실차를 완료로 표시하지 않는다. 원본 APK/DB·임시 script·전체 로그는 로컬 `/private/tmp/results-onboarding-evidence/`에 보존하고 커밋하지 않는다.
+
+## #57 퀘스트·업적·휴식 표시 UI 부분 검증
+
+2026-11-07, main `b6631a44e80e56a6b86ea9bfc1790cefc4ea82c0`에서 독립 worktree와 `app/57-progress-ui` 브랜치를 만들었다. #57 본문/댓글(댓글 없음), PR #60, PRD의 거리 퀘스트·거리 업적/시즌·주말 이벤트 제외와 휴식 규칙, 기존 #119 `RestBonus` 계산 경계를 직접 대조했다. 표시·호출 계약은 [09 명세의 해당 절](09_UI_UX_SPEC.md#57-퀘스트업적휴식-독립-표시-ui)에 둔다. 계산·공통 저장·호스트·탐색·차량 gate는 수정하지 않았다.
+
+### 입력과 본인 검증
+
+debug 전용 `ProgressPreviewStates`는 실제 원장·DB·차량·위치·주차 증거가 아닌 결정적인 **고정 시험 입력**이다. 일일/주간·업적의 잠김/진행/완료/청구가능/처리중/수령/만료/실패/미지원, 누락·빈목록·40개 긴 목표명·선택 소멸, 휴식 조건 충족/미충족/판정 불가와 다음 출발 대기/활성/미지원을 재현한다. 채택되지 않은 목표·보상은 시험값임을 화면 출처와 주석에 명시하며 채택 이벤트를 새로 만들지 않는다.
+
+환경은 macOS arm64·Temurin JDK17·기존 Gradle8.11.1/Kotlin2.2.21/AGP8.10.1·Android SDK35다. SDK 경로는 환경변수로 전달했고 Gradle/Manifest/의존성은 변경하지 않았다.
+
+| 확인 | 실제 결과·의미 |
+|---|---|
+| 단위 회귀 선실행 | 표시 모델/상호작용 구현 전 신규 시험의 미정의 심볼로 컴파일 실패. 로컬 `/private/tmp/progress-red-tests.txt`에 보존 |
+| `:app:testDebugUnitTest --tests '*ProgressInteractionTest'` | 10개 통과, 실패·오류·생략0. 확인 전 청구 차단, 반복 탭·재표시·제한·상세 닫기/소멸·View 교체의 요청 중복 방지, 오래된 sequence/revision/확인 버튼 거절, 새 복구 offer, 외부 Pending 차단, 미지원·누락·불허 행동, 목록 복사·중복 key, 명시적 재조회 잠금 해제 검증 |
+| `:core:test --tests '*RestBonusTest'` | 기존 휴식 계산 15개 통과, 실패·오류·생략0. UI는 이 계산을 실행하지 않으며 기존 출력 enum의 소비 경계를 확인 |
+| `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` | 성공. Lint 오류0·경고17. 이번 View의 프로그램 생성자 관련 ViewConstructor 경고1개가 포함되며 나머지는 기존 대상API·SDK·뷰 등의 경고다 |
+| `python3 scripts/check_repository.py`, `git diff --check` | 통과. 원격 CI·독립 검증은 아직 미실시 |
+| `ProgressViewTest` | 배정된 기존 Pleos 기기의 격리 패키지에서 4개 통과(최종 1.598초). 청구 요청/수령 분리, 제한/선택 소멸, 빈/누락/미지원/휴식 상태, 440dp/1360dp 긴 목록 측정 검증. 실제 SDK·경제·저장 연결 시험과 구분 |
+
+본인 검증은 청구 이벤트의 중복 방지와 상태 표시 계약에 한정된다. 실제 보상 지급·원장 멱등성·재실행 후 수령 이력·실제 휴식 증거·수익 적용을 검증한 것이 아니다. 전체 core/앱 시험을 반복하지 않고 새 UI에 관련된 단위 시험과 APK/Lint를 실행했다. 앱/시험 APK는 이 작업 폴더의 `app/build/outputs/apk/`에 있으며 로컬 로그는 `/private/tmp/progress-validation.txt`다.
+
+### 실제 Android 화면과 남은 연결
+
+본인검증 중 메인이 C 한 세션에 기기를 배정해 기존 ADB5038·emulator-5556/user10에서 수행했다. 제품 Manifest·Gradle은 그대로 두고 로컬 임시 init-script와 Activity로 `io.drivegrowth.app.progress57` 격리 호스트를 만들었다. 실제 View 표적4개와 네이티브 터치·Activity 재생성 뒤 Pending 복원, 정상/누락/제한/휴식·긴 목록·큰 글꼴을 확인했다. 초기 임시 설정 적용 순서 오류로 첫 APK에 제품 ID가 남아 설치/시험이 서명 불일치로 차단됐으며 제품이 교체되거나 시험이 시작되지 않았다. 적용 시점을 수정한 뒤 aapt로 실제 격리 package/target을 확인하고 재실행했다.
+
+| 실제 Android 화면·근거 | 범위 |
+|---|---|
+| [정상 목록](evidence/issue57-progress-ui/normal.png) | 기존 앱 창의 한 열 구성, 고정 시험 출처·미채택 보상 명시 |
+| [넓은 본문](evidence/issue57-progress-ui/wide-scaled.png) | 호스트 내부1360dp를 현재 창에 축소 표시한 두 열 View. 공식 폼 팩터/원래 크기 가독성 시험이 아님 |
+| [440dp·큰 글꼴](evidence/issue57-progress-ui/many.png) | 호스트 내부440dp·로컬 context fontScale1.3, 긴 목표명 줄바꿈·40개 목록. 전역 설정 변경 없음 |
+| [휴식 카드](evidence/issue57-progress-ui/rest.png) | 충족/다음 출발 대기와 모의 판정·실제 연결 미완료를 표시. 출발·운전 버튼/카운트다운 없음 |
+| [제한 화면](evidence/issue57-progress-ui/restricted.png) | 외부 false 입력으로 게임 내용과 버튼 제거. 실제 기어/SDK gate 검증과 구분 |
+| [청구 후 재생성](evidence/issue57-progress-ui/native-pending-restored.png)·[이벤트](evidence/issue57-progress-ui/native-events.txt) | 실제 터치로 요청 뒤 created restored=true, 동일 실행에서 ClaimReward1개, 반복 탭은 추가 요청 없음. 수령 성공을 만들지 않음 |
+| [표적 시험 결과](evidence/issue57-progress-ui/instrumentation.txt)·[APK/환경 metadata](evidence/issue57-progress-ui/metadata.json) | 최종 격리 APK의 실제 실행, 제품 탐색 연결과 구분 |
+
+주변 차량·차량 제어 화면은 OEM 셸이며 앱 자산이 아니다. 기존 공유 기기 불안정 기록을 해소한 것으로 확대하지 않는다. 공식 폼 팩터 전체·CCP·실차·실제 주행 정책 #81은 미검증이다.
+
+시험 뒤 자기 격리 패키지2개만 제거했다. [제품 파일 전](evidence/issue57-progress-ui/product-hashes-before.txt)/[후](evidence/issue57-progress-ui/product-hashes-after.txt)의 6개 해시와 [제품 APK](evidence/issue57-progress-ui/product-apk-after.txt) `793e1db8…`가 동일하다. 권한·기어·전역 크기/밀도/글꼴은 변경하지 않았다. [종료 상태](evidence/issue57-progress-ui/state-after.txt)는 user10/boot완료/1080×600/120dpi/fontScale설정null, 원래 내비 복귀, 활성 instrumentation·추가 forward 없음이다. 기존 AVD PID64177·ADB5038 PID66071을 유지하고 기기 반환을 보고했으며 이후 추가 adb를 실행하지 않는다. 임시 호스트·init-script·원본 APK/로그는 `/private/tmp/progress-device-host/`·`/private/tmp/progress-device-evidence/`에 보존했다.
+
+09에 공급 상태/이벤트/복원 예시를 남겼다. 경민 #45의 실제 목표·기간·진행/청구·영속 수령 API, 정원 #40의 장소/P/시간 증거·원자 저장·출발 감지와 수익 연결, 환석 #51의 탐색·gate/프로필/요청 세대·수명주기 연결은 후속 범위다. 휴식 시간을 UI가 합산/소모하지 않고 짧은 P 합산·일반 주차 중 소모 제안을 확정하지 않았다. #57 전체 체크·ready/Blocked by·담당·종료는 바꾸지 않는다. 최신 운영 지시에 따라 이 로컬 결과는 독립 검증 인계 전이며 PR 게시·CI·main 머지는 아직 하지 않는다.
