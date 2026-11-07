@@ -5,7 +5,7 @@
 | 담당 | 지금 할 일 | 막고 있는 이슈 | 해제 조건 |
 |---|---|---|---|
 | 정원 | [#80](https://github.com/Yaho03/drive-growth/issues/80), [#37](https://github.com/Yaho03/drive-growth/issues/37) 시험용 후보·규칙 확인, [#40](https://github.com/Yaho03/drive-growth/issues/40) 음성 없는 뼈대 | #38·#39는 정원 #37 | 선택 의뢰의 필요한 결과 검토·main 반영 |
-| 환석 | [#51](https://github.com/Yaho03/drive-growth/issues/51)·[#52](https://github.com/Yaho03/drive-growth/issues/52) 실제 연결, [#54](https://github.com/Yaho03/drive-growth/issues/54) 결과 UI·[#56](https://github.com/Yaho03/drive-growth/issues/56) 첫 실행 UI 병렬 구현 | 실제 탐색 연결은 #51의 해당 연결점, 실제 지급·정산은 각 기능 결과 | #105 입력·Back 기반과 #103 표시 UI 사용. 독립 View부터 구현하고 호스트·명령 연결 후 검증 |
+| 환석 | [#51](https://github.com/Yaho03/drive-growth/issues/51)·[#54](https://github.com/Yaho03/drive-growth/issues/54)·[#56](https://github.com/Yaho03/drive-growth/issues/56) 정산·첫 실행 화면 연결, [#52](https://github.com/Yaho03/drive-growth/issues/52) 관리 명령 연결 | 첫 지급은 호열 #50, 차량 관리 거래는 호열 #47~#49 | #108·#109·#110의 View·typed 호스트 사용. 정산 열람 저장·Back·제한·복원 연결 후 검증 |
 | 호열 | [#47](https://github.com/Yaho03/drive-growth/issues/47), [#48](https://github.com/Yaho03/drive-growth/issues/48), [#50](https://github.com/Yaho03/drive-growth/issues/50), #46 활동·영속 도감 연결·#35 콘텐츠 | #49는 경민 #42 | #104 개체 필드·단일 개체 저장 사용 가능. 확정 사고 결과 인계와 다중 개체 거래는 별도 확인 |
 | 경민 | [#41](https://github.com/Yaho03/drive-growth/issues/41) 조회 후보·자동 배정 구현 | #42는 경민 #41, #43·#44는 경민 #42 | 각 기능이 소비할 결과의 검토·main 반영 |
 
@@ -13,7 +13,7 @@
 
 평소 이동을 탁송·차량 영입으로 연결하고, 주차 후 차량을 모으고 렌터카 가게를 확장하는 Pleos Connect 차량용 게임을 기획하고 있습니다.
 
-**공통 차량 계약·단일 개체 저장과 차고·상세·도감 표시 UI를 구현했고, 실제 게임 기능과 화면의 연결을 진행 중입니다.** 표시 UI의 고정 입력·격리 Activity 시험은 실제 지급·경제 명령·앱 전체 흐름 완료와 구분합니다. Debug APK는 로컬 시험 산출물이며 제출 Release APK·실제 게임 시연 영상은 준비 전입니다.
+**차고·상세·도감의 실제 탐색과 정산·첫 실행의 독립 표시 UI를 구현했습니다. 정산·첫 실행 화면을 제품 호스트와 연결하는 작업은 진행 전입니다.** 표시 UI의 고정 입력·격리 Activity 시험은 실제 지급·경제 명령·앱 전체 흐름 완료와 구분합니다. Debug APK는 로컬 시험 산출물이며 제출 Release APK·실제 게임 시연 영상은 준비 전입니다.
 
 처음 참여한다면 [4인 구현 시작 안내와 책임표](docs/08_PROJECT_PLAN.md)를 확인하세요. 기능 이슈 → 해당 PRD 항목 → 공통 데이터 계약 → 화면 명세 → 검증 명령 순서로 진행합니다. 공통 타입·거래 저장·fixture 구현은 기능 연결의 선행 작업입니다.
 
@@ -36,7 +36,8 @@
 | 공통 거래 원장 | #104에서 개체 희귀도·진행량·취득 정보와 단일 개체 저장 확장. SQLite 시험 26개 통과. 구형 데이터 migration·영속 도감·다중 개체 거래·제품 앱 재실행은 남음 |
 | 전경 차량 입력·Back | #105의 SDK 단일 worker·늦은 응답/수신 시각 처리. Pleos API34에서 D/P 제한·권한·Back·재생성, 제어된 worker 정지 중 제한·복귀 확인. 공식 폼 팩터·실차·장기 안정성은 남음 |
 | 개발 도구·APK | 공통 조합 빌드·Lint, Debug 설치·Activity 기본 실행 확인 |
-| 새 화면 | [UI 시안 v3](docs/design-assets/ui-v3/)를 반영한 #103 차고·개체 상세·도감 Android Views 구현. 격리 Activity 장치 시험 10개 통과. #51 탐색·주행 제한 및 실제 데이터·명령 연결은 남음 |
+| 차고·도감 탐색 | #109에서 typed 조회·SQLite→차고·Back·선택 복원과 SDK 제한 연결. 독립 장치 회귀 5개 및 D/P·권한·CCP 확인. 실제 활동·도감 이력·관리 명령은 남음 |
+| 정산·첫 실행 표시 | #108 결과 UI 독립 장치10개, #110 첫 실행 UI 독립 장치12개 통과. 정산의 실제 열람 저장·재실행과 첫 지급(#50), 제품 탐색 연결은 남음. 상세 근거는 [독립 UI 검토와 통합](docs/06_VERIFICATION.md#pr-108109110-독립-검토와-통합--2026-11-07) |
 | 렌터카 게임·추가 기능 | 상세 구현 이슈로 진행. 정책·수치·일부 동작은 결정 대기 |
 | 최종 APK·시연·실차 | 제출 산출물 미준비, 실차 미검증 |
 
