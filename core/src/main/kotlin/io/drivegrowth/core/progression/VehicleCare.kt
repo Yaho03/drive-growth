@@ -1,6 +1,7 @@
 package io.drivegrowth.core.progression
 
 import io.drivegrowth.core.contract.Rarity
+import java.math.BigInteger
 
 // 수치는 PRD "렌터카 영업·차량·시설"의 시험값. 금액은 게임머니 정수, 퍼센트 계산은 내림.
 // ponytail: 반올림 규칙은 PRD 미정이라 내림으로 고정, 산식 확정 시 이 파일만 바꾼다.
@@ -36,7 +37,9 @@ class VehicleCare(private val rules: VehicleCareRules = VehicleCareRules()) {
         require(level < rules.maxLevel) { "최대 레벨은 레벨업할 수 없다" }
         require(price >= 0) { "금액은 0 이상" }
         val percentTimes100 = rules.levelUpCostPercentPerLevel.toLong() * level * rules.costMultiplierPercent.getValue(rarity)
-        return Math.multiplyExact(price, percentTimes100) / 10_000
+        // 중간 곱이 Long을 넘어도 최종 비용이 Long 안이면 계산한다. 최종값이 넘으면 ArithmeticException.
+        return BigInteger.valueOf(price).multiply(BigInteger.valueOf(percentTimes100))
+            .divide(BigInteger.valueOf(10_000)).longValueExact()
     }
 
     /** 게임머니 레벨업은 한 레벨 올리고 진행량은 유지한다. 최대 레벨이 되면 진행량은 0. */

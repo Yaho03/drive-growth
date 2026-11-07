@@ -18,6 +18,12 @@ class VehicleCareTest {
         assertEquals(4_370L, care.levelUpCost(10_000, 19, Rarity.LEGEND))
         assertEquals(16L, care.levelUpCost(777, 1, Rarity.ADVANCED)) // 777×2%×1.05 = 16.317 → 16
         assertThrows(IllegalArgumentException::class.java) { care.levelUpCost(10_000, 20, Rarity.COMMON) }
+        // 중간 곱(price × 200)은 Long을 넘지만 최종 비용은 표현 가능
+        assertEquals(184_467_440_737_095_516L, care.levelUpCost(Long.MAX_VALUE, 1, Rarity.COMMON))
+        assertEquals(Long.MAX_VALUE / 10_000 * 4_370 + Long.MAX_VALUE % 10_000 * 4_370 / 10_000, care.levelUpCost(Long.MAX_VALUE, 19, Rarity.LEGEND))
+        // 기본 규칙의 비용은 차값의 43.7% 이하라 넘지 않는다. 규칙을 바꿔 최종 비용이 Long을 넘으면 잘리지 않고 예외
+        val steep = VehicleCare(VehicleCareRules(levelUpCostPercentPerLevel = 10)) // 19레벨 전설 = 218.5%
+        assertThrows(ArithmeticException::class.java) { steep.levelUpCost(Long.MAX_VALUE, 19, Rarity.LEGEND) }
     }
 
     @Test fun `재료는 희귀도별 진행량을 채우고 남는 진행량을 넘기며 20을 넘는 몫은 버린다`() {

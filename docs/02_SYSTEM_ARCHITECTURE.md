@@ -359,12 +359,12 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 
 #### #48 레벨업과 재료 강화
 
-`io.drivegrowth.core.garage.VehicleUpgrade`가 `Garage.find`로 대상·재료를 찾고 `VehicleRef`(개체 ID·화면에서 본 revision)와 호출자가 넘긴 활동 상태로 검사한다. 계산은 `VehicleCare`의 PRD 시험값이다: 레벨업 비용 = 차종 가격 × 2% × 현재 레벨 × 희귀도 비용 배율(1.0·1.05·1.1·1.15, 마지막에 한 번 내림), 재료 진행량 = 재료 희귀도별 100·150·250·400%(이월, 20레벨 초과분 버림).
+`io.drivegrowth.core.garage.VehicleUpgrade`가 `Garage.find`로 대상·재료를 찾고 `VehicleRef`(개체 ID·화면에서 본 revision)와 호출자가 넘긴 활동 상태(`(OwnedVehicleId) -> ContractResult<VehicleActivity>`, `Garage.availableForRental`과 같은 형태)로 검사한다. 계산은 `VehicleCare`의 PRD 시험값이다: 레벨업 비용 = 차종 가격 × 2% × 현재 레벨 × 희귀도 비용 배율(1.0·1.05·1.1·1.15, 중간 곱은 BigInteger로 계산하고 마지막에 한 번 내림), 재료 진행량 = 재료 희귀도별 100·150·250·400%(이월, 20레벨 초과분 버림).
 
 | 동작 | 저장 | 실패 |
 |---|---|---|
-| `levelUp(store, requestId, source, VehicleRef, activityOf)` | 비용 DEBIT + `VehicleWrite.Update`(레벨+1, 진행량 유지, 20이면 0)를 `GameChange` 한 건으로 커밋. 성공 뒤 같은 요청 재시도는 revision이 달라 `STATE_CONFLICT` | 없음·처분 `DATA_UNAVAILABLE`, revision 불일치·대여/반납/수리 필요 `STATE_CONFLICT`, 20레벨 `INVALID_INPUT`, 잔액 부족·저장 실패는 저장소가 전체 거절 |
-| `planMaterial(owned, target, material, activityOf)` | **계산·검사만.** 대상 성장 Update와 재료 CONSUMED Update(성장값 보존) 두 개를 `MaterialPlan`으로 반환하고 저장하지 않음 | 같은 개체·다른 차종·20레벨 대상 `INVALID_INPUT`, 처분된 재료 `DATA_UNAVAILABLE`, revision 불일치·사용 중 `STATE_CONFLICT`. 재료는 20레벨이어도 사용 가능 |
+| `planLevelUp(owned, requestId, source, VehicleRef, activityOf)` | 비용 DEBIT + `VehicleWrite.Update`(레벨+1, 진행량 유지, 20이면 0)를 담은 불변 `GameChange` 계획을 반환하고, 호출자가 `commitGameChange`로 저장. **응답을 잃으면 보관한 같은 계획을 다시 제출**해 처음 정산을 재생한다(같은 requestId·다른 내용은 `STATE_CONFLICT`). 성공 뒤 계획을 새로 만들면 revision이 달라 새 요청으로 거절 | 없음·처분 `DATA_UNAVAILABLE`, revision 불일치·대여/반납/수리 필요 `STATE_CONFLICT`, 20레벨·최종 비용 Long 초과 `INVALID_INPUT`, 활동 조회 실패는 받은 오류 그대로, 잔액 부족·저장 실패는 저장소가 전체 거절 |
+| `planMaterial(owned, target, material, activityOf)` | **계산·검사만.** 대상 성장 Update와 재료 CONSUMED Update(성장값 보존) 두 개를 `MaterialPlan`으로 반환하고 저장하지 않음 | 같은 개체·다른 차종·20레벨 대상 `INVALID_INPUT`, 처분된 재료 `DATA_UNAVAILABLE`, revision 불일치·사용 중 `STATE_CONFLICT`, 대상·재료 활동 조회 실패는 받은 오류 그대로. 재료는 20레벨이어도 사용 가능 |
 
 재료 강화는 두 개체를 한 정산에 확정해야 하므로 위 「#48 후속 거래」의 다중 개체 명령이 #33·#34에 생긴 뒤 `MaterialPlan`을 한 건으로 커밋한다. 희귀도 수익 배율(1.0~1.3)과 대여료 반영은 영업 계산(B) 범위라 이번에 바꾸지 않았다.
 
