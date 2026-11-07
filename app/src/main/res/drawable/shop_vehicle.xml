@@ -1,0 +1,6 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="100dp" android:height="72dp" android:viewportWidth="100" android:viewportHeight="72">
+    <!-- #55 자체 중립 도형. 실차·외부 캐릭터 자산 없음. -->
+    <path android:fillColor="#8AA4C5" android:pathData="M12,34 L24,18 L68,18 L82,34 L92,38 L92,55 L8,55 L8,38 Z"/>
+    <path android:fillColor="#26374E" android:pathData="M29,23 L63,23 L73,34 L21,34 Z"/>
+    <path android:fillColor="#0E1014" android:pathData="M18,49 L32,49 L32,63 L18,63 Z M69,49 L83,49 L83,63 L69,63 Z"/>
+</vector>

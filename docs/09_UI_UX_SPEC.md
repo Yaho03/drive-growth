@@ -219,3 +219,21 @@ collection.render(mappedCollectionState, controlsEnabled = allowedByCommonShell)
 - 기준 main에는 #50의 프로필 초기화 조회·지급 확정/마커 API가 없으므로 온보딩은 무행동 `Unavailable`만 공급한다. 보유 0대·저장된 선택/진행 ID로 Intro/후보/Completed를 만들지 않는다. 선택/진행 ID가 Android 저장 상태에 있으면 보존하되 지급 여부 미확인을 안내한다. Retry의 단계 계약·프로필/requestId/같은 차종 이전 시도 검사는 위 #56 계약이며 실제 #50 연결/재실행 검증은 남아 있다.
 
 실제 실행 범위와 미검증 항목은 [호스트 연결 검증](06_VERIFICATION.md#정산첫-실행-실제-호스트-연결-검증--2026-11-07)을 따른다.
+
+
+### #55 가게·시설·꾸미기 표시 UI 연결점
+
+2026-11-07 `app/ui/shop/ShopView`를 Android Views로 추가했다. `wireframes.svg`와 `ui-v3/4a-shop-home.png`, `4o-facilities.png`, `4u-landscape-shop-home.png`, `4z-landscape-facilities.png`를 직접 확인해 어두운 카드·큰 버튼·전체/차량 보기와 시설 조건 표시를 적용한다. 시안 홈의 누락된 세차장 문구를 이미지로 재사용하지 않고 실제 텍스트로 표시한다. `shop_vehicle.xml`은 이번에 작성한 자체 중립 도형이며 외부 실차·캐릭터·로고를 포함하지 않는다. 3D 자산·자유 배치 엔진은 추가하지 않았다.
+
+- 호스트는 `ShopScreenState.Content`에 확정 이름·레벨·보유수·공간·잔액·간판/색상·차량 표시 목록과 확장·시설·장식 `ShopOption`을 제공한다. 누락 숫자는 null로 전달하며 0으로 채우지 않는다. 세 시설은 공통 `Facility`로 식별하고, 누락 시설은 정보 미제공으로 표시한다. 시설 해금·효과·가격·행동 허용은 공급값이다. UI에서 `unlocked`·경제 계산을 다시 실행하지 않는다.
+- 확장은 공통 `ShopExpansion`, 시설은 `FacilityOffer`를 `ShopCommand`로 감싼다. 금액·ruleVersion·trial 표시와 명령 payload의 불일치는 생성 시 거절한다. 장식은 공급자가 승인한 decorationId·간판/색상 표시안만 전달한다. 보유·구입·배치 규칙과 실제 장식 저장 API는 미연결이며 시험 품목을 제품 품목으로 확정하지 않는다.
+- `revision`은 호스트 표시 snapshot의 신선도 표식이다. 현재 `RentalLedger.shop()`의 `ShopState`에는 이 값이 없으므로 실제 어댑터가 조회 일관성과 갱신 표식을 공급해야 한다. 차량 revision을 가게 revision으로 대입하지 않는다. 최근 수락 revision을 uiState에 보존해 낮은 Content는 Loading/Failure·View 재생성 뒤에도 거절한다. 낮은 입력의 false gate는 적용하지만 오래된 true는 제한을 풀지 않는다. 새 프로필은 새 View/호스트 세션으로 시작하며 이전 프로필의 uiState를 복원하지 않는다. 이 표식은 DB 원자성·조건 재검사·revision 검사·저장 책임을 대체하지 않는다.
+- `ShopEvent.Submit(ShopRequest)`에는 선택 당시 revision·전체 옵션·거래 requestId·UI attemptId가 들어간다. 호스트는 공통 거래에 같은 requestId와 명령을 전달하고, 같은 요청 객체로 `complete(request, result)`를 호출한다. 실패 뒤 동일 옵션 재시도는 거래 requestId를 유지하고 attemptId만 바꿔 이전 시도의 늦은 응답을 무시한다. 같은 snapshot에서 다른 실패 옵션을 오가도 선택별 requestId를 유지하며 맵을 방어 복사해 uiState 복원에 포함한다. 새 revision을 수락하면 이전 revision의 키만 제거한다. 다른 요청 응답도 무시한다.
+- 미리보기·취소·실패·제한으로 확정 입력을 변경하지 않는다. 성공 응답은 처리 응답 수신으로 표시하고 그 snapshot의 추가 요청을 막는다. 호스트가 저장 확정을 확인한 새 snapshot을 `render`해야 잔액·외형·공간·시설이 바뀐다. 조회 중·제한 중 재표시만으로 Pending을 풀지 않는다. 오래된 선택·가격·허용 변경은 확인을 거절한다.
+- 호스트는 `uiState`를 View 수명 밖에 보관하고 새 View에서 `restoreUiState`한다. 복원 자체는 요청·저장·재지급을 하지 않는다. 미리보기의 `handleBack()`을 먼저 적용하고, 처리 중 요청의 부모 탐색은 공통 호스트가 결정한다. 프로세스 종료 후 미완료 요청 복원·실제 저장 재조회는 호스트 연결 때 검증한다.
+- `controlsEnabled=false`이면 게임 내용·버튼을 제거하고 이전 버튼 callback도 gate를 재검사한다. 폭 1000dp 이상은 장면/관리 두 열, 좁은 폭은 단일 세로 스크롤이다. Loading/Empty/Failure/Unsupported와 요청 Pending을 구분한다.
+
+표시 예제는 `ShopPreviewStates.normal()`·`missing()`이며 시험 잠금·무료 장식·비용·효과를 명시한다. #24 경제 제안 댓글과 환석 동의는 전원 채택이나 콘텐츠 반영 증거로 사용하지 않는다. MainActivity·탐색/gate·실제 #44 구매/확장·꾸미기 영속화는 이번 변경에 연결하지 않았다. #55 전체 완료와 앱 종료 뒤 금액/배치 일치는 실제 연결 및 #28 검증에 남는다.
+
+
+#55 수정본의 실제 격리 View·네이티브 호스트 표적8개와 별도 C 재검토15개의 근거는 [06 수정본 검증](06_VERIFICATION.md#55-수정본-기기-표적독립-재검토-및-게시-근거)을 따른다. UI 상태 객체를 새 View에 복원한 시험이며 제품 Activity/프로세스 영속 복원은 아니다. 실제 CCP 가용폭936dp에서는 두 열 분기(1000dp 이상)를 실행하지 못했으므로 공식 폼팩터 전체 완료로 해석하지 않는다.
