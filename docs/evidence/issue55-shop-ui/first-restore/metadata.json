@@ -1,0 +1,41 @@
+{
+  "head": "515507cac01ae15445c323836c07366edb5a063e",
+  "package": "io.drivegrowth.app.shop55restorec",
+  "testTarget": "io.drivegrowth.app.shop55restorec",
+  "appSha256": "5da60557549cb743bfe063765d4c1464bd4e027637f8cf686a28fed072083581",
+  "testApkSha256": "7d5bc78bcf066298bd9aa56809f48dd6af881cc99bd209b2780c12a525bcc835",
+  "sourceBlobs": {
+    "app/src/androidTest/java/io/drivegrowth/app/ui/shop/ShopViewTest.kt": "f1ffc1e88b2f029c55f592236a2f1aae93a5c22d",
+    "app/src/main/java/io/drivegrowth/app/ui/shop/ShopPreviewStates.kt": "27f7229079cabc8375f70643667aa8668b46f7d9",
+    "app/src/main/java/io/drivegrowth/app/ui/shop/ShopScreenState.kt": "09e240425011cf5a4a00579fbfd1b72bc49b8b27",
+    "app/src/main/java/io/drivegrowth/app/ui/shop/ShopStyle.kt": "11d46d71c7f0353f7f641bec3c3eb8932733f492",
+    "app/src/main/java/io/drivegrowth/app/ui/shop/ShopView.kt": "c658d74c1c9f21bc1bb31de30a0cc65982201969",
+    "app/src/main/res/drawable/shop_vehicle.xml": "280e62a493d1e238c5300fb827d8d61a6cdfd5e9",
+    "app/src/main/res/values/shop_strings.xml": "53a7aac39db55635f623c211fae55f00b611e513",
+    "app/src/test/java/io/drivegrowth/app/ui/shop/ShopFirstRestoreTest.kt": "68863bfd9426543e353af758864bbf127042ebdf",
+    "app/src/test/java/io/drivegrowth/app/ui/shop/ShopFreshnessTest.kt": "a346aa91240c2481276a79270fa75281232cab5d",
+    "app/src/test/java/io/drivegrowth/app/ui/shop/ShopInteractionTest.kt": "4a830469d9fb40d41830961652823c88ee83459c"
+  },
+  "temporaryHostSha256": "717d7f81a679c6606e72f825cf1bcedd26faa1f4b6786a45334092d3d6c01930",
+  "tests": 1,
+  "failures": 0,
+  "deviceTestSeconds": 0.284,
+  "productFilesUnchanged": true,
+  "productApkUnchanged": true,
+  "isolatedPackagesRemoved": true,
+  "activeInstrumentation": [],
+  "forwardAfter": "\n",
+  "deviceReleased": true,
+  "evidenceSha256": {
+    "ShopRestoreDeviceActivity.kt": "717d7f81a679c6606e72f825cf1bcedd26faa1f4b6786a45334092d3d6c01930",
+    "AndroidManifest.xml": "6a45c23a86cb9c61e6d34bf99f98c05dd820c38b3bc38d2267c8e5d45415feac",
+    "targeted-device.txt": "152b248e1c396332ecc27f33e15678da22557a06ad77bf82e3ee2c91222cc987",
+    "latest.png": "f760619ce2d73665a3274e1b244e8141adce6b60c6b8c550d1fbc8a6156975c2",
+    "isolate.gradle": "71b0f20735c7dca803e708d7aa28f8c6ae2daf76419aec13b31e05d369f2b6c9",
+    "host-log.txt": "a5885436e4d9eef52bed9aab7144ea13103eb350b0d94c0f9daf16f727347ba2",
+    "loading.png": "f87c9e146d5b59d85d27691bc242fb78292ab71c1d0a893b7defc4e8a720aa8d"
+  },
+  "sourceBlobsVerifiedByAuthor": true,
+  "localApksVerifiedByAuthor": true,
+  "providedDeviceEvidence": "C가 실행/원복한 독립 표적 근거를 작성자가 파일·해시 대조. 작성자가 기기 명령을 재실행한 결과 아님"
+}

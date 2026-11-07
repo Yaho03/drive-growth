@@ -237,3 +237,6 @@ collection.render(mappedCollectionState, controlsEnabled = allowedByCommonShell)
 
 
 #55 수정본의 실제 격리 View·네이티브 호스트 표적8개와 별도 C 재검토15개의 근거는 [06 수정본 검증](06_VERIFICATION.md#55-수정본-기기-표적독립-재검토-및-게시-근거)을 따른다. UI 상태 객체를 새 View에 복원한 시험이며 제품 Activity/프로세스 영속 복원은 아니다. 실제 CCP 가용폭936dp에서는 두 열 분기(1000dp 이상)를 실행하지 못했으므로 공식 폼팩터 전체 완료로 해석하지 않는다.
+
+
+#55 새 View의 첫 render/복원 순서 최소 수정은 원코드 `515507c`의 A 코드/구조 검토와 C 신규 View 표적1개·임시 실제 호스트에서 확인했다. [06의 첫 복원 근거](06_VERIFICATION.md#55-첫-복원-수정의-독립-검토장치-근거-회수)를 따르며 같은 활성 View의 과거 상태 반복 복원·제품 호스트/프로세스 저장으로 범위를 넓히지 않는다.
