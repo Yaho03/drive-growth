@@ -3,7 +3,7 @@ package io.drivegrowth.core.delivery
 import io.drivegrowth.core.contract.Rarity
 import io.drivegrowth.core.contract.RuleVersion
 
-/** 시험값. #24 제안이며 PRD에 확정된 제품 규칙이 아니다. 수익 탁송 최소 거리와 제시 개수는 #24에서 논의 중이다. */
+/** 시험값. #24 제안이며 PRD에 확정된 제품 규칙이 아니다. 수익 탁송 최소 거리와 제시 개수는 #24에서 논의 중이다. 제품에 연결하기 전에 합의를 확인한다. */
 object DeliveryFixtures {
     private fun weights(common: Int, advanced: Int, rare: Int, legend: Int) = mapOf(
         Rarity.COMMON to common, Rarity.ADVANCED to advanced, Rarity.RARE to rare, Rarity.LEGEND to legend,

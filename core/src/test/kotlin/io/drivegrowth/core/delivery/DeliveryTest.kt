@@ -62,13 +62,13 @@ class DeliveryTest {
 
     @Test fun `저장 목록은 다른 난수로도 재추첨하지 않는다`() {
         val saved = list(seed = 1)
-        assertTrue((2..50).all { proposed(saved = listOf(saved), seed = it).list === saved })
+        assertTrue((2..50).all { proposed(saved = listOf(saved), seed = it).list == saved })
     }
 
     @Test fun `같은 구간이면 목적지와 거리가 달라도 같은 목록이다`() {
         val saved = list(meters = 20_000, seed = 1)
         val other = proposed(meters = 49_000, saved = listOf(saved), to = DestinationKey("destination-b"), seed = 2)
-        assertSame(saved, other.list)
+        assertEquals(saved, other.list)
         assertEquals(DestinationKey("destination-b"), other.destination)
         assertEquals(49_000L, other.estimated.meters)
     }
@@ -80,7 +80,7 @@ class DeliveryTest {
         assertEquals(listOf(0, 1, 2), saved.map { it.band })
         (100..120).forEach { seed ->
             distances.forEachIndexed { i, meters ->
-                assertSame(saved[i], proposed(meters, saved = saved, seed = seed).list)
+                assertEquals(saved[i], proposed(meters, saved = saved, seed = seed).list)
             }
         }
     }
@@ -95,7 +95,7 @@ class DeliveryTest {
         val saved = list(seed = 1)
         val changed = DeliveryProposal(rules.copy(ruleVersion = RuleVersion("delivery-trial-v1")))
         val made = success(changed.propose(listOf(saved), destination, route(20_000), content, 1, today, Random(2)))
-        assertNotSame(saved, made.list)
+        assertNotEquals(saved, made.list)
         assertEquals(RuleVersion("delivery-trial-v1"), made.list.ruleVersion)
     }
 
@@ -110,7 +110,7 @@ class DeliveryTest {
     @Test fun `최소 거리 미만은 같은 목록에서 수익 의뢰만 가린다`() {
         val saved = list(meters = 5_000, seed = 1)
         val short = proposed(meters = 999, saved = listOf(saved))
-        assertSame(saved, short.list)
+        assertEquals(saved, short.list)
         assertTrue(short.offers.incomes().isEmpty())
         assertEquals(saved.offers.purchases(), short.offers.purchases())
         assertEquals(saved.offers, proposed(meters = 1_000, saved = listOf(saved)).offers)
@@ -158,7 +158,7 @@ class DeliveryTest {
         val before = list(seed = 1)
         val done = before.offers.first()
         val after = replaced(before, done, seed = 7)
-        assertTrue((8..30).all { replaced(after, done, seed = it) === after })
+        assertTrue((8..30).all { replaced(after, done, seed = it) == after })
     }
 
     @Test fun `채운 의뢰는 같은 유형 안에서 차종이 겹치지 않고 ID를 다시 쓰지 않는다`() {
@@ -188,7 +188,7 @@ class DeliveryTest {
     @Test fun `규칙 버전이 다른 목록은 완료해도 바꾸지 않고 잘못된 가게 레벨은 거절한다`() {
         val before = list(seed = 1)
         val changed = DeliveryProposal(rules.copy(ruleVersion = RuleVersion("delivery-trial-v1")))
-        assertSame(before, success(changed.replaceCompleted(before, before.offers.first().id, content, 1, Random(2))))
+        assertEquals(before, success(changed.replaceCompleted(before, before.offers.first().id, content, 1, Random(2))))
         assertEquals(ContractError.INVALID_INPUT, failure(proposal.replaceCompleted(before, before.offers.first().id, content, 0, Random(2))))
     }
 
@@ -198,7 +198,7 @@ class DeliveryTest {
         success(DeliverySelection.select(first, offer.id, RequestId("r1"), GameMoney(0), null))
         // 포기는 활성 의뢰만 지우고 목록은 건드리지 않는다.
         val again = proposed(saved = listOf(first.list), seed = 2)
-        assertSame(first.list, again.list)
+        assertEquals(first.list, again.list)
         assertEquals(offer, success(DeliverySelection.select(again, offer.id, RequestId("r2"), GameMoney(0), null)).active.offer)
     }
 
@@ -353,6 +353,136 @@ class DeliveryTest {
         val active = success(DeliverySelection.select(made, offer.id, RequestId("r1"), GameMoney(0), null)).active
         val other = proposed(saved = listOf(made.list), to = DestinationKey("destination-b"))
         assertEquals(ContractError.STATE_CONFLICT, failure(DeliverySelection.select(other, offer.id, RequestId("r1"), GameMoney(0), active)))
+    }
+
+    @Test fun `선택 뒤 입력 목록을 바꿔도 활성 의뢰와 결제는 그대로이고 바뀐 내용의 재시도는 충돌이다`() {
+        val made = proposed()
+        val offer = made.offers.purchases().first()
+        val listOffers = made.list.offers.toMutableList()
+        val offers = made.offers.toMutableList()
+        val input = made.copy(list = made.list.copy(offers = listOffers), offers = offers)
+        val selected = success(DeliverySelection.select(input, offer.id, RequestId("r1"), offer.price, null))
+        val cheap = offer.copy(price = GameMoney(1))
+        listOffers[listOffers.indexOf(offer)] = cheap
+        offers[offers.indexOf(offer)] = cheap
+
+        assertEquals(offer, selected.active.offer)
+        assertEquals(made, selected.active.proposed)
+        assertEquals(offer.price, selected.payment?.money?.amount)
+        assertEquals(ContractError.STATE_CONFLICT, failure(DeliverySelection.select(input, offer.id, RequestId("r1"), offer.price, selected.active)))
+    }
+
+    @Test fun `저장 목록 입력을 바꿔도 제시 결과는 그대로다`() {
+        val saved = list(seed = 1)
+        val offers = saved.offers.toMutableList()
+        val made = proposed(saved = listOf(saved.copy(offers = offers)))
+        offers.clear()
+        assertEquals(saved, made.list)
+        assertEquals(saved.offers, made.offers)
+    }
+
+    @Test(expected = UnsupportedOperationException::class)
+    fun `제시 결과 목록은 수정할 수 없다`() {
+        (proposed().offers as MutableList<DeliveryOffer>).clear()
+    }
+
+    @Test(expected = UnsupportedOperationException::class)
+    fun `저장용 목록은 수정할 수 없다`() {
+        (proposed().list.offers as MutableList<DeliveryOffer>).clear()
+    }
+
+    @Test(expected = UnsupportedOperationException::class)
+    fun `교체 결과 목록은 수정할 수 없다`() {
+        val before = list(seed = 1)
+        (replaced(before, before.offers.first()).offers as MutableList<DeliveryOffer>).clear()
+    }
+
+    @Test fun `목록에 없는 내용으로 위조한 의뢰는 선택할 수 없다`() {
+        val made = proposed()
+        val offer = made.offers.purchases().first()
+        val forged = made.copy(offers = listOf(offer.copy(price = GameMoney(1))))
+        assertEquals(ContractError.INVALID_INPUT, failure(DeliverySelection.select(forged, offer.id, RequestId("r1"), GameMoney(1), null)))
+    }
+
+    @Test fun `규칙 생성 뒤 입력 맵과 목록을 바꿔도 검증한 값은 그대로다`() {
+        val prices = rules.rarityPricePercent.toMutableMap()
+        val weights = rules.bands.last().rarityWeights.toMutableMap()
+        val bands = (rules.bands.dropLast(1) + DeliveryBand(null, weights, 150)).toMutableList()
+        val built = rules.copy(bands = bands, rarityPricePercent = prices)
+
+        prices[Rarity.COMMON] = 0
+        weights[Rarity.COMMON] = -1
+        bands.clear()
+
+        assertEquals(GameMoney(8_000), built.purchasePrice(GameMoney(8_000), Rarity.COMMON))
+        assertEquals(rules.bands.size, built.bands.size)
+        assertEquals(600, built.bands.last().rarityWeights[Rarity.COMMON])
+    }
+
+    @Test(expected = UnsupportedOperationException::class)
+    fun `규칙의 가격 배율 맵은 수정할 수 없다`() {
+        (rules.rarityPricePercent as MutableMap<Rarity, Int>)[Rarity.COMMON] = 0
+    }
+
+    @Test(expected = UnsupportedOperationException::class)
+    fun `구간의 가중치 맵은 수정할 수 없다`() {
+        (rules.bands.first().rarityWeights as MutableMap<Rarity, Int>)[Rarity.COMMON] = 0
+    }
+
+    @Test fun `교체 입력의 구간이 범위 밖이면 거절한다`() {
+        val before = list(seed = 1)
+        val id = before.offers.first().id
+        listOf(999, -1).forEach { band ->
+            assertEquals(ContractError.INVALID_INPUT, failure(proposal.replaceCompleted(before.copy(band = band), id, content, 1, Random(2))))
+        }
+    }
+
+    @Test fun `교체 입력의 다음 번호가 기존 번호와 겹치거나 더 늘릴 수 없으면 거절한다`() {
+        val before = list(seed = 1)
+        val id = before.offers.first().id
+        listOf(0, before.nextOfferNumber - 1, -1, Int.MAX_VALUE).forEach { next ->
+            assertEquals("next=$next", ContractError.INVALID_INPUT, failure(proposal.replaceCompleted(before.copy(nextOfferNumber = next), id, content, 1, Random(2))))
+        }
+    }
+
+    @Test fun `교체 입력의 의뢰 ID가 겹치거나 형식이 다르면 거절한다`() {
+        val before = list(seed = 1)
+        val first = before.offers.first()
+        val duplicated = before.copy(offers = before.offers + first)
+        val strange = before.copy(offers = listOf(before.offers.purchases().first().copy(id = DeliveryOfferId("other"))))
+        assertEquals(ContractError.INVALID_INPUT, failure(proposal.replaceCompleted(duplicated, first.id, content, 1, Random(2))))
+        assertEquals(ContractError.INVALID_INPUT, failure(proposal.replaceCompleted(strange, DeliveryOfferId("other"), content, 1, Random(2))))
+    }
+
+    @Test fun `손상된 저장 목록은 새로 뽑지 않고 거절한다`() {
+        val saved = list(seed = 1).copy(nextOfferNumber = 0)
+        assertEquals(ContractError.INVALID_INPUT, failure(proposal.propose(listOf(saved), destination, route(20_000), content, 1, today, Random(2))))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `가중치 합이 Int 범위를 넘으면 규칙을 거절한다`() {
+        DeliveryBand(null, mapOf(Rarity.COMMON to Int.MAX_VALUE, Rarity.ADVANCED to Int.MAX_VALUE, Rarity.RARE to 3), 100)
+    }
+
+    @Test fun `가중치 합이 Int 최댓값까지는 추첨할 수 있다`() {
+        val band = DeliveryBand(null, mapOf(Rarity.COMMON to Int.MAX_VALUE - 1, Rarity.LEGEND to 1), 100)
+        val made = success(DeliveryProposal(rules.copy(bands = listOf(band))).propose(emptyList(), destination, route(20_000), content, 1, today, Random(5)))
+        assertEquals(3, made.offers.purchases().size)
+    }
+
+    @Test fun `계산 금액이 범위를 넘으면 예외 없이 명시 오류로 거절한다`() {
+        val maxPrice = GameMoney(Long.MAX_VALUE)
+        assertNull(rules.purchasePrice(maxPrice, Rarity.LEGEND))
+        assertEquals(maxPrice, rules.purchasePrice(maxPrice, Rarity.COMMON))
+        assertNull(rules.copy(incomeRatePercent = 200).incomeReward(maxPrice, rules.bands[1]))
+
+        val huge = content.copy(vehicles = content.vehicles.map { it.copy(price = maxPrice) })
+        val double = DeliveryProposal(rules.copy(rarityPricePercent = Rarity.entries.associateWith { 200 }))
+        assertEquals(ContractError.INVALID_INPUT, failure(double.propose(emptyList(), destination, route(20_000), huge, 1, today, Random(1))))
+
+        val before = success(double.propose(emptyList(), destination, route(20_000), content, 1, today, Random(1))).list
+        val done = before.offers.purchases().first()
+        assertEquals(ContractError.INVALID_INPUT, failure(double.replaceCompleted(before, done.id, huge, 1, Random(2))))
     }
 
     @Test fun `시험 규칙의 구간 가중치는 천분율 합 1000이다`() {

@@ -27,9 +27,11 @@ data class DeliverySelected(
 
 object DeliverySelection {
     /**
-     * 제시된 의뢰를 선택한다. 실패하면 아무것도 바꾸지 않으며, 의뢰와 결제의 저장은 호출자가 한 거래로 묶는다.
+     * 제시된 의뢰를 선택한다. 실패하면 아무것도 바꾸지 않는다.
+     * 호출자는 활성 의뢰와 결제를 한 거래로 저장한다. 결제만 먼저 커밋하지 않는다.
+     * 활성 의뢰 1개는 #24 제안 단계의 시험 규칙이다.
      *
-     * @param current 이미 진행 중인 의뢰. 활성 의뢰는 동시에 하나뿐이다.
+     * @param current 이미 진행 중인 의뢰. 같은 요청 ID라도 제시 내용이나 의뢰가 다르면 STATE_CONFLICT다.
      */
     fun select(
         proposed: DeliveryProposed,
@@ -38,20 +40,23 @@ object DeliverySelection {
         balance: GameMoney,
         current: ActiveDelivery?,
     ): ContractResult<DeliverySelected> {
+        val request = proposed.snapshot()
         if (current != null) {
+            val active = current.copy(proposed = current.proposed.snapshot())
             return when {
-                current.requestId != requestId -> ContractResult.Failure(ContractError.CAPACITY_EXCEEDED)
-                current.offer.id == offerId && current.proposed == proposed ->
-                    ContractResult.Success(DeliverySelected(current, paymentOf(current)))
+                active.requestId != requestId -> ContractResult.Failure(ContractError.CAPACITY_EXCEEDED)
+                active.offer.id == offerId && active.proposed == request ->
+                    ContractResult.Success(DeliverySelected(active, paymentOf(active)))
                 else -> ContractResult.Failure(ContractError.STATE_CONFLICT)
             }
         }
-        val offer = proposed.offers.firstOrNull { it.id == offerId }
+        val offer = request.offers.firstOrNull { it.id == offerId }
+            ?.takeIf { it in request.list.offers }
             ?: return ContractResult.Failure(ContractError.INVALID_INPUT)
         if (offer is DeliveryOffer.Purchase && offer.price.units > balance.units) {
             return ContractResult.Failure(ContractError.INSUFFICIENT_FUNDS)
         }
-        val active = ActiveDelivery(requestId, proposed, offer)
+        val active = ActiveDelivery(requestId, request, offer)
         return ContractResult.Success(DeliverySelected(active, paymentOf(active)))
     }
 
