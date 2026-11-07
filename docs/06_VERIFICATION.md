@@ -1202,3 +1202,14 @@ JDK17·기존 Android SDK35·Gradle8.11.1, `--offline --no-daemon`을 사용했�
 보조 코드 검토 APPROVE·구조 CLEAR를 회수했다. 검토 head `f8e4449`와 제품 수정 `10cd845`의 Gacha 소스가 동일하며 추가 필수 결함은 없었다. 두 lane은 원인·수정·시험 소스와 기존 red/green/XML을 읽은 검토이고 Gradle/기기를 새로 실행하지 않았으며 사람 승인으로 표시하지 않는다.
 
 실제 #47 소비·티켓/보장/차량 지급·#122 SQLite·발견 저장·호스트 탐색/gate 연결·Activity Bundle/프로세스 복원·공식 폼팩터/실차는 미완료다. 이미 제공된 #126 가챠 메모리 참조와 #127 재료 순수 검증을 미제공으로 되돌리지 않으며 UI의 실제 연결과 구분한다. 이번 결과는 #52 전체 완료가 아니다. 수정본 장치 검증·정확한 원격 head/CI/PR/main 반영은 메인이 이어 기록하며 구현 세션은 로컬 고정 커밋/PR 본문 인계 후 새 기능을 시작하지 않는다.
+
+
+### #52 수정본 최종 독립 검증 회수 — 2026-11-07
+
+앞 절의 수정본 기기 미실행 표기는 구현 인계 당시 기록이다. 이후 **별도 검증 A**가 고정 `6bedb76a27dcf06b5a14ea782d1d19de91fe1c08`(통합 main `f14c193`)에서 두 P2 해소·추가 확정 결함0, 코드 APPROVE·구조 CLEAR를 확인했다. 정식20+독립7=**단위27개 실패/오류/생략0**, 표적 단위/APK/시험 APK 빌드16초 성공이다. 구현 세션은 [독립 보고서](evidence/issue52-gacha-ui/REPORT.md)·[로그](evidence/issue52-gacha-ui/targeted-build.txt)·XML 원문을 읽고 회수했으며 작성자의 전체 core225/app139·Lint20을 독립 검증자가 반복한 것으로 표시하지 않는다.
+
+기존 ADB5038·emulator-5556·user10/boot23의 격리 앱 `io.drivegrowth.app.gacha52finala`에서 **수정된 정식 View9+실제 호스트2=11개, 7.116초, 실패/오류0**이었다. [장치 결과](evidence/issue52-gacha-ui/device-tests.txt)·[최종 호스트 이벤트](evidence/issue52-gacha-ui/host-log.txt)에 키 이동 차단/명시 해소·두 번째 이동 token 복원/옛 완료 거절/현재 완료 후 재이동과 A/B/A·외부 제한·옛 버튼·Pending 복원·성공 뒤 확정 조회 대기를 보존했다. [현재 이동 token 복원](evidence/issue52-gacha-ui/current-token-restored.png)·[320dp 긴 후보](evidence/issue52-gacha-ui/long-candidates-320dp.png)·[936dp 가로 호스트](evidence/issue52-gacha-ui/guaranteed-936dp.png)를 공개한다. 실제 화면과 로그를 직접 읽었으나 구현 세션이 장치를 재실행한 것은 아니다.
+
+설치 앱 SHA-256은 `bad1e1314e0f3411c98cf7b9254148a1f144d2d37bb7fc3c9929115d8cebaab7`, 시험은 `1320fd3fb1372815c1ef29f5c882c400c4c5339b5ac0a91661096a198ecaf9e5`로 빌드/실제 설치가 일치했다. [metadata의 소스7개 Git blob·해시](evidence/issue52-gacha-ui/metadata.json)를 원본·현재 작업 파일과 직접 대조했다. [제품/설정 전후 발췌](evidence/issue52-gacha-ui/restoration.json)에서 제품 APK `793e1db8…`·기존 데이터 파일6개·권한·user10/boot23·1080×600/120dpi·font null/night no가 동일했고 자기 격리2패키지만 제거해 내비 전면으로 반환했다. 활성 시험 없음은 검증 A 보고이며 snapshot의 미지원 instrumentation 명령 오류를 성공 근거로 사용하지 않는다. 기어·전역 창·글꼴·CarService/VHAL·제품 데이터 변경 없이 반환했고 이후 추가 adb는 없다는 종료 보고를 회수했다.
+
+[공개 증거 안내·격리 재현 호스트](evidence/issue52-gacha-ui/README.md)에 최소 자료를 모았다. 개인 경로·APK 바이너리·전체 dump를 제외하고 발췌/경로 치환은 명시했다. 이번 최종 정리는 문서·증거만 바꾸며 제품/정식 시험/리소스7파일은 고정 소스와 동일하다. 고정 입력·새 View 생성자 복원 시험이며 실제 #47 소비/경제·#122 SQLite·발견 저장·제품 탐색/gate·Activity Bundle/프로세스 영속 복원·공식 폼팩터/실차는 미완료다. #52 전체 완료로 닫지 않는다. 최종 PR·원격 head/CI·main 반영은 메인이 처리하고 새 기능은 시작하지 않는다.
