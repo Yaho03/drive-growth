@@ -357,6 +357,17 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 
 #48 후속 거래는 대상ID/revision·재료ID/revision·활동·차종/희귀도·규칙 버전에서 계산한 새 레벨/진행량과 필요한 재화 변경을 입력으로 받아야 한다. 한 정산에서 대상 성장 snapshot과 재료 CONSUMED snapshot을 함께 확정하고 취득 정보는 각각 보존해야 한다. 같은 개체 중복·활동 제한·revision 충돌·금액 부족이면 전부 미반영이어야 한다. 현재 단일 `GameChange` 두 번 호출로 이를 흉내 내지 않는다. 다중 개체 명령·결과 구조 자체는 #48·#34의 후속 연결이며 이번에는 구현하지 않는다. 가챠 티켓/보장 이력·초기 지급 이력·사고/활동·도감 영속 입력도 각 기존 담당의 범위다. 기존 `VehicleCare.levelAfterMaterial`의 +3레벨 시험 로직을 이번에 희귀도별 진행량 계산으로 바꾼 것은 아니며 #48이 최신 PRD와 새 필드로 연결해야 한다.
 
+#### #47 가챠 1회 지급
+
+`io.drivegrowth.core.garage.GachaPull.pull(store, GachaRequest)`는 `Garage.owned`로 보유 수를 확인하고, 희귀도 추첨(30회 보장) → `unlockedAt(shopLevel)` 차종 균등 선택 → 뽑기권 금액 DEBIT과 `VehicleWrite.Add`(GACHA, 실제 지불액, 1레벨 0%)를 `GameChange` 한 건으로 `commitGameChange`에 넘긴다. 유료권 금액은 `GachaRules.ticketPrice`(PRD 시험값 500, 콘텐츠 메타 이전은 #35), 무료권은 금액 변경 없이 취득액 0이다. 추첨 seed와 새 `ownedVehicleId`(`gacha-<requestId>`)를 requestId에서 정하므로 같은 요청·카운터의 재시도는 같은 명령이 되어 저장소가 기존 정산을 반환한다.
+
+| 실패 | 처리 |
+|---|---|
+| 차고 칸 부족 / 해금 차종 없음 / 가게 레벨·카운터 범위 밖 / 손상 개체 | 저장 전 `CAPACITY_EXCEEDED` / `DATA_UNAVAILABLE` / `INVALID_INPUT` |
+| 잔액 부족·저장 실패 | 저장소가 거래 전체 거절(`INSUFFICIENT_FUNDS`·`STORAGE_FAILURE`) |
+
+보장 카운터와 무료 뽑기권 보유 수는 현재 계약에 저장 위치가 없다. `GachaResult.draw.drawsSinceGuarantee`는 저장 성공 뒤의 다음 카운터 값만 돌려주며, 거래와 같은 정산에 카운터·무료권 차감을 함께 확정하는 계약·저장 확장은 #33·#34와 조율한다. 그 전까지 카운터 별도 저장은 지급과 원자적이지 않다. 실제 앱 연결·재실행 검증은 #52·#28이다.
+
 ### 거래 원장 영속 저장
 
 #34의 첫 영속 어댑터는 앱 내부의 SQLite 데이터베이스 하나를 `SQLiteOpenHelper`로 관리한다. 초기 스키마는 v1이다. Android 기본 API로 잔액·보유 차량·거래 결과를 한 트랜잭션에서 확정하고, 요청 ID의 유일성을 DB에서 강제한다. 기존 `SnapshotStore`는 출처별 주행 기록과 경험치를 한 파일로 저장한다. `AtomicFile`의 파일 교체는 해당 용도에 적합하며, 거래 원장에 그대로 적용하면 중복 키·동시 갱신 규칙을 직접 구현해야 한다. 기존 파일은 유지하고 과거 경험치를 게임머니로 변환하지 않는다. [SQLiteDatabase](https://developer.android.com/reference/android/database/sqlite/SQLiteDatabase), [SQLiteOpenHelper](https://developer.android.com/reference/android/database/sqlite/SQLiteOpenHelper), [AtomicFile](https://developer.android.com/reference/android/util/AtomicFile)

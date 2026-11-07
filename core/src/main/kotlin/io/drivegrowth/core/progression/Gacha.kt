@@ -1,5 +1,6 @@
 package io.drivegrowth.core.progression
 
+import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.Rarity
 import kotlin.random.Random
 
@@ -8,6 +9,8 @@ data class GachaRules(
     val weights: Map<Rarity, Int> = mapOf(Rarity.COMMON to 747, Rarity.ADVANCED to 200, Rarity.RARE to 50, Rarity.LEGEND to 3),
     val pity: Int = 30,
     val guaranteedFrom: Rarity = Rarity.RARE,
+    // ponytail: 콘텐츠 파일에 아직 열이 없어 PRD 시험값을 기본으로 쓴다. #35에서 앱 콘텐츠를 20종으로 바꿀 때 gacha_ticket_price 메타로 옮긴다.
+    val ticketPrice: GameMoney = GameMoney(500),
 ) {
     init {
         require(Rarity.entries.all { (weights[it] ?: 0) >= 0 } && weights.values.sum() > 0) { "가중치는 0 이상, 합은 양수" }
