@@ -282,7 +282,6 @@ class DeliveryChangeLedgerTest : InstrumentationTestCase() {
             "UPDATE delivery_changes SET paid = 3500.5",
             "UPDATE delivery_changes SET paid = 3400",
             "UPDATE delivery_changes SET charged = 0",
-            "UPDATE delivery_changes SET charged = 'yes'",
             "UPDATE delivery_changes SET active = '$cheaperActive'",
             "UPDATE delivery_changes SET command = replace(command, '\"fee\":10', '\"fee\":\"10\"')",
             "UPDATE settlements SET result = replace(result, '\"amount\":500', '\"amount\":400') WHERE request_id = 'delivery/r1/change'",
@@ -296,6 +295,12 @@ class DeliveryChangeLedgerTest : InstrumentationTestCase() {
         }
         assertEquals(first.settlement?.settlementId, ok(ledger.changeDestination(changeRules, offer, pricier.id, newRoute)).settlement?.settlementId)
         assertEquals(6_500, balance())
+        // CHECK를 우회한 값은 같은 연결에서 이 원장이 막고, 다시 열면 저장소 전체 검사(quick_check)가 손상으로 막는다.
+        sql("PRAGMA ignore_check_constraints = ON", "UPDATE delivery_changes SET charged = 'yes'", "PRAGMA ignore_check_constraints = OFF")
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), ledger.inProgress())
+        reopen()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), ledger.inProgress())
+        assertEquals(LedgerFailureReason.CORRUPT, store.lastStorageFailure)
     }
 
     fun testSamePriceChangeHasNoSettlementAndInjectedOneIsStorageFailure() {
