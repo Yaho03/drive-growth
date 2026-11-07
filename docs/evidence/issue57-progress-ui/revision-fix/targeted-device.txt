@@ -1,0 +1,6 @@
+
+io.drivegrowth.app.ui.progress.ProgressViewTest:.
+Test results for InstrumentationTestRunner=.
+Time: 0.119
+
+OK (1 test)
