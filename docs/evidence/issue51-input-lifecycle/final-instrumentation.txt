@@ -1,0 +1,9 @@
+
+io.drivegrowth.app.NavigationTest:.
+io.drivegrowth.app.PackagedContentTest:.
+io.drivegrowth.app.data.SnapshotStoreTest:........
+io.drivegrowth.app.data.SqliteGameChangeStoreTest:............
+Test results for InstrumentationTestRunner=......................
+Time: 2.134
+
+OK (22 tests)

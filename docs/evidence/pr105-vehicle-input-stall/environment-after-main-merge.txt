@@ -1,0 +1,21 @@
+통합 후 관측한 OEM crash 발췌. 앱의 NO_DATA 원인이나 새 회귀로 확정하지 않음.
+11-06 12:22:27.431 22671 22875 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 22875 (GameThread), pid 22671 (mos.drivingview)
+11-06 12:22:27.782 23097 23097 F DEBUG   : Cmdline: ai.umos.drivingview
+11-06 12:22:30.703 23164 23378 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 23378 (GameThread), pid 23164 (mos.drivingview)
+11-06 12:22:31.302 23635 23635 F DEBUG   : Cmdline: ai.umos.drivingview
+11-06 12:22:38.905 23751 24073 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 24073 (GameThread), pid 23751 (mos.drivingview)
+11-06 12:22:39.843 24455 24455 F DEBUG   : Cmdline: ai.umos.drivingview
+11-06 12:22:42.948 24592 24830 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 24830 (GameThread), pid 24592 (mos.drivingview)
+11-06 12:22:43.266 25061 25061 F DEBUG   : Cmdline: ai.umos.drivingview
+11-06 12:23:45.954   185   185 F libc    : crash_dump helper failed to exec, or was killed
+11-06 12:23:45.968   201   201 F libc    : crash_dump helper failed to exec, or was killed
+11-06 12:24:09.500   185   185 F libc    : crash_dump helper failed to exec, or was killed
+11-06 12:24:09.525   201   201 F libc    : crash_dump helper failed to exec, or was killed
+11-06 12:25:12.473   185   185 F libc    : crash_dump helper failed to exec, or was killed
+11-06 12:25:12.483   201   201 F libc    : crash_dump helper failed to exec, or was killed
+11-06 12:26:54.557   185   185 F libc    : crash_dump helper failed to exec, or was killed
+11-06 12:26:54.566   201   201 F libc    : crash_dump helper failed to exec, or was killed
+11-06 12:26:56.408   185   185 F libc    : crash_dump helper failed to exec, or was killed
+11-06 12:26:56.417   201   201 F libc    : crash_dump helper failed to exec, or was killed
+호스트 qemu 로그: Failed to find ColorBuffer / Failed to bind to texture: invalid color buffer.
+현재 PID 스택 확보 실패(JDWP handshake closed/ADB shell timeout). 반복 재부팅하지 않음.

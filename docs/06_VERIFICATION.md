@@ -457,6 +457,97 @@ PR #32 최초 Android CI는 앱 컴파일 전 `setup-android@v3`의 기본 `tool
 
 이 시험 당시의 #36 신호 미연결과 #51·#63 인계는 과거 기록이다. 현재 main에는 PR #93의 차량 신호 소비 경로가 반영됐다. 같은 버전의 D 정차·제한 중 재진입·P 복귀, CCP와 실제 분할 창의 남은 실행 결과는 #51 본인 검증·PR 검토와 #28 통합 검증에서 확인한다. 이 과거 APK 시험만으로 최신 연결 빌드의 전체 검증을 완료 처리하지 않는다.
 
+### #51 Back·창·입력 후속 본인 검증 — 2026-11-07
+
+출발 소스는 `origin/main c57cb32304129124bad97353442f8a51e954b527`이다. 아래는 macOS ARM64에서 직접 실행한 결과이며, [팀원의 Windows/x86_64 보고](https://github.com/Yaho03/drive-growth/issues/51#issuecomment-6689704196)를 이 세션의 재실행으로 표시하지 않는다. #100 Garage·경제·내비·기록 서비스는 수정하지 않았다.
+
+- 환경: Pleos Connect 2.1.0 / API 34 ARM64, Emulator 37.2.13.0, 사용자10, `emulator-5556`, ADB5038. 기존 데이터 유지, 별도 창·host GPU·RAM4096MB·스냅샷 로드/저장 없이 기동했다. 기존 실행 AVD·연결 장치가 없음을 먼저 확인했고 메인 세션과 사용 범위를 조율했다.
+- 기본 표시: 1080×600px / 120dpi. 실제 앱 창은 `(360,57)–(1062,495)`, 702×438px / 936×584dp였다. 플랫폼 신호는 `InputSource.VEHICLE`, 원장·콘텐츠는 화면에 `모의 원장 · 시험용 콘텐츠 · fixture-content-v0`로 표시한다. 에뮬레이터 신호를 실차로 부르지 않는다.
+- **기기 검증 APK** SHA-256: `1ba2f47f9dee687f53be3a851d614b6362d1cd76a09d73c7b06fc9863a01f284`. 출발 main에 이번 앱 코드를 적용한 이 APK에서 창 숨김·복귀·재생성·22개 기기 시험을 확인했다. 표 A의 화면·task와 재생성 화면은 이 버전의 근거다. 기존 개발 서명과 일치함을 확인한 뒤 데이터 유지 업데이트했다. 서명키·APK·전체 시스템 로그는 게시하지 않는다.
+- **최신 main 통합 APK** SHA-256: `30b294f4107cf209657f42b49edd6b752aaeef3a46175877e4b1be8e17e1fb37`. main `e7a1bcca218f89f870e9c342ecb56c39cafa48bf`의 #100·#102 결과를 보존해 rebase 후 빌드했다. 앱 코드 변경은 동일하지만 core가 달라져 APK가 바뀌었다. 이 버전의 [기기 재검사는 시험 시작 전 Process crashed로 중단](evidence/issue51-input-lifecycle/rebased-instrumentation.txt)됐으며, 앞의22개 통과를 이 APK 성공으로 옮기지 않는다. 최신 통합 APK의 기기 재검증은 남아 있다.
+- 중간 진단 빌드 SHA-256: `eeac0ed1d52791125ebcac3ab75e23e05143ef91f27751f55d08937bf2b05954`. 창 표시 보완 전의 DISPLAY2·중복 원인·전체 표시/창 크기 시험은 이 단계의 근거다. 원인 진단 자료로 유지하지만 최종 APK에서 다시 실행한 것으로 세지 않는다. 이 중간 APK 파일은 별도로 보존하지 않았고 당시 빌드의 해시와 로그·화면을 보존했다. 최초 수정 전 실패는 출발 main의 근거이며 해당 APK 해시는 별도로 남기지 못했다.
+
+| 항목·입력 | 직접 재현·수정·결과 | 한계·남은 확인 |
+|---|---|---|
+| A. 최상위 Back | 수정 전 Activity1개에서도 일반 Back 후 게임이 남았다. `moveTaskToBack(true)`만으로는 포커스만 이동하고 `RESUMED`·창 표시가 유지됐다. 최상위에서 관측·gate를 정리하고 `setVisible(false)`와 Task 뒤 이동을 함께 수행하도록 보완했다. 일반 Back·CCP `inject-key 4` 후 [실제 게임 창 숨김](evidence/issue51-input-lifecycle/final-ccp-hidden.png), [같은 Activity 복귀](evidence/issue51-input-lifecycle/final-ccp-return.png)를 확인했다. task1003830·Activity `8ed4066` 유지, focus는 홈→앱으로 바뀌었다. | 공개 창 표시 API를 사용한 다중 창 보완이며 Pleos 공식 예제 자체와 구분한다. 다른 Android 버전·에뮬레이터 툴바의 세모 버튼 전달은 미검증이다. |
+| B. 중복 Activity | 깨끗한 `MAIN/LAUNCHER`, flags `0x10200000` 재진입을 반복해 task1003826·Activity `2e4848e` 한 개 유지. `am start -n`만 반복하면 같은 task에3개가 생겼다. 따라서 launchMode는 바꾸지 않았다. | 런처형 Intent와 실제 런처 UI의 버튼 실행은 구분한다. 공개 `ACTION_APP_GRID`로 AppGridActivity 전면 진입은 확인했지만 아이콘 목록이 표시되지 않아 실제 앱 목록 버튼 재진입은 미검증이다. 가상 표시 시험의 `MULTIPLE_TASK`·component task가 후속 시험을 오염시킨 구간은 제외하고 task만 정리해 재시험했다. |
+| C. DISPLAY2 UX | Android 개발자 overlay `800x480/120`에서 [제한 화면](evidence/issue51-input-lifecycle/display2-parked.png), Activity `displayId=2`, `speed=OK gear=PARK ux=true` 재현. 실제 창800×480px / 1067×640dp. 표시 속도0km/h, SDK 속도 숫자 원값은 별도 수집하지 않았다. 시스템 UXR 구성에는 display0만 있고 `DO=false UxR=0`이었다. 조회 대상을 표시하는 로그만 추가했다. | 공식 FormFactorConsole 실행과 구분한 진단이다. 공개 무인자 UXR getter는 연결 Context의 display를 사용한다. 미구성 display는 완전 제한으로 귀결되는 AOSP 경로와 일치하지만 OEM 동일 구현을 확정하지 않는다. display0 허용값으로 대체하거나 P만으로 열지 않았다. |
+| D. 크기·복원 | 기본 앱 창에서 터치로 가게·보유 차량·미확인 정산·새로고침에 접근했다. [정산 선택과 콘텐츠 버전은 Activity 재생성 후 유지](evidence/issue51-input-lifecycle/final-recreated-results.png). 전체 `wm size 800x480`에서는 ARM64도 앱 bounds가1062px까지 남아 [잘림](evidence/issue51-input-lifecycle/whole-display-800x480.png)을 재현했고 [원복](evidence/issue51-input-lifecycle/whole-display-restored.png)했다. `am task resize` 요청도 실제 bounds가 바뀌지 않아 좁은 창 통과로 세지 않았다. | 전체 표시 변경·앱 창·가상 표시·팀원841px 분할 창은 다른 시험이다. Go·Host Display Bridge가 준비되지 않아 공식 FormFactorConsole 프리셋 시험은 미수행. DISPLAY2에서는 제한을 유지하므로 게임 콘텐츠 배치는 미검증이다. |
+| E. CCP 다이얼 | 2026-11-07 사용자 결정대로 `<application>`에 `com.hmg.rotary.ROTARY_SUPPORTED=false` 선언. 필수 탐색은 터치로 시험하고 하위 CCP Back은 가게로, 최상위 CCP Back은 숨김으로 확인했다. | 다이얼 이동·선택 지원 완료가 아니다. 선택 지원 확대는 별도 결정이며 Back·복원·안전 제한은 면제하지 않는다. |
+
+**회귀·자동 검사:** 최상위 Back의 최초 [수정 전 실패](evidence/issue51-input-lifecycle/back-before-fix.txt), 포커스 검사만 통과하던 중간 구현의 [창 가시성 실패](evidence/issue51-input-lifecycle/back-visibility-before.txt)를 보존했다. 최종 `NavigationTest`는 포커스·실제 창 숨김·미종료·숨김 시 Restricted·최근 Task 복귀를 확인한다. 3초 이상 복귀가 지연돼도 정상 P 허용을 실패로 보지 않도록 Restricted는 숨김 시점에 검사한다. gate 초기화 후 연속 주차 재판정은 기존 `AppShellTest`와 연결한다.
+
+- `python3 scripts/check_repository.py`, `git diff --check` 실행 결과는 PR에서 최종 확인한다.
+- `./gradlew --offline :core:test :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug` 성공. 출발 main 기준 core71개·app4개, 최신 main 통합 후 **core86개·app4개**, 실패0. Lint 오류0·경고12개: 기존11개(`DrawAllocation`6·`ViewConstructor`2·`OldTargetApi`·`DataExtractionRules`·`MissingApplicationIcon`)와 새 API29 callback의 `@TargetApi`에 대한 `UseRequiresApi` 제안1개다. 새 의존성으로 경고를 지우거나 미사용 DashboardView·디자인을 정리하지 않았다.
+- `am instrument --user 10 -w io.drivegrowth.app.test/android.test.InstrumentationTestRunner`: 기기 검증 APK에서 [22개 성공](evidence/issue51-input-lifecycle/final-instrumentation.txt). 저장 검사는 격리된 시험 DB를 사용한다. [task·display 발췌](evidence/issue51-input-lifecycle/device-evidence.txt)는 빌드 구분 및 UI와 함께 대조한다.
+- 최신 통합 APK 재검사가 종료된 뒤 확인한 로그에는 OEM 오디오 SIGABRT·CarService `registerAudioPolicy failed -1`가 있었고 emulator 실행도 종료코드139로 끝났다. [선별 환경 기록](evidence/issue51-input-lifecycle/recovery-evidence.txt)을 보존했다. 앱 코드가 원인이라고 확정하지 않는다. 데이터 삭제 없는 재기동은 이전 crash 보고 동의창에서 멈췄고 `-no-metrics` 옵션도 확인했지만 장치에 연결되지 않았다. 외부 보고를 보내거나 crash 저장소·AVD 데이터를 삭제하지 않고 이번 실행만 중단했다. 장시간 emulator 안정성과 최신 APK 재실행 성공은 미검증이다.
+
+**미충족·인계:** 현재 Virtual Console `/vehicle/gear?gear=Drive` 요청은 시간 초과했고 SDK·화면에서는 P가 유지됐다. 이를 D 시험 성공으로 세지 않는다. 이번 변경 빌드의 D 정차·주행·감속·제한 중 재진입·D 재생성·P 복귀와 권한 거부/복원의 전체 실행은 미검증이다. 팀원의 `506a38c` 보고는 기존 근거로 유지하되 새 수명주기 보완의 성공으로 확장하지 않는다. user 이미지에서 제한된 VHAL 주입을 root·정책 변경으로 우회하지 않았다. 로컬에서 관측한 긴 표본 간격에도 유효성·3초 연속 주차 기준을 완화하지 않았다.
+
+#51은 **부분 인계**다. 공통 화면·조회·출처·선택 복원, Back 창 숨김·복귀와 다이얼 미지원 범위를 사용할 수 있으나, 새 빌드의 D/P 회귀·지원 폼 팩터·실제 런처 입력 확인이 남아 전체 종료로 판단하지 않는다. 저장 성공 전 완료 연출·중복 명령의 실제 거래 기능 연결은 각 기능과 #28에서 확인한다. 새 원장이나 별도 교차검증 대기는 만들지 않는다. #36·#63은 다시 열지 않는다.
+
+재현 시 중복 시험 task를 구분하고 다음 런처형 Intent를 사용한다. 전용 시험 장치에서 `am force-stop --user 10 io.drivegrowth.app`으로 task를 정리할 수 있지만 앱 데이터 삭제는 하지 않는다.
+
+```sh
+adb -P 5038 -s emulator-5556 shell am start --user 10 \
+  -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
+  -f 0x10200000 -n io.drivegrowth.app/.MainActivity
+adb -P 5038 -s emulator-5556 shell input keyevent KEYCODE_BACK
+adb -P 5038 -s emulator-5556 shell cmd car_service inject-key 4
+adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w \
+  io.drivegrowth.app.test/android.test.InstrumentationTestRunner
+```
+
+시험 종료 전 `wm size reset` 후1080×600·원래120dpi, overlay 설정 null, 야간 모드 no·원래 secure 설정 null, `car_service:found`, 사용자10 속도 권한 granted를 확인했다. 권한은 변경하지 않았다. D·속도 변경 성공 근거는 없고 마지막 화면은 P·0km/h였다. 실제 설치 APK 해시도 기기 검증 APK 값과 대조했다. 이후 최신 main APK 업데이트·재검사에서 위 환경 실패가 발생해 정상 기기 종료 상태를 새 성공으로 만들지 않는다. 처음 실행 AVD가 없어 이번에 기동했던 실행들은 모두 중단했고, 마지막 `adb -P 5038 devices -l`은 장치 없음·추가 forward 없음이었다. adb 서버는 종료하거나 포트를 바꾸지 않았다. 최종 APK·시험 로그는 로컬에 보존한다.
+
+공식 근거: [Pleos CCP](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/ccp-rotary-controller-development), [폼 팩터](https://document.pleos.ai/docs/pleos-only/app-test-guide/form-factor-test-guide), [Android 창 표시 API](https://developer.android.com/reference/android/app/Activity#setVisible(boolean)), [API34 display 선택](https://android.googlesource.com/platform/packages/services/Car/+/f9a252f4a3b621daabd330531fce555300a1d4c0/car-lib/src/android/car/drivingstate/CarUxRestrictionsManager.java#422), [미구성 display의 제한](https://android.googlesource.com/platform/packages/services/Car/+/f9a252f4a3b621daabd330531fce555300a1d4c0/service/src/com/android/car/CarUxRestrictionsManagerService.java#549).
+
+
+### #105 차량 동기 조회 멈춤 수정 — 2026-11-07
+
+사용자 요청으로 기존 PR #105의 `92d343a239102eaa3169f849c0b21362c6620c4e`에서 차량 입력 동기 경계를 수정했다. **기존 main부터 있는 UI-thread IPC 취약점**이며 #105가 새로 만든 회귀로 바꾸지 않는다. 검증 C가 제공한 `/private/tmp/pr105-session3-evidence/`의 JDWP·CarService 스택·metadata·동일 APK 재부팅 후22개 결과를 직접 읽었다. 앱 main은 `VehicleInput.read → getProperty → BinderProxy.transactNative`, 시험 thread는 `startActivitySync`를 기다렸고 시스템 속성 lock 소유자는 VHAL unsubscribe를 기다렸다. [앱 스택](evidence/pr105-vehicle-input-stall/before-main-blocked.txt)·[시스템 스택](evidence/pr105-vehicle-input-stall/before-carservice-lock.txt)을 발췌 보존했다. 환경 정체와 앱의 동기 호출 책임을 구분한다.
+
+최초 worker 구현은 `56986ba`, 최종 수신 시각 보완은 `9e7ebbc1fdcb00d4ebcfb9eea36bfd216ad4e21d`다. 단일 SDK worker·진행 중 작업 하나·세션/revision 폐기·수신 시각 보존/요청 deadline과 실패/해제 처리는 [02의 입력 경계](02_SYSTEM_ARCHITECTURE.md#36-차량-입력-구현-경계)를 따른다. 기존 gate 수치·경제·UI 구조·SDK 버전·의존성은 바꾸지 않았다. 09의 사용자 화면 기준도 바꾸지 않았다. 실제 SDK가 계속 반환하는 센서 AVAILABLE 값의 나이 문제와 SDK 미응답 문제는 별개다.
+
+게시 전 최신 main `3b547e52bcc7cdb0b513e8c19236f7ea66306fee`와 README·06 충돌을 확인했다. 메인에서 이미 머지한 #103·#104·#106을 `c9cb569`의 일반 merge로 통합했고 최신 README 담당표와 양쪽 검증 이력을 보존했다. 그 PR의 코드·계약을 별도로 수정하거나 임의 cherry-pick하지 않았다. 다음 결과는 통합 전/후 APK를 구분한다.
+
+| 검사·입력 | 실제 결과·근거 |
+|---|---|
+| 수정 전 근거 | 위 검증 C의 실제 SDK 정체를 참조. 제어 가능한 입력 경계에서 만료 응답과 해제 대기 중 폐기 세션 open 경합의 [수정 전 실패](evidence/pr105-vehicle-input-stall/regressions-before.txt)를 확인한 뒤 수정했다. 새 클래스의 최초 컴파일 미구현 실패와 행동 실패를 혼동하지 않는다. |
+| 제어 가능한 JVM 지연·실패 | 최종 `VehicleInputQueueTest`15개 통과. 막힌 read/close 중 main 작업·gate 만료, 2500/2501ms deadline·수신 elapsed/UTC 보존·변동 지연의3초 주차, 오류/권한 이유, stop/revision/이전 세션 폐기, 1000회 start/stop의 작업 하나·최신 factory만 생성, open/close 오류 후 상태·자원 보존·cleanup 진단을 확인. latch/수동 scheduler/clock 사용, 임의 sleep 없음. |
+| 통합 전 `56986ba` | core86개·app18개, 빌드/Lint 성공. APK `6f09e9daed5dae61f7c9cff5125745e2f65b11c1d410e2fd5ed1fc2d75c8d29a`, [기기23개 통과](evidence/pr105-vehicle-input-stall/instrumentation-before-main-merge-23.txt): 원본22개+지연 경계1개. |
+| 수신 시각 보완 전 main 통합 `c9cb569` | core97개·app25개, 실패/오류/생략0. `./gradlew --offline :core:test :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug` 성공. Lint 오류0·경고14(통합 main13+기존 #105 API29 callback 제안1), 경고 숨김/새 의존성 없음. |
+| 기기 시험 APK 식별(시각 보완 전) | 앱 SHA-256 `8774cfc32210502b91ac1aa8f838425c0e49f01c8627affc071076430a243193`, 시험 APK `09cc28008de8e89dc7533db34e041b6aabeb80166338e5651ee41f42a4fb65c2`. 기존 설치 인증서 일치 확인 후 `install -r` 사용. 실제 설치 해시와 최종 대조하며 키 경로/비밀값·APK 원본은 게시하지 않는다. |
+| 시각 보완 전 기기 전체 | [47개 통과](evidence/pr105-vehicle-input-stall/instrumentation-final-47.txt), 18.574초. 원본22개와 통합 main SQLite/차고 시험·새 지연1개를 포함한다. 새 검증 세션은 만들지 않았다. |
+| Android main 지연 회귀 | 제품 큐+실제 main Looper에서 worker의 가짜 reader를 latch로 막은 채 main의 제한 판정·1000회 poll·stop을 먼저 완료, 결과 폐기·worker 종료 확인. 실제 CarService 지연 보장이 아니라 제어된 입력 경계 시험이다. |
+| 실제 제품 UI의 입력 부재 | 통합 전 APK에서 JDWP로 **SDK worker만** 일시 중지, main 비중지와 [실제 제한·숨김·같은 Activity 복귀](evidence/pr105-vehicle-input-stall/worker-pause.txt)를 확인. 재개·detach 후 P 재수신. 실제 Binder 내부 정체를 주입한 시험은 아니다. 첫 유효기간 전 캡처·다른 창 포커스/앱 목록 오버레이 입력은 성공 근거에서 제외했다. |
+
+기기 환경은 Pleos2.1.0/API34 ARM64·Emulator37.2.13·사용자10·동일 AVD(console5556), 1080×600/120dpi다. 메인에 현재 점유를 확인해 우선 사용 배정을 받았고 active instrumentation/제품 프로세스 없음도 재확인했다. 첫 재시험은 NavigationTest 시작문구 뒤 장치와 qemu가 사라져 **실패/원인 미확정**으로 보존했다. 메인·검증 A/B는 종료 조작을 하지 않았다고 보고했다. 데이터 유지 재기동의 보고창은 자동화 앱 목록에서 접근할 수 없어 사용자가 자동 전송 체크를 해제하고 Don't send를 눌렀다. 외부 충돌 보고·AVD 초기화·앱 삭제·시스템 패치·UX 우회는 하지 않았다.
+
+복구 명령의 첫 AVD 경로 오류는 게스트를 시작하지 않았다. 실제 경로로 기동한 한 번의 게스트 복구는 기본 ADB5037에 등록돼, 기존5038 서버에서 같은 게스트를 `localhost:5557`로 연결했다. 원래5038 서버는 종료하지 않았고 이번 복구가 만든5037 서버는 해당 게스트만 있음을 확인한 뒤 정리했다. 이 별칭과 복구를 새 장치/실차 시험으로 표시하지 않는다. 브리지 복구는 공개 콘솔의8088 포워딩·`/browser/session` heartbeat·`/vehicle/gear`와`/vehicle/controls`를 사용했으며 SDK/시스템 앱은 변경하지 않았다.
+
+통합 전 수동 시험에서는 P 콘텐츠·선택/재생성, 일반/CCP Back·실제 창 숨김/같은 Activity 복귀, 속도 권한 거부/복원과 거부 중 재생성을 확인했다. 콘솔이 처음 `bridge_ready=false/emulator_active=false`였으나 재기동 후 브라우저 세션을 유지한 요청에서 true가 됐고 **앱 SDK `gear=DRIVE·ux=true`** 수신을 확인했다. D 정차, 콘솔30km/h 주행·10km/h/브레이크60% 감속, D 숨김·재진입·재생성에서 게임 콘텐츠가 나타나지 않았고 P 복귀 후 `PARK·ux=false`와 콘텐츠를 확인했다. 속도의 콘솔 설정/표시와 앱의 `speed=OK` 상태는 구분하며 앱 로그에 숫자 속도는 남기지 않았다. 통합 후 핵심 수동 결과와 종료 상태는 아래 최종 기록을 따른다.
+
+
+**`c9cb569` 시각 보완 전 통합 APK 수동 결과:** 앱의 권한은 허용 상태였지만 SDK는 `NO_DATA`에 머물렀다. [제한 신호](evidence/pr105-vehicle-input-stall/final-no-data-signals.txt), [Back 후 실제 창 숨김](evidence/pr105-vehicle-input-stall/final-no-data-hidden.png), [복귀·재생성 뒤 제한 화면](evidence/pr105-vehicle-input-stall/final-no-data-recreated.png)을 확인했다. 콘솔 Drive/30/10/P 응답이 성공해도 이 버전의 SDK D/P 수신 성공으로 기록하지 않는다. 앱의 현재 PID 스택 확보는 JDWP handshake 종료·ADB shell 지연으로 실패했고, 이어진 재실행도15초 host timeout이었다. [DrivingView SIGSEGV·호스트 ColorBuffer 오류](evidence/pr105-vehicle-input-stall/environment-after-main-merge.txt)는 관측 근거이며 원인 확정이 아니다. 통합 후의 정상 P 콘텐츠·실제 D/P·권한 거부/복원 전체 수동 회귀는 미완료로 남긴다. 앞의47개 자동 기기 통과와 통합 전의 수동 성공을 이 빈칸에 옮기지 않는다.
+
+
+**최종 시각 보완과 적용 범위:** 게시 후 self-review와 같은 기존 AI 코드 검토에서 요청 시작 시각 덮어쓰기가 연속 주차를 앞당길 수 있음을 확인했다. 요청0/첫 완료1500/다음 완료2000·3000ms에서 조기 허용되는 [추가 수정 전 실패](evidence/pr105-vehicle-input-stall/variable-latency-before.txt)를 먼저 재현했다. `9e7ebbc`는 SDK 조회 완료의 수신 elapsed/UTC를 보존하고 요청 시작은2500ms 결과 deadline에만 사용한다. 첫 수신1500 후4500ms의 새 P 표본에서만 허용되는 회귀가 통과했다. gate 임계값·추가 주차 guard·계약 필드를 바꾸지 않았다.
+
+이 **최종 코드**는 core97개·app26개(Queue15+기존11), 실패/오류/생략0, 앱/시험 APK 빌드와 Lint 오류0·경고14가 통과했다. 최종 앱 SHA-256은 `793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9`, 시험 APK는 앞의 `09cc2800…`와 같다. 처음에는 장치 종료/불안정으로 미설치였으나, 메인에 현재 점유를 다시 확인하고 최종 APK용 기존 AVD 기동1회를 재배정받아 다음 시험을 수행했다. 이전8774의 미완료를 삭제하거나 성공으로 바꾼 것이 아니다.
+
+**최종793e APK 실제 기기 재검증:** 메인에서 A/B/C 검증·다른 구현이 idle·미사용임을 확인한 뒤 devices/qemu/instrumentation 없음도 직접 확인했다. ADB5038·emulator-5556을 명시해 같은 AVD를 데이터 보존으로 한 번 기동했다(11.059초 boot, host GPU/headless·RAM4096·snapshot load/save 없음). 앞의 SwiftShader 복구와 GPU/전송 별칭 조건을 구분하며 공식 폼팩터 시험으로 표시하지 않는다. 기존 인증서 일치 뒤 `install -r`로 설치했고 **실제 설치 해시도793e와 일치**했다. 시험한 head는 `e165098c389913fffe48d5fc736b2a4ef10fc333`이며 수신 시각 코드 `9e7ebbc`와 같고 이후는 문서/증거만 갱신한다.
+
+- [최종47개 기기 시험](evidence/pr105-vehicle-input-stall/final-793-instrumentation-47.txt) 통과,9.952초. 원본22개·통합 main SQLite/차고·제어된 Android 지연 회귀를 포함한다. 최종 수신 시각 코드의 실제 기기 실행 근거다.
+- P 콘텐츠·미확인 정산 선택 후 [재생성/연속 주차 재판정 뒤 같은 선택](evidence/pr105-vehicle-input-stall/final-793-selection-recreated.png) 유지. 일반 Back/D 숨김·같은 Activity 복귀, 앱 창 포커스를 확인한 CCP 하위→가게·[최상위 실제 창 숨김](evidence/pr105-vehicle-input-stall/final-793-ccp-hidden.png)·[동일 Activity 복귀의 새 제한](evidence/pr105-vehicle-input-stall/final-793-ccp-return.png) 확인.
+- 콘솔의 browser heartbeat/기어·controls 요청으로 [실제 SDK DRIVE·ux=true 및 PARK·ux=false](evidence/pr105-vehicle-input-stall/final-793-sdk-signals.txt) 수신 확인. D 정차·콘솔30km/h/가속50%·10km/h/브레이크60%의 [제한 화면](evidence/pr105-vehicle-input-stall/final-793-d-restricted.png), D 재생성·숨김/재진입에서 게임 콘텐츠가 나타나지 않았다. P 복귀 후 콘텐츠를 확인했다. 콘솔 속도와 앱의 speed=OK 상태를 구분하며 센서별 시각·정밀 속도/지연 측정은 하지 않았다.
+- 사용자10 CAR_SPEED를 일시 거부하고 임시user-set/user-fixed를 적용해 `PERMISSION_DENIED`·[재생성 뒤 제한](evidence/pr105-vehicle-input-stall/final-793-permission-denied.png)을 확인했다. grant/임시flags 해제와 야간no 복구 뒤 SDK P 재수신·[게임 콘텐츠 복귀](evidence/pr105-vehicle-input-stall/final-793-permission-restored.png)를 확인했다.
+- [최종 설정·데이터 원복](evidence/pr105-vehicle-input-stall/final-793-restoration.txt): boot1/user10·1080×600/120dpi·nightno/overlaynull/securenull·권한granted·ceDataInode491836 유지. 콘솔Park·속도/가속/브레이크0 요청, Car UX 서비스dump 응답을 확인했다. 제품 프로세스와 heartbeat/8088 forward를 정리한 뒤 이번 qemu 실행을 중단했고 최종 devices/forward·시험 프로세스는 없고 원래5038 서버만 유지했다. 반복 재부팅이나 데이터 삭제로 기존 장애를 덮지 않았다. 장시간/OEM 전체 안정성은 이 짧은 성공으로 확대하지 않는다.
+
+**종료·원복:** 콘솔 기어Park·속도/가속/브레이크0 요청, 사용자10 속도 권한granted와 임시user-set/user-fixed 해제, `ceDataInode=491836` 유지, [야간no·1080×600/120dpi·overlay/secure null 원복](evidence/pr105-vehicle-input-stall/final-restoration.txt)을 확인했다. 이 문단은 첫 복구 실행의 종료 기록이다. 당시 실제 설치는 시각 보완 전 `8774…`였고, 재배정받은 최종793e 시험/종료는 위 최종 기록을 따른다. 마지막 Car UX 서비스 dump는 응답했으나 차량 입력·ADB가 간헐 지연돼 전체 건강 상태를 정상으로 판정하지 않는다. 이번 복구 qemu 실행을 중단하고 offline 별칭·JDWP·heartbeat·8088/8701 forward를 제거했다. 최종 devices/forward는 비었고 qemu/JDWP/heartbeat 프로세스는 없으며 원래5038 서버만 유지했다. 사용자가 해제한 자동 crash 보고 설정은 다시 켜지 않았다. 데이터 삭제 없이 APK 업데이트와 위 한 번의 실제 게스트 복구를 수행했다. [빌드·설치·시험 단계별 메타데이터](evidence/pr105-vehicle-input-stall/verification-metadata.json)를 참조한다.
+
+남은 범위: SDK 내부 main 콜백의 Car.mLock/OEM 정체 전체 제거, 영구 Binder 정체의 강제 취소·해제 완료/자동 복구, 센서 시각 신뢰성, 실제 CarService 지연·단절 주입, 공식 폼팩터/미구성 DISPLAY2의 콘텐츠·API28·실차는 미검증이다. #51 전체 완료·main 머지·Draft 해제·이슈 종료·ready/Blocked by 변경은 하지 않는다. 최종 독립 검증은 결과를 받은 메인이 요청하며 새 검증 세션은 만들지 않았다.
+
 
 ## #52 차고·도감 표시 UI 부분 검증
 
@@ -506,3 +597,16 @@ PR #32 최초 Android CI는 앱 컴파일 전 `setup-android@v3`의 기본 `tool
 메인 통합 worktree에서 JDK17·기존 SDK로 `./gradlew --offline --no-daemon :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`를 실행했다. core97개·app11개가 실패·오류·생략0으로 통과했고 앱·시험 APK 빌드 및 Lint(오류0·경고13)가 성공했다. 저장소 검사와 `git diff --check`도 통과했다. 기존 02·06 기록을 보존하고 09 연결 설명과 README의 구현 범위를 맞췄다. 실제 최종 커밋과 원격 CI 결과는 PR #103에서 확인한다.
 
 이번 통합은 adb·에뮬레이터를 사용하지 않았다. 위 SQLite26개·격리 UI10개의 실제 장치 근거를 새 조합의 제품 앱·경제 명령·저장/재실행 시험으로 확대하지 않는다. #46의 활동·영속 도감·migration·다중 개체 거래, #52의 #51 탐색·주행 제한·실제 명령 연결과 #28 통합 흐름은 남아 있다. #105 차량 입력·Back 변경은 이 통합에 포함하지 않는다.
+
+
+### PR #105 독립 최종 검토와 인계 — 2026-11-07
+
+검증 C가 최종 코드 `055649180ef265789da914bd36d83f390108b2d5`를 검토했다. 작성자의 기기 시험 head `e165098` 이후 app/core diff가 없고, 보존된 앱 `793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9`·시험 APK `09cc28008de8e89dc7533db34e041b6aabeb80166338e5651ee41f42a4fb65c2`와 실제 설치본이 일치함을 시작·종료 시 대조했다. fresh 빌드는 DEX 분할 순서 때문에 전체 해시가 달랐으며 DEX 내용 집합·다른 항목의 동일성을 확인했다. 추가 장치 시험에는 정확한 보존 APK를 사용했고 서로 같은 해시라고 기록하지 않았다.
+
+- 새 Queue 회귀 15개를 직접 실행하고 빌드·Lint(오류0·경고14)·저장소·diff 검사를 확인했다. 메인에서도 별도 최종 worktree에서 Queue15개 실패·오류·생략0과 저장소·diff를 확인했다.
+- 작성자의 장치47개와 실제 D/P·권한·Back·선택 복원 근거는 최종 소스·APK·로그·화면을 대조해 활용했고 일괄 재실행하지 않았다.
+- 정확한 793e 설치본에서 `VehicleInputDelayTest`·`NavigationTest`를 추가 실행해 [2개 통과, 1.147초](evidence/pr105-vehicle-input-stall/final-review-targeted-2.txt)를 확인했다.
+- 실제 제품의 SDK worker 하나만 통제해 중지한 동안 새 표본 만료로 제한 전환, 일반 Back의 창 숨김, 같은 Activity 재진입의 제한 유지, worker 재개·디버거 분리 후 새 P 관측으로 콘텐츠 복귀를 확인했다. 실제 CarService/VHAL 장애 주입과 구분한다. 로컬 원본은 `/private/tmp/pr105-final-verification-evidence/worker-pause-jdwp.txt`와 해당 화면·metadata에 보존했다.
+- 신호·권한·창·야간 설정은 이 추가 시험에서 변경하지 않았다. worker 재개·디버거 분리·포워딩 제거 후 제품 시험 프로세스와 이번 AVD만 종료했고 기존 ADB5038 서버를 유지했다. 데이터 삭제·초기화는 하지 않았다.
+
+이번 입력·수명주기 변경에서 차단 결함은 발견되지 않았다. PR 검토·사용자 머지 지시와 최종 원격 커밋/CI는 PR #105에서 관리하며 AI 검토를 사람 승인으로 표시하지 않는다. 위 SDK 내부 잠금·실제 서비스 장애 주입·센서 시각·공식 폼 팩터·실차 한계는 유지한다. 실제 명령 중복·저장 성공 경계, #103 표시 UI의 제품 탐색 연결과 후속 기능 통합은 #51·#52·#28에 남긴다. README의 화면 병렬 작업표는 같은 인계를 반영한다.

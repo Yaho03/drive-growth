@@ -1,0 +1,25 @@
+최신 통합 APK 재검사 종료 후 수집한 crash buffer 발췌. 인과관계 확정 아님.
+11-06 09:41:34.492 22650 23101 E AndroidRuntime: Process: com.android.car, PID: 22650
+11-06 09:41:48.803 24372 24372 F libc    : Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 24372 (audioserver), pid 24372 (audioserver)
+11-06 09:41:49.635 25965 25965 F DEBUG   : Cmdline: /vendor/bin/hw/android.hardware.audio.service-caremu
+11-06 09:41:53.692 26160 26160 F DEBUG   : signal 6 (SIGABRT), code -1 (SI_QUEUE), fault addr --------
+11-06 09:42:23.505 26458 26625 F libc    : Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 26625 (binder:26458_2), pid 26458 (audioserver)
+11-06 09:42:24.963 28082 28082 F DEBUG   : Cmdline: /vendor/bin/hw/android.hardware.audio.service-caremu
+11-06 09:42:26.550 28118 28118 F DEBUG   : signal 6 (SIGABRT), code -1 (SI_QUEUE), fault addr --------
+11-06 10:02:06.155 22482 22482 F DEBUG   : Cmdline: /vendor/bin/hw/android.hardware.audio.service-caremu
+11-06 10:02:06.245 28308 31146 F libc    : Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 31146 (binder:28308_6), pid 28308 (audioserver)
+11-06 10:02:07.201 22583 22583 F DEBUG   : signal 6 (SIGABRT), code -1 (SI_QUEUE), fault addr --------
+11-06 10:02:11.671 21221 21221 E AndroidRuntime: Process: com.android.car, PID: 21221
+11-06 10:02:11.671 21221 21221 E AndroidRuntime: java.lang.RuntimeException: Unable to create service com.android.car.CarService: java.lang.RuntimeException: registerAudioPolicy failed -1
+11-06 10:02:11.671 21221 21221 E AndroidRuntime: Caused by: java.lang.RuntimeException: registerAudioPolicy failed -1
+11-06 10:02:25.868 22712 22712 F libc    : Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 22712 (audioserver), pid 22712 (audioserver)
+11-06 10:02:26.958 24366 24366 F DEBUG   : Cmdline: /vendor/bin/hw/android.hardware.audio.service-caremu
+11-06 10:02:29.914 24484 24484 F DEBUG   : signal 6 (SIGABRT), code -1 (SI_QUEUE), fault addr --------
+11-06 10:02:58.758 24884 26165 F libc    : Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 26165 (binder:24884_3), pid 24884 (audioserver)
+11-06 10:02:59.965 26724 26724 F DEBUG   : Cmdline: /vendor/bin/hw/android.hardware.audio.service-caremu
+11-06 10:03:00.799 26805 26805 F DEBUG   : Cmdline: /vendor/bin/hw/android.hardware.audio.service-caremu
+11-06 10:03:01.881 26833 26833 F DEBUG   : signal 6 (SIGABRT), code -1 (SI_QUEUE), fault addr --------
+
+초기 emulator 실행 세션 종료코드139. 로그: Failed to find ColorBuffer / Failed to bind to texture.
+동일 AVD 재기동은 Showing crashdialog to get consent 단계에서 대기. 외부 보고 전송하지 않음.
+재기동 실행만 Ctrl-C로 종료(130). 마지막 devices 목록·forward 목록 비어 있음. adb5038 서버 유지.

@@ -1,0 +1,8 @@
+11-06 12:13:40.879 26732 26732 I DriveGrowthVehicle: signal_state speed=OK gear=DRIVE ux=true
+11-06 12:14:34.080 26732 26732 I DriveGrowthVehicle: signal_state speed=OK gear=DRIVE ux=true
+11-06 12:14:41.883 26732 26732 I DriveGrowthVehicle: signal_state speed=OK gear=DRIVE ux=true
+11-06 12:14:44.860 26732 26732 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false
+11-06 12:15:08.711 26732 26732 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false
+11-06 12:16:45.774 15522 15522 I DriveGrowthVehicle: signal_state speed=PERMISSION_DENIED gear=PARK ux=false
+11-06 12:16:49.041 15522 15522 I DriveGrowthVehicle: signal_state speed=PERMISSION_DENIED gear=PARK ux=false
+11-06 12:17:09.360 15522 15522 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false

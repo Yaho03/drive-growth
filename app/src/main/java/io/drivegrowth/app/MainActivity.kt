@@ -68,6 +68,18 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        startObserving()
+    }
+
+    @android.annotation.TargetApi(29)
+    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        super.onTopResumedActivityChanged(isTopResumedActivity)
+        if (isTopResumedActivity) startObserving()
+    }
+
+    private fun startObserving() {
+        setVisible(true)
+        if (active) return
         active = true
         try {
             input = VehicleInput(this, { if (active) { interaction.accept(it); updateAccess() } }, {}).also { it.start() }
@@ -78,13 +90,17 @@ class MainActivity : Activity() {
     }
 
     override fun onPause() {
+        stopObserving()
+        super.onPause()
+    }
+
+    private fun stopObserving() {
         active = false
         handler.removeCallbacks(watchdog)
         interaction.reset()
         updateAccess()
         input?.stop()
         input = null
-        super.onPause()
     }
 
     override fun onDestroy() {
@@ -190,6 +206,11 @@ class MainActivity : Activity() {
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
         if (allowed() && screen is Screen.Content && page != Page.HOME) select(Page.HOME)
-        else super.onBackPressed()
+        else {
+            // 다중 창에서 Task를 뒤로 보내도 RESUMED·표시가 유지되는 경우를 함께 처리한다.
+            stopObserving()
+            setVisible(false)
+            moveTaskToBack(true)
+        }
     }
 }

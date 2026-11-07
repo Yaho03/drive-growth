@@ -125,7 +125,9 @@ collection.render(mappedCollectionState, controlsEnabled = allowedByCommonShell)
 
 비용·소비가 있는 요청의 확인 패널은 대상 개체, 비용, 예상 결과, 되돌릴 수 없는 변화, `확정/돌아가기`를 표시한다. 서버/저장 요청 전에 확인을 완료한다. 재시도는 같은 요청 ID를 재사용하며 버튼을 새 요청으로 반복 전송하지 않는다.
 
-Back은 확인 패널 닫기→직전 화면→최상위 동작 순으로 처리한다. 처리 중에는 중복 전송을 막고 화면을 떠나더라도 거래 결과는 조회로 복원한다. CCP·최상위 숨김 동작은 [공식 자료](contest/04_OFFICIAL_RESOURCES.md)의 정책과 #13 시험 결과를 따르며 실제 입력 검증은 남아 있다.
+Back은 확인 패널 닫기→직전 화면→최상위 동작 순으로 처리한다. 최상위에서는 [Pleos CCP 가이드](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/ccp-rotary-controller-development)에 따라 `moveTaskToBack(true)`로 Task를 뒤로 보내고 게임 창을 숨기며 `finish()`·`finishAffinity()`로 종료하지 않는다. 처리 중에는 중복 전송을 막고 화면을 떠나더라도 거래 결과는 조회로 복원한다. 숨김 후 복귀와 Activity 재생성에서 선택 상태를 복원하되 주차·UX 허용을 다시 확인한다. 일반 Android Back·CCP Back의 실제 전달과 Task·화면 변화의 검증 결과 및 한계는 [검증 문서](06_VERIFICATION.md)를 따른다.
+
+2026-11-07 사용자 결정: 이번 #51은 CCP 다이얼 미지원으로 범위를 정하고 `<application>`에 `com.hmg.rotary.ROTARY_SUPPORTED=false`를 명시한다. 필수 조작은 터치만으로 완료할 수 있어야 하며, 다이얼 미지원이 최상위 Back·숨김 후 복귀·상태 복원·주행 제한의 검증을 면제하지 않는다. 다이얼 이동·선택 지원의 추가는 별도 결정으로 남긴다.
 
 ## 4. 공통 실패·빈 상태
 

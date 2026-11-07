@@ -1,0 +1,4 @@
+VehicleInputQueueTest > variableReadLatencyCannotShortenContinuousParking FAILED
+    java.lang.AssertionError at VehicleInputQueueTest.kt:218
+
+1 test completed, 1 failed

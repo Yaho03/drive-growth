@@ -1,0 +1,6 @@
+Night mode: no
+Night mode: no
+Physical size: 1080x600
+Physical density: 120
+null
+null

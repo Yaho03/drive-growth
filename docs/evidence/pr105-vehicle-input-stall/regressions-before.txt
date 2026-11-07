@@ -1,0 +1,9 @@
+VehicleInputQueueTest > stalledReadDoesNotBlockUiOrExpiryTimer FAILED
+    java.lang.AssertionError at VehicleInputQueueTest.kt:63
+
+2 tests completed, 1 failed
+
+VehicleInputQueueTest > replacementDuringCloseSkipsTheNowObsoleteFactory FAILED
+    java.lang.AssertionError at VehicleInputQueueTest.kt:260
+
+1 test completed, 1 failed
