@@ -254,7 +254,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
 
 /**
  * [change]로 확정된 공용 정산을 읽는다. 없으면 null이다.
- * 정산 행의 명령이 [change]와 같고, 결과의 정산 ID·요청 ID·종류·출처·규칙 버전·금액·방향·차량 ID가 [change]와 맞아야 한다.
+ * 정산 행의 명령이 [change]와 같고, 결과의 정산 ID·요청 ID·종류·출처·규칙 버전·금액·방향·차량이 [change]와 맞아야 한다.
  * 하나라도 다르면 파싱에 성공해도 손상으로 본다.
  */
 internal fun readRecordedSettlement(db: SQLiteDatabase, change: GameChange): Settlement? =
@@ -268,12 +268,13 @@ internal fun readRecordedSettlement(db: SQLiteDatabase, change: GameChange): Set
         ) {
             throw JSONException("정산 결과가 원래 거래와 다름")
         }
-        val vehicleId = when (val write = change.vehicle) {
-            null -> null
-            is VehicleWrite.Add -> write.vehicle.ownedVehicleId
-            is VehicleWrite.Update -> write.ownedVehicleId
+        val sameVehicle = when (val write = change.vehicle) {
+            null -> settlement.changedVehicle == null
+            // 새로 지급한 차량은 희귀도·취득액·출처까지 원래 거래와 같아야 한다.
+            is VehicleWrite.Add -> settlement.changedVehicle == write.vehicle
+            is VehicleWrite.Update -> settlement.changedVehicle?.ownedVehicleId == write.ownedVehicleId
         }
-        if (settlement.changedVehicle?.ownedVehicleId != vehicleId) throw JSONException("정산 차량이 원래 거래와 다름")
+        if (!sameVehicle) throw JSONException("정산 차량이 원래 거래와 다름")
         settlement
     }
 
