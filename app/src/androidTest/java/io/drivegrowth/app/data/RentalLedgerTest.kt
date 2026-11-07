@@ -245,6 +245,53 @@ class RentalLedgerTest : InstrumentationTestCase() {
         assertEquals(transactions, ok(store.listUnviewedSettlements()))
     }
 
+    fun testAccidentCountUsesOnlyCommittedAccidentsOfOneOwnedVehicle() {
+        val id = car.ownedVehicleId
+        val other = OwnedVehicleId("same-model")
+        add(car.copy(ownedVehicleId = other), 0)
+        ok(store.rental.setResting(other, true))
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
+            store.rental.accidentCount(OwnedVehicleId("unknown")))
+        assertEquals(0, ok(store.rental.accidentCount(id)))
+
+        for (n in 0..3) {
+            val start = n * 4500000L
+            val r = request.copy(id = RequestId("visit-$n"))
+            // 첫 대여는 정상, 이어지는 세 번은 사고다.
+            val t = terms.copy(start = EpochMillis(start), roll = if (n == 0) 99 else 0)
+            assertEquals(id, ok(assign(r = r, t = t)))
+            val before = (n - 1).coerceAtLeast(0)
+            assertEquals(before, ok(store.rental.accidentCount(id)))
+            ok(store.rental.account(r.id, t.start, EpochMillis(start + 3600000), null))
+            if (n == 1) {
+                store.beforeCommit = { throw SQLiteException("정산 실패") }
+                assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.rental.settle(r.id))
+                reopen()
+                assertEquals(before, ok(store.rental.accidentCount(id)))
+            }
+            val receipt = ok(store.rental.settle(r.id))
+            assertEquals(n != 0, receipt.accident)
+            assertEquals(receipt, ok(store.rental.settle(r.id)))
+            ok(store.rental.finishReturn(r.id, EpochMillis(start + 4500000)))
+            reopen()
+            assertEquals(n, ok(store.rental.accidentCount(id)))
+            assertEquals(0, ok(store.rental.accidentCount(other)))
+            if (n in 1..2) {
+                // #49 수리 명령 전의 fixture: 수리 완료 활동만 주입하고 대여·사고 이력은 그대로 둔다.
+                store.close()
+                SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                    it.execSQL("UPDATE rentals SET phase='IDLE' WHERE id=? AND phase='NEEDS_REPAIR'", arrayOf(r.id.value))
+                }
+                store = open()
+            }
+        }
+        val current = ok(store.listOwnedVehicles()).single { it.ownedVehicleId == id }
+        ok(store.commitGameChange(GameChange(RequestId("scrap"), TransactionKind.GARAGE, source, version,
+            vehicle = VehicleWrite.Update(id, current.revision, current.level, VehicleLifecycle.SCRAPPED, current.levelProgressPercent))))
+        reopen()
+        assertEquals(3, ok(store.rental.accidentCount(id)))
+    }
+
     fun testFirstCompletedRentalUsesActualCommitOrderAcrossV2Upgrade() {
         val second = request.copy(id = RequestId("second"))
         add(car.copy(ownedVehicleId = OwnedVehicleId("two")), 0)

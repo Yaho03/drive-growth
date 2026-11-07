@@ -123,9 +123,12 @@ class SqliteGameChangeStore(
         return ContractResult.Success(result)
     }
 
-    @Synchronized
     internal fun <T> read(query: (SQLiteDatabase) -> T): ContractResult<T> =
-        storage { ContractResult.Success(query(helper.readableDatabase)) }
+        readResult { db -> ContractResult.Success(query(db)) }
+
+    @Synchronized
+    internal fun <T> readResult(query: (SQLiteDatabase) -> ContractResult<T>): ContractResult<T> =
+        storage { query(helper.readableDatabase) }
 
     private fun readVehicles(db: SQLiteDatabase): List<OwnedVehicle> =
         db.rawQuery("SELECT payload FROM vehicles ORDER BY owned_id", null).use { cursor ->

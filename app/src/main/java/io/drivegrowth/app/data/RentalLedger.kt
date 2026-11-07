@@ -107,8 +107,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         }
         if (lastReturn != null && terms.start.value < lastReturn) return@atomic conflict()
         val hourlyFare = hourlyRates[v.vehicleId] ?: return@atomic missing()
-        val pastAccidents = db.rawQuery("SELECT count(*) FROM rentals WHERE owned_id=? AND accident=1 AND settlement_request IS NOT NULL",
-            arrayOf(v.ownedVehicleId.value)).use { it.moveToFirst(); it.getInt(0) }
+        val pastAccidents = countSettledAccidents(db, v.ownedVehicleId)
         val quote = plan.quote(hourlyFare, pastAccidents, terms.customer, terms.roll,
             rentalFacilities(installed(db), terms.fuelBonus))
         val end = terms.start.value + plan.request.hours * 3_600_000L
@@ -160,6 +159,19 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
 
     /** #49가 지정 대여의 확정 결과만 읽는다. 미완료/없는 대여는 null이다. */
     override fun completedRental(id: RequestId): ContractResult<CompletedRental?> = completed(id)
+
+    override fun accidentCount(ownedVehicleId: OwnedVehicleId): ContractResult<Int> =
+        store.readResult { db ->
+            if (store.findVehicle(db, ownedVehicleId) == null) missing()
+            else ContractResult.Success(countSettledAccidents(db, ownedVehicleId))
+        }
+
+    private fun countSettledAccidents(db: SQLiteDatabase, ownedVehicleId: OwnedVehicleId): Int =
+        db.rawQuery("SELECT count(*) FROM rentals WHERE owned_id=? AND accident=1 AND settlement_request IS NOT NULL",
+            arrayOf(ownedVehicleId.value)).use { rows ->
+            rows.moveToFirst()
+            rows.getInt(0)
+        }
 
     private fun completed(id: RequestId?): ContractResult<CompletedRental?> = store.read { db ->
         val filter = if (id == null) "" else " AND r.id=?"

@@ -21,4 +21,7 @@ data class CompletedRental(val rentalId: RequestId, val ownedVehicleId: OwnedVeh
 interface CompletedRentalSource {
     fun firstCompletedRental(): ContractResult<CompletedRental?>
     fun completedRental(id: RequestId): ContractResult<CompletedRental?>
+
+    /** 보유 개체의 정산 완료 사고 건수. 처분 후에도 조회되며 없는 개체는 DATA_UNAVAILABLE이다. */
+    fun accidentCount(ownedVehicleId: OwnedVehicleId): ContractResult<Int>
 }
