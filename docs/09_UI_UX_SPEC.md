@@ -240,3 +240,33 @@ collection.render(mappedCollectionState, controlsEnabled = allowedByCommonShell)
 
 
 #55 새 View의 첫 render/복원 순서 최소 수정은 원코드 `515507c`의 A 코드/구조 검토와 C 신규 View 표적1개·임시 실제 호스트에서 확인했다. [06의 첫 복원 근거](06_VERIFICATION.md#55-첫-복원-수정의-독립-검토장치-근거-회수)를 따르며 같은 활성 View의 과거 상태 반복 복원·제품 호스트/프로세스 저장으로 범위를 넓히지 않는다.
+### #57 퀘스트·업적·휴식 독립 표시 UI
+
+2026-11-07 `app/ui/progress/ProgressView`를 Android Views로 구현했다. `4r-quests-achievements.png`·`5c-landscape-quests-achievements.png`·`4t-rest-bonus-info.png`·`4c-rest-stop-open.png`를 직접 열어 어두운 바탕, 둥근 카드, 파란 청구 버튼과 진행 막대를 참고했다. 기존 중립 `wireframes.svg`의 정보 우선순위도 확인했다. 시안의 캐릭터·코인 이미지·운전 지시형 휴식 문구는 사용하지 않는다. 새 자산·의존성·음성·게임 알림은 없다. 화면의 목표·보상 예시는 제품 규칙이 아니다.
+
+- 진입점은 `ProgressView(context, onEvent)`, `render(ProgressScreenState, controlsEnabled): Boolean`, `handleBack()`, `uiState`, `restoreUiState()`, `completeRetry()`, `completePendingRecovery(resolved)`다. 공통 gate가 허용한 주차 영역에서만 사용하고 false이면 제목을 포함한 게임 내용과 버튼을 제거한다. 신호·위치·주행·DB를 직접 조회하지 않는다. 프로필이 달라지면 새 View와 UI 상태를 사용한다.
+- `Loading`, `Content`, `Empty`, 재시도 허용이 있는 `Failure`, 무행동 `Unsupported`를 구분한다. 일일/주간 목록, 업적, 채택 이벤트 공급 영역과 휴식 카드를 표시한다. `RewardStatus`는 잠김·진행·목표완료·청구가능·처리중·수령확인·만료·실패·미지원을 구분한다. Content의 빈 목록도 오류·미지원과 구분한다. 목록·휴식 조건은 render 때 복사한다.
+- `ProgressItem`은 표시 전용 ID/기간 ID, revision, 이미 계산된 진행 문구/퍼센트, 보상 문구, 상태와 허용된 `ClaimOffer(requestKey, enabled, reason)`를 받는다. 공유 게임 모델·원장·재화 타입을 복제하지 않는다. 누락된 기간·진행·보상은 확인 불가이며 0이나 정상 완료로 채우지 않는다. UI가 날짜/주기·목표·보상·해금·수령 가능 여부를 계산하지 않는다. 기간별 3개 규칙을 생성하지 않고 공급 목록을 그대로 표시한다.
+- `Select(key)`로 상세를 열고 예정 보상을 확인한 뒤 `ClaimReward(key, revision, requestKey)`를 보낸다. 이는 청구 의사이며 지급 성공이 아니다. Pending과 이미 시도한 requestKey를 먼저 보존해 동기 callback·반복 탭·목록 전환·같은 상태 재표시·제한·View 교체로 요청을 다시 보내지 않는다. 오래된 확인 버튼은 캡처한 ID/revision/requestKey가 현재 선택과 같아야 동작한다. 다른 청구가 처리 중이면 새 청구도 막는다.
+- 호스트는 동일 프로필의 Content `sequence`를 단조 증가시키고 같은 세대에는 같은 snapshot을 공급한다. 더 오래된 Content, 같은 세대의 다른 내용, 같은 목표·기간 키의 최대 수락 revision보다 낮은 항목을 포함한 Content 전체는 무시한다. 최대 수락 revision은 `uiState.acceptedRevisions`에 보존하며 목록 소멸로 지우지 않는다. 같은 키의 더 높은 revision은 허용하고 다른 기간 키는 별도 목표로 다룬다. 제한 값은 무시된 응답에도 먼저 적용한다. 호출자가 조회/명령의 요청 세대를 관리해 늦은 Loading/Failure/다른 프로필 결과도 걸러야 한다. View는 실제 requestId·영속 중복 방지·서버/원장 정합성의 대체물이 아니다.
+- 요청 결과는 **더 높은 sequence와 항목 revision**의 새 Content로 전달한다. `CLAIMED`는 확정 저장을 확인한 호스트만 공급한다. 실패/만료/미지원 확정도 같은 방식으로 공급해 로컬 Pending을 해제한다. 다시 청구를 허용할 때는 새 offer requestKey를 주고, 기존 명령의 조회·복구·멱등성은 호스트가 보장한다. 같은 key가 사라지면 소멸 안내만 표시하고 미확정 Pending을 수령/실패로 추정하지 않는다. Back은 상세를 닫을 뿐 청구를 취소하거나 재전송하지 않는다.
+- 호스트가 `uiState`의 선택·탭·Pending·요청한 key·재조회 잠금·`pendingConflicts`와 `acceptedRevisions` 전체를 수명주기 밖에 보존한다. 같은 View에 과거 선택/탭을 복원할 때 요청 키는 현재·복원 값과 알려진 Pending 키의 합집합으로 보존한다. 현재 미확정 Pending을 복원 null로 해제하지 않으며 `retryPending`도 과거 false로 해제하지 않는다. 재조회 잠금은 기존 `completeRetry()` 경로로 해제한다. 서로 다른 Pending을 만나면 모든 참조를 읽기 전용 `pendingConflicts`에 보존하고 추가 청구 없는 조회 대기와 설명을 표시한다. 복구 재조회는 Retry로 요청하며 각 요청의 실제 조회/복구 완료를 확인한 호스트가 정확한 `ClaimReference` 집합으로 `completePendingRecovery(resolved)`를 호출한다. 알 수 없는 참조는 무시하고 일부만 해소되면 나머지는 계속 대기한다. 이 callback은 수령/실패 결과나 새 콘텐츠를 만들지 않으며, 해소 뒤 호스트가 유효한 Content를 다시 공급해야 표시가 열린다. 일반 목표의 terminal Content만으로 서로 다른 요청의 충돌 전체가 해소됐다고 추정하지 않는다. View 교체/Activity 재생성에도 소멸한 항목의 최대 revision 맵을 포함해 `restoreUiState`한다. 맵은 방어 복사되며 같은 View에 더 오래된 복원 상태를 전달해도 기존 최대값을 낮추지 않는다. 첫 render 뒤 restore가 오는 경우도 현재 Content를 복원 맵과 다시 비교한다. 낮은 항목이 있으면 낡은 Content를 행동 없는 Loading으로 무효화하며 이력/Pending/요청 키를 보존한다. 이력만으로 수령·실패를 만들지 않고, 같은 낮은 Content를 다시 보내도 조회 대기를 유지한다. 유효한 새 Content가 수락돼야 다시 표시하며 canClaim도 현재 항목 revision을 재검사한다. 이 맵은 UI 역행 방어용이고 실제 수령 원장이 아니다. Content sequence 비교 이력은 View 내부이므로 새 View에서는 호스트가 기존 조회 세대/프로필의 늦은 결과도 차단해야 한다. 프로세스 재실행에서 실제 상태를 확인하기 전에는 Loading/Unsupported를 공급하며 보존된 UI 상태로 보상 수령을 만들지 않는다. 실제 중복 지급 방지는 #45/공통 저장의 책임이다. 재조회 Retry는 한 번 요청한 뒤 호스트가 응답을 확인하고 `completeRetry()`를 호출해야 재활성화된다.
+- 휴식 조건 판정에는 기존 #119의 `RestOutcome`을 그대로 받아 표시한다. `RestBonus.classify/depart/consume`을 View에서 실행하지 않는다. 인정 여부와 별도로 저장·출발 연결을 확인한 `BuffPhase`(없음/다음 출발 대기/활성/판정 불가/미지원), 이미 구성된 효과·잔여 문구와 조건별 충족/미충족/확인 불가를 받는다. 장소·P·직전 운전/휴식 증거·원자 저장·실제 출발 감지·수익 적용이 없으면 실제 활성 버프를 공급하지 않는다. 잔여 문구는 스냅샷이며 카운트다운·사용/출발 버튼이 없다. 짧은 P 합산·일반 주차 중 소모 제안은 채택하지 않았다.
+- 1000dp 이상 본문은 퀘스트/업적 두 열, 미만은 한 열이다. 초기 구현 분기값이며 공식 규격이 아니다. 전체 본문을 세로 스크롤하고 탭은 가로 스크롤한다. 긴 문구는 줄바꿈하며 기본 버튼 최소 높이는 64dp다. 선택·잠김·처리 상태는 문구와 버튼 상태로 함께 표시한다. 기기에서 440dp 본문·로컬 큰 글꼴·1360dp 축소 호스트와 실제 터치/재생성 상태 보존을 확인했다. 공식 폼 팩터 전체·CCP 배치는 미검증이며 실행 범위는 06을 따른다.
+
+연결 예시(함수는 호스트가 구현할 책임이며 실제 청구 API가 있다는 뜻이 아니다):
+
+```kotlin
+val progress = ProgressView(context) { event ->
+    when (event) {
+        is ProgressEvent.Select -> rememberSelection(event.key)
+        ProgressEvent.CloseDetail -> rememberDetailClosed()
+        is ProgressEvent.ClaimReward -> queryOrSubmitThroughExistingRewardHost(event)
+        ProgressEvent.Retry -> reloadProgressWithCurrentQueryGeneration()
+    }
+}
+progress.render(ProgressScreenState.Unsupported("진행·청구 연결을 아직 제공하지 않아요."), allowed)
+// UI 복원: progress.restoreUiState(savedUiState). 확정 저장 뒤 새 Content를 render한다.
+```
+
+MainActivity·공통 탐색·gate·공통 모델/fixture·DB·경제 계산·02/08/README는 수정하지 않았다. #45 실제 진행/청구/기간·영속 수령, #40 실제 휴식 증거/출발/수익 연결, #51 탐색/수명주기와 #81 정책 검증은 남으며 #57 전체 완료가 아니다. 고정 debug 입력과 실행/미실행 근거는 [검증 문서](06_VERIFICATION.md#57-퀘스트업적휴식-표시-ui-부분-검증)를 따른다.
