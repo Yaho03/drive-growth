@@ -65,8 +65,11 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
 
     private fun choose(offer: DeliveryOffer, id: String = "r1") {
         ok(ledger.select(proposed, offer.id, RequestId(id)))
-        ok(ledger.beginRoute(RequestId(id), route, start))
+        ok(ledger.beginRoute(RequestId(id), routeOf(id), start))
     }
+
+    /** 경로 ID는 다시 쓸 수 없어 의뢰마다 다른 경로를 쓴다. */
+    private fun routeOf(id: String) = if (id == "r1") route else RouteId("route-$id")
 
     private fun arrival(at: Long = start.value + 60_000, r: RouteId = route) =
         Observation.Available(DeliveryArrivalEvidence(r, source, EpochMillis(at)))
@@ -84,7 +87,8 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
 
     private val tables = listOf(
         "account", "settlements", "vehicles", "delivery_lists", "delivery_requests", "delivery_active", "delivery_routes",
-        "delivery_outcomes", "delivery_held", "delivery_hold_outcomes", "driving_days", "driving_drives",
+        "delivery_outcomes", "delivery_held", "delivery_hold_outcomes", "delivery_changes", "delivery_route_history",
+        "driving_days", "driving_drives",
     )
 
     /** 표의 모든 칸을 형식까지 포함해 읽는다. 실패한 호출이 원본을 바꾸지 않았는지 본다. */
@@ -210,7 +214,7 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
 
     fun testNewRouteKeepsDeadlineStartAndRejectsOldRouteEvidence() {
         choose(purchase)
-        val moved = ok(ledger.beginRoute(RequestId("r1"), RouteId("route-2"), EpochMillis(start.value + 30_000)))
+        val moved = ok(ledger.beginRoute(RequestId("r1"), RouteId("route-2"), EpochMillis(start.value + 30_000), replacing = route))
         assertEquals(start, moved.startedAt)
         assertTrue(ok(settle(arrival(r = route))).outcome is DeliveryOutcome.AwaitingEvidence)
         assertTrue(ok(settle(arrival(r = RouteId("route-2")))).outcome is DeliveryOutcome.VehicleDelivered)
@@ -287,12 +291,12 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
             assertEquals(RequestId("$id-next"), ok(ledger.active())?.requestId)
             ok(store.atomic { ledger.finishActive(it, RequestId("$id-next")) })
         }
-        lostResponse(income, "a", arrival(), start.value + 120_000)
-        lostResponse(purchase, "b", arrival(), start.value + 120_000)
+        lostResponse(income, "a", arrival(r = routeOf("a")), start.value + 120_000)
+        lostResponse(purchase, "b", arrival(r = routeOf("b")), start.value + 120_000)
         lostResponse(purchase, "c", Observation.Missing(MissingReason.NO_DATA), start.value + dayMs)
         lostResponse(income, "d", Observation.Missing(MissingReason.NO_DATA), start.value + dayMs)
         fillGarage(3)
-        lostResponse(purchase, "e", arrival(), start.value + 120_000)
+        lostResponse(purchase, "e", arrival(r = routeOf("e")), start.value + 120_000)
         assertNull(ok(ledger.arrivalResult(RequestId("never"))))
     }
 
