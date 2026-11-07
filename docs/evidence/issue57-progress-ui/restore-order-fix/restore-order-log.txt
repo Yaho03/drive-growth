@@ -1,0 +1,2 @@
+--------- beginning of main
+11-07 03:22:08.536 18582 18582 I Progress57RestoreOrder: PASS renderBeforeRestore=true rollbackAccepted=false buttons=0 max=5

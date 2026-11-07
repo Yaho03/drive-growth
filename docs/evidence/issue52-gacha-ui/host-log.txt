@@ -1,0 +1,12 @@
+수정본 최종 실행 PID31757의 태그 행만 발췌. 앞선 실행의 동일 태그 행은 제외. 원시 로그는 로컬 보존.
+11-07 04:35:59.145 31757 31826 I Gacha52ReviewA: PASS host widths320,936 no global wm/font change narrow long candidates and wide guarantee
+11-07 04:35:59.602 31757 31757 I Gacha52ReviewA: tap gacha:option:paid point=[750, 435] size=279x48 visible=Rect(390, 378 - 669, 426)
+11-07 04:35:59.963 31757 31757 I Gacha52ReviewA: tap gacha:confirm point=[750, 435] size=279x48 visible=Rect(390, 378 - 669, 426)
+11-07 04:36:00.370 31757 31757 I Gacha52ReviewA: tap gacha:option:free point=[750, 435] size=279x48 visible=Rect(390, 378 - 669, 426)
+11-07 04:36:00.722 31757 31757 I Gacha52ReviewA: tap gacha:confirm point=[750, 435] size=279x48 visible=Rect(390, 378 - 669, 426)
+11-07 04:36:01.184 31757 31757 I Gacha52ReviewA: tap gacha:option:paid point=[750, 435] size=279x48 visible=Rect(390, 378 - 669, 426)
+11-07 04:36:01.601 31757 31757 I Gacha52ReviewA: tap gacha:confirm point=[750, 435] size=279x48 visible=Rect(390, 378 - 669, 426)
+11-07 04:36:02.149 31757 31757 I Gacha52ReviewA: tap gacha:garage point=[393, 435] size=636x48 visible=Rect(33, 378 - 669, 426)
+11-07 04:36:02.490 31757 31757 I Gacha52ReviewA: tap gacha:garage point=[393, 435] size=636x48 visible=Rect(33, 378 - 669, 426)
+11-07 04:36:02.939 31757 31757 I Gacha52ReviewA: tap gacha:garage point=[393, 435] size=636x48 visible=Rect(33, 378 - 669, 426)
+11-07 04:36:03.010 31757 31826 I Gacha52ReviewA: PASS native A-B-A economicKey preserved attempt changed staleResponse ignored restriction constructorPending garage token late-response blocked restored current completion accepted

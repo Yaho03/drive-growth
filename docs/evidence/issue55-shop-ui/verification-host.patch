@@ -1,0 +1,163 @@
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -5,7 +5,7 @@
+     useLibrary("android.test.runner")
+     useLibrary("android.test.base")
+     defaultConfig {
+-        applicationId = "io.drivegrowth.app"
++        applicationId = "io.drivegrowth.verify55fixedb"
+         minSdk = 28
+         targetSdk = 34
+         versionCode = 1
+--- a/app/src/debug/AndroidManifest.xml
++++ b/app/src/debug/AndroidManifest.xml
+@@ -1,5 +1 @@
+-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+-    <application>
+-        <activity android:name="io.drivegrowth.app.ui.garage.CollectionScrollTestActivity" android:exported="false" />
+-    </application>
+-</manifest>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><activity android:name="io.drivegrowth.app.ui.review.Host55Activity" android:exported="true" android:theme="@android:style/Theme.Material.NoActionBar" /></application></manifest>--- /dev/null
++++ b/app/src/debug/java/io/drivegrowth/app/ui/review/Host55Activity.kt
+@@ -0,0 +1,29 @@
++package io.drivegrowth.app.ui.review
++import android.app.Activity
++import android.os.Bundle
++import android.widget.LinearLayout
++import android.widget.TextView
++import io.drivegrowth.app.ui.shop.*
++class Host55Activity : Activity() {
++    private lateinit var box: LinearLayout
++    lateinit var screen: ShopView
++    val requests = mutableListOf<ShopEvent>()
++    fun show(width: Int, state: ShopScreenState = ShopPreviewStates.normal(), enabled: Boolean = true) {
++        box.removeAllViews(); screen = ShopView(this, { requests.add(it) }); box.addView(screen, LinearLayout.LayoutParams(minOf(dp(width), box.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels), -1)); screen.render(state, enabled)
++    }
++    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
++        root.addView(TextView(this).apply { text = "#55 격리 기기 시험 · 고정 입력 · 실제 저장/차량 입력 아님"; textSize = 14f })
++        box = LinearLayout(this)
++        root.addView(box, LinearLayout.LayoutParams(-1, 0, 1f)); setContentView(root); show(320)
++    }
++    fun restore(width: Int, state: ShopScreenState, saved: ShopUiState, enabled: Boolean) {
++        box.removeAllViews(); screen = ShopView(this, { requests.add(it) })
++        screen.restoreUiState(saved)
++        box.addView(screen, LinearLayout.LayoutParams(minOf(dp(width), box.width), -1))
++        screen.render(state, enabled)
++    }
++
++}
+--- /dev/null
++++ b/app/src/androidTest/java/io/drivegrowth/app/ui/review/Host55DeviceTest.kt
+@@ -0,0 +1,109 @@
++package io.drivegrowth.app.ui.review
++import android.test.ActivityInstrumentationTestCase2
++import android.test.TouchUtils
++import android.view.View
++import android.view.ViewGroup
++import android.widget.Button
++import android.widget.TextView
++import android.graphics.Rect
++import android.graphics.Bitmap
++import java.io.File
++import java.io.FileOutputStream
++import io.drivegrowth.app.ui.shop.*
++import io.drivegrowth.core.contract.*
++@Suppress("DEPRECATION")
++class Host55DeviceTest : ActivityInstrumentationTestCase2<Host55Activity>(Host55Activity::class.java) {
++
++    private fun onUi(block: () -> Unit) { var failure: Throwable? = null; instrumentation.runOnMainSync { try { block() } catch(t: Throwable) { failure = t } }; failure?.let { throw it }; instrumentation.waitForIdleSync() }
++    private fun all(v: View): List<View> = listOf(v) + if(v is ViewGroup) (0 until v.childCount).flatMap { all(v.getChildAt(it)) } else emptyList()
++    private fun texts(v: View) = all(v).filterIsInstance<TextView>().joinToString("\n") { it.text.toString() }
++    private fun tap(v: View) { onUi { v.requestRectangleOnScreen(Rect(0,0,v.width,v.height),true) }; TouchUtils.clickView(this, v); instrumentation.waitForIdleSync() }
++    private fun shot(name: String) { instrumentation.waitForIdleSync(); android.os.SystemClock.sleep(350); instrumentation.uiAutomation.takeScreenshot().let { b -> FileOutputStream(File(activity.filesDir,name)).use { b.compress(Bitmap.CompressFormat.PNG,100,it) }; b.recycle() } }
++
++
++    fun testNativeTouchWidthsPreviewFailureAndRestriction() {
++        val a = activity
++        for(width in listOf(320,1100)) {
++            onUi { a.requests.clear(); a.show(width) }
++            val v = a.screen
++            instrumentation.waitForIdleSync(); android.os.SystemClock.sleep(350)
++            onUi { assertTrue(v.width <= (v.parent as View).width) }
++            File(a.filesDir,"layout.txt").appendText("requested=$width measuredPx=${v.width} density=${v.resources.displayMetrics.density} heightPx=${v.height}\n")
++            assertTrue(texts(v).contains("가게 레벨 3 필요 · 현재 레벨 2"))
++            shot("55-${width}-shop.png")
++            val wash = all(v).filterIsInstance<TextView>().single { it.text.contains("가게 레벨 3 필요") }
++            onUi { wash.requestRectangleOnScreen(Rect(0,0,wash.width,wash.height),true) }
++            shot("55-${width}-wash.png")
++            tap(v.findViewWithTag<Button>("shop:preview:blue-sign"))
++            assertTrue(a.requests.isEmpty()); assertTrue(texts(v).contains("변경안 · 파란 가게"))
++            shot("55-${width}-preview.png")
++            tap(v.findViewWithTag<Button>("shop:cancel"))
++            assertFalse(texts(v).contains("변경안 · 파란 가게"))
++            tap(v.findViewWithTag<Button>("shop:preview:expand"))
++            tap(v.findViewWithTag<Button>("shop:confirm"))
++            assertEquals(1,a.requests.size)
++            val request = (a.requests.single() as ShopEvent.Submit).request
++            val saved = v.uiState
++            onUi {
++                val restored = ShopView(a,{a.requests.add(it)})
++                restored.restoreUiState(saved); restored.render(ShopPreviewStates.normal(),true)
++                assertEquals(request,restored.uiState.pending); assertEquals(1,a.requests.size)
++                v.render(ShopPreviewStates.normal(),false)
++            }
++            assertTrue(all(v).none { it is Button }); assertFalse(texts(v).contains("2,400"))
++            onUi { v.complete(request,ContractResult.Failure(ContractError.STORAGE_FAILURE)) }
++            assertTrue(all(v).none { it is Button })
++            onUi { v.render(ShopPreviewStates.normal(),true) }
++            assertTrue(texts(v).contains("STORAGE_FAILURE")); assertTrue(texts(v).contains("2,400 게임머니"))
++        }
++    }
++
++    fun testFixedFreshnessAndAlternatingFailedRequestsOnAttachedView() {
++        val a = activity
++        val old = ShopPreviewStates.normal()
++        val latest = old.copy(revision = Revision(13), balance = GameMoney(900), capacity = 7)
++        onUi { a.requests.clear(); a.show(320, latest) }
++        var v = a.screen
++        onUi { v.render(old, true) }
++        assertTrue(texts(v).contains("보유 / 공간 · 2 / 7"))
++        assertTrue(texts(v).contains("900 게임머니")); assertFalse(texts(v).contains("2,400"))
++        onUi { v.render(old, false); v.render(old, true) }
++        assertTrue(all(v).none { it is Button })
++        onUi { v.render(ShopScreenState.Loading, false); v.render(old, true) }
++        assertTrue(all(v).none { it is Button })
++        onUi { v.render(latest, true) }; assertTrue(texts(v).contains("900 게임머니"))
++        onUi { v.render(ShopScreenState.Failure("시험 조회 실패"), false); v.render(old, true) }
++        assertTrue(all(v).none { it is Button })
++        val saved = v.uiState
++        onUi { a.restore(320, old, saved, true) }; v = a.screen
++        assertFalse(texts(v).contains("2,400")); assertTrue(all(v).none { it is Button })
++        onUi { v.render(latest, true) }
++        assertTrue(texts(v).contains("보유 / 공간 · 2 / 7")); shot("fixed-latest-after-restore.png")
++
++        onUi { a.requests.clear(); a.show(320, old) }; v = a.screen
++        tap(v.findViewWithTag<Button>("shop:preview:blue-sign")); tap(v.findViewWithTag<Button>("shop:confirm"))
++        val first = (a.requests.last() as ShopEvent.Submit).request
++        onUi { v.complete(first, ContractResult.Failure(ContractError.STORAGE_FAILURE)) }
++        tap(v.findViewWithTag<Button>("shop:preview:expand")); tap(v.findViewWithTag<Button>("shop:confirm"))
++        val second = (a.requests.last() as ShopEvent.Submit).request
++        assertFalse(first.requestId == second.requestId)
++        onUi { v.complete(second, ContractResult.Failure(ContractError.STORAGE_FAILURE)); v.render(old, false) }
++        val pendingIds = v.uiState
++        onUi { a.restore(320, old, pendingIds, false) }; v = a.screen
++        assertTrue(all(v).none { it is Button })
++        onUi { v.render(old, true) }
++        tap(v.findViewWithTag<Button>("shop:preview:blue-sign")); tap(v.findViewWithTag<Button>("shop:confirm"))
++        val retry = (a.requests.last() as ShopEvent.Submit).request
++        assertEquals(first.requestId, retry.requestId); assertFalse(first.attemptId == retry.attemptId)
++        assertEquals(3, a.requests.size)
++        onUi { v.complete(first, ContractResult.Success(Unit)) }
++        assertEquals(retry, v.uiState.pending)
++        shot("fixed-alternating-retry.png")
++        onUi { v.render(latest, false); v.complete(retry, ContractResult.Success(Unit)) }
++        assertTrue(all(v).none { it is Button })
++        onUi { v.render(latest, true) }
++        assertTrue(texts(v).contains("900 게임머니")); assertFalse(texts(v).contains("2,400"))
++        File(a.filesDir,"fixed-request-ids.txt").writeText("A=${first.requestId.value}\nB=${second.requestId.value}\nretryA=${retry.requestId.value}\nfirstAttempt=${first.attemptId}\nretryAttempt=${retry.attemptId}\n")
++    }
++
++}

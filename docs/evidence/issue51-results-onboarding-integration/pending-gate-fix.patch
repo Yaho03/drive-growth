@@ -1,0 +1,10 @@
+--- a/app/src/main/java/io/drivegrowth/app/MainActivity.kt
++++ b/app/src/main/java/io/drivegrowth/app/MainActivity.kt
+@@ -263 +263,6 @@
+-        if (!allowed()) { updateAccess(); return }
++        if (!allowed()) {
++            updateAccess()
++            // View가 callback 전에 만든 Pending은 실제 제출 상태로 되돌린다.
++            results.restoreUiState(session.results.uiState)
++            return
++        }

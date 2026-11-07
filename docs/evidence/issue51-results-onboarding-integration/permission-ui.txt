@@ -1,0 +1,2 @@
+product-permission-denied ['주차 후 조작이 허용되면 이용할 수 있습니다.']
+product-permission-restored ['뒤로', '가게', '보유 차량', '도감', '미확인 정산', '첫 차량 안내', '드라이브 키우기', '모의 원장 · fixture-content-v0', '잔액 0 · 보유 차량 0대', '새로고침']

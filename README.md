@@ -2,18 +2,20 @@
 
 ## 팀 작업 현황 (임시)
 
-| 담당 | 지금 할 일 | 막고 있는 이슈 | 해제 조건 |
-|---|---|---|---|
-| 정원 | [#80](https://github.com/Yaho03/drive-growth/issues/80), [#37](https://github.com/Yaho03/drive-growth/issues/37) 시험용 후보·규칙 확인, [#40](https://github.com/Yaho03/drive-growth/issues/40) 음성 없는 뼈대 | #38·#39는 정원 #37 | 선택 의뢰의 필요한 결과 검토·main 반영 |
-| 환석 | [#51](https://github.com/Yaho03/drive-growth/issues/51)·[#52](https://github.com/Yaho03/drive-growth/issues/52) 실제 연결, [#54](https://github.com/Yaho03/drive-growth/issues/54) 결과 UI·[#56](https://github.com/Yaho03/drive-growth/issues/56) 첫 실행 UI 병렬 구현 | 실제 탐색 연결은 #51의 해당 연결점, 실제 지급·정산은 각 기능 결과 | #105 입력·Back 기반과 #103 표시 UI 사용. 독립 View부터 구현하고 호스트·명령 연결 후 검증 |
-| 호열 | [#47](https://github.com/Yaho03/drive-growth/issues/47), [#48](https://github.com/Yaho03/drive-growth/issues/48), [#50](https://github.com/Yaho03/drive-growth/issues/50), #46 활동·영속 도감 연결·#35 콘텐츠 | #49는 경민 #42 | #104 개체 필드·단일 개체 저장 사용 가능. 확정 사고 결과 인계와 다중 개체 거래는 별도 확인 |
-| 경민 | [#41](https://github.com/Yaho03/drive-growth/issues/41) 조회 후보·자동 배정 구현 | #42는 경민 #41, #43·#44는 경민 #42 | 각 기능이 소비할 결과의 검토·main 반영 |
+| 담당 | 지금 할 일 | 필요한 공통 연결·해제 조건 |
+|---|---|---|
+| 정원 | #37 Ledger/직렬화·#38/#39 독립 계산, #40 실제 증거 연결. #112·#119·#36 재사용 | 탁송 최종 공용 연결은 경민과 수정 범위·#116 이전 순서 조율. 실제 도착은 #80·기록/음성은 #81 해당 근거만 기다림 |
+| 환석 | [공통 계약 후속](https://github.com/Yaho03/drive-growth/issues/121)의 PR #126 가챠 타입·메모리 참조와 #127 재료 타입·순수 검증 인계 완료. [#132](https://github.com/Yaho03/drive-growth/pull/132) 가챠 독립 표시 UI·검증 main 반영 완료, #52/#54/#56 실제 공급 연결 조건 유지, #58 정의 조율 | 기존 #104·호스트/열람 코드 유지. 가챠 실제 소비·SQLite, 재료 store, 초기화 NEW 근거·수리·진행 명령은 미연결/미제공 범위를 확인해 소비 |
+| 호열 | #111 두 P1 소비 수정, #48 재료 거래·#49 최신 계산/수리·처분·#50 초기화 연결, #35 유형/정의 | #113/#114/#115 유지. 공통 전체 요청/결과·다중 개체/티켓·최종 공간 저장과 #116 수정·머지된 이력/사고 조회 사용 |
+| 경민 | [저장 후속](https://github.com/Yaho03/drive-growth/issues/122), #116 세 지적 수정, #41~#45 실제 입력·진행/수령 연결 | 기존 #107 RentalLedger 유지. 합의된 계약 묶음부터 저장·이전·최종 점유 검증. 금액/퀘스트 정의는 #24/#35와 조율 |
+
+#53 탁송·#55 시설/꾸미기·#57 진행/휴식 표시 UI는 PR #124·#125·#129로 main에 인계됐고, #55 첫 복원 수정도 PR #130에 반영됐다. #52 가챠는 두 P2 수정·독립 단위/장치 검증·CI를 통과해 [PR #132](https://github.com/Yaho03/drive-growth/pull/132)로 main에 반영됐다. 이들 UI의 실제 호스트·거래·저장 연결은 남아 있다. 실제 명령/저장 미지원은 화면에 구분하고 UI 작업 전체를 공통 구현 완료 대기로 바꾸지 않는다. 구체 입출력과 제공/대기 구분은 [기술 계약](docs/02_SYSTEM_ARCHITECTURE.md#전체-기능의-공통-계약과-저장-선행-작업), 순서·책임은 [진행 계획](docs/08_PROJECT_PLAN.md#남은-공통-선행-작업과-병렬-연결-순서), 실제 차단은 각 이슈를 따른다.
 
 선행 결과가 검토·머지되거나 이슈를 완료로 닫으면 이 표도 갱신한다. 세부 정책·실제 연결 조건은 각 이슈를 따른다. 팀 구현이 끝나면 이 섹션을 삭제한다.
 
 평소 이동을 탁송·차량 영입으로 연결하고, 주차 후 차량을 모으고 렌터카 가게를 확장하는 Pleos Connect 차량용 게임을 기획하고 있습니다.
 
-**공통 차량 계약·단일 개체 저장과 차고·상세·도감 표시 UI를 구현했고, 실제 게임 기능과 화면의 연결을 진행 중입니다.** 표시 UI의 고정 입력·격리 Activity 시험은 실제 지급·경제 명령·앱 전체 흐름 완료와 구분합니다. Debug APK는 로컬 시험 산출물이며 제출 Release APK·실제 게임 시연 영상은 준비 전입니다.
+**차고·도감·정산·첫 실행 View를 실제 탐색에 연결했습니다. 정산은 기존 SQLite 열람 저장·재조회·복원을 사용하며, 첫 실행은 초기 지급 조회 미지원 상태를 표시합니다.** 실제 #50 지급·관리 경제 명령·앱 전체 흐름 완료와 구분합니다. Debug APK는 로컬 시험 산출물이며 제출 Release APK·실제 게임 시연 영상은 준비 전입니다.
 
 처음 참여한다면 [4인 구현 시작 안내와 책임표](docs/08_PROJECT_PLAN.md)를 확인하세요. 기능 이슈 → 해당 PRD 항목 → 공통 데이터 계약 → 화면 명세 → 검증 명령 순서로 진행합니다. 공통 타입·거래 저장·fixture 구현은 기능 연결의 선행 작업입니다.
 
@@ -36,7 +38,8 @@
 | 공통 거래 원장 | #104에서 개체 희귀도·진행량·취득 정보와 단일 개체 저장 확장. SQLite 시험 26개 통과. 구형 데이터 migration·영속 도감·다중 개체 거래·제품 앱 재실행은 남음 |
 | 전경 차량 입력·Back | #105의 SDK 단일 worker·늦은 응답/수신 시각 처리. Pleos API34에서 D/P 제한·권한·Back·재생성, 제어된 worker 정지 중 제한·복귀 확인. 공식 폼 팩터·실차·장기 안정성은 남음 |
 | 개발 도구·APK | 공통 조합 빌드·Lint, Debug 설치·Activity 기본 실행 확인 |
-| 새 화면 | [UI 시안 v3](docs/design-assets/ui-v3/)를 반영한 #103 차고·개체 상세·도감 Android Views 구현. 격리 Activity 장치 시험 10개 통과. #51 탐색·주행 제한 및 실제 데이터·명령 연결은 남음 |
+| 차고·도감 탐색 | #109에서 typed 조회·SQLite→차고·Back·선택 복원과 SDK 제한 연결. 독립 장치 회귀 5개 및 D/P·권한·CCP 확인. 실제 활동·도감 이력·관리 명령은 남음 |
+| 정산·첫 실행 연결 | 기존 #108/#110 View를 실제 호스트·gate·Back에 연결. 원본 Settlement→실제 markViewed 응답·재조회, host 회귀9개·격리 장치3개·제품 SDK D/P·권한·CCP와 원장 불변 재시작 확인. 초기화는 Unavailable이며 실제 #50 지급·전체 history/세부 수익·공식 폼 팩터/실차는 남음. [실행 근거](docs/06_VERIFICATION.md#정산첫-실행-실제-호스트-연결-검증--2026-11-07) |
 | 렌터카 게임·추가 기능 | 상세 구현 이슈로 진행. 정책·수치·일부 동작은 결정 대기 |
 | 최종 APK·시연·실차 | 제출 산출물 미준비, 실차 미검증 |
 
@@ -51,11 +54,13 @@ python3 scripts/check_repository.py
 ./gradlew :core:test :app:assembleDebug :app:lintDebug
 ```
 
-Android 저장 시험은 Pleos 시험 장치를 연결한 뒤 실행합니다.
+기존 SQLite 저장 시험은 Pleos 시험 장치를 연결한 뒤 대상 클래스를 지정합니다.
 
 ```sh
-./gradlew :app:connectedDebugAndroidTest
+./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.drivegrowth.app.data.SqliteGameChangeStoreTest
 ```
+
+실제 호스트의 기본 원장에 시험 정산을 만드는 새 `ResultsHostStorageTest`·`ResultsHostActivityTest`는 제품 데이터 보호를 위해 **격리 패키지에서만 실행**하며 제품 패키지에서는 쓰기 전에 실패합니다. 이 시험까지 포함한 전체 계측 시험을 제품 앱에 무조건 실행하지 않습니다. 격리 빌드·설치·권한·표적 실행 명령은 [실제 연결 검증의 재현 절차](docs/06_VERIFICATION.md#격리-표적-시험-재현)를 따릅니다. 장치 점유를 먼저 조율하고 실제 P·정차·UX 허용 조건을 준비합니다.
 
 Debug 산출물은 `app/build/outputs/apk/debug/app-debug.apk`입니다. 설치·로그 수집은 개발환경 문서를 따릅니다. CI는 소스 포함 시 `repository-checks`와 `android-checks`를 실행합니다. 실제 로컬·CI 결과와 경고는 [검증 기록](docs/06_VERIFICATION.md)을 확인합니다.
 

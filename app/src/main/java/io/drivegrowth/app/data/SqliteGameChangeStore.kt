@@ -8,6 +8,7 @@ import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteDatabaseCorruptException
 import android.database.sqlite.SQLiteOpenHelper
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.progression.VehicleActivity
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.Closeable
@@ -16,7 +17,7 @@ import java.util.UUID
 /** 단일 기기 거래 원장. 호출자는 메인 스레드 밖에서 사용한다. 출처마다 별도 DB를 사용한다. */
 class SqliteGameChangeStore(
     context: Context,
-    private val source: InputSource,
+    internal val source: InputSource,
     databaseName: String = "game-ledger-${source.name.lowercase()}.db",
     private val clock: () -> Long = System::currentTimeMillis,
 ) : GameChangeStore, Closeable {
@@ -30,78 +31,94 @@ class SqliteGameChangeStore(
     @Synchronized
     override fun commitGameChange(change: GameChange): ContractResult<Settlement> {
         if (change.source != source) return failure(ContractError.INVALID_INPUT)
-        return storage {
-            val db = helper.writableDatabase
-            db.beginTransaction()
-            try {
-                val command = LedgerJson.command(change).toString()
-                val existing = db.rawQuery("SELECT command, result FROM settlements WHERE request_id = ?", arrayOf(change.requestId.value)).use {
-                    if (it.moveToFirst()) it.getString(0) to it.getString(1) else null
-                }
-                if (existing != null) {
-                    return@storage if (existing.first == command) ContractResult.Success(LedgerJson.settlement(JSONObject(existing.second)))
-                    else failure(ContractError.STATE_CONFLICT)
-                }
-                val previousBalance = readBalance(db)
-                val balance = when (val money = change.money) {
-                    null -> previousBalance
-                    else -> when (money.direction) {
-                        MoneyDirection.CREDIT -> {
-                            if (money.amount.units > Long.MAX_VALUE - previousBalance.units) return@storage failure(ContractError.INVALID_INPUT)
-                            GameMoney(previousBalance.units + money.amount.units)
-                        }
-                        MoneyDirection.DEBIT -> {
-                            if (money.amount.units > previousBalance.units) return@storage failure(ContractError.INSUFFICIENT_FUNDS)
-                            GameMoney(previousBalance.units - money.amount.units)
-                        }
-                    }
-                }
-                val vehicle = when (val write = change.vehicle) {
-                    null -> null
-                    is VehicleWrite.Add -> {
-                        if (findVehicle(db, write.vehicle.ownedVehicleId) != null) return@storage failure(ContractError.STATE_CONFLICT)
-                        if (write.vehicle.revision != Revision(0) || write.vehicle.lifecycle != VehicleLifecycle.OWNED) return@storage failure(ContractError.INVALID_INPUT)
-                        write.vehicle
-                    }
-                    is VehicleWrite.Update -> {
-                        val previous = findVehicle(db, write.ownedVehicleId) ?: return@storage failure(ContractError.DATA_UNAVAILABLE)
-                        if (previous.revision != write.expectedRevision || previous.lifecycle != VehicleLifecycle.OWNED) return@storage failure(ContractError.STATE_CONFLICT)
-                        if (previous.revision.value == Int.MAX_VALUE) return@storage failure(ContractError.INVALID_INPUT)
-                        if (write.lifecycle != VehicleLifecycle.OWNED &&
-                            (write.level != previous.level || write.levelProgressPercent != previous.levelProgressPercent)) return@storage failure(ContractError.INVALID_INPUT)
-                        previous.copy(level = write.level, lifecycle = write.lifecycle, revision = Revision(previous.revision.value + 1),
-                            levelProgressPercent = write.levelProgressPercent)
-                    }
-                }
-                val result = Settlement(
-                    SettlementId(UUID.randomUUID().toString()),
-                    Transaction(TransactionId(UUID.randomUUID().toString()), change.requestId, change.kind, change.source, change.ruleVersion, change.money),
-                    balance, vehicle, EpochMillis(clock()),
-                )
-                db.execSQL("UPDATE account SET balance = ? WHERE id = 1", arrayOf(balance.units))
-                if (vehicle != null) {
-                    val values = ContentValues().apply {
-                        put("owned_id", vehicle.ownedVehicleId.value)
-                        put("payload", LedgerJson.vehicle(vehicle).toString())
-                    }
-                    if (change.vehicle is VehicleWrite.Add) db.insertOrThrow("vehicles", null, values)
-                    else if (db.update("vehicles", values, "owned_id = ?", arrayOf(vehicle.ownedVehicleId.value)) != 1) throw SQLiteException("차량 갱신 실패")
-                }
-                db.insertOrThrow("settlements", null, ContentValues().apply {
-                    put("request_id", change.requestId.value)
-                    put("settlement_id", result.settlementId.value)
-                    put("command", command)
-                    put("result", LedgerJson.settlement(result).toString())
-                    put("viewed", 0)
-                })
+        return atomic { db -> record(db, change, LedgerJson.command(change).toString()) }
+    }
+
+    val rental = RentalLedger(this)
+
+    @Synchronized
+    internal fun <T> atomic(action: (SQLiteDatabase) -> ContractResult<T>): ContractResult<T> = storage {
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            val result = action(db)
+            if (result is ContractResult.Success) {
                 beforeCommit?.invoke()
                 db.setTransactionSuccessful()
-                ContractResult.Success(result)
-            } finally {
-                // 반환값은 endTransaction의 COMMIT까지 성공한 뒤 호출자에게 전달된다.
-                db.endTransaction()
+            }
+            result
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    internal fun record(db: SQLiteDatabase, change: GameChange, command: String): ContractResult<Settlement> {
+        val existing = db.rawQuery("SELECT command, result FROM settlements WHERE request_id = ?", arrayOf(change.requestId.value)).use {
+            if (it.moveToFirst()) it.getString(0) to it.getString(1) else null
+        }
+        if (existing != null) {
+            return if (existing.first == command) ContractResult.Success(LedgerJson.settlement(JSONObject(existing.second)))
+            else failure(ContractError.STATE_CONFLICT)
+        }
+        val previousBalance = readBalance(db)
+        val balance = when (val money = change.money) {
+            null -> previousBalance
+            else -> when (money.direction) {
+                MoneyDirection.CREDIT -> {
+                    if (money.amount.units > Long.MAX_VALUE - previousBalance.units) return failure(ContractError.INVALID_INPUT)
+                    GameMoney(previousBalance.units + money.amount.units)
+                }
+                MoneyDirection.DEBIT -> {
+                    if (money.amount.units > previousBalance.units) return failure(ContractError.INSUFFICIENT_FUNDS)
+                    GameMoney(previousBalance.units - money.amount.units)
+                }
             }
         }
+        val vehicle = when (val write = change.vehicle) {
+            null -> null
+            is VehicleWrite.Add -> {
+                if (findVehicle(db, write.vehicle.ownedVehicleId) != null) return failure(ContractError.STATE_CONFLICT)
+                if (write.vehicle.revision != Revision(0) || write.vehicle.lifecycle != VehicleLifecycle.OWNED) return failure(ContractError.INVALID_INPUT)
+                write.vehicle
+            }
+            is VehicleWrite.Update -> {
+                val previous = findVehicle(db, write.ownedVehicleId) ?: return failure(ContractError.DATA_UNAVAILABLE)
+                val activity = rental.activity(db, write.ownedVehicleId)
+                if (activity == VehicleActivity.RENTED ||
+                    activity == VehicleActivity.RETURNING ||
+                    (activity == VehicleActivity.NEEDS_REPAIR &&
+                        write.lifecycle !in setOf(VehicleLifecycle.SOLD, VehicleLifecycle.SCRAPPED)))
+                    return failure(ContractError.STATE_CONFLICT)
+                if (previous.revision != write.expectedRevision || previous.lifecycle != VehicleLifecycle.OWNED) return failure(ContractError.STATE_CONFLICT)
+                if (previous.revision.value == Int.MAX_VALUE) return failure(ContractError.INVALID_INPUT)
+                if (write.lifecycle != VehicleLifecycle.OWNED &&
+                    (write.level != previous.level || write.levelProgressPercent != previous.levelProgressPercent)) return failure(ContractError.INVALID_INPUT)
+                previous.copy(level = write.level, lifecycle = write.lifecycle, revision = Revision(previous.revision.value + 1),
+                    levelProgressPercent = write.levelProgressPercent)
+            }
+        }
+        val result = Settlement(
+            SettlementId(UUID.randomUUID().toString()),
+            Transaction(TransactionId(UUID.randomUUID().toString()), change.requestId, change.kind, change.source, change.ruleVersion, change.money),
+            balance, vehicle, EpochMillis(clock()),
+        )
+        db.execSQL("UPDATE account SET balance = ? WHERE id = 1", arrayOf(balance.units))
+        if (vehicle != null) {
+            val values = ContentValues().apply {
+                put("owned_id", vehicle.ownedVehicleId.value)
+                put("payload", LedgerJson.vehicle(vehicle).toString())
+            }
+            if (change.vehicle is VehicleWrite.Add) db.insertOrThrow("vehicles", null, values)
+            else if (db.update("vehicles", values, "owned_id = ?", arrayOf(vehicle.ownedVehicleId.value)) != 1) throw SQLiteException("차량 갱신 실패")
+        }
+        db.insertOrThrow("settlements", null, ContentValues().apply {
+            put("request_id", change.requestId.value)
+            put("settlement_id", result.settlementId.value)
+            put("command", command)
+            put("result", LedgerJson.settlement(result).toString())
+            put("viewed", 0)
+        })
+        return ContractResult.Success(result)
     }
 
     @Synchronized
@@ -133,12 +150,12 @@ class SqliteGameChangeStore(
     @Synchronized
     override fun close() = helper.close()
 
-    private fun readBalance(db: SQLiteDatabase): GameMoney = db.rawQuery("SELECT balance FROM account WHERE id = 1", null).use {
+    internal fun readBalance(db: SQLiteDatabase): GameMoney = db.rawQuery("SELECT balance FROM account WHERE id = 1", null).use {
         if (!it.moveToFirst()) throw SQLiteException("거래 계정 누락")
         GameMoney(it.getLong(0))
     }
 
-    private fun findVehicle(db: SQLiteDatabase, id: OwnedVehicleId): OwnedVehicle? =
+    internal fun findVehicle(db: SQLiteDatabase, id: OwnedVehicleId): OwnedVehicle? =
         db.rawQuery("SELECT payload FROM vehicles WHERE owned_id = ?", arrayOf(id.value)).use {
             if (it.moveToFirst()) LedgerJson.vehicle(JSONObject(it.getString(0))) else null
         }
@@ -164,7 +181,7 @@ internal enum class LedgerFailureReason { SQLITE, CORRUPT, UNSUPPORTED_SCHEMA, S
 private class LedgerStorageException(val reason: LedgerFailureReason) : SQLiteException(reason.name)
 
 private class LedgerHelper(context: Context, name: String, private val source: InputSource) : SQLiteOpenHelper(
-    context, name, null, 1,
+    context, name, null, 2,
     // Android 기본 핸들러의 손상 DB 삭제를 막고 원본을 보존한다.
     DatabaseErrorHandler { throw LedgerStorageException(LedgerFailureReason.CORRUPT) },
 ) {
@@ -176,26 +193,33 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         db.execSQL("INSERT INTO account VALUES (1, 0, ?)", arrayOf(source.name))
         db.execSQL("CREATE TABLE vehicles (owned_id TEXT PRIMARY KEY NOT NULL, payload TEXT NOT NULL)")
         db.execSQL("CREATE TABLE settlements (request_id TEXT PRIMARY KEY NOT NULL, settlement_id TEXT UNIQUE NOT NULL, command TEXT NOT NULL, result TEXT NOT NULL, viewed INTEGER NOT NULL CHECK(viewed IN (0,1)))")
+        RentalLedger.createTables(db)
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
+        if (oldVersion != 1 || newVersion != 2) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
+        verifySource(db)
+        // 기존 원장과 개체 JSON은 그대로 보존한다.
+        RentalLedger.createTables(db)
     }
     override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
     }
     override fun onOpen(db: SQLiteDatabase) {
         super.onOpen(db)
-        db.rawQuery("SELECT source FROM account WHERE id = 1", null).use {
-            if (!it.moveToFirst() || it.getString(0) != source.name) throw LedgerStorageException(LedgerFailureReason.SOURCE_MISMATCH)
-        }
+        verifySource(db)
         db.rawQuery("PRAGMA quick_check", null).use {
             if (!it.moveToFirst() || it.getString(0) != "ok") throw LedgerStorageException(LedgerFailureReason.CORRUPT)
+        }
+    }
+    private fun verifySource(db: SQLiteDatabase) {
+        db.rawQuery("SELECT source FROM account WHERE id = 1", null).use {
+            if (!it.moveToFirst() || it.getString(0) != source.name) throw LedgerStorageException(LedgerFailureReason.SOURCE_MISMATCH)
         }
     }
 }
 
 /** 필드 순서가 고정된 명령 표현을 저장해 요청 ID 재사용 시 전체 입력을 비교한다. */
-private object LedgerJson {
+internal object LedgerJson {
     fun vehicle(v: OwnedVehicle) = JSONObject().put("id", v.ownedVehicleId.value).put("vehicle", v.vehicleId.value)
         .put("level", v.level).put("revision", v.revision.value).put("lifecycle", v.lifecycle.name)
         .put("rarity", v.rarity.name).put("levelProgressPercent", v.levelProgressPercent)

@@ -1,0 +1,7 @@
+
+io.drivegrowth.app.host.ResultsHostStorageTest:..
+io.drivegrowth.app.host.ResultsHostActivityTest:.
+Test results for InstrumentationTestRunner=...
+Time: 14.925
+
+OK (3 tests)

@@ -1,6 +1,6 @@
 package io.drivegrowth.core.content
 
-/** 시험용 콘텐츠. 가격·해금 레벨은 임의 시험값이며 PRD의 게임용 가격표가 아니다. 가챠 수치는 PRD 시험값. */
+/** 테스트용 5종 콘텐츠. 해금 레벨은 PRD 배치가 아닌 테스트값이다. 실제 20종 표는 app/src/main/assets/content/game-content.csv. */
 object GameContentFixtures {
     val facts = """
         vehicle_id,model_name
@@ -15,15 +15,16 @@ object GameContentFixtures {
         # content_version=fixture-content-v0
         # rule_version=fixture-rule-v0
         # trial=true
+        # price_unit=8000
         # gacha_weights=COMMON:747,ADVANCED:200,RARE:50,LEGEND:3
         # gacha_pity=30
         # gacha_guaranteed_from=RARE
-        vehicle_id,game_price,rarity,unlock_shop_level
-        hyundai_casper,8000,COMMON,1
-        hyundai_avante,10000,COMMON,1
-        hyundai_sonata,15000,ADVANCED,1
-        hyundai_grandeur,25000,RARE,1
-        genesis_g90,60000,LEGEND,2
+        vehicle_id,price_ratio_percent,unlock_shop_level
+        hyundai_casper,100,1
+        hyundai_avante,120,1
+        hyundai_sonata,150,1
+        hyundai_grandeur,200,1
+        genesis_g90,300,2
     """.trimIndent()
 
     fun loaded(): GameContentSnapshot = (GameContentLoader.load(facts, content) as ContentLoad.Loaded).snapshot
