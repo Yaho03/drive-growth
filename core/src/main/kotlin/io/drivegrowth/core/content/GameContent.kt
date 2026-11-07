@@ -11,6 +11,7 @@ import io.drivegrowth.core.contract.VehicleDefinition
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.progression.GachaRules
 import io.drivegrowth.core.contract.Rarity
+import java.math.BigInteger
 import java.util.Collections
 import java.util.EnumMap
 
@@ -68,6 +69,7 @@ sealed interface ContentLoad {
  * ```
  */
 object GameContentLoader {
+    private val HUNDRED = BigInteger.valueOf(100)
     private const val CONTENT_HEADER = "vehicle_id,price_ratio_percent,unlock_shop_level"
     private val META_KEYS = setOf("content_version", "rule_version", "trial", "price_unit", "gacha_weights", "gacha_pity", "gacha_guaranteed_from")
 
@@ -120,8 +122,11 @@ object GameContentLoader {
             require(ratio > 0) { "가격 비율은 양수: ${id.value}" }
             val level = cols[2].toInt()
             require(level >= 1) { "해금 가게 레벨은 1 이상: ${id.value}" }
-            // 내림. 비율이 정수 %라 price_unit이 100의 배수면 정확하다.
-            VehicleGameData(id, GameMoney(Math.multiplyExact(priceUnit, ratio.toLong()) / 100), level)
+            // 내림은 마지막에 한 번. 중간 곱이 Long을 넘어도 최종값이 표현 가능하면 계산한다.
+            val price = BigInteger.valueOf(priceUnit).multiply(BigInteger.valueOf(ratio.toLong())).divide(HUNDRED)
+            require(price.bitLength() < Long.SIZE_BITS) { "차종 가격이 지원 범위(Long)를 넘음: ${id.value}" }
+            require(price.signum() > 0) { "차종 가격은 1 이상(단위×비율 내림 결과): ${id.value}" }
+            VehicleGameData(id, GameMoney(price.toLong()), level)
         }
         require(vehicles.isNotEmpty()) { "콘텐츠 차량이 없음" }
         require(vehicles.map { it.vehicleId }.toSet().size == vehicles.size) { "콘텐츠 중복 vehicle_id" }

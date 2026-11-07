@@ -253,7 +253,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 `core/src/testFixtures`의 `RentalContractFixtures`에서 시험 차량 v1/v2, 관측 30,000m·예상 20,000m, 고정 시각·규칙 버전·seed 33, 성공·실패 카탈로그와 메모리 저장소를 얻는다. `:core:test --tests '*RentalContractConsumerTest'`로 소비 예제를 실행한다. 다른 모듈의 테스트에서는 필요할 때 `testFixtures(project(":core"))`를 테스트 의존성으로 사용한다.
 
-#35의 첫 로더는 `io.drivegrowth.core.content.GameContentLoader.load(사실 CSV, 게임 콘텐츠)`다. 사실 CSV에서는 `vehicle_id`·`model_name`만 읽는다. 이미지·로고·3D 열은 읽지 않는다. 게임 콘텐츠는 별도 파일이다. 머리 메타에는 콘텐츠·규칙 버전, 시험값 여부, 가격 단위 `price_unit`, 가챠 천분율 가중치(합 1000)·천장·보장 희귀도가 들어간다. 본문(`vehicle_id,price_ratio_percent,unlock_shop_level`)에는 차종별 가격 비율(1.0 = 100)과 해금 가게 레벨이 들어간다. 차종 가격은 `price_unit × 비율 / 100`(내림)이다. 실제 금액 단위는 #44에서 정해지면 `price_unit` 한 값만 바꾼다. 다음 경우에는 `ContractError.INVALID_INPUT`으로 거절하고 기본값을 넣지 않는다.
+#35의 첫 로더는 `io.drivegrowth.core.content.GameContentLoader.load(사실 CSV, 게임 콘텐츠)`다. 사실 CSV에서는 `vehicle_id`·`model_name`만 읽는다. 이미지·로고·3D 열은 읽지 않는다. 게임 콘텐츠는 별도 파일이다. 머리 메타에는 콘텐츠·규칙 버전, 시험값 여부, 가격 단위 `price_unit`, 가챠 천분율 가중치(합 1000)·천장·보장 희귀도가 들어간다. 본문(`vehicle_id,price_ratio_percent,unlock_shop_level`)에는 차종별 가격 비율(1.0 = 100)과 해금 가게 레벨이 들어간다. 차종 가격은 `price_unit × 비율 / 100`(마지막에 한 번 내림)이다. 중간 곱이 Long을 넘어도 최종값이 Long 안이면 계산하고, 최종값이 Long을 넘거나 1 미만이면 거절한다(차종 기준가는 양수. 첫 지급·무료 취득액 0과는 다른 값). 실제 금액 단위는 #44에서 정해지면 `price_unit` 한 값만 바꾼다. 다음 경우에는 `ContractError.INVALID_INPUT`으로 거절하고 기본값을 넣지 않는다.
 
 - 사실 CSV에 없는 ID 또는 중복 ID
 - 0 이하·비정수 가격 비율 또는 가격 단위, 1 미만 해금 레벨
@@ -306,7 +306,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 #### #46 개체 정보 v1과 공통 소비 예제
 
-2026-11-07, #46 공통 계약 조율 댓글과 최신 PRD의 개별 희귀도·재료 진행량·실제 취득액 결정을 코드 계약에 반영한다. 제품 규칙 추가가 아니라 기존 결정의 타입화다. `Rarity`는 `core.progression`에서 `core.contract`로 이동하며 enum은 하나만 둔다. 기존 소비자는 공통 위치를 import한다. 호환 alias는 두지 않는다. `VehicleGameData.rarity`는 아직 남아 있는 #35의 과거 시험 콘텐츠 필드이며 개체 희귀도의 생성 근거로 자동 복사하지 않는다. 콘텐츠 형식·1차 차종 연결은 #35 후속 범위다.
+2026-11-07, #46 공통 계약 조율 댓글과 최신 PRD의 개별 희귀도·재료 진행량·실제 취득액 결정을 코드 계약에 반영한다. 제품 규칙 추가가 아니라 기존 결정의 타입화다. `Rarity`는 `core.progression`에서 `core.contract`로 이동하며 enum은 하나만 둔다. 기존 소비자는 공통 위치를 import한다. 호환 alias는 두지 않는다. 콘텐츠의 차종 희귀도 열과 `VehicleGameData.rarity`는 PR #115에서 제거했다. 개체 희귀도는 가챠 추첨·첫 지급 등 취득 시점에 정해진다.
 
 | 필드·명령 | 단위와 유효 범위·보존 조건 |
 |---|---|

@@ -93,6 +93,20 @@ class GameContentLoaderTest {
         assertEquals(GameMoney(16_000), doubled.vehicles.first().price) // 수익 단위만 바꾸면 전체 가격이 따라 바뀐다
     }
 
+    @Test fun `중간 곱이 커도 최종 가격이 표현 가능하면 계산하고 범위를 넘거나 0이면 거절한다`() {
+        // 캐스퍼 한 종만 남긴 콘텐츠에서 가격 단위·비율만 바꾼다.
+        val casperOnly = content.lines().filter { !it.startsWith("hyundai_") && !it.startsWith("genesis_") || it.startsWith("hyundai_casper,") }
+            .joinToString("\n")
+        fun casperPrice(unit: String, ratio: Int) =
+            (GameContentLoader.load(facts, casperOnly.replace("price_unit=8000", "price_unit=$unit").replace("hyundai_casper,100,", "hyundai_casper,$ratio,"))
+                as ContentLoad.Loaded).snapshot.vehicles.single().price
+        assertEquals(GameMoney(Long.MAX_VALUE), casperPrice(Long.MAX_VALUE.toString(), 100)) // 중간 곱은 Long 초과
+        assertEquals(GameMoney(Long.MAX_VALUE / 100 * 99 + Long.MAX_VALUE % 100 * 99 / 100), casperPrice(Long.MAX_VALUE.toString(), 99))
+        assertTrue(rejected(content = contentWith("price_unit=8000", "price_unit=${Long.MAX_VALUE}")).contains("지원 범위")) // G90 300%
+        assertTrue(rejected(content = contentWith("price_unit=8000", "price_unit=1").replace("hyundai_casper,100,", "hyundai_casper,1,")).contains("1 이상"))
+        assertEquals(GameMoney(1), casperPrice("1", 100))
+    }
+
     @Test fun `가챠 확률 합·누락 희귀도·보장 조건 오류는 거절한다`() {
         rejected(content = contentWith("COMMON:747", "COMMON:748"))                 // 합 1001
         rejected(content = contentWith(",LEGEND:3", "").replace("COMMON:747", "COMMON:750")) // LEGEND 누락
