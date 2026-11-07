@@ -118,4 +118,27 @@ class ProgressViewTest : InstrumentationTestCase() {
         assertEquals(1, events.filterIsInstance<ProgressEvent.ClaimReward>().size)
     }
 
+    fun testOldSelectionRestoreKeepsRequestLocksAndConflictsWaitForRecovery() = onUi {
+        val events = mutableListOf<ProgressEvent>(); val view = ProgressView(instrumentation.targetContext, events::add)
+        view.render(ProgressPreviewStates.normal, true); select(view)
+        val old = view.uiState; val submit = claim(view)
+        submit.performClick(); val pending = view.uiState.pending
+        view.restoreUiState(old); submit.performClick(); claim(view).performClick()
+        assertEquals(pending, view.uiState.pending)
+        assertEquals(1, events.filterIsInstance<ProgressEvent.ClaimReward>().size)
+        assertFalse(claim(view).isEnabled)
+        val conflict = ClaimReference(ProgressKey("other", "fixture-day"), 1, "other-request")
+        view.restoreUiState(old.copy(pending = conflict))
+        assertTrue(texts(view).any { it.contains("청구 요청 이력이 달라") })
+        assertTrue(all(view).filterIsInstance<Button>().none { it.tag == "progress-claim" })
+        val retry = all(view).filterIsInstance<Button>().single { it.text.toString() == "다시 확인" }
+        retry.performClick(); view.restoreUiState(old); retry.performClick()
+        assertEquals(1, events.filterIsInstance<ProgressEvent.Retry>().size)
+        assertEquals(1, events.filterIsInstance<ProgressEvent.ClaimReward>().size)
+        view.completePendingRecovery(setOf(pending!!, conflict))
+        assertTrue(all(view).filterIsInstance<Button>().none { it.tag == "progress-claim" })
+        view.render(ProgressPreviewStates.received, true)
+        assertTrue(texts(view).contains("수령 확인됨"))
+    }
+
 }

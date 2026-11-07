@@ -171,4 +171,64 @@ class ProgressInteractionTest {
         assertTrue(ui.claim())
     }
 
+    @Test fun restoringOldSelectionCannotForgetSubmittedOfferOrEnableAnotherClaim() {
+        val events = mutableListOf<ProgressEvent>(); val ui = interaction(events)
+        val other = item(token = "other-offer").copy(key = key.copy(id = "other"))
+        ui.render(content(entries = listOf(item(), other)), true); ui.select(key)
+        val beforeClaim = ui.uiState
+        assertTrue(ui.claim()); val pending = ui.uiState.pending
+        ui.restoreUiState(beforeClaim)
+        assertFalse(ui.claim())
+        ui.select(other.key); assertFalse(ui.claim())
+        assertEquals(pending, ui.uiState.pending)
+        assertEquals(setOf("offer-1"), ui.uiState.requestedKeys)
+        assertEquals(1, events.filterIsInstance<ProgressEvent.ClaimReward>().size)
+    }
+    @Test fun restoringOldRetryFlagCannotUnlockAnOutstandingReadRequest() {
+        val events = mutableListOf<ProgressEvent>(); val ui = interaction(events)
+        ui.render(ProgressScreenState.Failure("읽기 실패", true), true)
+        val beforeRetry = ui.uiState
+        assertTrue(ui.retry()); ui.restoreUiState(beforeRetry)
+        assertFalse(ui.retry())
+        assertEquals(1, events.filterIsInstance<ProgressEvent.Retry>().size)
+        ui.completeRetry(); assertTrue(ui.retry())
+        assertEquals(2, events.filterIsInstance<ProgressEvent.Retry>().size)
+    }
+
+    @Test fun conflictingPendingNeedsExplicitPerRequestRecoveryAndCannotBeClearedByContent() {
+        val events = mutableListOf<ProgressEvent>(); val ui = interaction(events)
+        val other = key.copy(id = "other")
+        val a = ClaimReference(key, 1, "pending-a"); val b = ClaimReference(other, 1, "pending-b")
+        ui.restoreUiState(ProgressUiState(pending = a))
+        val input = mutableSetOf(b)
+        ui.restoreUiState(ProgressUiState(pending = b, pendingConflicts = input)); input.clear()
+        assertEquals(setOf(a, b), ui.uiState.pendingConflicts)
+        assertEquals(setOf(a.requestKey, b.requestKey), ui.uiState.requestedKeys)
+        assertThrows(UnsupportedOperationException::class.java) { (ui.uiState.pendingConflicts as MutableSet).clear() }
+        val fresh = content(2, listOf(item(2, "recovered-offer", RewardStatus.FAILED),
+            item(2, "other-terminal", RewardStatus.CLAIMED).copy(key = other, claim = null)))
+        ui.render(fresh, true)
+        assertEquals(ProgressScreenState.Loading, ui.state); assertFalse(ui.claim())
+        ui.completePendingRecovery(setOf(a))
+        assertEquals(b, ui.uiState.pending); assertEquals(setOf(b), ui.uiState.pendingConflicts)
+        ui.render(fresh, true); assertEquals(ProgressScreenState.Loading, ui.state)
+        ui.completePendingRecovery(setOf(b))
+        assertNull(ui.uiState.pending); assertTrue(ui.uiState.pendingConflicts.isEmpty())
+        assertEquals(ProgressScreenState.Loading, ui.state)
+        assertTrue(events.isEmpty())
+        ui.render(fresh, true); ui.select(key); assertTrue(ui.claim())
+        assertEquals(1, events.filterIsInstance<ProgressEvent.ClaimReward>().size)
+    }
+    @Test fun oldSelectionRestoreAfterExplicitFailureKeepsHistoryAndAllowsOnlyTheNewOffer() {
+        val events = mutableListOf<ProgressEvent>(); val ui = interaction(events)
+        ui.render(content(), true); ui.select(key); val old = ui.uiState
+        ui.claim()
+        ui.render(content(2, listOf(item(2, "offer-1", RewardStatus.FAILED))), true)
+        ui.restoreUiState(old); assertFalse(ui.claim())
+        assertEquals(setOf("offer-1"), ui.uiState.requestedKeys)
+        ui.render(content(3, listOf(item(3, "offer-2", RewardStatus.FAILED))), true)
+        ui.restoreUiState(old); assertTrue(ui.claim())
+        assertEquals(listOf("offer-1", "offer-2"), events.filterIsInstance<ProgressEvent.ClaimReward>().map { it.requestKey })
+    }
+
 }

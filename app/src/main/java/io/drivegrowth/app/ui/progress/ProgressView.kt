@@ -27,6 +27,7 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
     }
     fun restoreUiState(state: ProgressUiState) { interaction.restoreUiState(state); drawScreen() }
     fun completeRetry() { interaction.completeRetry(); drawScreen() }
+    fun completePendingRecovery(resolved: Set<ClaimReference>) { interaction.completePendingRecovery(resolved); drawScreen() }
     fun handleBack(): Boolean {
         if (!interaction.closeDetail()) return false
         detailY = 0; drawScreen(); return true
@@ -48,13 +49,19 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
         addView(text(s(R.string.progress_title), 32, bold = true))
         showingDetail = interaction.uiState.selectedKey != null && interaction.state is ProgressScreenState.Content
         val body = column()
+        if (uiState.pendingConflicts.isNotEmpty()) {
+            add(body, text(s(R.string.progress_recovery_required), color = amber))
+            add(body, button(s(if (uiState.retryPending) R.string.progress_retry_pending else R.string.progress_retry), interaction.canRetry()) {
+                interaction.retry(); drawScreen()
+            })
+        }
         when (val state = interaction.state) {
             ProgressScreenState.Loading -> add(body, text(s(R.string.progress_loading)))
             is ProgressScreenState.Empty -> { add(body, text(s(R.string.progress_empty), 26, bold = true)); add(body, text(state.message)) }
             is ProgressScreenState.Unsupported -> { add(body, text(s(R.string.progress_unsupported), 26, bold = true)); add(body, text(state.message)) }
             is ProgressScreenState.Failure -> {
                 add(body, text(s(R.string.progress_failure), 26, bold = true)); add(body, text(state.message))
-                if (state.retryAllowed) add(body, button(s(if (uiState.retryPending) R.string.progress_retry_pending else R.string.progress_retry), !uiState.retryPending) {
+                if (state.retryAllowed && uiState.pendingConflicts.isEmpty()) add(body, button(s(if (uiState.retryPending) R.string.progress_retry_pending else R.string.progress_retry), !uiState.retryPending) {
                     interaction.retry(); drawScreen()
                 })
             }

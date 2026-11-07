@@ -68,6 +68,8 @@ data class ProgressUiState(
     val retryPending: Boolean = false,
     /** 같은 프로필에서 수락한 목표·기간별 최대 revision. 목록 소멸로 지우지 않는다. */
     val acceptedRevisions: Map<ProgressKey, Long> = emptyMap(),
+    /** 서로 다른 미확정 요청은 각각 조회로 해소할 때까지 함께 보존한다. */
+    val pendingConflicts: Set<ClaimReference> = emptySet(),
 )
 sealed interface ProgressEvent {
     data class Select(val key: ProgressKey) : ProgressEvent
@@ -95,12 +97,12 @@ class ProgressInteraction(private val onEvent: (ProgressEvent) -> Unit) {
                 rest = value.rest?.copy(conditions = Collections.unmodifiableList(ArrayList(value.rest.conditions))))
             val pending = uiState.pending
             val updated = frozen.entries.find { it.key == pending?.key }
-            if (pending != null && updated != null && updated.revision > pending.revision &&
+            if (uiState.pendingConflicts.isEmpty() && pending != null && updated != null && updated.revision > pending.revision &&
                 updated.status in listOf(RewardStatus.CLAIMED, RewardStatus.FAILED, RewardStatus.EXPIRED, RewardStatus.UNSUPPORTED)) {
                 update(uiState.copy(pending = null))
             }
             update(uiState.copy(acceptedRevisions = uiState.acceptedRevisions + frozen.entries.associate { it.key to it.revision }))
-            latest = frozen; state = frozen
+            latest = frozen; state = if (uiState.pendingConflicts.isEmpty()) frozen else ProgressScreenState.Loading
         } else state = value
         return true
     }
@@ -109,10 +111,15 @@ class ProgressInteraction(private val onEvent: (ProgressEvent) -> Unit) {
         value.acceptedRevisions.forEach { (key, revision) ->
             revisions[key] = maxOf(revisions[key] ?: -1L, revision)
         }
-        update(value.copy(acceptedRevisions = revisions))
+        val requests = (listOfNotNull(uiState.pending, value.pending) + uiState.pendingConflicts + value.pendingConflicts).toSet()
+        val conflicts = if (requests.size > 1 || uiState.pendingConflicts.isNotEmpty() || value.pendingConflicts.isNotEmpty()) requests else emptySet()
+        update(value.copy(acceptedRevisions = revisions,
+            pending = uiState.pending ?: value.pending ?: requests.firstOrNull(), pendingConflicts = conflicts,
+            requestedKeys = uiState.requestedKeys + value.requestedKeys + requests.map { it.requestKey },
+            retryPending = uiState.retryPending || value.retryPending))
         // 복원이 첫 render 뒤에 와도 낡은 표시를 남기지 않는다. 이력만으로 결과를 만들지 않는다.
         val current = state as? ProgressScreenState.Content
-        if (current != null && containsStaleRevision(current)) state = ProgressScreenState.Loading
+        if (uiState.pendingConflicts.isNotEmpty() || current != null && containsStaleRevision(current)) state = ProgressScreenState.Loading
     }
     fun select(key: ProgressKey) {
         if (!controlsEnabled || (state as? ProgressScreenState.Content)?.entries?.none { it.key == key } != false) return
@@ -125,11 +132,12 @@ class ProgressInteraction(private val onEvent: (ProgressEvent) -> Unit) {
         if (!controlsEnabled || uiState.selectedKey == null) return false
         update(uiState.copy(selectedKey = null)); onEvent(ProgressEvent.CloseDetail); return true
     }
-    fun isPending(item: ProgressItem): Boolean = item.status == RewardStatus.PENDING || uiState.pending?.key == item.key
+    fun isPending(item: ProgressItem): Boolean = item.status == RewardStatus.PENDING || uiState.pending?.key == item.key ||
+        uiState.pendingConflicts.any { it.key == item.key }
     fun canClaim(): Boolean {
         val item = selectedItem ?: return false; val offer = item.claim ?: return false
         if (item.revision < (uiState.acceptedRevisions[item.key] ?: -1L)) return false
-        return controlsEnabled && uiState.pending == null &&
+        return controlsEnabled && uiState.pending == null && uiState.pendingConflicts.isEmpty() &&
             (state as? ProgressScreenState.Content)?.entries?.none { it.status == RewardStatus.PENDING } == true && offer.enabled && offer.requestKey !in uiState.requestedKeys &&
             item.rewardLabel != null && item.status in listOf(RewardStatus.CLAIMABLE, RewardStatus.FAILED)
     }
@@ -140,15 +148,27 @@ class ProgressInteraction(private val onEvent: (ProgressEvent) -> Unit) {
         update(uiState.copy(pending = ClaimReference(item.key, item.revision, offer.requestKey), requestedKeys = uiState.requestedKeys + offer.requestKey))
         onEvent(ProgressEvent.ClaimReward(item.key, item.revision, offer.requestKey)); return true
     }
+    fun canRetry(): Boolean = controlsEnabled && !uiState.retryPending &&
+        ((state as? ProgressScreenState.Failure)?.retryAllowed == true ||
+            state == ProgressScreenState.Loading && uiState.pendingConflicts.isNotEmpty())
     fun retry(): Boolean {
-        if (!controlsEnabled || uiState.retryPending || (state as? ProgressScreenState.Failure)?.retryAllowed != true) return false
+        if (!canRetry()) return false
         update(uiState.copy(retryPending = true)); onEvent(ProgressEvent.Retry); return true
     }
     fun completeRetry() { update(uiState.copy(retryPending = false)) }
+    /** 호스트가 각 요청의 실제 조회/복구 완료를 확인한 뒤 호출한다. 수령 결과는 새 Content로 별도 공급한다. */
+    fun completePendingRecovery(resolved: Set<ClaimReference>) {
+        if (uiState.pendingConflicts.isEmpty()) return
+        val confirmed = resolved.intersect(uiState.pendingConflicts)
+        val remaining = uiState.pendingConflicts - confirmed
+        update(uiState.copy(pending = uiState.pending?.takeUnless { it in confirmed } ?: remaining.firstOrNull(),
+            pendingConflicts = remaining))
+    }
     private fun containsStaleRevision(value: ProgressScreenState.Content): Boolean =
         value.entries.any { it.revision < (uiState.acceptedRevisions[it.key] ?: -1L) }
     private fun update(value: ProgressUiState) {
         uiState = value.copy(requestedKeys = Collections.unmodifiableSet(LinkedHashSet(value.requestedKeys)),
-            acceptedRevisions = Collections.unmodifiableMap(LinkedHashMap(value.acceptedRevisions)))
+            acceptedRevisions = Collections.unmodifiableMap(LinkedHashMap(value.acceptedRevisions)),
+            pendingConflicts = Collections.unmodifiableSet(LinkedHashSet(value.pendingConflicts)))
     }
 }
