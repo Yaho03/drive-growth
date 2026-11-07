@@ -378,19 +378,20 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 
 #### #47 가챠 1회 지급
 
-`io.drivegrowth.core.garage.GachaPull.prepare(owned, GachaRequest)`는 `Garage.owned`로 보유 수를 확인하고, 희귀도 추첨(30회 보장) → `unlockedAt(shopLevel)` 차종 균등 선택 → 뽑기권 금액 DEBIT과 `VehicleWrite.Add`(GACHA, 실제 지불액, 1레벨 0%)를 담은 불변 `GachaPlan`(거래 + 추첨 결과)을 만든다. `submit(store, plan)`이 `commitGameChange`로 저장한다. 유료권 금액은 `GachaRules.ticketPrice`(PRD 시험값 500, 콘텐츠 메타 이전은 #35), 무료권은 금액 변경 없이 취득액 0이다. 추첨 seed와 새 `ownedVehicleId`(`gacha-<requestId>`)는 requestId에서 정한다. **응답을 잃으면 보관한 같은 계획을 다시 submit**한다. 재제출은 현재 공간·후보·보유 조회를 하지 않으므로 그사이 차고가 차거나 콘텐츠·조회 상태가 바뀌어도 처음 정산과 추첨 결과를 돌려준다.
+`io.drivegrowth.core.garage.GachaPull.prepare(store, requestId, ticket)`는 `readGachaState()`의 권위 상태와 이 콘텐츠를 대조한 뒤(콘텐츠·규칙 버전, 천장·보장 희귀도, 양수 가중치 희귀도, 가게 레벨의 해금 차종 집합이 모두 같아야 함) 희귀도 추첨(30회 보장) → 해금 차종 균등 선택으로 추첨을 고정한 `GachaCommand`를 만든다. 가게 레벨·칸 수·카운터·가챠 revision·뽑기권 가격은 저장 측 `GachaAuthority`/`GachaProgress` 값을 쓰고 호출자 입력이나 콘텐츠 `price_unit`을 쓰지 않는다. 새 개체는 `gacha-<requestId>`, GACHA·1레벨·0%·실제 지불액(유료 `purchasePrice`, 무료 0)이다. 추첨 seed는 requestId에서 정한다.
 
-| 실패 | 처리 |
+저장은 호출자가 `store.commitGacha(command)`로 한다(#126 `GachaChangeStore`). 차감·새 개체·다음 카운터·무료권 −1이 한 번에 확정되고, 결과는 저장소가 돌려준 `GachaSettlement`(최초 명령·당시 정산·진행 상태)만 사용한다. **응답을 잃으면 보관한 같은 command를 다시 commitGacha**한다. 저장소가 현재 공간·조회 상태보다 먼저 최초 결과를 재생한다.
+
+| 경우 | 처리 |
 |---|---|
-| 차고 칸 부족 / 해금 차종 없음 / 가게 레벨·카운터 범위 밖 / 손상 개체 | 저장 전 `CAPACITY_EXCEEDED` / `DATA_UNAVAILABLE` / `INVALID_INPUT` |
-| 잔액 부족·저장 실패 | 저장소가 거래 전체 거절(`INSUFFICIENT_FUNDS`·`STORAGE_FAILURE`) |
+| 권위 상태 없음 / 해금 차종 없음 | `DATA_UNAVAILABLE` (계획 단계) |
+| 저장 측 규칙·해금이 이 콘텐츠와 다름 | `STATE_CONFLICT` (계획 단계) |
+| 차고 칸 부족 / 무료권 0 / 손상 개체 | `CAPACITY_EXCEEDED` / `INSUFFICIENT_FUNDS` / `INVALID_INPUT` (계획 단계, 저장소도 확정 때 다시 검사) |
+| 같은 requestId·다른 입력(카운터·티켓·버전·결과) | 저장소 `STATE_CONFLICT`, 무변경 |
+| 같은 상태로 만든 두 요청의 마지막 칸 경쟁 | 저장소가 한 건만 확정(다른 건은 가챠 revision 충돌) |
+| 잔액 부족·저장 실패 | 저장소가 전체 미반영 |
 
-아직 보장하지 않는 두 경계(공통 계약·저장 확장 필요, PR #111에 필요한 입출력 정리):
-
-- 같은 requestId로 카운터·뽑기권 종류 등 입력만 바꾼 **새 계획**은 `GameChange`에 가챠 입력이 없어 같은 명령으로 재생되고, 새로 계산한 다음 카운터가 함께 반환된다. 같은 ID·다른 입력의 `STATE_CONFLICT`에는 가챠 입력·결과가 정산 명령에 포함돼야 한다.
-- 마지막 칸에 서로 다른 두 요청이 같은 보유 목록으로 계획하면 둘 다 저장될 수 있다. 공간 조건은 저장 거래 안에서 다시 검사해야 한다.
-
-보장 카운터와 무료 뽑기권 보유 수는 현재 계약에 저장 위치가 없다. `GachaResult.draw.drawsSinceGuarantee`는 저장 성공 뒤의 다음 카운터 값만 돌려주며, 거래와 같은 정산에 카운터·무료권 차감을 함께 확정하는 계약·저장 확장은 #33·#34와 조율한다. 그 전까지 카운터 별도 저장은 지급과 원자적이지 않다. 실제 앱 연결·재실행 검증은 #52·#28이다.
+메모리 참조 구현(`InMemoryGameChangeStore`)으로 검증했다. 실제 SQLite 원자 확정은 경민 PR #136(#122), 무료권 지급·제품 초기 권위 상태·앱 재실행은 후속이다.
 
 ### 거래 원장 영속 저장
 
