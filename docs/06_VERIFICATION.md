@@ -621,3 +621,7 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w \
 - 전체 기기 실행에서 기존 `NavigationTest.testTopLevelBackHidesTask`가 시작 시 앱 창 포커스를 얻지 못했다. 시험 DB 재개방은 제품 프로세스 강제 종료·전원 차단·실차 검증과 별개다. 실제 고객 분포·단골 판정, 수리 명령, A/D 수명주기·화면 연결과 최종 경제 수치의 검증은 후속 인계 범위다.
 
 재현은 프로젝트의 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` 후 Pleos의 활성 사용자에 앱/시험 APK를 설치하고 `adb shell am instrument --user 10 -w -e class io.drivegrowth.app.data.RentalLedgerTest io.drivegrowth.app.test/android.test.InstrumentationTestRunner`로 실행한다.
+
+### #34·#46·#49·#50 이력과 영업 조회 인계
+
+Android API 37 독립 에뮬레이터에서 `RentalLedgerTest` 11개와 `SqliteGameChangeStoreTest` 26개를 실행해 37개가 통과했다. 판매·폐차·강화 재료 소비 뒤 재개방해 개체와 취득 출처를 읽었고, 발견 중복 및 실패 배치가 추가 기록·재화 변경을 일으키지 않음을 확인했다. 두 대여를 배정과 반대 순서로 정산하고 최초 영수증을 열람한 뒤 v2 → v3로 이전해도 동일한 정산 ID·개체·사고 결과를 읽었다. 기존 v1에서의 직접 이전도 통과했다. 실행 범위는 SQLite이며 실제 가챠 화면 노출·선물 지급·실차 연동은 검증하지 않았다.

@@ -22,11 +22,10 @@ data class RentalTerms(
     }
 }
 
-data class RentalReceipt(val settlement: Settlement, val accident: Boolean, val matchReview: Boolean,
-                         val washReview: Boolean, val facilityBonus: GameMoney, val regularCustomer: Boolean?)
+typealias RentalReceipt = io.drivegrowth.core.rental.RentalReceipt
 data class ShopState(val progress: ShopProgress, val capacity: Int, val facilities: Set<Facility>)
 
-class RentalLedger internal constructor(private val store: SqliteGameChangeStore) {
+class RentalLedger internal constructor(private val store: SqliteGameChangeStore) : CompletedRentalSource {
     internal companion object {
         fun createTables(db: SQLiteDatabase) {
             db.execSQL("""CREATE TABLE rentals (
@@ -153,6 +152,29 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
                 while (it.moveToNext()) add(Pending(RequestId(it.getString(0)), OwnedVehicleId(it.getString(1)),
                     VehicleActivity.valueOf(it.getString(2)), EpochMillis(it.getLong(3)), EpochMillis(it.getLong(4)), EpochMillis(it.getLong(5))))
             })
+        }
+    }
+
+    /** 정산 쓰기 순서로 최초 영업을 찾는다. 같은 시각·이미 열람한 정산도 구분한다. */
+    override fun firstCompletedRental(): ContractResult<CompletedRental?> = completed(null)
+
+    /** #49가 지정 대여의 확정 결과만 읽는다. 미완료/없는 대여는 null이다. */
+    override fun completedRental(id: RequestId): ContractResult<CompletedRental?> = completed(id)
+
+    private fun completed(id: RequestId?): ContractResult<CompletedRental?> = store.read { db ->
+        val filter = if (id == null) "" else " AND r.id=?"
+        db.rawQuery("""SELECT r.id,r.owned_id,s.result,r.accident,r.match_review,r.wash_review,
+            r.bonus,r.weighted,r.regular_customer FROM rentals r
+            LEFT JOIN settlements s ON s.request_id=r.settlement_request
+            WHERE r.settlement_request IS NOT NULL$filter ORDER BY s.rowid LIMIT 1""",
+            id?.let { arrayOf(it.value) }).use { row ->
+            if (!row.moveToFirst()) return@read null
+            if (row.isNull(2)) throw android.database.sqlite.SQLiteException("대여 정산 누락")
+            val settlement = LedgerJson.settlement(JSONObject(row.getString(2)))
+            val bonus = if (BigDecimal(row.getString(7)).signum() == 0) GameMoney(0) else GameMoney(row.getLong(6))
+            CompletedRental(RequestId(row.getString(0)), OwnedVehicleId(row.getString(1)),
+                RentalReceipt(settlement, row.getInt(3) == 1, row.getInt(4) == 1, row.getInt(5) == 1,
+                    bonus, if (row.isNull(8)) null else row.getInt(8) == 1))
         }
     }
 
