@@ -1,0 +1,76 @@
+{
+  "source_head": "f975c8051b456c3a94b0e983cb989311bd9a8d16",
+  "base": "6adf357b6d568067f60d0e0982fbfc015856a35c",
+  "package": "io.drivegrowth.app.onboarding56",
+  "apks": {
+    "app-debug.apk": "8b22597d76abd691024a0e1db25b6e680b58e5dcf055c777b6a591da509bd8da",
+    "app-debug-androidTest.apk": "4c518f8d599600ecb74b7c829d60adb7e9cdcaaddede9be974b998a02518772a"
+  },
+  "installed": {
+    "io.drivegrowth.app.onboarding56": "8b22597d76abd691024a0e1db25b6e680b58e5dcf055c777b6a591da509bd8da",
+    "io.drivegrowth.app.onboarding56.test": "4c518f8d599600ecb74b7c829d60adb7e9cdcaaddede9be974b998a02518772a"
+  },
+  "capture_change": "임시 AttachedTest에서 합성 프레임 대기·단계/포커스/크기 기록만 추가. 제품/fixture/정식시험/리소스는 f975c80과 동일.",
+  "touch_test_apk_sha256": "e83ba6c9d8e3bbe45f6bc3e7457f788ad18c33a8afabe2035a72728a3614c2ef",
+  "scope": "고정 입력 격리 OnboardingView. 실제 #50·프로필·DB·주행 제한 정책 연결 검증 아님.",
+  "device": {
+    "serial": "emulator-5556",
+    "adb_port": 5038,
+    "user": 10,
+    "physical_pixels": "1080x600",
+    "density_dpi": 120,
+    "night": "no"
+  },
+  "source_equivalence": {
+    "base": "6adf357b6d568067f60d0e0982fbfc015856a35c",
+    "package": "io.drivegrowth.app.onboarding56",
+    "source_files": {
+      "app/src/main/java/io/drivegrowth/app/ui/onboarding/OnboardingScreenState.kt": "efaa9ddad6810f7473c2ccda6d85dbed82ca68b3818f1359c6bb826f65fad7e9",
+      "app/src/main/java/io/drivegrowth/app/ui/onboarding/OnboardingView.kt": "9eaef0f89b9b57d39d99185c3e9327b3540b39df350791858717c01b52245429",
+      "app/src/debug/java/io/drivegrowth/app/ui/onboarding/OnboardingPreviewStates.kt": "cdd7be971d6ea3092e707be86b60c44ba3bd23edb15db83e4b65f1da20017c8b",
+      "app/src/test/java/io/drivegrowth/app/ui/onboarding/OnboardingInteractionTest.kt": "e3fe66a5b5607e106822b4ff1edad73c63a26effb1eb10d02af9896b03f02b6e",
+      "app/src/androidTest/java/io/drivegrowth/app/ui/onboarding/OnboardingViewTest.kt": "3cbcc3951efd684edd85eae37363ea4dbc5176f639bf361cfeabb6ce143e9408",
+      "app/src/main/res/values/onboarding_strings.xml": "14dfe9ea3a40ce8d1e7666ca3bad3f7dad7482700460a0bc044bb69604527227"
+    },
+    "isolated_files": [
+      "OnboardingPreviewActivity.kt",
+      "OnboardingAttachedTest.kt",
+      "debug Activity 등록·로컬 applicationIdSuffix"
+    ]
+  },
+  "frames": {
+    "intro.png": "phase=Intro,focus=true,width=702,height=419",
+    "completed.png": "phase=Completed,focus=true,width=702,height=419",
+    "narrow-confirm-action.png": "phase=Confirming,focus=true,width=330,height=419",
+    "restricted.png": "phase=Confirming,focus=true,width=702,height=419"
+  },
+  "test_runs": [
+    {
+      "file": "device-tests.txt",
+      "result": "OK (12 tests)",
+      "note": "정식 View 6개 + 임시 실제 Activity 6개. 합성 프레임 대기 뒤 캡처."
+    },
+    {
+      "file": "native-touch-test.txt",
+      "result": "OK (1 test)",
+      "note": "추가 임시 시험. 440dp 본문·글꼴1.5, 실제 스크롤과 터치로 안내→선택→확인→처리 중."
+    }
+  ],
+  "capture_limits": "첫 캡처는 전환 직전/OEM 내비 창이 섞여 로컬 first-pass-captures에 보존하고 성공 화면으로 사용하지 않았다. 제품 변경 없이 임시 캡처 시점만 보완했다.",
+  "restoration": "격리 앱/.test만 제거, 제품 APK 793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9 전후 동일. 사용자·권한·기어·전역창·서버·night 변경 없음, forward 빈 목록, AVD 유지. 장치 사용 종료.",
+  "verification_sources": {
+    "OnboardingPreviewActivity.kt": {
+      "local_archive": "/private/tmp/onboarding56-evidence/OnboardingPreviewActivity.kt",
+      "sha256": "0dce5d9f1cd35b327a62047d13cc92414f8f02f06e11f2769d419f94005d8e29"
+    },
+    "OnboardingAttachedTest-12.kt": {
+      "local_archive": "/private/tmp/onboarding56-evidence/OnboardingAttachedTest-12.kt",
+      "sha256": "dcd8bb935496079b962ccba6b2f39b4ce2288eb59e6be31b73493f48f0df87e9"
+    },
+    "OnboardingAttachedTest-touch.kt": {
+      "local_archive": "/private/tmp/onboarding56-evidence/OnboardingAttachedTest-touch.kt",
+      "sha256": "622168fda179c1f1d08f1b071775a68e2aa236c665d4b60a86342da16708f904"
+    }
+  },
+  "verification_sources_note": "12개 실행 뒤 추가 터치 메서드/해당 import를 덧붙인 임시 시험을 별도 보존했다. 12개 버전은 그 추가분을 제거한 원본이며 제품/정식6개시험은 두 실행 모두 source_head와 동일하다. 임시 호스트는 두 실행에서 동일하다."
+}

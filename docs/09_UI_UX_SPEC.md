@@ -82,6 +82,42 @@ flowchart LR
 
 최초 실행에서 저장 조회·주차 허용 확인 후 첫 안내를 연다. 캐스퍼·아반떼 선택 후보, 첫 지급 희귀도 일반·취득 기준액 0, 개업 선물 뽑기권과 초기 재화/공간은 [PRD의 시작 경험·주요 기능](01_PRD.md#시작-경험과-주요-기능)을 따른다. 설계는 **안내→후보 비교→선택 확인→저장 성공→가게**로 잡고 확인 후 선택 취소 불가와 프로필당 1회 지급을 표시한다. 첫 성장의 순서·비용 등 남은 결정은 #24에서 정하며 화면 예시로 확정하지 않는다. 재실행은 초기 지급을 반복하지 않아야 한다. 차량 신호/권한 안내를 주행 중 튜토리얼 관문으로 띄우지 않는다.
 
+### #56 첫 실행 독립 표시 UI 연결점
+
+2026-11-07 `app/ui/onboarding/OnboardingView`를 Android Views로 구현했다. `4q-first-run.png`·`5b-landscape-first-run.png`를 직접 열어 어두운 카드·보라색 주요 버튼을 참고하고, 기존 `GarageStyle`과 자체 중립 차량 vector를 재사용했다. 시안의 첫 뽑기·건너뛰기 흐름은 최신 PRD의 캐스퍼/아반떼 선택·한 번 확인·지급 확정 흐름으로 맞췄다. 3D 가게/캐릭터/실차 이미지는 넣지 않았다. 첫 성장 순서·비용을 새로 정하지 않는다.
+
+- 진입점은 `OnboardingView(context, onEvent)`, `render(OnboardingScreenState, controlsEnabled): Boolean`, `handleBack(): Boolean`, `restoreSelection(VehicleId?)`다. 호스트는 프로필당 인스턴스를 유지하고 프로필이 바뀌면 새 View를 만든다. `controlsEnabled`만 소비하며 차량 신호·허용 판정·DB를 직접 읽지 않는다. false이면 게임 콘텐츠·선택·버튼을 제거한다.
+- 상태는 `Loading`, `Unavailable`, `Intro`, `Choosing`(빈 후보 포함), `Confirming`, `Submitting`, `LoadError`, `GrantError`, `Completed`다. 호스트가 신규 프로필임을 확인한 때만 Intro/Choosing을 공급한다. **빈 보유 목록·보유 수 0으로 신규 프로필을 추정하지 않는다.** 초기화 조회 API 미지원/미확인은 무행동 `Unavailable(message)`로, 읽기 실패는 재시도 가능 여부를 가진 LoadError로 구분한다.
+- 후보는 공통 `VehicleDefinition`과 선택 허용·비교 설명/불가 사유를 공급받는다. 누락된 비교 설명·초기 재화/공간/선물 안내는 확인 불가로 표시한다. `plannedBenefits`는 **지급 예정 안내**이며 실제 잔액·보유·지급 완료가 아니다. 초기 1,000·3칸은 PRD 시험값이고 선물 1장도 실제 #50 지급과 구분한다. 화면이 계산하거나 지급하지 않는다.
+- 이벤트는 `StartChoosing`, `SelectVehicle(vehicleId)`, `ReviewSelection(vehicleId)`, `ConfirmSelection(vehicleId)`, `Previous`, `Retry(vehicleId?)`, `GoToShop`이다. Select/Review는 지급 명령이 아니다. ConfirmSelection은 선택 ID와 확인 의사를 전달할 뿐이며 호스트가 #50·공통 저장 경로의 프로필/requestId·지급 마커·재시도 동일성을 관리한다.
+- Confirming은 취소 불가·프로필당 1회 안내와 `backAllowed`를 표시한다. 확인 전 Previous로 후보를 바꿀 수 있으나 확인/복구 요청 중에는 중복 확인·후보 변경·내부 Back을 막는다. GrantError의 `changeAllowed`는 호스트가 미지급·변경 허용을 확인한 경우에만 true로 공급한다. 미확정 상태를 성공으로 바꾸지 않는다.
+- 확인/복구 요청을 수신하면 호스트는 먼저 `Submitting(vehicleId, vehicleName?, sourceLabel)`을 render하고 실제 결과를 기다린다. `Retry(null)`은 초기/후보 재조회로 `Loading → 결과`를, ID가 있는 Retry는 **기존 지급 요청의 조회·복구**로 `Submitting → GrantError/Completed`를 사용한다. 같은 오류의 문구/출처 재표시만으로 잠금을 해제하지 않는다. 실제 실패가 같은 문구여도 중간 처리 상태를 거쳐 응답했음을 명시한다.
+- Completed에는 호스트가 확정 저장을 확인한 공통 `OwnedVehicle`, 표시 이름·확정 요약·`alreadyGranted`·출처를 제공한다. 이미 지급된 프로필도 재선택을 열지 않고 가게 이동만 요청한다. View는 전달받은 개체의 희귀도·레벨·취득액을 표시하며 프로필 초기화·재화/차량·튜토리얼 완료를 자체 생성하지 않는다. 같은 완료 화면의 재표시/요약 갱신으로 가게 이동을 중복 요청하지 않는다.
+- `render`가 false이면 다른 선택의 늦은 응답이나 완료 뒤 역행을 무시한 것이다. 제한 입력은 이 경우에도 적용한다. 이 ID 방어는 호스트의 프로필·requestId·시도 순서 검증을 대체하지 않는다. 특히 같은 차종의 이전 시도 응답은 호스트가 거른다. 저장된 UI 단계만으로 지급 성공을 추정하지 않는다.
+- 호스트는 `selectedVehicleId`와 `pendingVehicleId`, 현재 단계·실제 requestId/프로필을 자신의 기존 복원 경계에 보존한다. 재생성 시 지급 여부를 확인하기 전에는 Loading/Unavailable, 확인 중 요청은 Submitting을 공급한다. `restoreSelection`은 선택 가능한 단계의 ID만 복원하며 확인/처리/완료의 확정 입력을 덮지 않는다. 처리 중 Back은 소비하고, Intro/오류/완료의 최상위 Back은 공통 호스트에 맡긴다. 실제 Activity/CCP 정책은 #51 소유다.
+- 사용 가능 폭 760dp 이상은 후보 2열, 그 미만은 1열로 줄인다. 이는 초기 구현 분기값이며 공식 규격이 아니다. 긴 문구는 줄바꿈하고 본문을 스크롤한다. 제한·선택·비활성은 문구와 버튼 상태로 함께 표현한다. 기기의 가로 앱 영역과 440dp 본문/큰 글꼴의 격리 검증은 06의 해당 절을 따른다.
+
+호스트 연결 예시(아래 함수는 호스트가 구현할 연결 책임이다):
+
+```kotlin
+val onboarding = OnboardingView(context) { event ->
+    when (event) {
+        OnboardingEvent.StartChoosing -> loadCandidatesForConfirmedNewProfile()
+        is OnboardingEvent.SelectVehicle -> saveSelectedVehicleId(event.vehicleId)
+        is OnboardingEvent.ReviewSelection -> openSelectionConfirmation(event.vehicleId)
+        is OnboardingEvent.ConfirmSelection -> submitInitialGrantThroughHost(event.vehicleId)
+        OnboardingEvent.Previous -> returnToPreviousAllowedStep()
+        is OnboardingEvent.Retry -> reloadOrRecoverTheSameGrant(event.vehicleId)
+        OnboardingEvent.GoToShop -> openShop()
+    }
+}
+onboarding.render(OnboardingScreenState.Unavailable("첫 실행 상태를 확인할 수 없어요."), allowed)
+// 초기화 조회 미지원에서 빈 차고만 보고 Intro를 선택하지 않는다.
+// #50 결과 수신 전: Submitting. 확정 저장 확인 후에만 Completed.
+```
+
+이 부분 구현은 MainActivity·공통 탐색·공유 Manifest·core·SQLite를 수정하지 않는다. #50 실제 지급/마커/저장·재실행, 호스트 신규/이미 지급 조회·응답 정합성, 실제 주행 제한·CCP 연결과 첫 성장의 남은 규칙/화면은 #56 전체 완료 조건으로 남는다.
+
 ### 차량 정보·도감·처분·랭킹 표시
 
 2026-11-07 PRD 결정을 반영한 구현 기준이다. 1차 차종·게임 유형·가격 비율·해금 배치는 [PRD의 차량 표](01_PRD.md#1차-차종가격-비율해금-배치)를 사용하고, 실제 금액은 수익 단위 결정과 검증된 콘텐츠 공급 후 표시한다. B 경제 제안이나 시안 예시를 제품 가격으로 합치지 않는다. 도감은 차종×희귀도별 발견·보유 이력을 표시하고 처분 뒤에도 보유했음 기록을 유지한다. 목록·필드·이력 저장의 실제 연결과 검증은 #35·#46·#52의 완료 조건으로 남긴다.
@@ -121,79 +157,16 @@ collection.render(mappedCollectionState, controlsEnabled = allowedByCommonShell)
 
 위 예시의 호스트 함수는 연결 책임을 나타낸다. MainActivity·공통 탐색·공통 계약·DB·Gradle·제품 Manifest는 이 표시 UI에서 수정하지 않았다. 장치 회귀용 debug Activity·Manifest는 제품 탐색과 분리한다. #51 연결, 실제 차량 데이터/명령/저장·재실행과 제품 화면 검증은 #52 전체 완료 조건으로 남긴다. 실행 결과와 기기 시험 인계는 [06 검증 문서](06_VERIFICATION.md#52-차고도감-표시-ui-부분-검증)를 따른다.
 
-### 요청 확인과 Back
 
-비용·소비가 있는 요청의 확인 패널은 대상 개체, 비용, 예상 결과, 되돌릴 수 없는 변화, `확정/돌아가기`를 표시한다. 서버/저장 요청 전에 확인을 완료한다. 재시도는 같은 요청 ID를 재사용하며 버튼을 새 요청으로 반복 전송하지 않는다.
 
-Back은 확인 패널 닫기→직전 화면→최상위 동작 순으로 처리한다. 최상위에서는 [Pleos CCP 가이드](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/ccp-rotary-controller-development)에 따라 `moveTaskToBack(true)`로 Task를 뒤로 보내고 게임 창을 숨기며 `finish()`·`finishAffinity()`로 종료하지 않는다. 처리 중에는 중복 전송을 막고 화면을 떠나더라도 거래 결과는 조회로 복원한다. 숨김 후 복귀와 Activity 재생성에서 선택 상태를 복원하되 주차·UX 허용을 다시 확인한다. 일반 Android Back·CCP Back의 실제 전달과 Task·화면 변화의 검증 결과 및 한계는 [검증 문서](06_VERIFICATION.md)를 따른다.
+### #51 차고·도감 실제 호스트 연결
 
-2026-11-07 사용자 결정: 이번 #51은 CCP 다이얼 미지원으로 범위를 정하고 `<application>`에 `com.hmg.rotary.ROTARY_SUPPORTED=false`를 명시한다. 필수 조작은 터치만으로 완료할 수 있어야 하며, 다이얼 미지원이 최상위 Back·숨김 후 복귀·상태 복원·주행 제한의 검증을 면제하지 않는다. 다이얼 이동·선택 지원의 추가는 별도 결정으로 남긴다.
+2026-11-07, #105 머지 뒤 `MainActivity`에서 기존 `GarageView`·`CollectionView`를 같은 인스턴스로 보관하고 공통 탐색에 연결한다. 가게·보유 차량·도감·미확인 정산·첫 차량 안내 진입과 터치 `뒤로`를 제공한다. 좁은 폭에서는 탐색 행을 가로로 스크롤한다. 조회 중·조회 실패에서도 화면 이동과 Back은 가능하며 실제 게임 행동은 공통 차량 gate의 허용을 따른다. 이전 표시 UI 절의 미연결 기록은 #103 당시 범위다.
 
-## 4. 공통 실패·빈 상태
+- `HostSnapshot`은 콘텐츠·출처·잔액과 원본 `OwnedVehicle`·`Settlement`를 보존한다. 차고는 공통 `Garage.owned` 검증 후 실제 개체를 표시하며 같은 차종의 서로 다른 ID와 revision을 합치지 않는다. 희귀도·레벨·진행량·취득 기준액을 새로 계산하지 않는다.
+- 현재 저장 조회가 제공하지 않는 활동·사고·모델 가격·공간은 확인 불가다. #47~#49 관리 명령은 아직 연결되지 않아 모든 관리 행동을 비활성화하고 사유를 표시한다. 준비 이벤트를 거래 확정으로 취급하지 않으며 잔액·차량을 바꾸거나 완료 연출을 하지 않는다.
+- 도감은 현재 보유 목록과 별도인 획득·발견 이력 공급 경계를 사용한다. 기본 공급자는 `DATA_UNAVAILABLE`이므로 이력 오류와 재시도를 표시한다. 명시적인 이력 없이 빈 도감·과거 보유·해금을 추정하지 않는다. 초기 지급 이력도 연결되지 않았으므로 보유 0대를 신규 프로필로 간주하지 않는다.
+- 선택 개체 ID·페이지·미완료 준비 요청의 대상 ID/revision/action을 Activity 저장 상태로 복원한다. 선택 개체가 새 조회에서 사라져도 기존 View의 소멸 안내를 유지한다. 준비 요청 복원은 실행·성공을 뜻하지 않으며 미연결 사유와 닫기만 제공한다. Back은 준비 요청 닫기→차고 상세 닫기→가게→앱 숨김 순서다.
+- 제한·숨김·재생성 때 이전 조회 세대를 무효화하고 새 차량 허용 판정을 기다린다. 조회 작업은 호스트당 한 개만 실행하며 반복 요청은 최신 한 건으로 합친다. 구성 변경에서는 `HostSession`의 기존 조회 작업만 유지하고 Activity/View callback은 분리한다. 새 화면은 제한 상태로 연결하며 실제 종료에서 worker를 해제한다. 이 작업은 #105의 차량 입력 큐·정책 임계값·SDK 호출 방식을 바꾸지 않는다.
 
-| 상황 | 표시 | 가능한 행동·해제 조건 |
-|---|---|---|
-| 초기 로딩 | 해당 영역의 준비 중 표시, 이전 확정값을 0으로 대체하지 않음 | 취소 가능한 조회만 돌아가기. 확정 거래와 구분 |
-| 보유/기록 없음 | 차량 지급 전·첫 영업 전 등 원인을 설명 | 가게/안내 보기. 추가 주행을 요구하는 카운트다운 사용 안 함 |
-| 권한 거부·신호 미지원 | 확인 불가 항목과 영향받는 기능만 구분 | 주차 중 권한/연결 안내·재확인. 공통 상태가 `ALLOWED`일 때만 게임 조작 허용. [차량 표본·화면 잠금 계약](02_SYSTEM_ARCHITECTURE.md#차량-표본화면-잠금도착-증거-계약) 참조 |
-| 후보 없음·경로 실패 | `후보 없음`과 `경로 정보를 확인하지 못함`을 구분 | 목적지 재선택/다시 조회. 임의 거리·희귀도 생성 금지 |
-| 잔액·공간 부족 | 필요한 값과 현재 값이 확인된 경우에만 비교 표시 | 다른 후보 선택/가게로. 추가 운전 재촉 안 함 |
-| 상태 충돌 | 해당 차량/의뢰가 다른 상태로 바뀌었음을 설명 | 최신 상태 다시 조회. 처분·환급을 자동 반복하지 않음 |
-| 저장 실패 | `확정되지 않음`·조회/재시도 안내 | 같은 요청 ID로 복구. 성공 연출·잔액 증가를 먼저 표시하지 않음 |
-| 데이터 누락·도착 증거 부족 | 확인한 기록과 대기 원인 표시 | 관련 의뢰 보존·재확인. 임의 보상/취소 정책은 #24에서 결정 |
-| 복귀·재실행 | 미확인 결과·활성 의뢰·개체·꾸미기 상태 조회 | 이전 화면 복원보다 주차/UX 허용 확인 우선 |
-| 주행 중 오류 | 게임 팝업·반복 알림 표시 안 함 | 주차·허용 후 사용자 복귀 시 설명 |
-
-## 5. 호출·상태 계약 연결
-
-아래 함수명은 [#27 기술 계약](02_SYSTEM_ARCHITECTURE.md)의 문서 제안과 연결하며 실제 코드 API가 존재한다는 뜻은 아니다. 최종 타입·서명은 공통 계약 구현 이슈에서 확정한다.
-
-| 화면 동작 | 연결 계약 | UI가 직접 하지 않는 일 |
-|---|---|---|
-| 차고·대여 가능 차량 조회 | `listOwnedVehicles` | 차량 개체 생성·대여 점유 변경 |
-| 탁송 목록·변경 요청 | `proposeDelivery` / `changeDelivery` | 경로 거리 추정·희귀도·환급 계산 |
-| 영업 결과 표시 | `calculateRentalResult`의 확정 저장 결과 조회 | 계산 결과안만으로 잔액 증가 |
-| 강화·수리·처분 확인 | `prepareVehicleChange` → `commitGameChange` | 잔액·차량 DB 직접 수정 |
-| 구매·영업·가게 거래 결과 | 공통 `commitGameChange`의 결과/오류 | 화면별 별도 저장·중복 지급 |
-| 결과 목록·열람 | `listPendingResults` / `markResultViewed` | 결과 확인으로 재정산 |
-
-화면 상태는 `Loading / Content / Empty / RecoverableError / Restricted`와 요청 중 여부를 구분하는 안을 사용한다. 이것은 화면 표현을 위한 분류이며 게임의 의뢰·대여 상태 enum과 혼합하지 않는다. `requestId`·개체 ID·revision·입력 출처를 명령 경계에서 보존한다.
-
-## 6. 최초 디자인 기준
-
-다음 값은 첫 화면 구현과 가독성 검토를 위한 **초기 기준**이다. 공식 Pleos 최소치나 실차 검증 결과로 주장하지 않는다. 최종 브랜드/그림체는 팀 검토 대상이며 가게·차량 권리 확인 후 적용한다.
-
-| 항목 | 첫 구현 기준 |
-|---|---|
-| 분위기 | 차가 잘 보이는 작은 가게, 차분한 배경과 명확한 상태. 캐릭터는 사장 안내 위치에 한정하고 주행 중 반응 연출 없음 |
-| 색 | 배경 `#0C1722`, 패널 `#172634`, 본문 `#E8F0F4`, 보조 `#9DB1C0`, 주요 행동 `#75E8BE`, 주의 `#F2C879`, 오류 `#F08C8C`. 색만으로 대여/수리/오류를 구분하지 않고 텍스트 병기 |
-| 글자 | 시스템 sans-serif. 화면 제목 32sp, 주요 수치 30sp, 본문·버튼 24sp, 보조 20sp를 시작값으로 사용. 긴 차종명은 핵심 식별자를 유지하고 상세에서 전체 표시 |
-| 여백 | 바깥 24dp, 큰 영역 간 24dp, 카드 내부 16dp, 항목 간 12dp. 좁은 창에서 글자를 먼저 줄이기보다 열을 줄이고 상세로 분리 |
-| 버튼 | 초기 높이 64dp 이상, 인접 행동 간 16dp. 주요 확정 행동 한 개를 강조하고 비용/취소·처분은 확인 단계 제공 |
-| 카드 | 이름→상태→핵심 수치 순서. 실제 차종 외형 확보 전 중립 차량 도형. 동일 차종은 개체별 선택 상태 명확히 표시 |
-| 성장 표현 | 주차·UX 허용 후 짧은 정적 전환/페이드와 요약. 필수 정보는 애니메이션 없이 읽을 수 있게 하고 반복 점멸·긴 보상 연쇄 없음 |
-| 화면 크기 | 가로형 2열/3열과 좁은 1열 구조. 시스템 영역을 피하고 실제 사용 가능 dp 크기로 검토. 포커스·선택·현재 화면 상태 유지 |
-
-## 7. 자산과 구현 전 확인
-
-| 자산 | 현재 사용/계획 | 권리·상태 |
-|---|---|---|
-| 와이어프레임 도형 | [wireframes.svg](design-assets/wireframes.svg) | 이 프로젝트에서 작성한 중립 도형. 실제 차종/가게 아트 아님 |
-| UI 시안 v3 | [ui-v3/](design-assets/ui-v3/) 화면 PNG 30개 | 팀원이 Claude Design으로 작성한 시안. 3D 그림·캐릭터는 임시 오리지널, "르르르" 이름 사용은 #19 확인 전 |
-| 차량·르르르·가게 아트 | #19의 확인 결과에 따라 적용 | [차량 조사](04_VEHICLE_RESEARCH.md) 참조. 공식 사이트 자료 발견은 사용 허가와 구분 |
-| Pleos UI·CCP 참고 | [공식 자료 목록](contest/04_OFFICIAL_RESOURCES.md) | Figma 내부/개별 재사용 조건 미확인 |
-
-## 8. 검토 절차와 완료 판단
-
-| 확인 | 절차·기대 결과 | 현재 결과 |
-|---|---|---|
-| 문서·도형 연결 | 네 핵심 화면과 전환·버튼을 SVG/명세에서 대조 | XML 파싱·PNG 렌더·작성자 시각 점검 완료. 겹침/잘림 미발견. 실제 사용자 검토 미실시 |
-| 계약 경계 | 각 행동의 입력/결과·저장 책임을 #27과 대조 | 문서 연결 작성. 최종 API·가짜 구현 미완료 |
-| 제한 상태 | 게임 중 주행 전환·재진입·정차·주차·신호 만료 | #13과 앱 연결 후 실행 필요 |
-| 폼 팩터 | 가로·좁은 창·방향/크기 변경·가상 디스플레이 제거 후 복원 | 공식 도구 preset·dp/DPI로 실행 필요 |
-| 가독성·입력 | 제목·상태·확정 행동, 긴 이름·오류, 터치/지원 입력 탐색 | 초기 값의 실기기 가독성·입력 시험 미실시 |
-| 복원·거래 실패 | 결과 열람·중복 탭·저장 실패·강제 종료 | #28 통합 검증에 연결 |
-
-폼 팩터 도구 조건과 디스플레이 제거에 따른 종료는 [공식 자료 6절](contest/04_OFFICIAL_RESOURCES.md)을 따른다. 와이어프레임의 고정 캔버스가 모든 화면 크기에서의 성공을 의미하지 않는다. 화면 구현 완료는 앱의 연결과 위 실행 검증 근거가 확보된 뒤 판단한다.
-
-문서 작업 확인: `python3 scripts/check_repository.py` 통과, SVG XML 파싱 통과, `rsvg-convert`로 PNG 변환 후 네 패널의 글자·버튼·차량 도형과 하단 제한 안내를 시각 점검했다. 이 확인은 실제 앱 렌더링·터치·사용성 시험과 구분한다.
+구현·자동 검사와 실제 기기 시험의 상태는 [06 검증 문서](06_VERIFICATION.md#51-차고도감-호스트-연결-본인-검증)를 따른다. 정산·온보딩의 정식 View는 각 담당 코드의 실제 API를 확인한 뒤 연결하며, 별도의 초기 지급·관리 거래를 이 호스트에서 만들지 않는다.
