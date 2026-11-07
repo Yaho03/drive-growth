@@ -196,6 +196,37 @@ class DeliveryChangeTest {
         assertEquals(target.price.units - target.price.units * 10 / 100, refund)
     }
 
+    @Test fun `입력 후보 목록을 나중에 바꿔도 변경 결과와 차액은 그대로이고 반환 목록은 수정할 수 없다`() {
+        val t = terms(DeliveryOffer.Purchase::class.java)
+        val offer = changeOffer(t)
+        val target = offer.proposed.offers.first() as DeliveryOffer.Purchase
+        val offers = ArrayList(offer.proposed.offers)
+        val listOffers = ArrayList(offer.proposed.list.offers)
+        val mutable = offer.copy(proposed = offer.proposed.copy(list = offer.proposed.list.copy(offers = listOffers), offers = offers))
+        val held = t.copy(paid = GameMoney(target.price.units - 500))
+        val result = ok(change.change(held, mutable, target.id, GameMoney(500)))
+        offers.clear(); listOffers.clear()
+        assertEquals(offer.proposed, result.terms.active.proposed)
+        assertEquals(target, result.terms.active.offer)
+        assertTrue(result.terms.active.offer in result.terms.active.proposed.offers)
+        assertEquals(MoneyChange(MoneyDirection.DEBIT, GameMoney(500)), result.change?.money)
+        @Suppress("UNCHECKED_CAST")
+        fun mutate(list: List<DeliveryOffer>) = (list as MutableList<DeliveryOffer>).clear()
+        assertThrows(UnsupportedOperationException::class.java) { mutate(result.terms.active.proposed.offers) }
+        assertThrows(UnsupportedOperationException::class.java) { mutate(result.terms.active.proposed.list.offers) }
+    }
+
+    @Test fun `진행 중 의뢰의 목록을 나중에 바꿔도 포기 결과는 그대로다`() {
+        val t = terms(DeliveryOffer.Purchase::class.java)
+        val offers = ArrayList(t.active.proposed.offers)
+        val listOffers = ArrayList(t.active.proposed.list.offers)
+        val mutable = t.copy(active = t.active.copy(proposed = t.active.proposed.copy(list = t.active.proposed.list.copy(offers = listOffers), offers = offers)))
+        val abandoned = ok(change.abandon(mutable))
+        offers.clear(); listOffers.clear()
+        assertEquals(t, abandoned.terms)
+        assertTrue(abandoned.terms.active.offer in abandoned.terms.active.proposed.offers)
+    }
+
     @Test fun `수익 포기는 벌금이 없다`() {
         assertNull(ok(change.abandon(terms(DeliveryOffer.Income::class.java))).change)
     }
