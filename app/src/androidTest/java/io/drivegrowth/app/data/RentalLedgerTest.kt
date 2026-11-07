@@ -310,6 +310,7 @@ class RentalLedgerTest : InstrumentationTestCase() {
         val unviewed = ok(store.listUnviewedSettlements())
         store.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+            for (table in deliveryTables) it.execSQL("DROP TABLE $table")
             it.execSQL("DROP TABLE discoveries")
             it.execSQL("DROP TABLE gacha_progress")
             it.execSQL("DROP TABLE gacha_requests")
@@ -386,10 +387,13 @@ class RentalLedgerTest : InstrumentationTestCase() {
         assertNotNull(ok(store.rental.firstCompletedRental()))
     }
 
+    private val deliveryTables = listOf("delivery_lists", "delivery_requests", "delivery_active", "delivery_routes",
+        "delivery_outcomes", "delivery_held", "delivery_changes", "driving_days", "driving_drives")
+
     fun testUpgradeFromV1KeepsAccountAndOriginalVehicle() {
         store.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path,null,SQLiteDatabase.OPEN_READWRITE).use { db ->
-            listOf("visits","rentals","shop","facilities","rental_rest","discoveries","gacha_progress","gacha_requests").forEach { db.execSQL("DROP TABLE "+it) }
+            listOf("visits","rentals","shop","facilities","rental_rest","discoveries","gacha_progress","gacha_requests").plus(deliveryTables).forEach { db.execSQL("DROP TABLE "+it) }
             db.version=1
         }
         store=open()

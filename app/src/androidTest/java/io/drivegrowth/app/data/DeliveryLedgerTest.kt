@@ -1,6 +1,7 @@
 package io.drivegrowth.app.data
 
 import android.database.sqlite.SQLiteException
+import android.database.sqlite.SQLiteDatabase
 import android.test.InstrumentationTestCase
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.delivery.*
@@ -31,16 +32,90 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
         super.setUp()
         name = "delivery-test-" + System.nanoTime() + ".db"
         store = open()
-        ok(store.atomic { DeliveryLedger.createTables(it); ContractResult.Success(Unit) })
         ok(store.commitGameChange(GameChange(RequestId("seed"), TransactionKind.GARAGE, source, rule,
             MoneyChange(MoneyDirection.CREDIT, GameMoney(10_000)))))
-        ledger = DeliveryLedger(store)
+        ledger = store.delivery
         assertEquals(list, ok(ledger.saveList(list)))
+    }
+
+    fun testIncomeRequestBlocksOtherEntryPointsAndReservedIdsCannotBePreempted() {
+        ok(select(income, "income-visit"))
+        val credit = GameChange(RequestId("income-visit"), TransactionKind.GARAGE, source, rule,
+            MoneyChange(MoneyDirection.CREDIT, GameMoney(9)))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), store.commitGameChange(credit))
+        for (id in listOf("delivery/future/settle", "delivery/future/hold", "delivery/future/change", "drive/future")) {
+            assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
+                store.commitGameChange(credit.copy(requestId = RequestId(id))))
+        }
+        assertEquals(10_000, balance())
+        assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT), store.atomic {
+            store.record(it, credit.copy(requestId = RequestId("wrong-source"), source = InputSource.VEHICLE), "source")
+        })
+    }
+
+    private val deliveryTables = listOf("delivery_lists", "delivery_requests", "delivery_active", "delivery_routes",
+        "delivery_outcomes", "delivery_held", "delivery_changes", "driving_days", "driving_drives")
+
+    fun testV4MigrationPreservesExistingMoneyVehiclesDiscoveryAndProgress() {
+        val before = ok(store.listUnviewedSettlements())
+        store.close()
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            db.execSQL("INSERT INTO discoveries VALUES ('hyundai_casper','RARE')")
+            db.execSQL("INSERT INTO gacha_progress VALUES (1,2,3,4)")
+            deliveryTables.forEach { db.execSQL("DROP TABLE $it") }
+            db.version = 4
+        }
+        store = open()
+        ledger = store.delivery
+        assertEquals(before, ok(store.listUnviewedSettlements()))
+        assertEquals(10_000, balance())
+        assertEquals(setOf(io.drivegrowth.core.garage.CollectionKey(VehicleId("hyundai_casper"), Rarity.RARE)),
+            ok(store.discoveredVehicles()))
+        ok(store.read { db ->
+            db.rawQuery("SELECT revision,counter,tickets FROM gacha_progress", null).use {
+                assertTrue(it.moveToFirst())
+                assertEquals(2, it.getInt(0)); assertEquals(3, it.getInt(1)); assertEquals(4, it.getInt(2))
+            }
+        })
+        ok(ledger.saveList(list))
+        val saved = ok(select(purchase, "post-migration"))
+        reopen()
+        assertEquals(saved, ok(select(purchase, "post-migration")))
+    }
+
+    fun testMigrationFailurePreservesOriginalFile() {
+        store.close()
+        val file = context.getDatabasePath(name)
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db -> db.version = 4 }
+        val before = file.readBytes()
+        store = open()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.balance())
+        store.close()
+        assertTrue(before.contentEquals(file.readBytes()))
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db -> db.version = 5 }
+        store = open()
+    }
+
+    fun testTwoConnectionsOnlyActivateOneSelection() {
+        val other = open()
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(2)
+        val gate = java.util.concurrent.CountDownLatch(1)
+        try {
+            val jobs = listOf(store,other).mapIndexed { i,s -> pool.submit(java.util.concurrent.Callable {
+                gate.await()
+                s.delivery.select(proposed, purchase.id, RequestId("race-$i"))
+            }) }
+            gate.countDown()
+            val results = jobs.map { it.get(20, java.util.concurrent.TimeUnit.SECONDS) }
+            assertEquals(1, results.count { it is ContractResult.Success })
+            assertEquals(7_000, balance())
+            assertNotNull(ok(store.delivery.active()))
+        } finally { pool.shutdownNow(); other.close() }
     }
 
     override fun tearDown() { store.close(); context.deleteDatabase(name); super.tearDown() }
 
-    private fun reopen() { store.close(); store = open(); ledger = DeliveryLedger(store) }
+    private fun reopen() { store.close(); store = open(); ledger = store.delivery }
 
     private fun <T> ok(result: ContractResult<T>): T {
         assertTrue(result.toString(), result is ContractResult.Success)

@@ -78,7 +78,7 @@ class DrivingLedger internal constructor(private val store: SqliteGameChangeStor
             is ContractResult.Success -> settled.value
         }
         val recorded = result.change?.let {
-            when (val r = store.record(db, it, LedgerJson.command(it).toString())) {
+            when (val r = store.record(db, it, LedgerJson.command(it).toString(), SqliteGameChangeStore.RequestDomain.DRIVING)) {
                 is ContractResult.Failure -> return@atomic r
                 is ContractResult.Success -> r.value
             }

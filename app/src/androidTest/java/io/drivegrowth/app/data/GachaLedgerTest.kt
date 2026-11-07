@@ -141,6 +141,9 @@ class GachaLedgerTest : InstrumentationTestCase() {
         val original = ok(store.listUnviewedSettlements())
         store.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+            for (table in listOf("delivery_lists", "delivery_requests", "delivery_active", "delivery_routes",
+                "delivery_outcomes", "delivery_held", "delivery_changes", "driving_days", "driving_drives"))
+                it.execSQL("DROP TABLE $table")
             it.execSQL("DROP TABLE gacha_progress")
             it.execSQL("DROP TABLE gacha_requests")
             it.version = 3

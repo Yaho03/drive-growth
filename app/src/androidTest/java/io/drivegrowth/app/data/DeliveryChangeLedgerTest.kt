@@ -42,16 +42,15 @@ class DeliveryChangeLedgerTest : InstrumentationTestCase() {
         super.setUp()
         name = "change-test-" + System.nanoTime() + ".db"
         store = open()
-        ok(store.atomic { DeliveryLedger.createTables(it); ContractResult.Success(Unit) })
         ok(store.commitGameChange(GameChange(RequestId("seed"), TransactionKind.GARAGE, source, rule,
             MoneyChange(MoneyDirection.CREDIT, GameMoney(10_000)))))
-        ledger = DeliveryLedger(store)
+        ledger = store.delivery
         ok(ledger.saveList(list))
     }
 
     override fun tearDown() { store.close(); context.deleteDatabase(name); super.tearDown() }
 
-    private fun reopen() { store.close(); store = open(); ledger = DeliveryLedger(store) }
+    private fun reopen() { store.close(); store = open(); ledger = store.delivery }
 
     private fun <T> ok(result: ContractResult<T>): T {
         assertTrue(result.toString(), result is ContractResult.Success)

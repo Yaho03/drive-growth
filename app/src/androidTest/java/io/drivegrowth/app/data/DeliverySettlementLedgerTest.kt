@@ -42,7 +42,6 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
         super.setUp()
         name = "settle-test-" + System.nanoTime() + ".db"
         store = open()
-        ok(store.atomic { DeliveryLedger.createTables(it); DrivingLedger.createTables(it); ContractResult.Success(Unit) })
         ok(store.commitGameChange(GameChange(RequestId("seed"), TransactionKind.GARAGE, source, rule,
             MoneyChange(MoneyDirection.CREDIT, GameMoney(10_000)))))
         bind()
@@ -51,7 +50,7 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
 
     override fun tearDown() { store.close(); context.deleteDatabase(name); super.tearDown() }
 
-    private fun bind() { ledger = DeliveryLedger(store); driving = DrivingLedger(store) }
+    private fun bind() { ledger = store.delivery; driving = store.driving }
 
     private fun reopen() { store.close(); store = open(); bind() }
 
@@ -223,10 +222,10 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
     }
 
     fun testDriveIdUsedByAnotherLedgerEntryOrSourceIsRejected() {
-        ok(store.commitGameChange(GameChange(RequestId("drive/d1"), TransactionKind.GARAGE, source, rule,
-            MoneyChange(MoneyDirection.CREDIT, GameMoney(1)))))
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
-            driving.settle(drivingRules, ConfirmedDrive("d1", today, ObservedDistance(1_000, source))))
+            store.commitGameChange(GameChange(RequestId("drive/d1"), TransactionKind.GARAGE, source, rule,
+                MoneyChange(MoneyDirection.CREDIT, GameMoney(1)))))
+        ok(driving.settle(drivingRules, ConfirmedDrive("d1", today, ObservedDistance(1_000, source))))
         assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT),
             driving.settle(drivingRules, ConfirmedDrive("d2", today, ObservedDistance(1_000, InputSource.VEHICLE))))
     }

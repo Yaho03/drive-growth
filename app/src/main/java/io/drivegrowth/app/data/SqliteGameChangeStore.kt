@@ -38,6 +38,8 @@ class SqliteGameChangeStore(
         return atomic { db -> record(db, change, LedgerJson.command(change).toString()) }
     }
 
+    val delivery = DeliveryLedger(this)
+    val driving = DrivingLedger(this)
     val rental = RentalLedger(this)
     private val gacha = GachaLedger(this)
     override fun readGachaState() = gacha.readState()
@@ -59,16 +61,39 @@ class SqliteGameChangeStore(
         }
     }
 
-    internal fun record(db: SQLiteDatabase, change: GameChange, command: String): ContractResult<Settlement> {
-        if (db.rawQuery("SELECT 1 FROM visits WHERE id=?", arrayOf(change.requestId.value)).use { it.moveToFirst() })
+    internal enum class RequestDomain { GENERAL, DELIVERY, DRIVING }
+
+    internal fun requestUnavailable(db: SQLiteDatabase, id: RequestId): Boolean {
+        if (id.value.startsWith("delivery/") || id.value.startsWith("drive/")) return true
+        val queries = listOf(
+            "SELECT 1 FROM settlements WHERE request_id=?",
+            "SELECT 1 FROM visits WHERE id=?",
+            "SELECT 1 FROM gacha_requests WHERE request_id=?",
+            "SELECT 1 FROM delivery_requests WHERE request_id=?")
+        return queries.any { sql -> db.rawQuery(sql, arrayOf(id.value)).use { it.moveToFirst() } }
+    }
+
+    internal fun record(db: SQLiteDatabase, change: GameChange, command: String,
+                        domain: RequestDomain = RequestDomain.GENERAL): ContractResult<Settlement> {
+        if (change.source != source) return failure(ContractError.INVALID_INPUT)
+        val id = change.requestId.value
+        if ((id.startsWith("delivery/") && domain != RequestDomain.DELIVERY) ||
+            (id.startsWith("drive/") && domain != RequestDomain.DRIVING))
             return failure(ContractError.STATE_CONFLICT)
-        if (db.rawQuery("SELECT 1 FROM gacha_requests WHERE request_id=?", arrayOf(change.requestId.value)).use { it.moveToFirst() })
-            return failure(ContractError.STATE_CONFLICT)
-        val existing = db.rawQuery("SELECT command, result FROM settlements WHERE request_id = ?", arrayOf(change.requestId.value)).use {
+        if (domain == RequestDomain.DELIVERY && change.kind != TransactionKind.DELIVERY ||
+            domain == RequestDomain.DRIVING && change.kind != TransactionKind.DRIVING)
+            return failure(ContractError.INVALID_INPUT)
+        for (table in listOf("visits", "gacha_requests", "delivery_requests")) {
+            val key = if (table == "visits") "id" else "request_id"
+            if (db.rawQuery("SELECT 1 FROM $table WHERE $key=?", arrayOf(id)).use { it.moveToFirst() })
+                return failure(ContractError.STATE_CONFLICT)
+        }
+        val existing = db.rawQuery("SELECT command, result FROM settlements WHERE request_id = ?", arrayOf(id)).use {
             if (it.moveToFirst()) it.getString(0) to it.getString(1) else null
         }
         if (existing != null) {
-            return if (existing.first == command) ContractResult.Success(LedgerJson.settlement(JSONObject(existing.second)))
+            return if (domain == RequestDomain.GENERAL && existing.first == command)
+                ContractResult.Success(LedgerJson.settlement(JSONObject(existing.second)))
             else failure(ContractError.STATE_CONFLICT)
         }
         val previousBalance = readBalance(db)
@@ -224,7 +249,7 @@ internal enum class LedgerFailureReason { SQLITE, CORRUPT, UNSUPPORTED_SCHEMA, S
 private class LedgerStorageException(val reason: LedgerFailureReason) : SQLiteException(reason.name)
 
 private class LedgerHelper(context: Context, name: String, private val source: InputSource, private val initialGachaProgress: GachaProgress?) : SQLiteOpenHelper(
-    context, name, null, 4,
+    context, name, null, 5,
     // Android 기본 핸들러의 손상 DB 삭제를 막고 원본을 보존한다.
     DatabaseErrorHandler { throw LedgerStorageException(LedgerFailureReason.CORRUPT) },
 ) {
@@ -239,18 +264,22 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         RentalLedger.createTables(db)
         createDiscoveries(db)
         GachaLedger.createTables(db)
+        DeliveryLedger.createTables(db)
+        DrivingLedger.createTables(db)
         initialGachaProgress?.let { GachaLedger.insertInitialProgress(db, it) }
     }
     private fun createDiscoveries(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE discoveries (vehicle_id TEXT NOT NULL, rarity TEXT NOT NULL, PRIMARY KEY(vehicle_id, rarity))")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion !in 1..3 || newVersion != 4) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
+        if (oldVersion !in 1..4 || newVersion != 5) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
         verifySource(db)
         // 기존 원장과 개체 JSON은 그대로 보존한다.
         if (oldVersion == 1) RentalLedger.createTables(db)
         if (oldVersion < 3) createDiscoveries(db)
-        GachaLedger.createTables(db)
+        if (oldVersion < 4) GachaLedger.createTables(db)
+        DeliveryLedger.createTables(db)
+        DrivingLedger.createTables(db)
     }
     override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
