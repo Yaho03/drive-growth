@@ -102,6 +102,7 @@ sealed interface HoldOutcome {
  * 도착 정산을 계산한다. 저장, 실제 내비 어댑터, 화면은 담당하지 않는다.
  *
  * - 도착은 활성 경로 세대와 출처가 같고 기한 안에 받은 증거만 인정한다. 정차, P, 거리 0, 증거 누락은 도착이 아니다.
+ * - 받은 시각이 현재([now])보다 늦은 증거는 아직 받을 수 없는 시각이라 지급하지 않고 기다린다. 기한 안에 받았고 처리만 기한 뒤로 늦어진 경우는 정상 도착이다.
  * - 증거 생성 쪽은 현재 경로에 연결할 근거(#80)가 있을 때만 [DeliveryArrivalEvidence]를 만든다. 이 계산은 그 연결을 다시 증명하지 못한다.
  * - 완료·환급은 같은 요청 ID(`delivery/<requestId>/settle`)를 써서 원장에서 한 번만 확정된다. 보관 수령·환급은 `delivery/<requestId>/hold`다.
  * - 호출자는 결과와 활성 의뢰 종료, 완료 자리 교체를 한 트랜잭션으로 저장한다.
@@ -120,7 +121,8 @@ class DeliverySettlement(private val rules: DeliverySettlementRules) {
         val source = active.proposed.estimated.source
         val deadline = add(progress.startedAt, rules.arrivalWindowMs) ?: return ContractResult.Failure(ContractError.INVALID_INPUT)
         val arrival = (evidence as? Observation.Available)?.value?.takeIf {
-            it.matches(progress.route, source) && it.receivedAt.value >= progress.startedAt.value && it.receivedAt.value < deadline.value
+            it.matches(progress.route, source) && it.receivedAt.value >= progress.startedAt.value &&
+                it.receivedAt.value < deadline.value && it.receivedAt.value <= now.value
         }
         val settleId = RequestId("delivery/${active.requestId.value}/settle")
         val offer = active.offer
