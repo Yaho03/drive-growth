@@ -86,7 +86,8 @@ class SqliteGameChangeStore(
                 val activity = rental.activity(db, write.ownedVehicleId)
                 if (activity == VehicleActivity.RENTED ||
                     activity == VehicleActivity.RETURNING ||
-                    (activity == VehicleActivity.NEEDS_REPAIR && write.lifecycle == VehicleLifecycle.OWNED))
+                    (activity == VehicleActivity.NEEDS_REPAIR &&
+                        write.lifecycle !in setOf(VehicleLifecycle.SOLD, VehicleLifecycle.SCRAPPED)))
                     return failure(ContractError.STATE_CONFLICT)
                 if (previous.revision != write.expectedRevision || previous.lifecycle != VehicleLifecycle.OWNED) return failure(ContractError.STATE_CONFLICT)
                 if (previous.revision.value == Int.MAX_VALUE) return failure(ContractError.INVALID_INPUT)

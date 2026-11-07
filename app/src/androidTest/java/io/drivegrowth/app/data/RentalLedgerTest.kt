@@ -149,13 +149,61 @@ class RentalLedgerTest : InstrumentationTestCase() {
         ok(store.rental.account(request.id,start,EpochMillis(1),null))
         // 1ms 주행 후 주차하면 정산액에 소수가 남는다.
         ok(store.rental.account(request.id,EpochMillis(1),EpochMillis(3600000),EpochMillis(1)))
+        val before = ok(store.rental.pending())
+        val settlements = ok(store.listUnviewedSettlements())
         assertEquals(ContractResult.Failure(ContractError.POLICY_UNRESOLVED),store.rental.settle(request.id))
         reopen()
         assertEquals(GameMoney(100),ok(store.balance()))
+        assertEquals(before, ok(store.rental.pending()))
+        assertEquals(settlements, ok(store.listUnviewedSettlements()))
         val resolved = ok(store.rental.settle(request.id,RoundingMode.DOWN))
         assertEquals(GameMoney(178),resolved.settlement.balance)
         assertEquals(resolved,ok(store.rental.settle(request.id)))
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),store.rental.settle(request.id,RoundingMode.UP))
+    }
+
+    fun testDamagedCarRejectsMaterialButAllowsSale() = assertDamagedDisposition(VehicleLifecycle.SOLD)
+
+    fun testDamagedCarRejectsMaterialButAllowsScrap() = assertDamagedDisposition(VehicleLifecycle.SCRAPPED)
+
+    private fun assertDamagedDisposition(disposition: VehicleLifecycle) {
+        ok(assign(t = terms.copy(roll = 0)))
+        val assigned = ok(store.listOwnedVehicles()).single()
+        fun write(target: VehicleLifecycle) = store.commitGameChange(GameChange(
+            RequestId(target.name), TransactionKind.GARAGE, source, version,
+            money = MoneyChange(MoneyDirection.CREDIT, GameMoney(5)),
+            vehicle = VehicleWrite.Update(assigned.ownedVehicleId, assigned.revision,
+                assigned.level, target, assigned.levelProgressPercent),
+        ))
+        val conflict = ContractResult.Failure(ContractError.STATE_CONFLICT)
+        assertEquals(conflict, write(disposition))
+        ok(store.rental.account(request.id, terms.start, EpochMillis(3600000), null))
+        ok(store.rental.settle(request.id))
+        assertEquals(conflict, write(disposition))
+        assertEquals(VehicleActivity.NEEDS_REPAIR, ok(store.rental.finishReturn(request.id, EpochMillis(4500000))))
+        val balance = ok(store.balance())
+        val settlements = ok(store.listUnviewedSettlements())
+        assertEquals(conflict, write(VehicleLifecycle.CONSUMED))
+        reopen()
+        assertEquals(listOf(assigned), ok(store.listOwnedVehicles()))
+        assertEquals(balance, ok(store.balance()))
+        assertEquals(settlements, ok(store.listUnviewedSettlements()))
+        assertEquals(disposition, ok(write(disposition)).changedVehicle?.lifecycle)
+    }
+
+    fun testIntegralOverflowRejectsEveryRoundingPolicyWithoutWrites() {
+        ok(store.rental.assign(request, catalog, mapOf(car.vehicleId to RentalCategory.SEDAN),
+            mapOf(car.vehicleId to GameMoney(Long.MAX_VALUE - 2)), terms.copy(rounding = null)))
+        ok(store.rental.account(request.id, terms.start, EpochMillis(3600000), null))
+        val pending = ok(store.rental.pending())
+        val settlements = ok(store.listUnviewedSettlements())
+        for (policy in listOf(null, RoundingMode.UNNECESSARY, RoundingMode.DOWN)) {
+            assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT), store.rental.settle(request.id, policy))
+            reopen()
+            assertEquals(pending, ok(store.rental.pending()))
+            assertEquals(settlements, ok(store.listUnviewedSettlements()))
+            assertEquals(GameMoney(100), ok(store.balance()))
+        }
     }
 
     fun testUpgradeFromV1KeepsAccountAndOriginalVehicle() {

@@ -171,11 +171,17 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             if (row.getLong(3) != row.getLong(2)) return@atomic conflict()
             val numerator = BigDecimal(row.getString(5)) * weightedMillis
             val rounding = configured ?: resolvedRounding ?: RoundingMode.UNNECESSARY
+            val duration = (row.getLong(2) - row.getLong(1)).toBigDecimal()
+            if (duration.signum() <= 0) return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
+            val fare = try {
+                numerator.divide(duration, 0, rounding)
+            } catch (_: ArithmeticException) {
+                return@atomic ContractResult.Failure(ContractError.POLICY_UNRESOLVED)
+            }
             val amount = try {
-                val fare = numerator.divide((row.getLong(2)-row.getLong(1)).toBigDecimal(), 0, rounding)
                 GameMoney((fare + bonus.units.toBigDecimal()).longValueExact())
             } catch (_: ArithmeticException) {
-                return@atomic ContractResult.Failure(if (rounding == RoundingMode.UNNECESSARY) ContractError.POLICY_UNRESOLVED else ContractError.INVALID_INPUT)
+                return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
             }
             val change = GameChange(request, TransactionKind.RENTAL, store.source, RuleVersion(row.getString(0)),
                 MoneyChange(MoneyDirection.CREDIT, amount))
