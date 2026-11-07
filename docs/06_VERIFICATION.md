@@ -610,3 +610,14 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w \
 - 신호·권한·창·야간 설정은 이 추가 시험에서 변경하지 않았다. worker 재개·디버거 분리·포워딩 제거 후 제품 시험 프로세스와 이번 AVD만 종료했고 기존 ADB5038 서버를 유지했다. 데이터 삭제·초기화는 하지 않았다.
 
 이번 입력·수명주기 변경에서 차단 결함은 발견되지 않았다. PR 검토·사용자 머지 지시와 최종 원격 커밋/CI는 PR #105에서 관리하며 AI 검토를 사람 승인으로 표시하지 않는다. 위 SDK 내부 잠금·실제 서비스 장애 주입·센서 시각·공식 폼 팩터·실차 한계는 유지한다. 실제 명령 중복·저장 성공 경계, #103 표시 UI의 제품 탐색 연결과 후속 기능 통합은 #51·#52·#28에 남긴다. README의 화면 병렬 작업표는 같은 인계를 반영한다.
+
+### B 대여 배정·영업 원장 (#41–#44, 2026-11-07)
+
+코어 시험 103개와 앱 단위 시험 26개, debug APK·기기 시험 APK 조립, Android lint 및 저장소 검사를 확인했다. Pleos Connect 2.1.0 / Android 14의 활성 사용자 10에서 최종 APK로 신규 `RentalLedgerTest` 6개가 통과했다.
+
+- 별도 DB 연결 두 개에서 같은 차량에 대한 배정과 판매를 경쟁시키고, 두 방문이 경쟁할 때 한 건만 점유하는 것을 확인했다. 영업 쉬기 중의 미배정도 재요청 후 그대로 유지됐다.
+- 시험 기본료 100, 정확 일치, 주차 1시간은 대여료 78이었다. 주유소 추가금 5를 포함한 입금 83, 정산 직전 쓰기 실패 시 잔액 90 보존, 재시도 후 잔액 173 및 중복 요청 시 같은 영수증을 확인했다.
+- 주차 중 원래 기준점 유지, 반납 전 재배정 제한, 가상 사고 후 수리 필요 상태, 반올림 미정 시 지급 보류·정책 입력 후 재개, 시설·공간·구매 원장 DB 재개방 및 SQLite v1 → v2의 기존 잔액·개체·정산 보존을 검사했다.
+- 전체 기기 실행에서 기존 `NavigationTest.testTopLevelBackHidesTask`가 시작 시 앱 창 포커스를 얻지 못했다. 시험 DB 재개방은 제품 프로세스 강제 종료·전원 차단·실차 검증과 별개다. 실제 고객 분포·단골 판정, 수리 명령, A/D 수명주기·화면 연결과 최종 경제 수치의 검증은 후속 인계 범위다.
+
+재현은 프로젝트의 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` 후 Pleos의 활성 사용자에 앱/시험 APK를 설치하고 `adb shell am instrument --user 10 -w -e class io.drivegrowth.app.data.RentalLedgerTest io.drivegrowth.app.test/android.test.InstrumentationTestRunner`로 실행한다.
