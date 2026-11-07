@@ -1,0 +1,111 @@
+{
+  "head": "6bedb76a27dcf06b5a14ea782d1d19de91fe1c08",
+  "base": "f14c1933592515ab938d39fefba68b3be31cae6a",
+  "priorFailedHead": "a4625484b78a5c0619c004d86b3067c5640761a2",
+  "scope": "원래 두P2 재검증; 제품/원본/원격 미수정",
+  "trackedGachaSourceBlobs": {
+    "app/src/androidTest/java/io/drivegrowth/app/ui/gacha/GachaViewTest.kt": "f4ad2fdd3aa4c9c2efa4bd5b7e3136049827841c",
+    "app/src/debug/java/io/drivegrowth/app/ui/gacha/GachaPreviewStates.kt": "cc661c81d1f6e407f335b33c39affcf98ec8c514",
+    "app/src/main/java/io/drivegrowth/app/ui/gacha/GachaScreenState.kt": "f99d9802e40b87962020b41a4458a458ae698a14",
+    "app/src/main/java/io/drivegrowth/app/ui/gacha/GachaView.kt": "dfcaaa230092398ad07b5aefd049353553ab5add",
+    "app/src/main/res/values/gacha_strings.xml": "4b29de251b9905addbeec57063443281904d5ea9",
+    "app/src/test/java/io/drivegrowth/app/ui/gacha/GachaBoundaryRegressionTest.kt": "edd66c231b493aee5788db9d61c8178b0cbee35c",
+    "app/src/test/java/io/drivegrowth/app/ui/gacha/GachaInteractionTest.kt": "cf773c35306635123e9a38c97fd979c14259406e"
+  },
+  "trackedAppSourcesUnchanged": true,
+  "temporaryUnit": "GachaIndependentBoundaryTest.kt",
+  "tests": {
+    "formalUnit": 20,
+    "independentUnit": 7,
+    "unitFailures": 0,
+    "unitErrors": 0,
+    "unitSkipped": 0,
+    "formalDeviceWidget": 9,
+    "additionalNativeHost": 2,
+    "deviceTotal": 11,
+    "deviceFailures": 0,
+    "deviceErrors": 0,
+    "deviceSeconds": 7.116
+  },
+  "device": {
+    "adbPort": 5038,
+    "serial": "emulator-5556",
+    "user": 10,
+    "boot": 23,
+    "package": "io.drivegrowth.app.gacha52finala",
+    "testTarget": "io.drivegrowth.app.gacha52finala",
+    "nativeHostWidthsDp": [
+      320,
+      936
+    ],
+    "installedApkHashes": {
+      "io.drivegrowth.app.gacha52finala": "bad1e1314e0f3411c98cf7b9254148a1f144d2d37bb7fc3c9929115d8cebaab7",
+      "io.drivegrowth.app.gacha52finala.test": "1320fd3fb1372815c1ef29f5c882c400c4c5339b5ac0a91661096a198ecaf9e5"
+    }
+  },
+  "restoration": {
+    "sameProductApk": true,
+    "sameSixFiles": true,
+    "sameProductPermissions": true,
+    "sameUserBootSizeDensityFontNight": true,
+    "forwardEmpty": true,
+    "isolatedPackagesRemoved": true,
+    "activeInstrumentationNone": true,
+    "navigationForeground": true,
+    "released": true,
+    "noAdbAfterRelease": true
+  },
+  "review": {
+    "code": "APPROVE",
+    "architecture": "CLEAR",
+    "newConfirmedDefects": 0
+  },
+  "limits": [
+    "실제47소비/추첨·경제/SQL/티켓·카운터·발견저장 미연결",
+    "호스트탐색/gate·Activity Bundle/프로세스영속복원 미완료",
+    "실차/공식폼팩터 미검증",
+    "위젯9+native2는수정head실행; 옛기기7+2와별개",
+    "전체core225/app139/Lint20은작성자기존근거; root재실행아님",
+    "push/PR/CI/머지/이슈변경없음"
+  ],
+  "publication": {
+    "sourceHead": "6bedb76a27dcf06b5a14ea782d1d19de91fe1c08",
+    "performedBy": "별도 독립 검증 A",
+    "originalSha256": {
+      "targeted-build.log": "cc8b431cf40fca1c09671a0b65e3a943cd17283aff76f9cab082967476f2f076",
+      "current-token-restored.png": "132c176050878eca336505c0cd10bcd5386c7767adb0ea8a3b7737e4beb5add6",
+      "isolated-build.log": "fe5bca1053dedd857ae03119cd64d595f1d98f4e3eaf64c2ee62de9a30fde772",
+      "long-candidates-320dp.png": "36b520243ced81f0fa91ff4310503046cc40aae1cf084d2bc1a713aae6eacf6b",
+      "external-result.png": "f766eb0f8b220d2a3c9eccb9bcb9d4b27f64a609140b828abd26ca81a36fbe3e",
+      "native-pending-restored.png": "e43d9a3e71637594c2a6c6dae885dc6b7fe69aa27047f8ba57aa3aba72a30c0b",
+      "isolated-app.apk": "bad1e1314e0f3411c98cf7b9254148a1f144d2d37bb7fc3c9929115d8cebaab7",
+      "guaranteed-936dp.png": "f31371b501e7ed5b65c62c4280ae3bd41cfd93a4fb040dc3efd01499315f09e4",
+      "isolated-test.apk": "1320fd3fb1372815c1ef29f5c882c400c4c5339b5ac0a91661096a198ecaf9e5",
+      "device-tests.log": "5f11ee2e24eacabcc3e5923c26cd397fa9da6d5af1778a45305b2e3d92c9e125"
+    },
+    "omissions": [
+      "APK 바이너리·개인 경로·전체 activity/package dump 제외",
+      "host-log는최종PID31757행만발췌",
+      "isolate.gradle의임시절대경로만환경변수로치환;재실행안함",
+      "공개 빌드 로그의 임시 검토 사본 경로를 <검증 사본>으로 치환; 로그 확장자만 txt로 변경",
+      "공개 빌드 로그의 줄 끝 공백만 제거; 원본 해시는 별도 보존"
+    ],
+    "publishedSha256": {
+      "GachaIndependentBoundaryTest.kt": "fe1df978a7ad8ae7f07b07137d820adbf18baf113a69cec4675afd1830b92182",
+      "README.md": "0eaec5bddfdbff9313eae63a6b60d7ed52f10b01007a194ab44e62fed9c9e178",
+      "REPORT.md": "3bf4c0f6d0d296b7f3de49922626174a2b8dbdcdb1bd47ce929feaa28c4be1e3",
+      "current-token-restored.png": "132c176050878eca336505c0cd10bcd5386c7767adb0ea8a3b7737e4beb5add6",
+      "device-tests.txt": "5f11ee2e24eacabcc3e5923c26cd397fa9da6d5af1778a45305b2e3d92c9e125",
+      "guaranteed-936dp.png": "f31371b501e7ed5b65c62c4280ae3bd41cfd93a4fb040dc3efd01499315f09e4",
+      "host-log.txt": "ba186a17d21bedcf3a0e772c01629fef873b54a276d3498782cfd8fff63c12d6",
+      "installed-sha256.json": "270315ee766c14e1197ea84811cc4ecabed59bc46b02a9423f2bd6160d784672",
+      "long-candidates-320dp.png": "36b520243ced81f0fa91ff4310503046cc40aae1cf084d2bc1a713aae6eacf6b",
+      "restoration.json": "df99963f2f84446bc1b0acbee6e88fe43a13773e1c8d1ee26c7b3ada454dc249",
+      "targeted-build.txt": "cf48baaa8991828ead34b4e688a8281b14f60ef56e3e781f747ecd580cfc60af",
+      "temporary-host/AndroidManifest.xml": "20ee41cfd1b963fb304692b9ec0bb353dc2d647eeb9b7d4f0e6d90080113e37e",
+      "temporary-host/isolate.gradle": "ae00d08bfe34005c96151d3c9cca31600a02c39f3d86fb089b530a188fb0f6ec",
+      "temporary-host/java/io/drivegrowth/app/ui/gacha/GachaReviewHostActivity.kt": "e86caa81862a5bf5eb1de6d64d9a5ea6ce1e4efd9ccee63692f6ec6772c7fa38",
+      "temporary-host/test/io/drivegrowth/app/ui/gacha/GachaNativeReviewTest.kt": "700442d264d7c43a3a57e63368274ec9a8cb0063e2f016105a35b72b910e80d9"
+    }
+  }
+}
