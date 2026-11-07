@@ -135,4 +135,40 @@ class ProgressInteractionTest {
         assertEquals(1, events.filterIsInstance<ProgressEvent.ClaimReward>().size)
     }
 
+    @Test fun restorationInvalidatesOlderVisibleContentInEitherCallOrder() {
+        for (renderFirst in listOf(true, false)) {
+            val events = mutableListOf<ProgressEvent>(); val ui = interaction(events)
+            val saved = ProgressUiState(selectedKey = key, acceptedRevisions = mapOf(key to 5L))
+            if (renderFirst) ui.render(content(), true)
+            ui.restoreUiState(saved)
+            if (!renderFirst) assertFalse(ui.render(content(), true))
+            assertFalse(ui.claim())
+            assertEquals(ProgressScreenState.Loading, ui.state)
+            assertNull(ui.selectedItem)
+            assertFalse(ui.render(content(2), true))
+            assertEquals(ProgressScreenState.Loading, ui.state)
+            assertTrue(events.none { it is ProgressEvent.ClaimReward })
+            assertTrue(ui.render(content(3, listOf(item(6, "valid-new-offer"))), true))
+            ui.select(key); assertTrue(ui.claim())
+            assertEquals(1, events.filterIsInstance<ProgressEvent.ClaimReward>().size)
+        }
+    }
+    @Test fun invalidatingVisibleContentPreservesPendingAndWaitsForAnExplicitRecoverySnapshot() {
+        val events = mutableListOf<ProgressEvent>(); val ui = interaction(events)
+        ui.render(content(), true)
+        val pending = ClaimReference(key, 1, "pending-request")
+        ui.restoreUiState(ProgressUiState(selectedKey = key, requestedKeys = setOf(pending.requestKey),
+            pending = pending, retryPending = true, acceptedRevisions = mapOf(key to 5L)))
+        assertEquals(ProgressScreenState.Loading, ui.state)
+        assertEquals(pending, ui.uiState.pending)
+        assertEquals(setOf(pending.requestKey), ui.uiState.requestedKeys)
+        assertTrue(ui.uiState.retryPending)
+        assertEquals(5L, ui.uiState.acceptedRevisions[key])
+        assertFalse(ui.claim()); assertTrue(events.isEmpty())
+        assertTrue(ui.render(content(3, listOf(item(6, "recovery-request", RewardStatus.FAILED))), true))
+        assertNull(ui.uiState.pending)
+        assertEquals(RewardStatus.FAILED, ui.selectedItem!!.status)
+        assertTrue(ui.claim())
+    }
+
 }

@@ -949,3 +949,11 @@ debug 전용 `ProgressPreviewStates`는 실제 원장·DB·차량·위치·주�
 - **수정 기기 반환:** 자기 격리 패키지2개만 제거했다. [파일 전](evidence/issue57-progress-ui/revision-fix/product-hashes-before.txt)/[후](evidence/issue57-progress-ui/revision-fix/product-hashes-after.txt)의 6개 해시와 [제품 APK](evidence/issue57-progress-ui/revision-fix/product-apk-after.txt)가 동일하며 권한·기어·전역 크기/밀도/글꼴은 변경하지 않았다. [종료 상태](evidence/issue57-progress-ui/revision-fix/state-after.txt)는 원래 user10·1080×600/120dpi/fontScale설정null·기존 내비 Activity 복귀이며 활성 시험·추가 forward 없음, 기존 AVD PID64177/ADB5038 PID66071 유지다. 반환 보고 이후 추가 adb를 하지 않는다. [정확 소스·APK SHA-256 metadata](evidence/issue57-progress-ui/revision-fix/metadata.json), 원본 APK/로그 `/private/tmp/progress-revision-device-evidence/`, 임시 호스트 `/private/tmp/progress-device-host/`를 보존했다.
 
 09의 #57 복원 계약에 최대 revision 맵의 수명주기·동일 프로필 범위, View 내부 sequence 비교와 호스트의 조회 세대 책임을 구분했다. A의 같은 재현·영향 경계 재검토에 새 로컬 커밋을 인계하며, PR 게시/CI/main 머지는 계속 대기한다. #55·#53·공통 타입·DB·MainActivity는 수정하지 않았다.
+
+### #57 독립 재검토 추가 수정 — 표시 후 복원 순서
+
+2026-11-07, A가 `6e02ef7`(제품 코드 `4ad549d`)에서 `render(revision1/청구가능) → restore(동일 키 최대revision5) → claim` 순서의 추가 P2를 재현했다. 복원 맵은5가 됐지만 현재 표시가1로 남아 청구 이벤트를 허용했다. 원래 소멸 지적은 해결됐으나 복원 순서가 반대인 경계가 남은 것이며 실제 DB 중복 지급 재현은 아니다.
+
+정식 `restorationInvalidatesOlderVisibleContentInEitherCallOrder`, `invalidatingVisibleContentPreservesPendingAndWaitsForAnExplicitRecoverySnapshot`을 먼저 실행해 **수정 전2개 실패**를 확인했다(`/private/tmp/progress-restore-order-red.txt`). 복원 맵 병합 뒤 현재 Content의 모든 항목을 재검사해 낮은 revision이 있으면 행동 없는 Loading으로 무효화했다. 최대 이력·Pending·요청 키·재조회 잠금은 보존하며 맵만으로 수령/실패 결과를 생성하지 않는다. `canClaim`도 항목 revision을 확인한다. 조회 세대 비교 이력은 유지하므로 같은 낮은 Content 재전달은 조회 대기를 끝내지 않으며, 유효한 새 Content가 수락되면 다시 표시한다.
+
+수정 후 진행 UI 단위 **16개 통과, 실패·오류·생략0**이다. `render→restore`와 `restore→render`, 낮은 Content 재전달의 표시/청구 차단, 유효 Content 복귀, Pending 보존·명시적 실패 복구와 기존 소멸·새 기간·gate/불변성 회귀를 포함한다. `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`도 성공했고 Lint오류0·경고17이다. 신규 `testRenderBeforeRestoreClearsStaleContentAndRetainedButtons`를 포함한 기기 시험6개가 컴파일됐으며 변경된 View 표적만 새 배정 슬롯에서 실행한다. 로그는 `/private/tmp/progress-restore-order-validation.txt`다. 전체 core/앱과 앞선 기기 시험 전체는 반복하지 않는다. 09의 #57 복원 순서·표시 무효화 계약을 함께 갱신했으며 공통 호스트/DB·다른 기능은 변경하지 않았다.

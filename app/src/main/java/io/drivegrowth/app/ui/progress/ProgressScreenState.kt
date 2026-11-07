@@ -90,7 +90,7 @@ class ProgressInteraction(private val onEvent: (ProgressEvent) -> Unit) {
             val previous = latest
             if (previous != null && (value.sequence < previous.sequence ||
                     value.sequence == previous.sequence && value != previous)) return false
-            if (value.entries.any { it.revision < (uiState.acceptedRevisions[it.key] ?: -1L) }) return false
+            if (containsStaleRevision(value)) return false
             val frozen = value.copy(entries = Collections.unmodifiableList(ArrayList(value.entries)),
                 rest = value.rest?.copy(conditions = Collections.unmodifiableList(ArrayList(value.rest.conditions))))
             val pending = uiState.pending
@@ -110,6 +110,9 @@ class ProgressInteraction(private val onEvent: (ProgressEvent) -> Unit) {
             revisions[key] = maxOf(revisions[key] ?: -1L, revision)
         }
         update(value.copy(acceptedRevisions = revisions))
+        // 복원이 첫 render 뒤에 와도 낡은 표시를 남기지 않는다. 이력만으로 결과를 만들지 않는다.
+        val current = state as? ProgressScreenState.Content
+        if (current != null && containsStaleRevision(current)) state = ProgressScreenState.Loading
     }
     fun select(key: ProgressKey) {
         if (!controlsEnabled || (state as? ProgressScreenState.Content)?.entries?.none { it.key == key } != false) return
@@ -125,6 +128,7 @@ class ProgressInteraction(private val onEvent: (ProgressEvent) -> Unit) {
     fun isPending(item: ProgressItem): Boolean = item.status == RewardStatus.PENDING || uiState.pending?.key == item.key
     fun canClaim(): Boolean {
         val item = selectedItem ?: return false; val offer = item.claim ?: return false
+        if (item.revision < (uiState.acceptedRevisions[item.key] ?: -1L)) return false
         return controlsEnabled && uiState.pending == null &&
             (state as? ProgressScreenState.Content)?.entries?.none { it.status == RewardStatus.PENDING } == true && offer.enabled && offer.requestKey !in uiState.requestedKeys &&
             item.rewardLabel != null && item.status in listOf(RewardStatus.CLAIMABLE, RewardStatus.FAILED)
@@ -141,6 +145,8 @@ class ProgressInteraction(private val onEvent: (ProgressEvent) -> Unit) {
         update(uiState.copy(retryPending = true)); onEvent(ProgressEvent.Retry); return true
     }
     fun completeRetry() { update(uiState.copy(retryPending = false)) }
+    private fun containsStaleRevision(value: ProgressScreenState.Content): Boolean =
+        value.entries.any { it.revision < (uiState.acceptedRevisions[it.key] ?: -1L) }
     private fun update(value: ProgressUiState) {
         uiState = value.copy(requestedKeys = Collections.unmodifiableSet(LinkedHashSet(value.requestedKeys)),
             acceptedRevisions = Collections.unmodifiableMap(LinkedHashMap(value.acceptedRevisions)))

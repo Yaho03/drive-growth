@@ -95,4 +95,27 @@ class ProgressViewTest : InstrumentationTestCase() {
         assertTrue(all(replacement).none { it is Button })
     }
 
+    fun testRenderBeforeRestoreClearsStaleContentAndRetainedButtons() = onUi {
+        val events = mutableListOf<ProgressEvent>(); val view = ProgressView(instrumentation.targetContext, events::add)
+        val normal = ProgressPreviewStates.normal
+        view.render(normal, true); select(view)
+        val staleButton = claim(view)
+        view.restoreUiState(view.uiState.copy(acceptedRevisions = mapOf(ProgressPreviewStates.firstKey to 5L)))
+        assertTrue(texts(view).contains("진행 정보를 확인하고 있어요"))
+        assertTrue(all(view).none { it is Button })
+        assertFalse(texts(view).contains("영업 결과 확인하기"))
+        staleButton.performClick()
+        assertFalse(view.render(normal.copy(sequence = 2), true))
+        assertTrue(all(view).none { it is Button })
+        assertTrue(events.none { it is ProgressEvent.ClaimReward })
+        val latest = normal.copy(sequence = 3, entries = normal.entries.map {
+            if (it.key == ProgressPreviewStates.firstKey) it.copy(revision = 6) else it
+        })
+        assertTrue(view.render(latest, true))
+        staleButton.performClick()
+        assertTrue(events.none { it is ProgressEvent.ClaimReward })
+        claim(view).performClick()
+        assertEquals(1, events.filterIsInstance<ProgressEvent.ClaimReward>().size)
+    }
+
 }
