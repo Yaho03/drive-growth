@@ -25,7 +25,7 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
     fun render(value: GachaFrame, controlsEnabled: Boolean): Boolean { val accepted = session.render(value, controlsEnabled); drawScreen(); return accepted }
     fun complete(request: GachaRequest, result: ContractResult<Unit>) { session.complete(request, result); drawScreen() }
     fun completeReload(token: String) { session.completeReload(token); drawScreen() }
-    fun completeGarageNavigation(id: SettlementId) { session.completeGarageNavigation(id); drawScreen() }
+    fun completeGarageNavigation(request: GachaGarageRequest) { session.completeGarageNavigation(request); drawScreen() }
     fun resolveFailedRequest(key: RequestId): Boolean { val resolved = session.resolveFailedRequest(key); drawScreen(); return resolved }
     fun handleBack(): Boolean { val closed = session.cancel(); if (closed) drawScreen(); return closed }
     fun release() { session.release(); drawScreen() }

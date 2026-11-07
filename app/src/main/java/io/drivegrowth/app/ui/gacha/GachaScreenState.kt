@@ -77,16 +77,18 @@ sealed interface GachaScreen {
 data class GachaFrame(val generation: Long, val screen: GachaScreen) { init { require(generation >= 0) } }
 data class GachaDrawInput(val offers: GachaOffers, val option: GachaOption)
 data class GachaRequest(val generation: Long, val input: GachaDrawInput, val attemptId: String)
+/** 차고 이동 시도 상관값. 경제 RequestId와 별개다. */
+data class GachaGarageRequest(val settlementId: SettlementId, val ownedVehicleId: OwnedVehicleId, val token: String)
 data class GachaUiState(
     val frame: GachaFrame? = null, val selected: String? = null, val pending: GachaRequest? = null,
     val reservations: Map<String, GachaDrawInput> = emptyMap(),
     val acknowledged: Set<RequestId> = emptySet(), val failedKeys: Set<RequestId> = emptySet(),
-    val failure: ContractError? = null, val reloadToken: String? = null, val garagePending: SettlementId? = null,
+    val failure: ContractError? = null, val reloadToken: String? = null, val garagePending: GachaGarageRequest? = null,
 )
 sealed interface GachaEvent {
     data class Draw(val request: GachaRequest) : GachaEvent
     data class Reload(val token: String) : GachaEvent
-    data class OpenGarage(val settlementId: SettlementId, val ownedVehicleId: OwnedVehicleId) : GachaEvent
+    data class OpenGarage(val request: GachaGarageRequest) : GachaEvent
 }
 
 /** 표시·전송 경계만 관리한다. 추첨·재분배·해금·금액 판단·저장을 실행하지 않는다. */
@@ -122,7 +124,8 @@ class GachaInteraction(private val onEvent: (GachaEvent) -> Unit, restored: Gach
         if (option.displayProblem() != null) return false
         if (option.requestId in uiState.acknowledged) return false
         val input = GachaDrawInput(offers, option)
-        return uiState.reservations[id]?.let { it == input } ?: true
+        if (uiState.reservations[id]?.let { it != input } == true) return false
+        return uiState.reservations.values.none { it.option.requestId == option.requestId && it != input }
     }
     fun select(id: String): Boolean {
         if (!canSelect(id)) return false
@@ -166,10 +169,11 @@ class GachaInteraction(private val onEvent: (GachaEvent) -> Unit, restored: Gach
     fun openGarage(): Boolean {
         val result = (frame?.screen as? GachaScreen.Result)?.value ?: return false
         if (released || !controlsEnabled || uiState.garagePending != null) return false
-        val id = result.settlement.settlementId; uiState = uiState.copy(garagePending = id)
-        onEvent(GachaEvent.OpenGarage(id, result.settlement.changedVehicle!!.ownedVehicleId)); return true
+        val request = GachaGarageRequest(result.settlement.settlementId, result.settlement.changedVehicle!!.ownedVehicleId, UUID.randomUUID().toString())
+        uiState = uiState.copy(garagePending = request)
+        onEvent(GachaEvent.OpenGarage(request)); return true
     }
-    fun completeGarageNavigation(id: SettlementId) { if (!released && id == uiState.garagePending) uiState = uiState.copy(garagePending = null) }
+    fun completeGarageNavigation(request: GachaGarageRequest) { if (!released && request == uiState.garagePending) uiState = uiState.copy(garagePending = null) }
     fun release() { released = true; controlsEnabled = false }
 }
 

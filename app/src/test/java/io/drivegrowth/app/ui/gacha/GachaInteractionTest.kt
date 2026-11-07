@@ -122,8 +122,9 @@ class GachaInteractionTest {
         val events=mutableListOf<GachaEvent>();val ui=GachaInteraction(events::add)
         ui.render(ready(),true);assertFalse(ui.openGarage());ui.render(GachaPreviewStates.result(),false);assertFalse(ui.openGarage())
         ui.render(GachaPreviewStates.result(),true);assertTrue(ui.openGarage());assertFalse(ui.openGarage())
-        ui.completeGarageNavigation(SettlementId("other"));assertFalse(ui.openGarage())
-        ui.completeGarageNavigation((ui.frame!!.screen as GachaScreen.Result).value.settlement.settlementId)
+        val request=(events.last() as GachaEvent.OpenGarage).request
+        ui.completeGarageNavigation(request.copy(token="other"));assertFalse(ui.openGarage())
+        ui.completeGarageNavigation(request)
         assertTrue(ui.openGarage());assertEquals(2,events.size)
     }
 

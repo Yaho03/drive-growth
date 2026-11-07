@@ -74,7 +74,36 @@ class GachaViewTest : InstrumentationTestCase() {
         assertTrue(text(view).contains("아반떼 · 희귀"));assertTrue(text(view).contains("실제 취득 기준액 · 500 게임머니"))
         assertTrue(text(view).contains("fixture-gacha-owned"));assertTrue(text(view).contains("실제 추첨·차감·지급 아님"))
         button(view,"gacha:garage").performClick();button(view,"gacha:garage").performClick();assertEquals(1,events.size)
-        assertEquals(OwnedVehicleId("fixture-gacha-owned"),(events.single() as GachaEvent.OpenGarage).ownedVehicleId)
+        assertEquals(OwnedVehicleId("fixture-gacha-owned"),(events.single() as GachaEvent.OpenGarage).request.ownedVehicleId)
+    }
+    fun testUnresolvedEconomicKeyCannotMoveToAnotherOptionAcrossNewView()=onUi {
+        val events=mutableListOf<GachaEvent>();val view=make(events);val ready=GachaPreviewStates.ready()
+        view.render(ready,true);button(view,"gacha:option:paid").performClick();button(view,"gacha:confirm").performClick()
+        val request=(events.single() as GachaEvent.Draw).request
+        view.complete(request,ContractResult.Failure(ContractError.STORAGE_FAILURE))
+        val offers=(ready.screen as GachaScreen.Offers).value
+        val restored=GachaView(instrumentation.targetContext,events::add,view.uiState)
+        val moved=offers.copy(options=offers.options.map { if(it.id=="paid") it.copy(requestId=RequestId("replacement-paid")) else it.copy(requestId=request.input.option.requestId) })
+        restored.render(GachaFrame(2,GachaScreen.Offers(moved)),true)
+        val free=button(restored,"gacha:option:free");assertFalse(free.isEnabled);free.performClick()
+        assertEquals(1,events.size);assertNull(restored.uiState.pending)
+        assertTrue(restored.resolveFailedRequest(request.input.option.requestId!!))
+        button(restored,"gacha:option:free").performClick();button(restored,"gacha:confirm").performClick()
+        assertEquals(2,events.size)
+    }
+    fun testLateGarageCompletionKeepsSecondAttemptLockedAfterNewViewRestore()=onUi {
+        val events=mutableListOf<GachaEvent>();val view=make(events);val frame=GachaPreviewStates.result()
+        view.render(frame,true);button(view,"gacha:garage").performClick()
+        val first=(events.single() as GachaEvent.OpenGarage).request
+        view.completeGarageNavigation(first);button(view,"gacha:garage").performClick()
+        val second=(events.last() as GachaEvent.OpenGarage).request
+        assertFalse(first.token==second.token)
+        val restored=GachaView(instrumentation.targetContext,events::add,view.uiState)
+        restored.render(frame,true);restored.completeGarageNavigation(first)
+        val locked=button(restored,"gacha:garage");assertFalse(locked.isEnabled);locked.performClick()
+        assertEquals(second,restored.uiState.garagePending);assertEquals(2,events.size)
+        restored.completeGarageNavigation(second);button(restored,"gacha:garage").performClick()
+        assertEquals(3,events.size)
     }
     fun testLongInputAndCurrentStatesFitNarrowPortraitAndLandscapeWidths() {
         val ready=GachaPreviewStates.ready();val value=(ready.screen as GachaScreen.Offers).value
