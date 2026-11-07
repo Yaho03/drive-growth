@@ -934,6 +934,20 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w -e class io.driveg
 
 기기 사용 후 본인이 설치한 격리4패키지만 제거하고 제품 APK `793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9`·제품 파일6개·권한·user10·boot23·1080×600/120dpi·font null·night no·빈forward의 전후 동일, 내비 전면·활성 instrumentation 없음을 확인해 반환했다. 제품/DB 삭제·기어·GPS·AVD/서버·전역창/글꼴 설정 변경은 없었다. 근거는 로컬 `/private/tmp/b-ui-device-20261107/`의 source-comparison·53/55별 APK metadata·원본 시험 로그·화면·return-checks다. 반환 뒤 추가 adb 명령은 실행하지 않는다.
 
-**P2 수정본의 실제 기기 시험은 미수행**이며 독립 C 재검토에 인계한다. 위 최초 기기7개 통과를 수정본 검증·독립 승인·제품 저장/프로세스 복원 성공으로 바꾸지 않는다.
+**로컬 수정 인계 당시 P2 수정본의 실제 기기 시험은 미수행**이어서 독립 C 재검토에 인계했다. 이후 배정된 수정본 시험은 아래 절과 구분한다. 위 최초 기기7개 통과를 수정본 검증·독립 승인·제품 저장/프로세스 복원 성공으로 바꾸지 않는다.
 
 수정 후 최종 로컬 명령 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest --offline --no-daemon`은 BUILD SUCCESSFUL(26초)로 종료했다. core191·app83(Shop12 포함) 실패/오류/생략0, Lint오류0·경고17, 저장소21/26/252·diff 검사 통과다. 수정본 제품 APK SHA-256은 `61b75c6c29f8879fa70bff5fa8025215d32f941b1fa5a9c76a76c6c7cb83e01e`, 시험 APK는 `b3a83a21130df630b81e007f17844f1842381c8eba1e6410fc71564d9c1af439`다. 이 값은 격리 패키지의 수정 전 장치 시험 APK와 다르며 설치하지 않았다. PR·push·main 머지·이슈 변경 없이 수정본을 독립 재검토에 인계한다.
+
+
+### #55 수정본 기기 표적·독립 재검토 및 게시 근거
+
+검토 원코드 `6144ac83fef82dd501d69086e9b752994b9391b4`를 고정한 새 격리 사본에서 실행했다. 추적 소스116개를 대조해 기능/정식 시험은 모두 동일했고, 격리 applicationId·debug Manifest·임시 호스트만 달랐다. [검증 패치](evidence/issue55-shop-ui/verification-host.patch)는 고정 커밋을 추출한 임시 사본에만 적용한다. 기존 제품 또는 다른 작업자의 폴더에는 적용하지 않는다.
+
+- APK 설치 전에 패키지·시험 target·동일 debug 인증서를 확인했다. 격리 앱 `io.drivegrowth.verify55fixedb` SHA-256 `0120358d3c57a40e0ae9cbd1b0ea93e8940acf1c4450a7a181abf3ce7fe0cc11`, 시험 APK `c1b3a2d3e2c475ddad5187749132b9d43ab43480972ab6547c9382f4c59022a1`이며 설치본과 두 해시가 일치했다. 제품 APK로 시험 결과를 대체하지 않는다.
+- 실제 명령은 `am instrument --user 10 -w -r -e class io.drivegrowth.app.ui.shop.ShopViewTest,io.drivegrowth.app.ui.review.Host55DeviceTest io.drivegrowth.verify55fixedb.test/android.test.InstrumentationTestRunner`다. ADB5038/emulator-5556·API34/ARM64·user10에서 **View6개+네이티브 호스트2개 총8개 통과, 22.663초**, 실패/오류0([원본 로그](evidence/issue55-shop-ui/device-tests.log)).
+- 부착된 실제 View에서 revision13/공간7/잔액900 뒤 낮은 revision12, 오래된 false/true, Loading·Failure·새 View 상태 복원 후 낮은 snapshot을 거절했다([최신 표시 화면](evidence/issue55-shop-ui/latest-after-restore.png)). 실제 Activity Bundle/프로세스 복원 시험은 아니다.
+- 네이티브 터치로 A실패→B실패→제한→새 View 복원→A재시도를 실행했다. A와 retryA는 같은 거래ID, B는 다른 ID, 재시도 attemptId는 달랐고 이전 A 성공 응답도 현재 Pending을 해제하지 않았다([요청 식별자](evidence/issue55-shop-ui/request-ids.txt), [Pending 화면](evidence/issue55-shop-ui/alternating-retry.png)). 실제 DB 과금·저장 재생 시험은 아니다.
+- 전역 wm/글꼴을 바꾸지 않고 실제 호스트 내부 폭을 제한했다. 요청320dp는 실제320dp, 요청1100dp는 CCP 가용936dp로 제한했다([측정값](evidence/issue55-shop-ui/host-layout.txt)). [320dp](evidence/issue55-shop-ui/car-wash-320dp.png)·[936dp](evidence/issue55-shop-ui/car-wash-936dp.png)에서 세차장 잠금·레벨3 조건을 스크롤해 읽었다. 위젯의 840×1184/1360×948dp layout 시험과 달리 네이티브936dp에서는 1000dp 이상 두 열 분기를 실행하지 못했으며 공식 폼팩터 전체 가독성으로 확대하지 않는다.
+- 격리2패키지만 제거하고 제품 APK·기존 파일6개·권한·설정·user/boot·빈forward가 전후 동일, 내비 전면·활성 instrumentation 없음을 확인해 반환했다. 제품/DB 삭제·AVD 초기화·차량 서비스 우회·기어/GPS/전역 설정 변경은 없었다. 반환 뒤 추가 adb 없음. 해시·소스 대조·원복·증거 해시는 [metadata](evidence/issue55-shop-ui/metadata.json)에 기록했다.
+
+별도 C의 독립 재검토는 같은 원코드에서 기존8+정식회귀4+독립표적3=15개 모두 통과, 두 P2 해결·추가 차단 없음으로 APPROVE였다. AI 보조 검토이며 팀원 사람 승인으로 기록하지 않는다. 최신 main `085786a`의 #123 공통 선행 계약 문서를 일반 통합해 보존했고 게시 준비에서 기능·정식 시험 소스는 검토 원코드와 동일하다. 실제 #44 확정 콘텐츠·구매/배치 저장·탐색·프로세스 복원·공식 폼팩터/실차는 미완료다. PR은 Refs #55로 부분 구현·검증만 인계하며 이슈 전체를 자동 종료하지 않는다.

@@ -198,3 +198,6 @@ collection.render(mappedCollectionState, controlsEnabled = allowedByCommonShell)
 - `controlsEnabled=false`이면 게임 내용·버튼을 제거하고 이전 버튼 callback도 gate를 재검사한다. 폭 1000dp 이상은 장면/관리 두 열, 좁은 폭은 단일 세로 스크롤이다. Loading/Empty/Failure/Unsupported와 요청 Pending을 구분한다.
 
 표시 예제는 `ShopPreviewStates.normal()`·`missing()`이며 시험 잠금·무료 장식·비용·효과를 명시한다. #24 경제 제안 댓글과 환석 동의는 전원 채택이나 콘텐츠 반영 증거로 사용하지 않는다. MainActivity·탐색/gate·실제 #44 구매/확장·꾸미기 영속화는 이번 변경에 연결하지 않았다. #55 전체 완료와 앱 종료 뒤 금액/배치 일치는 실제 연결 및 #28 검증에 남는다.
+
+
+#55 수정본의 실제 격리 View·네이티브 호스트 표적8개와 별도 C 재검토15개의 근거는 [06 수정본 검증](06_VERIFICATION.md#55-수정본-기기-표적독립-재검토-및-게시-근거)을 따른다. UI 상태 객체를 새 View에 복원한 시험이며 제품 Activity/프로세스 영속 복원은 아니다. 실제 CCP 가용폭936dp에서는 두 열 분기(1000dp 이상)를 실행하지 못했으므로 공식 폼팩터 전체 완료로 해석하지 않는다.
