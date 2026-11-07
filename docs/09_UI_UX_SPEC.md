@@ -78,6 +78,40 @@ flowchart LR
 
 가게는 전체 보기와 차량 중심 보기를 전환해 수집 결과를 확인하게 한다. 사용자 입력 한 번에 하나의 명령만 보내며 상태 갱신을 받아 화면을 다시 그린다. 무거운 연산·저장·거래를 View 내부에서 수행하지 않는다. 기능별 화면과 공통 탐색의 파일 담당은 #25에서 정한다.
 
+### #53 탁송 독립 표시 UI 연결점
+
+2026-11-07 최신 main `b6631a4`의 `DeliveryProposed`·`DeliveryOffer`·`ActiveDelivery`를 사용하는 독립 Android Views를 추가했다. 화면 기준은 #24 [동의 댓글](https://github.com/Yaho03/drive-growth/issues/24#issuecomment-6705490205)이며 저장 책임은 #37 [조율 댓글](https://github.com/Yaho03/drive-growth/issues/37#issuecomment-6705230075)을 따른다. `wireframes.svg`와 ui-v3 `4h/4i/4j/4k/4l/4w/4x`를 직접 확인해 기존 `GarageStyle`의 어두운 배경·카드·파란 버튼을 재사용했다. 차량·캐릭터·로고·3D 그림은 추가하지 않았다. 시안 금액·진행률·후보 수를 제품 규칙으로 옮기지 않는다.
+
+- 진입점은 `DeliveryView(context, onRequest, restored)`이며 `render(DeliveryFrame, controlsEnabled)`, `complete(DeliveryRequest, DeliveryFrame)`, `saveUiState()`, `handleBack()`, `release()`를 제공한다. 호스트가 허용한 게임 영역에만 붙이며 차량 신호·gate·SDK·DB·경제 계산을 View에서 실행하지 않는다. false이면 게임 정보와 버튼을 제거한다. 해제 후 입력·응답은 폐기한다.
+- 화면은 `Loading`, `Unsupported`, `Failure`, `Destination`, `Offers`, `Active`, `ChangeReview`, `AbandonReview`, `AwaitingResult`다. 빈 후보는 정상 빈 목록이며 경로 실패/미지원과 구분한다. 목적지·출처·실제 관측 거리·진행 정보 누락은 확인 불가로 표시한다. 예상 경로 거리와 실제 관측 거리를 따로 표시하며 누락을 0·도착·지급 성공으로 바꾸지 않는다.
+- Offers는 `proposed.offers`만 표시하고 목록 안의 `offer-N`만으로 다른 날짜/구간의 후보를 식별하지 않는다. 로컬 상세에서 유형·구매 희귀도·금액·확정 조건을 확인한 뒤 `Select(proposed, offerId)`를 요청한다. 수익 탁송은 차량을 구매하지 않으며 기본 주행 수익과 별도인 완료 보상이다. 구매는 선택 확정 때 전액 결제·도착 후 차량 수령이라는 흐름을 안내한다. 실제 저장 전에 잔액·보유 차량을 바꾸지 않는다.
+- 후보별 `DeliveryAvailability`와 확인 조건은 호스트가 공급한다. 정보 누락·비허용·중복 후보 ID는 확정 불가다. Active 화면에서는 새 후보 선택이 없으며 변경 기회·불가 이유와 포기 조건 확인만 제공한다. 같은 구간의 일일 목록·완료 슬롯만 교체·포기 후 목록 유지·자정 재생성은 호스트/#37 규칙이며 UI가 목록을 재추첨하지 않는다. 후보 수·최소 거리·km당 수익을 UI 상수로 만들지 않았다.
+- 변경 확인은 기존 의뢰와 새 제안의 차량·희귀도·거리 및 공급자가 계산한 `DeliveryMoneyUi(direction, amount)`를 비교한다. 구매 변경 차액과 포기 수수료를 구분한다. 포기 확인은 공급된 수수료·환급액·결과 설명을 별도로 표시한다. 금액·희귀도 변경 안내·확정 조건이 누락되면 확정을 차단한다. 수익 변경/포기처럼 금전 이동이 없는 경우도 공급자가 확인한 0 또는 설명을 전달해야 하며 View가 대신 계산하지 않는다.
+- callback은 실행 요청일 뿐 저장 성공이 아니다. `DeliveryRequest.sequence`는 UI 응답 상관값, `DeliveryFrame.version`은 호스트의 단조 증가 화면 공급 순서다. 공통 `Revision`·DB 버전·경제 `RequestId`로 사용하지 않는다. 경제 요청 ID와 전체 정규화 명령·재시도 이력·원자 결제/선택 저장은 호스트/#37 책임이다. 후보·명령·복원 입력의 목록을 복사해 원본 변경으로 확인한 내용이 바뀌지 않게 한다.
+- 요청 직후 Pending을 그린 뒤 callback을 한 번 보낸다. 일반 render·같은 화면 재표시·새 문구는 Pending을 해제하지 않는다. 호스트는 실제 조회/명령 결과가 있을 때 **현재 미확정 요청과 같은 request 객체 값**, 현재 frame보다 큰 version으로 `complete`한다. 이전 요청의 응답·오래된 frame은 거절한다. 실패도 명시적 응답으로 해제한 뒤 재시도한다. 이 UI 상관 검사는 저장 거래의 요청 동일성 검사를 대체하지 않는다.
+- 제한 중 complete는 상태만 보관하고 화면을 다시 열거나 허용을 복원하지 않는다. 호스트는 숨김·화면 이탈 시에도 controlsEnabled=false를 전달하거나 View를 release하고, 동일 프로필/요청의 최신 결과만 해당 인스턴스에 전달해야 한다. 새로운 프로필은 새 인스턴스·새 호스트 세션을 사용한다. 이전 View의 callback을 새 화면에 연결하지 않는다.
+- 후보 상세의 Back은 선택만 닫는다. 변경/포기 검토의 Back은 `ExitReview`이며 `Abandon`과 다르다. Pending Back은 공통 호스트로 넘기므로 호스트가 앱 숨김/탐색을 진행할 수 있다. 화면 이동·확인 취소만으로 의뢰를 포기하거나 결제를 취소하지 않는다. stale 버튼은 그리기 세대가 달라지면 동작하지 않는다.
+- 호스트는 `saveUiState()`와 실제 경제 requestId/처리 상태를 기존 복원 경계에 보존한다. 재생성된 View는 제한 상태로 시작하며 현재 gate를 확인한 render 전 조작하지 않는다. 미확정 요청은 재전송하지 않고 같은 요청 응답을 연결한다. 로컬 상세 ID는 같은 frame version에서만 복원하며 후보 목록/일자/구간이 바뀌면 다시 확인한다. 이 메모리 상태 API만으로 프로세스 복원·저장 완료를 주장하지 않는다.
+
+호스트 연결 예시(함수명은 호스트의 연결 책임을 나타내며 이번 변경에 구현하지 않았다):
+
+```kotlin
+val delivery = DeliveryView(context, onRequest = { request ->
+    // 원본 제안/선택 문맥을 유지하고 경제 requestId를 기존 호스트에서 관리한다.
+    submitOrLoadThroughExistingHost(request) { resultFrame ->
+        // 호스트가 프로필·요청·응답 순서를 확인한 뒤 main thread에서 전달한다.
+        deliveryResultConsumer(request, resultFrame)
+    }
+})
+delivery.render(DeliveryFrame(1, DeliveryScreen.Unsupported("목적지 입력 연결을 확인할 수 없어요.")), allowed)
+// 실제 결과 수신 후: delivery.complete(request, nextFrame)
+// 숨김/제한: 현재 frame을 controlsEnabled=false로 render. 폐기: delivery.release().
+```
+
+본문은 긴 문구와 다수 후보를 스크롤한다. 변경 전후 비교는 폭 760dp 이상에서 2열, 그 미만에서 1열이다. 760dp는 구현 분기값이며 공식 폼 팩터 인증이나 실제 가독성 시험 결과가 아니다.
+
+전용 debug `DeliveryPreviewStates`는 정상·빈 후보·누락·실패·미지원·활성·변경·포기·확인 대기·다수 후보·긴 문구의 고정 입력이다. 실제 SDK·DB·선택 저장·차량 지급 성공을 의미하지 않는다. MainActivity/탐색/Manifest/공통 계약/저장은 수정하지 않았다. 실제 목적지 입력과 #37–#39 저장·변경·포기·도착 정산, 기존 host의 requestId 보존/재실행 연결, 실제 gate/CCP와 기기 가독성 검증은 #53 전체 완료 조건으로 남긴다.
+
 ### 첫 실행
 
 최초 실행에서 저장 조회·주차 허용 확인 후 첫 안내를 연다. 캐스퍼·아반떼 선택 후보, 첫 지급 희귀도 일반·취득 기준액 0, 개업 선물 뽑기권과 초기 재화/공간은 [PRD의 시작 경험·주요 기능](01_PRD.md#시작-경험과-주요-기능)을 따른다. 설계는 **안내→후보 비교→선택 확인→저장 성공→가게**로 잡고 확인 후 선택 취소 불가와 프로필당 1회 지급을 표시한다. 첫 성장의 순서·비용 등 남은 결정은 #24에서 정하며 화면 예시로 확정하지 않는다. 재실행은 초기 지급을 반복하지 않아야 한다. 차량 신호/권한 안내를 주행 중 튜토리얼 관문으로 띄우지 않는다.
