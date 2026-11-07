@@ -1,0 +1,14 @@
+{
+  "base": "b6631a44e80e56a6b86ea9bfc1790cefc4ea82c0",
+  "package": "io.drivegrowth.app.progress57",
+  "tests": 4,
+  "test_seconds": 1.598,
+  "app_sha256": "b25b4185280779289cbca1de2bb62f448ede3fbe0fa473b2c5d1df40f267bf0e",
+  "test_apk_sha256": "a9b81686ee7bc5cf664a51940cec1ba359831c95d0a7713ff82d7ebbb4bd8247",
+  "device": "emulator-5556 / existing ADB5038 / user10 / 1080x600 / 120dpi",
+  "source": "debug fixed preview; no actual rewards, rest evidence, SDK or ledger",
+  "wide": "1360dp local host scaled to fit existing window; not official full-size form-factor validation",
+  "narrow": "440dp local host; local context fontScale 1.3; no global wm/font changes",
+  "restored": "native claim then Activity.recreate; saved pending restored; one claim log per activity run",
+  "cleanup": "isolated packages removed; no forward; product APK and 6 files unchanged; original AVD/adb/navigation preserved"
+}

@@ -1000,6 +1000,124 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w -e class io.driveg
 
 게시 직후 main에 추가된 #124 탁송 표시 UI(`1a0499099006d4644e12527505eaf62f80e18d7e`)를 `688ed7d`의 일반 병합으로 보존했다. 추가 app/core 변경은 main의 탁송 파일이며 검토 원코드 `6144ac8` 대비 Shop 제품/정식 시험/리소스 차이는0이다. 양쪽09/06과 공개 증거를 보존했다. 통합 후 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`는31초에 성공했고 core191·app96(각 실패/오류/생략0), Lint오류0·경고18이다. 추가 경고는 main에서 합쳐진 프로그램 생성 DeliveryView의 도구용 생성자 안내이며 Shop 코드 변경은 없다. 저장소21/26/277·diff검사·공개 증거8개 해시도 통과했다. 이 통합 조합의 기기 시험을 다시 실행한 것은 아니다. 원격 정확head/CI 결과는 연결 PR에 기록한다.
 
+## #121 가챠 공통 계약 첫 부분의 메모리 검증 — 2026-11-07
+
+main `085786a`의 독립 core 브랜치에서 GachaChangeStore·전체 명령/결과·권위 상태와 기존 메모리 원장 공유를 구현했다. 첫 성공 기대 시험을 stub에서 실행해 AssertionError 1건으로 실패를 확인한 뒤 구현했다. 제품 GachaPull/VehicleCare/FirstGrant·SQLite/RentalLedger·UI·SDK·Gradle/CI는 수정하지 않았다. 이 기록은 메모리 참조 구현/소비 예제이며 SQLite·프로세스 재시작 시험이 아니다.
+
+표적 시험은 전체 의미 입력 변경의 충돌·최초 전체 결과 재생, 성장/처분 뒤 원본 snapshot, 실제0 무료권·잔액 부족/저장 실패 무변경, 보장/후보/취득액 검증, 권위 revision/카운터/공간·원시 후보 Set 불변, legacy 요청 ID 충돌 양방향, 동일/서로 다른 요청의 마지막 칸·무료권 경쟁과 실패 재시도를 다룬다. 구성한 권위 상태가 없는 기존 fixture는 새 가챠 상태를 생성하지 않는다. 문서와 관련 이슈의 #123 임시 브랜치 링크는 main 기준으로 갱신했으며 #122의 실제 저장 차단은 유지했다.
+
+로컬 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`는 성공했다. main `085786a` 기준 core212개·표적21개·app71개는 실패/오류/생략0, Lint오류0·경고16이었다. 검증 중 #124가 반영된 main `1a04990`으로 rebase해 공통 코드/시험3개가 처음 구현과 바이트 동일함을 확인하고 같은 검사를 다시 수행했다: core212개·app84개 실패/오류/생략0, APK/Lint성공(오류0·경고17). #124 탁송 표시 UI와 실행 기록을 보존했다. 저장소 검사(필수21·문서26·링크266)와 diff 검사도 통과했다. 독립 코드 검토 APPROVE·구조 CLEAR는 AI 보조 결과이며 사람 승인이 아니다. 정확한 인계 커밋과 추가 독립 검증은 #121에서 추적한다. 다중 재료·초기화/원래 지급 조회·무료권 지급·호열 #111 실제 소비·SQLite는 다음 묶음/담당 작업이며 이 부분 결과로 #121/#47/#122를 닫지 않는다.
+
+
+### #121 가챠 독립 검증 회수와 게시 준비
+
+검토 원본 `08eb3c4819f886381ab62b83473c86d8ebd6cc05`의 코드·참조 fixture·정식 시험3개 blob을 별도 C 검증 worktree에서 직접 대조했다. 독립 실행은 정식21+추가6=27개 실패/오류/생략0이며, 같은 ID의 일반/가챠 경쟁·혼합 마지막 칸·처분 ID 재사용·Long/Int 최대 경계·중첩 award 변경/컬렉션 불변성·미지원/기존 거래 유지까지 확인했다. 판정은 APPROVE·구조상 추가 차단 없음이며 AI 보조 결과다. 이 세션이 27개를 새로 실행한 것으로 표시하지 않는다.
+
+원본 [명령/시험 로그](evidence/issue121-gacha-contract/independent-tests.txt), [커밋·소스/시험 metadata](evidence/issue121-gacha-contract/independent-metadata.json), [독립 추가 시험](evidence/issue121-gacha-contract/GachaIndependentBoundaryTest.kt)을 보존한다. 추가 소스는 정식21개에 편입한 코드가 아니다. 재현은 검증용 독립 사본에서만 해당 소스를 `core/src/test/kotlin/io/drivegrowth/core/contract/`에 복사하고 `:core:test --tests '*GachaChangeStoreTest' --tests '*GachaIndependentBoundaryTest' --offline`로 실행한다. 제품/다른 작업자 폴더에 복사하지 않는다.
+
+가챠 게시 브랜치는 #125가 포함된 main `fbbf98e`에 rebase하며 06 충돌에서 기존 #55 설계/시험/실제 기기 기록과 이 가챠 기록을 모두 보존했다. 검토된 공통3개 파일은 원본과 바이트 동일하다. SQLite·무료권 지급·#111 실제 소비·초기화는 제공하지 않는다. 이미 착수한 다중 재료의 독립 타입/순수 검증은 별도 고정 커밋으로 인계하며 공유 fixture 결합·새 묶음으로 확대하지 않는다. 사용자 지시에 따라 현재 작업의 검증/PR/main 정리 후 후속 작업을 시작하지 않는다.
+
+main `fbbf98e` 조합의 직접 소비 통합 명령 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --offline --no-daemon`은28초에 성공했다. core212·app96 실패/오류/생략0, APK/Lint성공(오류0·경고18), 저장소21/26/280·diff검사 통과다. #53/#55 제품 소스·09/06·기기 증거를 유지했고 새 장치 시험은 하지 않았다. 기존 독립 검토 원본과 공통3개 파일의 blob 동일성은 게시 전 다시 확인했다. 정확한 게시 head·원격 CI는 연결 PR에서 관리한다.
+## #121 재료 강화 타입·순수 검증 준비 — 2026-11-07
+
+가챠 검토 커밋 `08eb3c4` 기반 별도 브랜치에서 MaterialContract 타입/순수 검증과 MaterialContractTest 소비 예제를 추가했다. 기존 계산이 만든 두 Update를 명령에 넣고, 역할·현재 revision/활동·취득/재료 성장 보존·비용과 예정 두 snapshot을 검증한다. 처음 시험 소스의 콘텐츠 버전 경로 컴파일 오류를 교정한 뒤 stub의 성공 기대 assertion 실패1건을 확인하고 구현했다.
+
+검토 중인 GachaContract·공유 RentalContractFixtures와 원작업 폴더는 변경하지 않았다. 메모리 commitMaterial 구현·실제 원자 경쟁·과거 결과 재생·SQLite·앱 프로세스 시험은 없다. 시험의 MaterialSettlement는 후속 결과 DTO의 형태 예시이며 저장을 실행한 결과가 아니다. 로컬 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug` 성공, core225개(재료 표적13개)·app84개 실패/오류/생략0, Lint오류0·경고17이다. 독립 코드 검토 APPROVE·구조 CLEAR는 이 타입/순수 검증 범위의 AI 보조 결과이며 사람 승인·실제 거래 검증이 아니다. 저장소/링크·diff 검사와 정확한 인계 커밋은 #121에서 구분한다.
+
+
+재료 준비 원본 `fbd93c448e88aa0dc76e7a26438ba25c8d0dc898`은 별도 A 검토에서 코드 APPROVE·구조 CLEAR, 정식13+독립3=표적16개와 기존 planMaterial 소비152조합 확인 결과를 회수했다. 이 독립 결과는 AI 보조 검증이며 이 세션의 재실행이 아니다. 가챠 #126 병합 main `1089926f7815bf49d3c5a6f233b06f28d5ee5c49`에 준비4파일만 rebase하고 양쪽06 기록을 유지했다. MaterialContract 제품/정식 시험2파일은 원검토 커밋과 바이트 동일하고 GachaContract/공유 fixture/기존 UI는 변경하지 않았다.
+
+통합 후 직접 실행한 `:core:test --tests '*MaterialContractTest' :app:compileDebugKotlin :app:compileDebugUnitTestKotlin --offline --no-daemon`은8초에 성공했다. 재료13개 실패/오류/생략0과 기존 앱/시험 소비 컴파일을 확인했다. 기존 전체225/84·APK/Lint 근거는 원본 기준으로 보존하고 전체/장치 검사를 무조건 반복하지 않았다. 저장소21/26/280·diff검사 통과, 정확한 게시head/원격CI는 연결PR에서 기록한다. 초기화·공유 재료 store·SQLite 등 새 묶음은 시작하지 않고 현재 준비 범위를 인계한다.
+
+## #57 퀘스트·업적·휴식 표시 UI 부분 검증
+
+2026-11-07, main `b6631a44e80e56a6b86ea9bfc1790cefc4ea82c0`에서 독립 worktree와 `app/57-progress-ui` 브랜치를 만들었다. #57 본문/댓글(댓글 없음), PR #60, PRD의 거리 퀘스트·거리 업적/시즌·주말 이벤트 제외와 휴식 규칙, 기존 #119 `RestBonus` 계산 경계를 직접 대조했다. 표시·호출 계약은 [09 명세의 해당 절](09_UI_UX_SPEC.md#57-퀘스트업적휴식-독립-표시-ui)에 둔다. 계산·공통 저장·호스트·탐색·차량 gate는 수정하지 않았다.
+
+### 입력과 본인 검증
+
+debug 전용 `ProgressPreviewStates`는 실제 원장·DB·차량·위치·주차 증거가 아닌 결정적인 **고정 시험 입력**이다. 일일/주간·업적의 잠김/진행/완료/청구가능/처리중/수령/만료/실패/미지원, 누락·빈목록·40개 긴 목표명·선택 소멸, 휴식 조건 충족/미충족/판정 불가와 다음 출발 대기/활성/미지원을 재현한다. 채택되지 않은 목표·보상은 시험값임을 화면 출처와 주석에 명시하며 채택 이벤트를 새로 만들지 않는다.
+
+환경은 macOS arm64·Temurin JDK17·기존 Gradle8.11.1/Kotlin2.2.21/AGP8.10.1·Android SDK35다. SDK 경로는 환경변수로 전달했고 Gradle/Manifest/의존성은 변경하지 않았다.
+
+| 확인 | 실제 결과·의미 |
+|---|---|
+| 단위 회귀 선실행 | 표시 모델/상호작용 구현 전 신규 시험의 미정의 심볼로 컴파일 실패. 로컬 `/private/tmp/progress-red-tests.txt`에 보존 |
+| `:app:testDebugUnitTest --tests '*ProgressInteractionTest'` | 10개 통과, 실패·오류·생략0. 확인 전 청구 차단, 반복 탭·재표시·제한·상세 닫기/소멸·View 교체의 요청 중복 방지, 오래된 sequence/revision/확인 버튼 거절, 새 복구 offer, 외부 Pending 차단, 미지원·누락·불허 행동, 목록 복사·중복 key, 명시적 재조회 잠금 해제 검증 |
+| `:core:test --tests '*RestBonusTest'` | 기존 휴식 계산 15개 통과, 실패·오류·생략0. UI는 이 계산을 실행하지 않으며 기존 출력 enum의 소비 경계를 확인 |
+| `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` | 성공. Lint 오류0·경고17. 이번 View의 프로그램 생성자 관련 ViewConstructor 경고1개가 포함되며 나머지는 기존 대상API·SDK·뷰 등의 경고다 |
+| `python3 scripts/check_repository.py`, `git diff --check` | 통과. 원격 CI·독립 검증은 아직 미실시 |
+| `ProgressViewTest` | 배정된 기존 Pleos 기기의 격리 패키지에서 4개 통과(최종 1.598초). 청구 요청/수령 분리, 제한/선택 소멸, 빈/누락/미지원/휴식 상태, 440dp/1360dp 긴 목록 측정 검증. 실제 SDK·경제·저장 연결 시험과 구분 |
+
+본인 검증은 청구 이벤트의 중복 방지와 상태 표시 계약에 한정된다. 실제 보상 지급·원장 멱등성·재실행 후 수령 이력·실제 휴식 증거·수익 적용을 검증한 것이 아니다. 전체 core/앱 시험을 반복하지 않고 새 UI에 관련된 단위 시험과 APK/Lint를 실행했다. 앱/시험 APK는 이 작업 폴더의 `app/build/outputs/apk/`에 있으며 로컬 로그는 `/private/tmp/progress-validation.txt`다.
+
+### 실제 Android 화면과 남은 연결
+
+본인검증 중 메인이 C 한 세션에 기기를 배정해 기존 ADB5038·emulator-5556/user10에서 수행했다. 제품 Manifest·Gradle은 그대로 두고 로컬 임시 init-script와 Activity로 `io.drivegrowth.app.progress57` 격리 호스트를 만들었다. 실제 View 표적4개와 네이티브 터치·Activity 재생성 뒤 Pending 복원, 정상/누락/제한/휴식·긴 목록·큰 글꼴을 확인했다. 초기 임시 설정 적용 순서 오류로 첫 APK에 제품 ID가 남아 설치/시험이 서명 불일치로 차단됐으며 제품이 교체되거나 시험이 시작되지 않았다. 적용 시점을 수정한 뒤 aapt로 실제 격리 package/target을 확인하고 재실행했다.
+
+| 실제 Android 화면·근거 | 범위 |
+|---|---|
+| [정상 목록](evidence/issue57-progress-ui/normal.png) | 기존 앱 창의 한 열 구성, 고정 시험 출처·미채택 보상 명시 |
+| [넓은 본문](evidence/issue57-progress-ui/wide-scaled.png) | 호스트 내부1360dp를 현재 창에 축소 표시한 두 열 View. 공식 폼 팩터/원래 크기 가독성 시험이 아님 |
+| [440dp·큰 글꼴](evidence/issue57-progress-ui/many.png) | 호스트 내부440dp·로컬 context fontScale1.3, 긴 목표명 줄바꿈·40개 목록. 전역 설정 변경 없음 |
+| [휴식 카드](evidence/issue57-progress-ui/rest.png) | 충족/다음 출발 대기와 모의 판정·실제 연결 미완료를 표시. 출발·운전 버튼/카운트다운 없음 |
+| [제한 화면](evidence/issue57-progress-ui/restricted.png) | 외부 false 입력으로 게임 내용과 버튼 제거. 실제 기어/SDK gate 검증과 구분 |
+| [청구 후 재생성](evidence/issue57-progress-ui/native-pending-restored.png)·[이벤트](evidence/issue57-progress-ui/native-events.txt) | 실제 터치로 요청 뒤 created restored=true, 동일 실행에서 ClaimReward1개, 반복 탭은 추가 요청 없음. 수령 성공을 만들지 않음 |
+| [표적 시험 결과](evidence/issue57-progress-ui/instrumentation.txt)·[APK/환경 metadata](evidence/issue57-progress-ui/metadata.json) | 최종 격리 APK의 실제 실행, 제품 탐색 연결과 구분 |
+
+주변 차량·차량 제어 화면은 OEM 셸이며 앱 자산이 아니다. 기존 공유 기기 불안정 기록을 해소한 것으로 확대하지 않는다. 공식 폼 팩터 전체·CCP·실차·실제 주행 정책 #81은 미검증이다.
+
+시험 뒤 자기 격리 패키지2개만 제거했다. [제품 파일 전](evidence/issue57-progress-ui/product-hashes-before.txt)/[후](evidence/issue57-progress-ui/product-hashes-after.txt)의 6개 해시와 [제품 APK](evidence/issue57-progress-ui/product-apk-after.txt) `793e1db8…`가 동일하다. 권한·기어·전역 크기/밀도/글꼴은 변경하지 않았다. [종료 상태](evidence/issue57-progress-ui/state-after.txt)는 user10/boot완료/1080×600/120dpi/fontScale설정null, 원래 내비 복귀, 활성 instrumentation·추가 forward 없음이다. 기존 AVD PID64177·ADB5038 PID66071을 유지하고 기기 반환을 보고했으며 이후 추가 adb를 실행하지 않는다. 임시 호스트·init-script·원본 APK/로그는 `/private/tmp/progress-device-host/`·`/private/tmp/progress-device-evidence/`에 보존했다.
+
+09에 공급 상태/이벤트/복원 예시를 남겼다. 경민 #45의 실제 목표·기간·진행/청구·영속 수령 API, 정원 #40의 장소/P/시간 증거·원자 저장·출발 감지와 수익 연결, 환석 #51의 탐색·gate/프로필/요청 세대·수명주기 연결은 후속 범위다. 휴식 시간을 UI가 합산/소모하지 않고 짧은 P 합산·일반 주차 중 소모 제안을 확정하지 않았다. #57 전체 체크·ready/Blocked by·담당·종료는 바꾸지 않는다. 최신 운영 지시에 따라 이 로컬 결과는 독립 검증 인계 전이며 PR 게시·CI·main 머지는 아직 하지 않는다.
+
+### #57 독립 검토 수정 — 소멸 항목의 revision 역행 방어
+
+2026-11-07, A의 독립 검토가 초기 구현 `339e2b369162efb31614719a98ab138dba291ae8`에서 같은 목표·기간 키의 revision5/수령 상태 → 빈 목록 → revision1/청구 가능 상태가 수락되는 P2를 재현했다. 직전 목록만 비교해 소멸 전 revision을 잊은 것이 원인이었다. 실제 DB 중복 지급 재현이 아니라 표시 역행과 청구 이벤트 허용 경계의 문제다.
+
+- **수정 전:** 정식 회귀 `removedKeyRetainsHighestAcceptedRevisionAndCannotClaimOldState`, `restoredViewRetainsRemovedRevisionsButAllowsANewPeriod` 2개를 실행해 모두 assertion 실패를 확인했다. `/private/tmp/progress-revision-red.txt`에 보존했다.
+- **수정:** `ProgressUiState.acceptedRevisions`에 목표·기간 키별 최대 수락 revision을 유지한다. 항목 소멸로 지우지 않으며, 더 낮은 항목을 포함한 Content는 전체 거절한다. 같은 키의 더 높은 revision과 다른 기간 키는 허용한다. View 교체 때 이 맵도 복원하며 방어 복사/읽기 전용 맵으로 외부 변경을 막는다. 같은 View에 오래된 복원 상태를 주어도 최대값은 낮아지지 않는다. 실제 원장/청구/경제 계약은 변경하지 않았다.
+- **수정 후 직접 실행:** `:app:testDebugUnitTest --tests '*ProgressInteractionTest'` 14개 통과, 실패·오류·생략0. 기존10개(Pending·실패 복구·늦은 확인/결과·제한·View 교체)와 추가4개(소멸 뒤 역행/청구0·높은 revision, View 교체/새 기간, 맵 방어/오래된 복원, 데이터 거절과 별개인 현재 gate 적용)를 포함한다.
+- **자동 검사:** `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` 성공, Lint 오류0·경고17. 기존4개와 신규 `testRemovedRevisionGuardSurvivesViewReplacement`를 포함한 기기 시험5개를 컴파일했다. 저장소·diff 검사도 통과했다. 로그는 `/private/tmp/progress-revision-validation.txt`다. core/휴식 계산·View 배치/문구는 수정하지 않아 전체 core/앱 및 무관한 검사를 반복하지 않았다.
+- **이전 기기 근거:** 위 표·화면·APK metadata의 기기4개/터치/Activity 재생성 증거는 수정 전 `339e2b3`의 실행 근거로 보존한다. 최초 로컬 보완에서는 B 단독 기기 배정을 지켜 JVM/컴파일만 진행했다. 이후 메인이 C에 단독 슬롯을 다시 배정해 아래 수정 표적을 실행했으며 이전4개 전체는 반복하지 않았다.
+- **수정 후 기기 직접 실행:** 제품 코드가 고정된 `4ad549dbbda615928d91dfd1b1d417422b0e628d`에서 격리 APK의 실제 package/시험 target이 `io.drivegrowth.app.progress57`임을 aapt로 확인한 뒤 설치했다. 신규 `ProgressViewTest#testRemovedRevisionGuardSurvivesViewReplacement` [1개 통과·0.119초](evidence/issue57-progress-ui/revision-fix/targeted-device.txt). 임시 Activity의 Bundle에 `acceptedRevisions`를 넣고 revision5/수령→소멸→실제 recreate→복원→revision1/청구가능의 늦은 Content를 전달해 [rollbackAccepted=false, max=5 로그](evidence/issue57-progress-ui/revision-fix/restore-log.txt)와 [선택 소멸 화면](evidence/issue57-progress-ui/revision-fix/revision-restored.png)을 확인했다. 이는 격리 호스트의 실제 직렬화 검증이며 제품 MainActivity/프로세스 종료·원장 복원 연결 성공은 아니다. 나머지 기존4개는 앞선 근거를 유지하고 수정 후 새 실행으로 바꾸지 않는다.
+- **수정 기기 반환:** 자기 격리 패키지2개만 제거했다. [파일 전](evidence/issue57-progress-ui/revision-fix/product-hashes-before.txt)/[후](evidence/issue57-progress-ui/revision-fix/product-hashes-after.txt)의 6개 해시와 [제품 APK](evidence/issue57-progress-ui/revision-fix/product-apk-after.txt)가 동일하며 권한·기어·전역 크기/밀도/글꼴은 변경하지 않았다. [종료 상태](evidence/issue57-progress-ui/revision-fix/state-after.txt)는 원래 user10·1080×600/120dpi/fontScale설정null·기존 내비 Activity 복귀이며 활성 시험·추가 forward 없음, 기존 AVD PID64177/ADB5038 PID66071 유지다. 반환 보고 이후 추가 adb를 하지 않는다. [정확 소스·APK SHA-256 metadata](evidence/issue57-progress-ui/revision-fix/metadata.json), 원본 APK/로그 `/private/tmp/progress-revision-device-evidence/`, 임시 호스트 `/private/tmp/progress-device-host/`를 보존했다.
+
+09의 #57 복원 계약에 최대 revision 맵의 수명주기·동일 프로필 범위, View 내부 sequence 비교와 호스트의 조회 세대 책임을 구분했다. A의 같은 재현·영향 경계 재검토에 새 로컬 커밋을 인계하며, PR 게시/CI/main 머지는 계속 대기한다. #55·#53·공통 타입·DB·MainActivity는 수정하지 않았다.
+
+### #57 독립 재검토 추가 수정 — 표시 후 복원 순서
+
+2026-11-07, A가 `6e02ef7`(제품 코드 `4ad549d`)에서 `render(revision1/청구가능) → restore(동일 키 최대revision5) → claim` 순서의 추가 P2를 재현했다. 복원 맵은5가 됐지만 현재 표시가1로 남아 청구 이벤트를 허용했다. 원래 소멸 지적은 해결됐으나 복원 순서가 반대인 경계가 남은 것이며 실제 DB 중복 지급 재현은 아니다.
+
+정식 `restorationInvalidatesOlderVisibleContentInEitherCallOrder`, `invalidatingVisibleContentPreservesPendingAndWaitsForAnExplicitRecoverySnapshot`을 먼저 실행해 **수정 전2개 실패**를 확인했다(`/private/tmp/progress-restore-order-red.txt`). 복원 맵 병합 뒤 현재 Content의 모든 항목을 재검사해 낮은 revision이 있으면 행동 없는 Loading으로 무효화했다. 최대 이력·Pending·요청 키·재조회 잠금은 보존하며 맵만으로 수령/실패 결과를 생성하지 않는다. `canClaim`도 항목 revision을 확인한다. 조회 세대 비교 이력은 유지하므로 같은 낮은 Content 재전달은 조회 대기를 끝내지 않으며, 유효한 새 Content가 수락되면 다시 표시한다.
+
+수정 후 진행 UI 단위 **16개 통과, 실패·오류·생략0**이다. `render→restore`와 `restore→render`, 낮은 Content 재전달의 표시/청구 차단, 유효 Content 복귀, Pending 보존·명시적 실패 복구와 기존 소멸·새 기간·gate/불변성 회귀를 포함한다. `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`도 성공했고 Lint오류0·경고17이다. 신규 `testRenderBeforeRestoreClearsStaleContentAndRetainedButtons`를 포함한 기기 시험6개가 컴파일됐으며 변경된 View 표적만 새 배정 슬롯에서 실행한다. 로그는 `/private/tmp/progress-restore-order-validation.txt`다. 전체 core/앱과 앞선 기기 시험 전체는 반복하지 않는다. 09의 #57 복원 순서·표시 무효화 계약을 함께 갱신했으며 공통 호스트/DB·다른 기능은 변경하지 않았다.
+
+추가 배정된 C 단독 기기 슬롯에서 제품 코드 `70f981e1bc1346f22e34c36672e89f25f2290f09`를 고정하고, 격리 APK의 package/시험 target `io.drivegrowth.app.progress57`을 aapt로 확인해 설치했다. 새 `ProgressViewTest#testRenderBeforeRestoreClearsStaleContentAndRetainedButtons`만 [1개 통과·0.135초](evidence/issue57-progress-ui/restore-order-fix/targeted-device.txt)했다. 실제 View에서 render→restore 직후 옛 내용·버튼 제거, 낮은 Content 재전달 및 보관한 옛 버튼의 청구 차단, 유효한 revision6 Content와 그 버튼의 청구 복귀를 확인했다. 임시 실제 Activity에서도 [Loading 화면](evidence/issue57-progress-ui/restore-order-fix/restore-order-loading.png)과 [rollbackAccepted=false/buttons=0/max=5 로그](evidence/issue57-progress-ui/restore-order-fix/restore-order-log.txt)를 확인했다. 앞선 기기 시험 전체를 다시 실행한 것으로 표시하지 않는다. [정확 소스·APK SHA-256 metadata](evidence/issue57-progress-ui/restore-order-fix/metadata.json)를 보존했다.
+
+시험 후 자기 격리 패키지2개만 제거했다. [제품 파일 전](evidence/issue57-progress-ui/restore-order-fix/product-hashes-before.txt)/[후](evidence/issue57-progress-ui/restore-order-fix/product-hashes-after.txt) 6개와 [제품 APK](evidence/issue57-progress-ui/restore-order-fix/product-apk-after.txt)는 동일하다. [종료 상태](evidence/issue57-progress-ui/restore-order-fix/state-after.txt)는 기존 내비 Activity·user10·1080×600/120dpi·fontScale설정null이며 권한·기어·전역 설정·차량 서비스는 변경하지 않았다. 활성 시험·추가 forward 없음, 기존 AVD PID64177/ADB5038 PID66071 유지로 반환 보고했고 이후 추가 adb를 하지 않는다. 원본 APK/로그는 `/private/tmp/progress-restore-order-device-evidence/`에 보존한다. 이번 검증은 고정 입력의 표시/청구 이벤트 경계이며 제품 호스트/저장·실제 수령·SDK·프로세스 복원 완료가 아니다. A 재검토 통과 전 PR 게시 대기를 유지한다.
+
+### #57 독립 재검토 추가 수정 — 과거 선택 복원의 요청 이력 보존
+
+2026-11-07, A가 `f01ce65`에서 청구 전 저장한 uiState를 같은 View에 복원하면 현재 Pending/요청 키가 지워져 동일 offer가 두 번 청구되는 추가 P2를 재현했다. 앞선 revision 두 지적은 해결됐으며 이번 문제는 선택 상태와 요청 이력을 함께 과거 값으로 교체한 별도 경계다. 실제 DB 중복 지급이 아니라 UI 청구 이벤트 중복을 재현한 것이다.
+
+정식 `restoringOldSelectionCannotForgetSubmittedOfferOrEnableAnotherClaim`·`restoringOldRetryFlagCannotUnlockAnOutstandingReadRequest`를 먼저 실행해 **수정 전2개 실패**를 확인했다(`/private/tmp/progress-request-restore-red.txt`). 요청 키는 현재/복원/알려진 Pending 키의 합집합으로 보존하고, 현재 미확정 Pending과 활성 Retry 잠금을 과거 null/false로 지우지 않도록 수정했다. 선택/탭은 복원하되 요청 이력과 분리한다. 서로 다른 Pending은 모두 `pendingConflicts`로 보존해 행동 없는 조회 대기와 복구 설명을 표시한다. 일반 Content만으로 두 요청이 모두 끝났다고 추정하지 않으며, 호스트가 각 요청의 실제 조회/복구 완료를 확인하고 `completePendingRecovery(resolved)`로 알려진 참조를 명시 해소한 뒤 새 Content를 공급한다. 이 API는 UI 잠금 해소일 뿐 지급·실패·원장 상태를 생성하지 않는다. 미확정 요청과 재화의 실제 조회/복구는 기존 담당의 후속 연결이다.
+
+수정 후 진행 UI 단위 **20개 통과, 실패·오류·생략0**이다. 동일 offer 재전송 차단·총 청구1개, 다른 목표 청구 차단, 과거 false의 중복 Retry 차단, 두 Pending의 부분/전체 명시 복구와 외부 Set 변경 격리, 명시 실패 뒤 새 offer 재시도를 검증하고 기존16개 revision/양순서 복원/낡은 표시 무효화 회귀도 유지했다. `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` 성공, Lint오류0·경고17이다. 신규 `testOldSelectionRestoreKeepsRequestLocksAndConflictsWaitForRecovery` 포함 기기7개는 컴파일됐으며 새 표적만 배정 슬롯에서 실행한다. 로그 `/private/tmp/progress-request-restore-validation.txt`를 보존했다. 09의 API/복원/해소 계약만 함께 갱신하며 MainActivity·공통 타입/DB·다른 게임 규칙은 바꾸지 않았다. 새 기능 배정 동결을 따라 이 수정과 인계만 마무리하고 A 재검토 전 PR 게시 대기를 유지한다.
+
+코드 `0930bd3e39a5d1aca3e63f1b4556408b93fd4553`를 고정한 뒤 메인이 허가한 C 단독 슬롯에서 격리 package/시험 target을 확인하고 새 `testOldSelectionRestoreKeepsRequestLocksAndConflictsWaitForRecovery`만 [1개 통과·0.189초](evidence/issue57-progress-ui/request-restore-fix/targeted-device.txt)했다. 과거 선택 복원 후 같은 offer/보관 버튼과 다른 목표의 청구 차단, 과거 Retry false 복원 뒤 재조회1회, 충돌 명시 해소 전 대기와 외부 확정 Content 표시를 실제 View에서 확인했다. 임시 호스트에서 네이티브 터치 청구 뒤 과거 선택을 복원하고 Pending 충돌을 만든 다음 실제 Activity를 재생성해 [청구1개·복원 후 conflicts2/requested2 로그](evidence/issue57-progress-ui/request-restore-fix/request-restore-log.txt)와 [추가 청구 없는 복구 화면](evidence/issue57-progress-ui/request-restore-fix/recovery-restored.png)을 확인했다. 이 임시 Activity는 Pending 충돌 집합·요청 키·최대 revision을 Bundle에 보존했다. [소스·APK SHA-256 metadata](evidence/issue57-progress-ui/request-restore-fix/metadata.json)에 고정 소스와 실행 범위를 남겼다. 이전6개 기기 시험을 이번 코드에서 모두 실행한 것으로 바꾸지 않는다.
+
+자기 격리 패키지2개만 제거하고 [제품 파일 전](evidence/issue57-progress-ui/request-restore-fix/product-hashes-before.txt)/[후](evidence/issue57-progress-ui/request-restore-fix/product-hashes-after.txt) 6개와 [제품 APK](evidence/issue57-progress-ui/request-restore-fix/product-apk-after.txt)의 동일성을 확인했다. [종료 상태](evidence/issue57-progress-ui/request-restore-fix/state-after.txt)는 원래 내비 Activity·user10·1080×600/120dpi·fontScale설정null이며 권한·기어·전역 설정·차량 서비스를 바꾸지 않았다. 활성 시험·추가 forward 없음, 기존 AVD PID64177/ADB5038 PID66071 유지로 반환했고 이후 추가 adb를 하지 않는다. 원본 APK/로그는 `/private/tmp/progress-request-restore-device-evidence/`에 보존했다. 실제 #45 저장 복구·지급/실패 및 제품 MainActivity 연결의 성공 근거가 아니며 A 재검토와 메인 PR/CI/머지 조율을 기다린다. 현재 작업 마무리 뒤 새 기능/검증 작업을 시작하지 않는다.
+
+### #57 독립 최종 재검토와 최신 main 통합
+
+A가 최종 검토 head `4f64ffc01ad14e922c1fe181e47cf64db849feb4`에 대해 코드 APPROVE·구조 CLEAR를 확정했다. 기본20개+독립표적5개=25개 통과 및 재빌드 APK의 코드/리소스가 실제 기기 증거 APK와 일치함을 확인한 독립 보고를 재사용했다. 이는 C가 새로25개를 실행한 기록이나 사람 승인 기록이 아니다. 기존 소멸 revision·표시 후 복원·요청 이력 복원 P2 세 건이 해소됐으며 실제 저장/지급 연결 완료로 확대하지 않는다.
+
+게시 준비에서 최신 main `1089926f7815bf49d3c5a6f233b06f28d5ee5c49`(#126 가챠 계약, #124/#125 표시 UI 포함)을 일반 병합했다. 06/09의 추가 절 충돌은 main의 해당 파일 전체와 #57 절 원문이 각각 보존됐는지 확인해 합쳤다. 검토 원본 `4f64ffc` 대비 진행 UI 제품·debug fixture·리소스·정식 JVM/기기 시험의 diff는0이다. main의 다른 UI·공통 계약·기기 증거는 보존했다.
+
+통합 조합에서 `:core:test --tests '*RestBonusTest' :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest --offline`를 직접 실행해 **휴식15·앱116개 통과(실패/오류/생략0), APK/Lint/시험APK 성공**을 확인했다. Lint오류0·경고19는 합쳐진 기존 UI/SDK 경고를 포함한다. 저장소21/26/319·diff검사도 통과했다. 무관한 전체core와 기기 시험을 중복 반복하지 않았다. 새 원격 head/CI와 main 머지는 연결 PR에서 관리하며 #57 전체 종료 없이 메인 조율을 따른다.
+
+게시 직전 #127 재료 계약이 main `50b856d1c5aef61fe838bf3310d5908fca6035bd`에 반영돼 이를 다시 일반 병합했다. 충돌은06의 추가 절만 있었고 main 파일 전체와 #57 원문을 모두 보존했다. 재료 계약/정식 시험·02/06도 그대로 유지했다. 진행 UI 제품·리소스·정식 시험은 검토 `4f64ffc`와 계속 동일하다. 새 계약은 UI에서 호출하지 않으므로 전체 core/기기를 반복하지 않고 `:app:testDebugUnitTest --tests '*ProgressInteractionTest' :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest --offline`를 실행해 진행20개·APK/시험APK/Lint성공(오류0·경고19)을 확인했다. 이전 통합의 앱116개 결과와 구분하며 로그는 `/private/tmp/progress-material-main-validation.txt`다.
+
 
 ## #52 가챠 독립 표시·확인·외부 결과 UI 본인검증 — 2026-11-07
 
