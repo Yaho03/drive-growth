@@ -1,0 +1,22 @@
+{
+  "baseMain": "6adf357b6d568067f60d0e0982fbfc015856a35c",
+  "package": "io.drivegrowth.verify54results",
+  "sourceSha256": {
+    "app/src/main/java/io/drivegrowth/app/ui/results/ResultsView.kt": "5ebcd1deb0acc7b3bf65e21d05f5e09b8f3274c83c1f6bb0041778e850dfae43",
+    "app/src/main/java/io/drivegrowth/app/ui/results/ResultsScreenState.kt": "edbdc7d39274dd5722547bcfcfafba5a08ebaa932eefb4081898363720411754",
+    "app/src/main/java/io/drivegrowth/app/ui/results/ResultsStyle.kt": "2c21bd0220763e7998a7d810f043a37081a65480b21b4dc94960cca3654d0f3f",
+    "app/src/debug/java/io/drivegrowth/app/ui/results/ResultsPreviewStates.kt": "284a9459bca21873b30f569315bb27c2542b8918ac978f6d2ef9e3002313bac1",
+    "app/src/androidTest/java/io/drivegrowth/app/ui/results/ResultsViewTest.kt": "af1df47facd255331615298415106708768582f41e7034804ac729faefab6efa",
+    "app/src/main/res/values/results_strings.xml": "5da017b4a261cf3dfb7eeb037bacf5d5850a6bf9dfd55bdb92559cd2253d737a"
+  },
+  "appApkSha256": "bfc4fe7c06c696901a89c897fb4dc04eadd619a496fd29f4e9f93a005624d92c",
+  "testApkSha256": "563614bfa7f592eb59d986f1571d0f8d0c3e013ce6c1478fdfe9afdf15f9abb3",
+  "fixtureOnly": true,
+  "deviceViewTests": 6,
+  "temporaryAttachedWindowTests": 1,
+  "physicalSize": "1080x600",
+  "densityDpi": 120,
+  "actualAppWindowDp": "936x584",
+  "constrainedContentWidthDp": 480,
+  "wide1360dp": "unattached widget layout test; not a physical display preset"
+}
