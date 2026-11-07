@@ -999,3 +999,27 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w -e class io.driveg
 
 
 게시 직후 main에 추가된 #124 탁송 표시 UI(`1a0499099006d4644e12527505eaf62f80e18d7e`)를 `688ed7d`의 일반 병합으로 보존했다. 추가 app/core 변경은 main의 탁송 파일이며 검토 원코드 `6144ac8` 대비 Shop 제품/정식 시험/리소스 차이는0이다. 양쪽09/06과 공개 증거를 보존했다. 통합 후 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`는31초에 성공했고 core191·app96(각 실패/오류/생략0), Lint오류0·경고18이다. 추가 경고는 main에서 합쳐진 프로그램 생성 DeliveryView의 도구용 생성자 안내이며 Shop 코드 변경은 없다. 저장소21/26/277·diff검사·공개 증거8개 해시도 통과했다. 이 통합 조합의 기기 시험을 다시 실행한 것은 아니다. 원격 정확head/CI 결과는 연결 PR에 기록한다.
+
+
+## #52 가챠 독립 표시·확인·외부 결과 UI 본인검증 — 2026-11-07
+
+기준 main `fbbf98e0ad53bdaa742ac17dcaf94183388b2742`에서 새 `app/52-gacha-ui` worktree를 사용했다. #52 최신 본문/댓글0·PR60·PRD·기술/화면·계획/기존 검증을 대조하고 실제 세로4p/가로5a 시안을 직접 열었다. 시안의3000을 옮기지 않고 비용/권수·현재 후보·적용 확률·보장·공간은 공급 입력으로 표시한다. 세부 입력/행동·복원·실패 해소 책임은 [09 가챠 연결점](09_UI_UX_SPEC.md#52-가챠-독립-표시확인결과-ui-연결점)에 기록했다.
+
+| 실행 | 실제 결과 |
+|---|---|
+| 초기 기대 시험 | 미구현 가챠 타입 참조로 컴파일 실패 확인. 동작 실패 재현으로 표시하지 않음 |
+| `:core:test :app:testDebugUnitTest` | core191·app112(신규 GachaInteraction16 포함) 전부 통과, 실패/오류/생략0 |
+| `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` | 성공, 최종 전체명령 BUILD SUCCESSFUL(26초) |
+| Lint | 오류0·경고19. 기존18+프로그램 생성 GachaView의 XML 도구용 생성자 안내1 |
+| 구현 중 컴파일 실패 | 새 외부 Result 처리의 nullable Pending 접근1건. safe call 수정 후 위 최종 검사 성공 |
+| 저장소·diff 검사 | 통과. 문서 수정 후 최종 재검사 포함 |
+
+JDK17·기존 Android SDK35·Gradle8.11.1, `--offline --no-daemon`을 사용했다. UI는 Gacha.drawRarity/무작위 추첨/확률 재분배/해금 판정/SQL·경제 쓰기를 호출하지 않는다. 기존 GarageStyle·중립 차량 vector와 GameContentSnapshot/GachaRules/Rarity/Settlement/OwnedVehicle을 재사용했고 미머지 #111/#121 타입에 의존하지 않았다. 공유 타입/fixture·MainActivity·탐색/gate·기존Garage·SQL/경제·Manifest/Gradle/CI·README/02/08은 변경하지 않았다.
+
+정식16개는 확인/취소 무변경, 유료/무료 A/B/A 실패 재시도의 공급 경제키 유지·새 attemptId, Pending 중복/생성자 복원/제한, 낮은/같은 세대의 다른 내용 거절, callback 성공 뒤 확정 조회 대기, 확정 결과 이후 새 키, 이전 실패 미해소 상태의 변경 키 차단·명시 해소, 입력/요청/복원 목록·맵 방어 복사, 확률 합계·옵션키 충돌·필수 정보 누락·게임 콘텐츠 참조 거절, 조회 token·동기 응답/release·차고 이동 중복을 확인했다. 기존 활성 인스턴스에 과거 상태를 주입하는 restore API는 없으며 복원은 생성자 한 번만 받는다. 실제 경제 키의 저장/중복 확정은 호스트/#47/#121/#122 책임이고 UI 상관키로 대체하지 않는다.
+
+`io.drivegrowth.app.ui.gacha.GachaViewTest`7개를 시험 APK로 컴파일했다. 대상은 공급 적용 확률/보장 회차, 확인·취소·callback Pending, 제한/옛 버튼·생성자 Pending 복원, 실패 옵션 A/B/A, 빈후보/보장불가/공간·재화·권수 부족/누락/미지원, 외부 정산 개체/차고 이동, 긴 문구와320×440/840×1184/1360×948dp layout이다. 실제 장치 배정 전이므로 **기기 실행·터치/화면 캡처는 미수행**이며 표적7개 예상 점유2~3분이다. adb/AVD 조회·설치·실행·기기 설정·제품 데이터를 조작하지 않았다. 위젯 컴파일을 실제 SDK/장치 성공으로 바꾸지 않는다.
+
+빌드 제품 APK SHA-256 `f0f6356d2475c1019a9d65b39980dd953f8ee7e1bab06684d0ef9ae5c57a0cdb`, 시험 APK `4310fce12bf60de7bd6567c57f8eb603d98aff80a156dc14d09ff1069cc66c10`이며 설치본 해시가 아니다. 원본 로컬 로그는 `/private/tmp/gacha52-red.log`, `gacha52-state-green.log`, `gacha52-view-check.log`, `gacha52-expanded-tests.log`, `gacha52-final-check.log`다.
+
+실제 #47 추첨/차감/차량·티켓/보장 저장, #121/#122 공통 거래·실패 복구/재실행, MainActivity/탐색/공통 gate/발견 기록 연결·실차/공식 폼팩터는 미완료다. debug 고정 결과는 실제 획득이 아니고 확정 결과 모양의 시험 입력이다. #52 전체 종료·체크/라벨/담당/차단 관계는 변경하지 않는다. 본인검증 커밋을 독립 검토에 인계하고 PR은 검증 전 게시하지 않는다. 사용자 동결 지시대로 이미 착수한 #52와 인계된 #55 결함 외 새 작업은 시작하지 않는다.
