@@ -330,6 +330,60 @@ class RentalLedgerTest : InstrumentationTestCase() {
         assertEquals(earliest, ok(store.rental.settle(second.id)))
     }
 
+    fun testDiscoveryUsesOneSnapshotOfChangingInput() {
+        val valid = CollectionKey(car.vehicleId, Rarity.RARE)
+        val invalid = CollectionKey(VehicleId("unknown"), Rarity.LEGEND)
+        var reads = 0
+        val changing = object : AbstractSet<CollectionKey>() {
+            override val size = 2
+            override fun iterator(): Iterator<CollectionKey> {
+                reads++
+                return if (reads == 1) setOf(valid, CollectionKey(car.vehicleId, Rarity.COMMON)).iterator()
+                else setOf(valid, invalid).iterator()
+            }
+        }
+        ok(store.recordDiscoveries(catalog, changing))
+        assertFalse(invalid in ok(store.discoveredVehicles()))
+        assertEquals(2, ok(store.discoveredVehicles()).size)
+    }
+
+    fun testCompletedRentalRejectsBrokenLinksAndRawValuesWithoutWrites() {
+        ok(assign())
+        ok(store.rental.account(request.id, terms.start, EpochMillis(3600000), null))
+        ok(store.rental.settle(request.id))
+        val balance = ok(store.balance())
+        val cases = listOf(
+            "UPDATE rentals SET settlement_request='add/one'" ,
+            "UPDATE settlements SET settlement_id='wrong' WHERE request_id='rental/settle/r1'",
+            "UPDATE settlements SET result=json_set(result,'$.request','wrong') WHERE request_id='rental/settle/r1'",
+            "UPDATE settlements SET result=json_set(result,'$.kind','GARAGE') WHERE request_id='rental/settle/r1'",
+            "UPDATE settlements SET result=json_set(result,'$.source','VEHICLE') WHERE request_id='rental/settle/r1'",
+            "UPDATE rentals SET accident=2",
+            "UPDATE rentals SET match_review=0.5",
+            "UPDATE rentals SET wash_review='invalid'",
+            "UPDATE rentals SET regular_customer=-1",
+            "UPDATE rentals SET bonus=1.5",
+            "UPDATE rentals SET bonus=-1",
+        )
+        store.close()
+        val file = context.getDatabasePath(name)
+        val original = file.readBytes()
+        for (sql in cases) {
+            file.writeBytes(original)
+            SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { it.execSQL(sql) }
+            val broken = file.readBytes()
+            store = open()
+            assertEquals(sql, ContractResult.Failure(ContractError.STORAGE_FAILURE), store.rental.firstCompletedRental())
+            assertEquals(sql, ContractResult.Failure(ContractError.STORAGE_FAILURE), store.rental.completedRental(request.id))
+            assertEquals(balance, ok(store.balance()))
+            store.close()
+            assertTrue(sql, broken.contentEquals(file.readBytes()))
+        }
+        file.writeBytes(original)
+        store = open()
+        assertNotNull(ok(store.rental.firstCompletedRental()))
+    }
+
     fun testUpgradeFromV1KeepsAccountAndOriginalVehicle() {
         store.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path,null,SQLiteDatabase.OPEN_READWRITE).use { db ->

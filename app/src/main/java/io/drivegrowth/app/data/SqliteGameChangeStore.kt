@@ -150,10 +150,11 @@ class SqliteGameChangeStore(
 
     /** 목록에서 실제로 본 칸만 기록한다. 재노출·재시도에는 같은 복합 키를 사용한다. */
     override fun recordDiscoveries(catalog: VehicleCatalogSnapshot, keys: Set<CollectionKey>): ContractResult<Unit> {
-        val known = catalog.vehicles.mapTo(mutableSetOf()) { it.vehicleId }
-        if (keys.any { it.vehicleId !in known }) return failure(ContractError.INVALID_INPUT)
+        val snapshot = keys.toSet()
+        val known = catalog.vehicles.toList().mapTo(mutableSetOf()) { it.vehicleId }
+        if (snapshot.any { it.vehicleId !in known }) return failure(ContractError.INVALID_INPUT)
         return atomic { db ->
-            for (key in keys) db.execSQL("INSERT OR IGNORE INTO discoveries(vehicle_id, rarity) VALUES (?, ?)",
+            for (key in snapshot) db.execSQL("INSERT OR IGNORE INTO discoveries(vehicle_id, rarity) VALUES (?, ?)",
                 arrayOf(key.vehicleId.value, key.rarity.name))
             ContractResult.Success(Unit)
         }

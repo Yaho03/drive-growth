@@ -1,5 +1,7 @@
 package io.drivegrowth.app.data
 
+import android.database.Cursor
+import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteDatabase
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.Garage
@@ -166,29 +168,55 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             else ContractResult.Success(countSettledAccidents(db, ownedVehicleId))
         }
 
+    private val completedSelect = """SELECT r.id,r.owned_id,s.result,r.accident,r.match_review,r.wash_review,
+        r.bonus,r.weighted,r.regular_customer,r.settlement_request,s.request_id,s.settlement_id FROM rentals r
+        LEFT JOIN settlements s ON s.request_id=r.settlement_request
+        WHERE r.settlement_request IS NOT NULL"""
+
     private fun countSettledAccidents(db: SQLiteDatabase, ownedVehicleId: OwnedVehicleId): Int =
-        db.rawQuery("SELECT count(*) FROM rentals WHERE owned_id=? AND accident=1 AND settlement_request IS NOT NULL",
-            arrayOf(ownedVehicleId.value)).use { rows ->
-            rows.moveToFirst()
-            rows.getInt(0)
+        db.rawQuery("$completedSelect AND r.owned_id=?", arrayOf(ownedVehicleId.value)).use { rows ->
+            var count = 0
+            while (rows.moveToNext()) if (decodeCompleted(rows).receipt.accident) count++
+            count
         }
 
     private fun completed(id: RequestId?): ContractResult<CompletedRental?> = store.read { db ->
         val filter = if (id == null) "" else " AND r.id=?"
-        db.rawQuery("""SELECT r.id,r.owned_id,s.result,r.accident,r.match_review,r.wash_review,
-            r.bonus,r.weighted,r.regular_customer FROM rentals r
-            LEFT JOIN settlements s ON s.request_id=r.settlement_request
-            WHERE r.settlement_request IS NOT NULL$filter ORDER BY s.rowid LIMIT 1""",
-            id?.let { arrayOf(it.value) }).use { row ->
+        db.rawQuery("$completedSelect$filter ORDER BY s.rowid LIMIT 1", id?.let { arrayOf(it.value) }).use { row ->
             if (!row.moveToFirst()) return@read null
-            if (row.isNull(2)) throw android.database.sqlite.SQLiteException("대여 정산 누락")
-            val settlement = LedgerJson.settlement(JSONObject(row.getString(2)))
-            val bonus = if (BigDecimal(row.getString(7)).signum() == 0) GameMoney(0) else GameMoney(row.getLong(6))
-            CompletedRental(RequestId(row.getString(0)), OwnedVehicleId(row.getString(1)),
-                RentalReceipt(settlement, row.getInt(3) == 1, row.getInt(4) == 1, row.getInt(5) == 1,
-                    bonus, if (row.isNull(8)) null else row.getInt(8) == 1))
+            decodeCompleted(row)
         }
     }
+
+    private fun decodeCompleted(row: Cursor): CompletedRental {
+        if (row.isNull(2) || row.isNull(10) || row.isNull(11)) throw SQLiteException("대여 정산 누락")
+        val rentalId = RequestId(row.getString(0))
+        val settlement = LedgerJson.settlement(JSONObject(row.getString(2)))
+        val expected = "rental/settle/" + rentalId.value
+        if (row.getString(9) != expected || row.getString(10) != expected ||
+            settlement.transaction.requestId.value != expected ||
+            settlement.settlementId.value != row.getString(11) ||
+            settlement.transaction.kind != TransactionKind.RENTAL ||
+            settlement.transaction.source != store.source)
+            throw SQLiteException("대여 정산 연결 불일치")
+        val bonusUnits = row.strictInteger(6, 0, Long.MAX_VALUE)
+        val weighted = if (row.getType(7) == Cursor.FIELD_TYPE_STRING) BigDecimal(row.getString(7))
+            else throw SQLiteException("시간 가중치 형식 오류")
+        if (weighted.signum() < 0) throw SQLiteException("시간 가중치 범위 오류")
+        val bonus = GameMoney(if (weighted.signum() == 0) 0 else bonusUnits)
+        return CompletedRental(rentalId, OwnedVehicleId(row.getString(1)),
+            RentalReceipt(settlement, row.strictBoolean(3), row.strictBoolean(4), row.strictBoolean(5),
+                bonus, if (row.isNull(8)) null else row.strictBoolean(8)))
+    }
+
+    private fun Cursor.strictInteger(column: Int, min: Long, max: Long): Long {
+        if (getType(column) != Cursor.FIELD_TYPE_INTEGER) throw SQLiteException("정수 저장 형식 오류")
+        val value = getLong(column)
+        if (value !in min..max) throw SQLiteException("정수 저장 범위 오류")
+        return value
+    }
+
+    private fun Cursor.strictBoolean(column: Int) = strictInteger(column, 0, 1) == 1L
 
     fun settle(id: RequestId, resolvedRounding: RoundingMode? = null) = store.atomic { db ->
         db.rawQuery("""SELECT version,start,end,cursor,weighted,fare,bonus,rounding,accident,match_review,wash_review,
