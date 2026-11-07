@@ -355,7 +355,18 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 
 이미 운영한 schema1 데이터가 새 필드를 가진 것으로 간주하지 않는다. 같은 DB 버전 안에서 payload 의미가 확장되므로 저장 담당이 실제 구버전 자료와 호환 전략을 검증해야 한다. 근거 있는 취득 기록 없이 COMMON·0·현재 차종가로 복구하거나, 새 DB/기존 데이터 삭제로 통과시키지 않는다. 확정 결과의 과거 값도 현재 개체로 재구성하지 않는다. 자동 이전은 이번에 제공하지 않는다.
 
-#48 후속 거래는 대상ID/revision·재료ID/revision·활동·차종/희귀도·규칙 버전에서 계산한 새 레벨/진행량과 필요한 재화 변경을 입력으로 받아야 한다. 한 정산에서 대상 성장 snapshot과 재료 CONSUMED snapshot을 함께 확정하고 취득 정보는 각각 보존해야 한다. 같은 개체 중복·활동 제한·revision 충돌·금액 부족이면 전부 미반영이어야 한다. 현재 단일 `GameChange` 두 번 호출로 이를 흉내 내지 않는다. 다중 개체 명령·결과 구조 자체는 #48·#34의 후속 연결이며 이번에는 구현하지 않는다. 가챠 티켓/보장 이력·초기 지급 이력·사고/활동·도감 영속 입력도 각 기존 담당의 범위다. 기존 `VehicleCare.levelAfterMaterial`의 +3레벨 시험 로직을 이번에 희귀도별 진행량 계산으로 바꾼 것은 아니며 #48이 최신 PRD와 새 필드로 연결해야 한다.
+#48 후속 거래는 대상ID/revision·재료ID/revision·활동·차종/희귀도·규칙 버전에서 계산한 새 레벨/진행량과 필요한 재화 변경을 입력으로 받아야 한다. 한 정산에서 대상 성장 snapshot과 재료 CONSUMED snapshot을 함께 확정하고 취득 정보는 각각 보존해야 한다. 같은 개체 중복·활동 제한·revision 충돌·금액 부족이면 전부 미반영이어야 한다. 현재 단일 `GameChange` 두 번 호출로 이를 흉내 내지 않는다. 다중 개체 명령·결과 구조 자체는 #48·#34의 후속 연결이며 이번에는 구현하지 않는다. 가챠 티켓/보장 이력·초기 지급 이력·사고/활동·도감 영속 입력도 각 기존 담당의 범위다. 기존 `VehicleCare.levelAfterMaterial`의 +3레벨 시험 로직은 아래 #48 절에서 희귀도별 진행량 계산으로 교체했다.
+
+#### #48 레벨업과 재료 강화
+
+`io.drivegrowth.core.garage.VehicleUpgrade`가 `Garage.find`로 대상·재료를 찾고 `VehicleRef`(개체 ID·화면에서 본 revision)와 호출자가 넘긴 활동 상태로 검사한다. 계산은 `VehicleCare`의 PRD 시험값이다: 레벨업 비용 = 차종 가격 × 2% × 현재 레벨 × 희귀도 비용 배율(1.0·1.05·1.1·1.15, 마지막에 한 번 내림), 재료 진행량 = 재료 희귀도별 100·150·250·400%(이월, 20레벨 초과분 버림).
+
+| 동작 | 저장 | 실패 |
+|---|---|---|
+| `levelUp(store, requestId, source, VehicleRef, activityOf)` | 비용 DEBIT + `VehicleWrite.Update`(레벨+1, 진행량 유지, 20이면 0)를 `GameChange` 한 건으로 커밋. 성공 뒤 같은 요청 재시도는 revision이 달라 `STATE_CONFLICT` | 없음·처분 `DATA_UNAVAILABLE`, revision 불일치·대여/반납/수리 필요 `STATE_CONFLICT`, 20레벨 `INVALID_INPUT`, 잔액 부족·저장 실패는 저장소가 전체 거절 |
+| `planMaterial(owned, target, material, activityOf)` | **계산·검사만.** 대상 성장 Update와 재료 CONSUMED Update(성장값 보존) 두 개를 `MaterialPlan`으로 반환하고 저장하지 않음 | 같은 개체·다른 차종·20레벨 대상 `INVALID_INPUT`, 처분된 재료 `DATA_UNAVAILABLE`, revision 불일치·사용 중 `STATE_CONFLICT`. 재료는 20레벨이어도 사용 가능 |
+
+재료 강화는 두 개체를 한 정산에 확정해야 하므로 위 「#48 후속 거래」의 다중 개체 명령이 #33·#34에 생긴 뒤 `MaterialPlan`을 한 건으로 커밋한다. 희귀도 수익 배율(1.0~1.3)과 대여료 반영은 영업 계산(B) 범위라 이번에 바꾸지 않았다.
 
 ### 거래 원장 영속 저장
 
