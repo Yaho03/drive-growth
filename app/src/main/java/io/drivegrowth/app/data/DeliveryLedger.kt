@@ -19,7 +19,11 @@ import io.drivegrowth.core.contract.Settlement
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.contract.VehicleLifecycle
 import io.drivegrowth.core.delivery.ActiveDelivery
+import io.drivegrowth.core.delivery.DeliveryChange
+import io.drivegrowth.core.delivery.DeliveryChangeOffer
+import io.drivegrowth.core.delivery.DeliveryChangeRules
 import io.drivegrowth.core.delivery.DeliveryInProgress
+import io.drivegrowth.core.delivery.DeliveryTerms
 import io.drivegrowth.core.delivery.DeliveryList
 import io.drivegrowth.core.delivery.DeliveryOffer
 import io.drivegrowth.core.delivery.DeliveryOfferId
@@ -56,6 +60,23 @@ data class ArrivalCommit(
     val settlement: Settlement?,
 )
 
+/**
+ * 목적지 변경의 확정 결과.
+ *
+ * @param terms 바뀐 의뢰, 보류 대금, 변경 사용 여부.
+ * @param settlement 차액 결제·환급의 공용 정산. 차액이 없으면 null이다.
+ */
+data class ChangeCommit(
+    val terms: DeliveryTerms,
+    val settlement: Settlement?,
+)
+
+/** 포기의 확정 결과. 수익 탁송 포기는 돈이 오가지 않아 settlement가 null이다. */
+data class AbandonCommit(
+    val requestId: RequestId,
+    val settlement: Settlement?,
+)
+
 /** 임시 보관 처리의 확정 결과. 계속 보관이면 settlement가 null이다. */
 data class HoldCommit(
     val outcome: HoldOutcome,
@@ -71,6 +92,9 @@ data class HoldCommit(
  */
 class DeliveryLedger internal constructor(private val store: SqliteGameChangeStore) {
     internal companion object {
+        /** delivery_outcomes.kind의 포기 값. 도착 정산 결과는 결과 클래스 이름을 쓴다. */
+        const val ABANDONED = "Abandoned"
+
         fun createTables(db: SQLiteDatabase) {
             db.execSQL(
                 """CREATE TABLE delivery_lists (
@@ -93,6 +117,11 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
                 "CREATE TABLE delivery_outcomes (request_id TEXT PRIMARY KEY NOT NULL, kind TEXT NOT NULL, settle_request TEXT)",
             )
             db.execSQL("CREATE TABLE delivery_held (request_id TEXT PRIMARY KEY NOT NULL, payload TEXT NOT NULL)")
+            db.execSQL(
+                """CREATE TABLE delivery_changes (
+                request_id TEXT PRIMARY KEY NOT NULL, command TEXT NOT NULL, active TEXT NOT NULL,
+                paid INTEGER NOT NULL CHECK (paid >= 0), charged INTEGER NOT NULL CHECK (charged IN (0, 1)))""",
+            )
         }
     }
 
@@ -255,6 +284,89 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         ContractResult.Success(ArrivalCommit(outcome, recorded))
     }
 
+    /**
+     * 진행 중 의뢰의 목적지를 바꾼다. 기존 변경 확인 → 활성 의뢰·잔액·후보 검사 → 확정 순서로 처리한다.
+     * 차액 결제·환급, 바뀐 의뢰와 보류 대금, 새 경로 세대를 한 트랜잭션으로 확정한다. 미도착 기한의 시작 시각은 처음 값을 유지한다.
+     *
+     * - 같은 의뢰·같은 변경 명령은 당시 결과를 돌려준다. 다른 변경 명령은 STATE_CONFLICT다(변경은 1회).
+     * - 활성 의뢰나 경로가 없으면 DATA_UNAVAILABLE이다. 실패하면 아무것도 바꾸지 않는다.
+     */
+    fun changeDestination(
+        rules: DeliveryChangeRules,
+        offer: DeliveryChangeOffer,
+        offerId: DeliveryOfferId,
+        route: RouteId,
+    ): ContractResult<ChangeCommit> = store.atomic { db ->
+        val command = DeliveryJson.changeCommand(rules, offer, offerId, route).toString()
+        val changeId = RequestId("delivery/${offer.requestId.value}/change")
+        readChange(db, offer.requestId)?.let { stored ->
+            if (stored.command != command) return@atomic failure(ContractError.STATE_CONFLICT)
+            return@atomic ContractResult.Success(ChangeCommit(stored.terms, if (stored.charged) readSettlement(db, changeId) else null))
+        }
+        val terms = readTerms(db) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
+        if (terms.active.requestId != offer.requestId) return@atomic failure(ContractError.STATE_CONFLICT)
+        if (offer.proposed.list.source != store.source) return@atomic failure(ContractError.INVALID_INPUT)
+        val started = readRoute(db, offer.requestId)?.second ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
+        if (hasSettlement(db, changeId)) return@atomic failure(ContractError.STATE_CONFLICT)
+        val changed = when (val result = DeliveryChange(rules).change(terms, offer, offerId, store.readBalance(db))) {
+            is ContractResult.Failure -> return@atomic result
+            is ContractResult.Success -> result.value
+        }
+        val recorded = changed.change?.let {
+            when (val result = store.record(db, it, LedgerJson.command(it).toString())) {
+                is ContractResult.Failure -> return@atomic result
+                is ContractResult.Success -> result.value
+            }
+        }
+        db.insertOrThrow("delivery_changes", null, ContentValues().apply {
+            put("request_id", offer.requestId.value)
+            put("command", command)
+            put("active", DeliveryJson.active(changed.terms.active).toString())
+            put("paid", changed.terms.paid.units)
+            put("charged", if (recorded != null) 1 else 0)
+        })
+        db.update("delivery_routes", ContentValues().apply {
+            put("route", route.value)
+            put("started_at", started.value)
+        }, "request_id = ?", arrayOf(offer.requestId.value))
+        ContractResult.Success(ChangeCommit(changed.terms, recorded))
+    }
+
+    /**
+     * 진행 중 의뢰를 포기한다. 환급, 활성 의뢰 종료, 결과 기록을 한 트랜잭션으로 확정하고 하루 목록은 바꾸지 않는다.
+     * 같은 의뢰의 포기 재전송은 당시 결과를 돌려준다. 이미 도착 정산 등으로 끝난 의뢰는 STATE_CONFLICT다.
+     */
+    fun abandon(rules: DeliveryChangeRules, requestId: RequestId): ContractResult<AbandonCommit> = store.atomic { db ->
+        val settleId = RequestId("delivery/${requestId.value}/settle")
+        db.rawQuery("SELECT kind FROM delivery_outcomes WHERE request_id = ?", arrayOf(requestId.value)).use {
+            if (it.moveToFirst()) {
+                if (it.getString(0) != ABANDONED) return@atomic failure(ContractError.STATE_CONFLICT)
+                val settlement = if (hasSettlement(db, settleId)) readSettlement(db, settleId) else null
+                return@atomic ContractResult.Success(AbandonCommit(requestId, settlement))
+            }
+        }
+        val terms = readTerms(db) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
+        if (terms.active.requestId != requestId) return@atomic failure(ContractError.STATE_CONFLICT)
+        val abandoned = when (val result = DeliveryChange(rules).abandon(terms)) {
+            is ContractResult.Failure -> return@atomic result
+            is ContractResult.Success -> result.value
+        }
+        val recorded = abandoned.change?.let {
+            when (val result = store.record(db, it, LedgerJson.command(it).toString())) {
+                is ContractResult.Failure -> return@atomic result
+                is ContractResult.Success -> result.value
+            }
+        }
+        finishActive(db, requestId).let { if (it is ContractResult.Failure) return@atomic it }
+        db.delete("delivery_routes", "request_id = ?", arrayOf(requestId.value))
+        db.insertOrThrow("delivery_outcomes", null, ContentValues().apply {
+            put("request_id", requestId.value)
+            put("kind", ABANDONED)
+            put("settle_request", recorded?.transaction?.requestId?.value)
+        })
+        ContractResult.Success(AbandonCommit(requestId, recorded))
+    }
+
     /** 임시 보관 중인 차량. */
     fun held(): ContractResult<List<HeldVehicle>> = store.atomic { db ->
         db.rawQuery("SELECT request_id, payload FROM delivery_held ORDER BY request_id", null).use {
@@ -405,11 +517,28 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         StoredRequest(it.getString(0), active, it.getInt(2) == 1)
     }
 
-    private fun readActive(db: SQLiteDatabase): ActiveDelivery? {
+    /** 현재 활성 의뢰. 목적지를 바꿨으면 바뀐 의뢰다. */
+    private fun readActive(db: SQLiteDatabase): ActiveDelivery? = readTerms(db)?.active
+
+    /** 현재 활성 의뢰의 보류 대금과 변경 사용 여부. 바꾼 적이 없으면 처음 선택한 의뢰와 결제액이다. */
+    private fun readTerms(db: SQLiteDatabase): DeliveryTerms? {
         val requestId = db.rawQuery("SELECT request_id FROM delivery_active WHERE id = 1", null).use {
             if (it.moveToFirst()) RequestId(it.getString(0)) else null
         } ?: return null
-        return (readRequest(db, requestId) ?: throw JSONException("활성 의뢰의 선택 이력 누락")).active
+        readChange(db, requestId)?.let { return it.terms }
+        val selected = (readRequest(db, requestId) ?: throw JSONException("활성 의뢰의 선택 이력 누락")).active
+        return DeliveryTerms(selected, (selected.offer as? DeliveryOffer.Purchase)?.price ?: GameMoney(0), changeUsed = false)
+    }
+
+    private class StoredChange(val command: String, val terms: DeliveryTerms, val charged: Boolean)
+
+    private fun readChange(db: SQLiteDatabase, requestId: RequestId): StoredChange? = db.rawQuery(
+        "SELECT command, active, paid, charged FROM delivery_changes WHERE request_id = ?", arrayOf(requestId.value),
+    ).use {
+        if (!it.moveToFirst()) return@use null
+        val active = DeliveryJson.active(JSONObject(it.getString(1)))
+        if (active.requestId != requestId) throw JSONException("변경 기록 요청 ID 불일치")
+        StoredChange(it.getString(0), DeliveryTerms(active, GameMoney(it.getLong(2)), changeUsed = true), it.getInt(3) == 1)
     }
 
     private fun hasSettlement(db: SQLiteDatabase, requestId: RequestId): Boolean =
@@ -478,6 +607,12 @@ internal object DeliveryJson {
     /** 선택 명령. 목록 키·목적지·거리·출처·버전·후보 전체와 고른 의뢰를 함께 비교한다. */
     fun command(requestId: RequestId, offerId: DeliveryOfferId, proposed: DeliveryProposed): JSONObject =
         JSONObject().put("request", requestId.value).put("offer", offerId.value).put("proposed", proposed(proposed))
+
+    /** 변경 명령. 변경 목록 전체, 고른 의뢰, 실제·합산 거리, 새 경로, 규칙을 함께 비교한다. */
+    fun changeCommand(rules: DeliveryChangeRules, offer: DeliveryChangeOffer, offerId: DeliveryOfferId, route: RouteId): JSONObject =
+        JSONObject().put("request", offer.requestId.value).put("offer", offerId.value)
+            .put("traveled", offer.traveledMeters).put("combined", offer.combinedMeters).put("route", route.value)
+            .put("rule", rules.ruleVersion.value).put("fee", rules.cancelFeePercent).put("proposed", proposed(offer.proposed))
 
     fun held(h: HeldVehicle): JSONObject = JSONObject().put("request", h.requestId.value).put("source", h.source.name)
         .put("vehicle", LedgerJson.vehicle(h.vehicle)).put("price", h.price.units)
