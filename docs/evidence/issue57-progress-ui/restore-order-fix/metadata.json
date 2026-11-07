@@ -1,0 +1,12 @@
+{
+  "source_head": "70f981e1bc1346f22e34c36672e89f25f2290f09",
+  "package": "io.drivegrowth.app.progress57",
+  "test_target": "io.drivegrowth.app.progress57",
+  "app_sha256": "8d5192e9bb2dbbcb18e4931744432680a60cd8104362d0da93df92fd22673888",
+  "test_apk_sha256": "9b9dee9e06b93fab3f72f4fecc3112a603dd117a9daeb366f828d737a279fda0",
+  "targeted_device_tests": 1,
+  "seconds": 0.135,
+  "scenario": "render revision1 then restore max5 -> Loading/no old content/buttons; repeat stale render rejected; retained old button cannot claim; valid new revision6 permits its own button",
+  "scope": "isolated real Android View and temporary host; fixed input only; no reward/DB/SDK evidence",
+  "cleanup": "own two packages removed; product APK and six file hashes unchanged; user10/1080x600/120dpi/fontScale=null; original navigation resumed; no instrumentation/forward; original AVD/ADB5038 retained"
+}

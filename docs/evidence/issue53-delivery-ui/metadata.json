@@ -1,0 +1,72 @@
+{
+  "testedOriginalHead": "5b26c412acac8eef56414485685141e8b9e3d04b",
+  "originalBaseMain": "b6631a44e80e56a6b86ea9bfc1790cefc4ea82c0",
+  "integratedMain": "085786a152ed8b4b534039ad3d0ccb3d5414f655",
+  "performedBy": "B 구현의 배정된 독립 검토·격리 장치 실행. A 구현은 보존 근거 대조·문서 반영만 수행, 추가 adb 없음",
+  "sourceComparison": {
+    "differences": [
+      "app/src/debug/AndroidManifest.xml"
+    ],
+    "role": "격리 debug Manifest의 시험 호스트 등록. 원본 main·debug 고정 입력·원본 시험 소스는 동일. 추가 호스트 Activity/시험은 증거 폴더에 보존",
+    "originalTrackedAppCoreFiles": 114
+  },
+  "package": "io.drivegrowth.verify53b",
+  "device": "Pleos 2.1.0 / API34 / ARM64, emulator-5556 / ADB5038 / user10",
+  "initialRun": {
+    "tests": 7,
+    "originalViewTests": 6,
+    "addedHostTests": 1,
+    "seconds": 7.638,
+    "appSha256": "b9cbe417c3d7c02a0e6f30dab15160e9f10c381ef10b6bf4db458c3fa114f45e",
+    "testApkSha256": "9ab5c95104cf4782a0a036e3feb26a32575985d775e81376cc4bba6e02182a2a"
+  },
+  "finalHostRerun": {
+    "tests": 1,
+    "seconds": 9.231,
+    "appSha256": "a9367103785db78fd8ccf61fd821b2e3b9154a9730ad40659c2b783d2ddfde6a",
+    "testApkSha256": "7e824a998d0135f4d2e841ca95bd6489887ce11cf788cac515bb20cd0a95332a",
+    "installedHashesMatchRecordedBuild": true,
+    "reason": "호스트 폭이 CCP 가용 영역보다 컸고 일부 캡처가 갱신 전 프레임을 담음. 호스트 가용폭 제한·캡처 대기 보완 후 호스트 시험만 재실행"
+  },
+  "layout": {
+    "density": 0.75,
+    "narrowWidthPx": 240,
+    "narrowWidthDp": 320,
+    "wideRequestedDp": 1100,
+    "wideMeasuredPx": 702,
+    "wideActualDp": 936,
+    "contentHeightPx": 424
+  },
+  "restoration": "같은 Activity 안에서 View 교체 후 saveUiState로 선택/Pending 보존·중복요청1회 확인. Activity.recreate/프로세스 재실행 시험 아님",
+  "restriction": "외부 controlsEnabled=false와 제한 중 complete. 실제 차량 D/CarUxRestrictions gate 시험 아님",
+  "returnChecksReportedByB": {
+    "user": true,
+    "boot": true,
+    "size": true,
+    "density": true,
+    "font": true,
+    "night": true,
+    "forward": true,
+    "data": true,
+    "productApk": true,
+    "productPermissions": true,
+    "noActiveInstrumentation": true,
+    "isolatedPackagesRemoved": true,
+    "navigationForeground": true
+  },
+  "limitations": [
+    "실제 SDK 목적지/거리·차량 gate·CCP Back/다이얼 미검증",
+    "실제 #37–#39 거래/경제 requestId 영속 복원/DB·발견 기록 미연결",
+    "공식 전체 폼 팩터·실차·장기 안정성 미검증"
+  ],
+  "privacy": "고정 시험 UI 화면·계측 결과·격리 호스트 코드만 발췌. 제품 DB/파일 해시 목록·제품 전체 로그·서명 경로·키·원시 위치는 제외",
+  "evidenceSha256": {
+    "Host53Activity.kt": "8f5c0081a7d350d8d4e61bd2a3353798d7c5943d71ee3d9acdbc6ed6560ef426",
+    "Host53DeviceTest.kt": "7eca76bad28e56e520aa92a68ff6fc0546d3d753ea013832e92ff4a257e6768a",
+    "device-tests.txt": "0e50e031a4b71d9257517b9e151376e71c29a8754f82937d0885631883d07c2c",
+    "host-final.txt": "3eac0edd513ebd63134b47eca5deff690de482f1306ee36fbf40f1b76c73d3f9",
+    "narrow-confirm.png": "8fca206674f5a5d9e9f1ab528e8869420e0a65f333be3574fe24552e6c1b0f2d",
+    "wide-active.png": "be6b4db3bb7c70e2feb4c8862ae9855f1c7d4480d019ab571990ab348942f7b6",
+    "wide-confirm.png": "c4e209e328335a22aa7455b2ec94fbc4a7b2767742fa7c4dac8dda051855091e"
+  }
+}

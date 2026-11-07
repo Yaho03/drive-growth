@@ -444,7 +444,7 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 | #36·#39·#40 주행·휴식 | 같은 부팅의 관측 순서/단조 시각·UTC·출처·누락·확인된 구간/일자 + 휴식 장소/출발 증거 → 원인 구간·보상 반영 거리/상한·버프 상태/시작 이벤트/소모 커서 | 기존 차량 gate/DriveEngine 기록과 RestBonus 계산 유지. 경험치 SnapshotStore를 게임머니 원장으로 간주하지 않음. 구간 중복 제거·주행 수익/하루500km·버프 소모를 원자 저장·복원. 주행 서비스·음성 활성화는 #81 조건 충족 후 |
 | #55 꾸미기 | 채택 아이템/해금/가격/배치 영역·현재 배치 revision·선택/미리보기 → 확정 배치/구매 결과 | 미리보기는 무저장, 확정 시 소유/해금·가격·배치를 공통 거래로 검사. 아이템 정의/비용/배치 규칙은 #24 결정 대기. 시설 buy를 꾸미기 지급으로 임의 대체하지 않음 |
 | #58 랭킹 | 가게 레벨·도감 수집 수·보유 차량 수·누적 게임머니·주행거리·최고가의 확정 집계 원인·범위/기간·출처·콘텐츠·집계 시각 → 값/지원 상태·채택 시 서버 응답 | 최고가=현재 보유 차종가×희귀도 수익 배율, 주행거리 하루500km/주간 초기화는 기존 기준. 가게 단계·도감 수·보유 수·누적금의 집계/동률·온라인 식별/API/인증/검증/개인정보는 #24·#58 결정. [댓글6705552358](https://github.com/Yaho03/drive-growth/issues/24#issuecomment-6705552358)은 제안. 로컬 fixture를 실제 순위로 표시하지 않음 |
-| #51~#58 공통 UI | 프로필/출처·현재 gate·콘텐츠/규칙 버전·대상 ID/revision·준비/확정 requestId·시도 세대 → Loading/내용(빈값)/Pending/실패/미지원/확정 snapshot | HostSession·QueryController·ResultsHostController·각 View 재사용. 현재 StoredHostSource의 기본 원장은 SIMULATION이며 차량 gate 허용을 실제 보상 출처로 혼동하지 않음. HostSnapshot은 개별 순차 조회이며 DB 일괄 원자 snapshot이 아님. 서로 의존하는 필드의 일관 조회/기준 revision은 저장 후속의 해당 조회에서 보완. 제한/페이지 이동/재생성 뒤 늦은 응답을 새 요청 결과로 쓰지 않음. Bundle의 선택/Pending만으로 지급 성공을 추정하지 않고 원래 요청을 조회·복구. #53/#55/#57 표시 UI는 fixture로 병렬 진행 |
+| #51~#58 공통 UI | 프로필/출처·현재 gate·콘텐츠/규칙 버전·대상 ID/revision·준비/확정 requestId·시도 세대 → Loading/내용(빈값)/Pending/실패/미지원/확정 snapshot | HostSession·QueryController·ResultsHostController·각 View 재사용. 현재 StoredHostSource의 기본 원장은 SIMULATION이며 차량 gate 허용을 실제 보상 출처로 혼동하지 않음. HostSnapshot은 개별 순차 조회이며 DB 일괄 원자 snapshot이 아님. 서로 의존하는 필드의 일관 조회/기준 revision은 저장 후속의 해당 조회에서 보완. 제한/페이지 이동/재생성 뒤 늦은 응답을 새 요청 결과로 쓰지 않음. Bundle의 선택/Pending만으로 지급 성공을 추정하지 않고 원래 요청을 조회·복구. #53/#55 표시 UI는 #124/#125 main 인계(실제 호스트/거래 연결은 별도), #57 표시 UI는 fixture로 진행 |
 
 ### 시간·초기화·이전과 검증 게이트
 
@@ -453,3 +453,36 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 3. main schema2, PR #116의 schema3 계획과 다음 탁송 이전은 경민·정원이 실제 머지 순서로 조율한다. **미래 버전 번호를 여기서 확정하지 않는다.** #116 수정·검토 후 탁송 공용 연결을 갱신하는 기본 순서와 독립 Ledger 작업의 병렬 진행은 #37 댓글을 따른다. 같은 버전에 서로 다른 스키마를 만들지 않는다.
 4. 테이블 이전과 개체 payload 복구는 별개다. 기존 schema1의 새 필드 없는 개체/정산·처분 이력은 자동 COMMON/0이나 빈 NEW로 바꾸지 않는다. 지원 구버전의 원본/부속 파일 보존·이전 실패 롤백, 알 수 없는/미래 버전 거절, 모든 조회의 엄격한 숫자/불리언 검증을 저장 후속에서 시험한다. 복구·사용자 초기화·백업 채택 정책은 #24 결정 전 임의 구현하지 않는다.
 5. 계약 후속은 소비 파트의 정상/누락/충돌/정책 미정 fixture와 전체 요청 재생을 검증하고, 저장 후속은 실제 SQLite에서 두 요청 경쟁·다중 개체 한쪽 실패·커밋 전/후 장애·현재 상태 변화 뒤 재생·오연결/손상·DB 재개방·지원 버전 이전을 검증한다. Activity 재생성·DB 재개방·프로세스 재시작은 각각 별도 근거다. 기능 PR의 실제 소비 뒤 #28에서 연결·UI 제한·버전/출처·중복 지급을 확인한다. 이 문서 작성은 제품 시험 통과 근거가 아니다.
+
+### #121 가챠 명령 capability의 첫 부분 공급
+
+이 변경은 `core.contract.GachaChangeStore : GameChangeStore`와 실행 가능한 같은 메모리 원장의 참조 구현을 제공한다. SQLite·호열의 PR #111 소비 연결은 아직 없으며 #122와 #47에서 이어간다. 기존 GameChange/Settlement·공통 개체와 `rental-contract-v1` 식별값을 유지하고 추가 capability로 지원 범위를 구분한다. 다중 개체 강화·초기화 NEW/EXISTING/UNKNOWN·원래 지급 조회는 #121의 다음 묶음으로 남는다.
+
+| 타입/호출 | 실제 입출력·조건 |
+|---|---|
+| `GachaAuthority` | 저장 측이 소유한 source·contentVersion·ruleVersion·shopLevel·garageCapacity·purchasePrice·pity·guaranteedFrom·현재 해금 차종/양수 가중치 희귀도 집합. 시간/경제 기본값 없음. 두 Set은 생성 시 복사하고 변경 불가로 공개 |
+| `GachaProgress` / `GachaState` | 가챠 상태 revision·카운터·무료권 수와 권위 설정. revision은 전체 원장 버전이 아니다. 설정/상태는 저장 담당이 검증·공급하며 UI 요청의 capacity/count를 현재 진실로 저장하지 않음 |
+| `readGachaState()` | `ContractResult<GachaState>`. 미지원/미공급은 DATA_UNAVAILABLE. fixture의 명시적인 상태 주입은 제품 초기화·무료권 지급이 아님 |
+| `GachaCommand` | requestId·출처·콘텐츠/규칙·예상 가챠 revision·기대 가게 단계/공간·이전 카운터·티켓 종류와 불변 `GachaAward`(새 개체·다음 카운터·보장 여부). 규칙 계산은 기존 Gacha/GachaPull이 담당하고 저장은 재추첨하지 않음 |
+| `commitGacha(command)` | `GachaSettlement(command, settlement, progress)`. 최초 명령에 포함된 추첨·당시 개체/잔액·확정 카운터/무료권을 함께 반환. 호출자가 현재 계획의 draw를 다시 붙이지 않음 |
+
+기존 요청의 종류/전체 입력 대조와 최초 결과 재생을 현재 상태 검사보다 먼저 한다. 같은 ID·다른 카운터/티켓/출처/버전/결과는 STATE_CONFLICT다. 새 요청은 현재 권위 설정·revision·카운터·가게 단계/공간, 실제 OWNED 수·잔액·무료권을 검사한다. 새 개체는 GACHA 취득·1레벨/0%·revision0·OWNED, 취득액은 유료의 권위 가격 또는 무료0이어야 한다. 비활성 희귀도/잠긴 차종·잘못된 보장/다음 카운터·revision 증가 범위 초과는 INVALID_INPUT, 후보 없음은 DATA_UNAVAILABLE, 무료권/잔액 부족은 INSUFFICIENT_FUNDS다. 유료는 금액 차감+Add, 무료는 금액 변경 없이 Add이며 가짜0원 거래를 만들지 않는다.
+
+`InMemoryGameChangeStore`는 기존 잔액·차량·단일 정산을 재사용하고 가챠 전체 결과를 같은 요청 ID에 연결한다. 동일 모니터 안에서 전체 변경을 확정하므로 마지막 칸·마지막 무료권·같은 요청 경쟁은 한 번만 반영된다. legacy와 가챠의 요청 ID 재사용을 양방향 거절한다. **가챠 권위 상태를 명시한 fixture에 한해** 기존 거래에도 source 일치, 기존 Add에도 같은 현재 용량을 적용해 혼합 진입점의 초과를 막는다. 기존 호출자가 가챠 상태를 생략한 경우 옛 단일 거래 동작은 유지되고 새 가챠 호출은 DATA_UNAVAILABLE다. 이 메모리 잠금은 SQLite의 다중 연결 원자성 증거가 아니다.
+
+#111 소비자는 먼저 저장 상태와 실제 사용하는 콘텐츠/규칙의 버전을 대조하고 같은 snapshot의 revision/카운터/가게 조건으로 기존 추첨·계획을 만든다. `GachaTicket`을 공통 `GachaTicketUse`에 대응시키고 plan.vehicle·plan.draw의 다음 카운터/보장 여부를 GachaAward에 넣는다. **보관한 같은 GachaCommand**를 재제출하고, 반환한 command/settlement/progress만 결과로 사용한다. 같은 ID로 현재 상태를 다시 읽어 새 명령/추첨을 만들면 충돌이므로 새 계획으로 재시도를 대체하지 않는다. 실제 소비 코드는 이 변경에서 수정하지 않았다.
+
+#122 인계 조건: 같은 출처 DB의 실제 가게/공간·카운터/무료권·규칙/후보를 거래 안에서 읽고, 설정 변경 시 가게 단계·후보·버전의 일관성을 보장한다. 전체 명령을 안정된 표현으로 저장하고 기존 공용 정산의 ID와 충돌 검사하며, 재화/개체/카운터/무료권/최초 전체 결과를 한 트랜잭션으로 확정한다. 저장한 결과는 성장·처분·설정 변경 후에도 당시 값으로 재생한다. 기존 Add를 포함한 생성 경로의 실제 공간 검사·source 검사도 같은 DB에서 적용한다. 메모리의 구성값을 제품 DB 기본값으로 복제하지 않는다. DB 재개방·두 연결 경쟁·커밋 전 실패·응답 유실·손상 원본 보존을 실제 SQLite에서 검증하기 전 저장 capability가 제공됐다고 표시하지 않는다.
+
+### #121 재료 강화의 독립 타입·순수 검증 준비
+
+가챠 검토용 커밋 `08eb3c4`를 기반으로 별도 브랜치의 `core.contract.MaterialContract` 파일에 다음 타입과 순수 검증을 추가했다. **MaterialChangeStore의 실제 구현은 없다.** 검토 중인 GachaContract·공유 RentalContractFixtures는 변경하지 않았으며, 같은 원장의 참조 구현/원자 경쟁은 미제공이다. 이번 준비 범위 이후 새 공유 구현은 착수하지 않는다. 기능 계산·SQLite·UI를 바꾸지 않았다.
+
+- `MaterialCommand`는 requestId/source/contentVersion/ruleVersion과 이름 있는 `target`·`material`의 기존 `VehicleWrite.Update`, 기본값 없는 `cost: GameMoney`를 보존한다. 역할·ID·revision·성장/lifecycle·비용·버전 모두 전체 입력 동일성에 포함된다. 비용0은 명시적 무과금이며 MoneyChange는 만들지 않는다. 현재 MaterialPlan 소비는 비용0을 명시하고, 양수 금액 시험값을 새 제품 강화 비용으로 채택하지 않는다.
+- `MaterialState`는 저장 측 출처/두 버전·실제 잔액과 역할별 현재 OwnedVehicle/VehicleActivity다. 활동 조회 실패는 state 생성 전에 ContractResult.Failure로 전달하며 IDLE·잔액0으로 보정하지 않는다. `readMaterialState(targetId, materialId)`는 이 상태의 조회 계약이며 아직 실행 구현이 없다.
+- `prepareMaterialChange(command, current)`는 같은 개체 중복·역할 lifecycle·출처/버전·ID/현재 OWNED·양쪽 revision/증가 범위·같은 차종·IDLE·최대 레벨 대상·대상 성장의 단조 증가·재료 성장값 보존·잔액을 검사한다. 예정 두 개체는 권위 개체의 copy로 만들어 희귀도·차종·취득 출처/기준액을 각각 보존하고 revision을 각각1 올린다. 20레벨 재료는 허용한다. 결과 `MaterialPreparedChange`는 예정 snapshot·잔액·양수 비용일 때만 DEBIT를 담으며, 성공은 **저장·예약·경쟁 해결을 뜻하지 않는다.**
+- 이 함수는 100/150/250/400% 성장 산식이나 비용 정책을 재계산/확정하지 않는다. 기존 `VehicleUpgrade.planMaterial → MaterialCommand → prepareMaterialChange` 소비 예제로 연결하며 정확한 성장량은 VehicleCare의 기존 계산 책임이다. 저장 시에는 검증된 규칙/계산 결과와 현재 상태를 같은 확정 경계에서 대조해야 한다.
+- `MaterialSettlement`는 원래 command와 공통 SettlementId·Transaction·잔액·확정 시각, nullable이 아닌 **target/material 두 snapshot**을 보존한다. 후속 decoder는 거래의 requestId/종류/출처/규칙/금액 및 두 역할 ID/revision·결과 연결을 검증한다. 기존 nullable changedVehicle 하나에 두 역할을 숨기지 않는다.
+- `commitMaterial(command)`는 동일 요청/전체 내용의 최초 결과 재생을 현재 검증보다 먼저 하고, 다른 내용/legacy/가챠 ID 재사용은 STATE_CONFLICT여야 한다. 새 명령은 같은 잠금/DB에서 최신 상태를 다시 읽고 두 개체·비용·요청/정산을 전부 확정하거나 전부 거절한다. **이 순서·원자성·저장 실패·재생 실행 검증은 아직 미제공**이며 두 번의 GameChange 커밋으로 우회하지 않는다.
+
+현재 순수 검증 오류는 잘못된 역할/동일 개체/차종/성장·보존/증가 범위·출처가 INVALID_INPUT, 버전/revision/활동 충돌은 STATE_CONFLICT, 대상 누락·처분은 DATA_UNAVAILABLE, 비용 부족은 INSUFFICIENT_FUNDS다. 실제 STORAGE_FAILURE와 현재 상태 변화 후 과거 두 snapshot 재생은 후속 공유 원장/SQLite 구현에서 검증한다. 이 부분 인계로 #121/#122/#48을 완료 처리하지 않는다.

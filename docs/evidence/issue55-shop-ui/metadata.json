@@ -1,0 +1,91 @@
+{
+  "codeHead": "6144ac83fef82dd501d69086e9b752994b9391b4",
+  "testKind": "작성자 격리 Android View 및 네이티브 호스트 표적 시험 · 실제 경제/SDK 입력 아님",
+  "package": "io.drivegrowth.verify55fixedb",
+  "testPackage": "io.drivegrowth.verify55fixedb.test",
+  "testTarget": "io.drivegrowth.verify55fixedb",
+  "appApkSha256": "0120358d3c57a40e0ae9cbd1b0ea93e8940acf1c4450a7a181abf3ce7fe0cc11",
+  "testApkSha256": "c1b3a2d3e2c475ddad5187749132b9d43ab43480972ab6547c9382f4c59022a1",
+  "signerCertificateSha256": "3398b6f1e8a85d4950d221b75ec046770046d8bc2c614ef7af3ebc1bbef856da",
+  "installedApksMatchBuilds": true,
+  "sourceComparison": {
+    "codeHead": "6144ac83fef82dd501d69086e9b752994b9391b4",
+    "comparedTrackedSourceFiles": 116,
+    "changedTrackedSourceFiles": [
+      "app/src/debug/AndroidManifest.xml"
+    ],
+    "addedTemporaryHostFiles": [
+      "app/src/debug/java/io/drivegrowth/app/ui/review/Host55Activity.kt",
+      "app/src/androidTest/java/io/drivegrowth/app/ui/review/Host55DeviceTest.kt"
+    ]
+  },
+  "environment": {
+    "api": 34,
+    "abi": "arm64-v8a",
+    "adbPort": 5038,
+    "serial": "emulator-5556",
+    "user": 10,
+    "bootCount": 23,
+    "physicalSize": "1080x600",
+    "densityDpi": 120,
+    "nativeHostWidthsDp": [
+      320,
+      936
+    ]
+  },
+  "testResult": {
+    "preparedViewTests": 6,
+    "nativeHostTests": 2,
+    "failures": 0,
+    "errors": 0,
+    "durationSeconds": 22.663
+  },
+  "restoration": {
+    "user": true,
+    "boot": true,
+    "size": true,
+    "density": true,
+    "font": true,
+    "night": true,
+    "forward": true,
+    "data": true,
+    "productApk": true,
+    "productPermissions": true,
+    "noActiveInstrumentation": true,
+    "isolatedPackagesRemoved": true,
+    "navigationForeground": true
+  },
+  "productApkSha256Before": "793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9",
+  "productApkSha256After": "793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9",
+  "productFilesBefore": [
+    "15642011a60ce572760c67e84431b28171c80dbc7636603721876723dd164141  databases/game-ledger-simulation.db",
+    "3bbccf6838e7513c635ee3cfa151451d9eea779cc49a2f57b6aabad238c9c9b8  files/simulation.json",
+    "449b6f2bc551fe6737c2873093815ae23d4eb7c0a541338da3ff5278b64c3cb3  files/vehicle.json",
+    "72cd070efdb92ac7970109aa0f72a961ed3d63c3e9423bf7533fb1725bcc0fa1  files/drive80-windows.txt",
+    "75e404b0b2195935740185a769f3fe5adbbdc2e714e213f88bad46e7d4f1f2fd  files/drive80-nmea-listener.txt",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  databases/game-ledger-simulation.db-journal"
+  ],
+  "productFilesAfter": [
+    "15642011a60ce572760c67e84431b28171c80dbc7636603721876723dd164141  databases/game-ledger-simulation.db",
+    "3bbccf6838e7513c635ee3cfa151451d9eea779cc49a2f57b6aabad238c9c9b8  files/simulation.json",
+    "449b6f2bc551fe6737c2873093815ae23d4eb7c0a541338da3ff5278b64c3cb3  files/vehicle.json",
+    "72cd070efdb92ac7970109aa0f72a961ed3d63c3e9423bf7533fb1725bcc0fa1  files/drive80-windows.txt",
+    "75e404b0b2195935740185a769f3fe5adbbdc2e714e213f88bad46e7d4f1f2fd  files/drive80-nmea-listener.txt",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  databases/game-ledger-simulation.db-journal"
+  ],
+  "limitations": [
+    "실제 #44 구매/확장·꾸미기 저장·제품 탐색/gate 미연결",
+    "View 상태 객체 복원이며 Activity Bundle·프로세스 종료 복원 아님",
+    "네이티브 가용936dp에서1000dp분할분기 미실행; 공식 폼팩터/실차 미검증"
+  ],
+  "evidenceSha256": {
+    "device-tests.log": "39e51e1001becbbaeb8f7398a625d5a260e0e72be2139db1aadbde4cd7f6af6e",
+    "latest-after-restore.png": "1e795ca89501f2ae736642752a8c285572ba07cc5394341b0ba854b652f41c08",
+    "alternating-retry.png": "6e8645354eb46138e1155ec8c25d860a4110df921ef2d9f5a2fe1701c243dbb6",
+    "car-wash-320dp.png": "d077327998f7d97a4ccf9fa82e9cf7848728f044379786a07b01cb8046807a31",
+    "car-wash-936dp.png": "7b4ae341a0380e7f8d03ca66b5244a41331ea9d708df8992a6c4f3c28fc7baf2",
+    "request-ids.txt": "29d2e270501a0f07c0ea17908ac500b3aa20aafc4b034d6ba44e6870b19aa12b",
+    "host-layout.txt": "32ed5b26c9e129a0820d0a80b94569ac6a260f2c45c2da318a4c6448949fadc1",
+    "verification-host.patch": "848c35e8ce74a6f0a006b95f1ddbc7d74380e6c920b9bf1bf92bfe24f3290a7e"
+  }
+}
