@@ -1,0 +1,55 @@
+{
+  "source": "독립 검증 A의 before.json/after.json과 REPORT에서 필요한 항목만 발췌. 전체 시스템 dump 제외.",
+  "settingsBefore": {
+    "user": "10",
+    "boot": "23",
+    "size": "Physical size: 1080x600",
+    "density": "Physical density: 120",
+    "font": "null",
+    "night": "Night mode: no",
+    "forward": ""
+  },
+  "settingsAfter": {
+    "user": "10",
+    "boot": "23",
+    "size": "Physical size: 1080x600",
+    "density": "Physical density: 120",
+    "font": "null",
+    "night": "Night mode: no",
+    "forward": ""
+  },
+  "productApkBefore": "793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9",
+  "productApkAfter": "793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9",
+  "filesBefore": {
+    "files/simulation.json": "3bbccf6838e7513c635ee3cfa151451d9eea779cc49a2f57b6aabad238c9c9b8",
+    "files/vehicle.json": "449b6f2bc551fe6737c2873093815ae23d4eb7c0a541338da3ff5278b64c3cb3",
+    "files/drive80-windows.txt": "72cd070efdb92ac7970109aa0f72a961ed3d63c3e9423bf7533fb1725bcc0fa1",
+    "files/drive80-nmea-listener.txt": "75e404b0b2195935740185a769f3fe5adbbdc2e714e213f88bad46e7d4f1f2fd",
+    "databases/game-ledger-simulation.db": "15642011a60ce572760c67e84431b28171c80dbc7636603721876723dd164141",
+    "databases/game-ledger-simulation.db-journal": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "filesAfter": {
+    "files/simulation.json": "3bbccf6838e7513c635ee3cfa151451d9eea779cc49a2f57b6aabad238c9c9b8",
+    "files/vehicle.json": "449b6f2bc551fe6737c2873093815ae23d4eb7c0a541338da3ff5278b64c3cb3",
+    "files/drive80-windows.txt": "72cd070efdb92ac7970109aa0f72a961ed3d63c3e9423bf7533fb1725bcc0fa1",
+    "files/drive80-nmea-listener.txt": "75e404b0b2195935740185a769f3fe5adbbdc2e714e213f88bad46e7d4f1f2fd",
+    "databases/game-ledger-simulation.db": "15642011a60ce572760c67e84431b28171c80dbc7636603721876723dd164141",
+    "databases/game-ledger-simulation.db-journal": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "productPackageDumpIdentical": true,
+  "navigationAfter": true,
+  "isolatedPackagesAfter": "",
+  "reportedRestoration": {
+    "sameProductApk": true,
+    "sameSixFiles": true,
+    "sameProductPermissions": true,
+    "sameUserBootSizeDensityFontNight": true,
+    "forwardEmpty": true,
+    "isolatedPackagesRemoved": true,
+    "activeInstrumentationNone": true,
+    "navigationForeground": true,
+    "released": true,
+    "noAdbAfterRelease": true
+  },
+  "instrumentationCaveat": "snapshot의 dumpsys activity instrumentation은 미지원 오류였다. 활성 시험 없음은 독립 검증 A의 REPORT 판정이며 이 오류 응답을 성공 근거로 쓰지 않는다."
+}

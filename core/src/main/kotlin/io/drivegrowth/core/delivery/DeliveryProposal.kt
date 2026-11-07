@@ -10,6 +10,7 @@ import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.InputSource
 import io.drivegrowth.core.contract.MissingReason
 import io.drivegrowth.core.contract.Observation
+import io.drivegrowth.core.contract.ObservedDistance
 import io.drivegrowth.core.contract.Rarity
 import io.drivegrowth.core.contract.RuleVersion
 import io.drivegrowth.core.contract.VehicleId
@@ -186,6 +187,65 @@ class DeliveryProposal(private val rules: DeliveryRules) {
         )
     }
 
+    /**
+     * 진행 중 목적지를 바꿀 때 보여 줄 변경 목록을 만든다. 하루 목록과 별도이며 저장된 하루 목록을 바꾸지 않는다.
+     *
+     * - 구간은 실제 이동 거리 + 새 목적지까지의 예상 거리로 정한다. 예상 거리는 목록 기준에만 쓰고 기본 주행 수익으로 지급하지 않는다.
+     * - 진행 중인 의뢰와 같은 유형의 의뢰만 만든다. 구매를 수익으로 바꿔 포기하면 취소 수수료를 피할 수 있어 유형 전환을 막는다(#24 제안 단계).
+     * - 구매 후보는 뽑은 희귀도를 1단계 낮추고 가격도 낮춘 희귀도로 계산한다. 일반은 일반으로 둔다(#24 제안 단계).
+     * - 거리를 얻지 못했거나 출처가 의뢰와 다르면 실패한다. 후보가 없으면 빈 목록이며 변경할 수 없다.
+     * - 의뢰 ID는 `change-N`이다. 하루 목록의 `offer-N`과 겹치지 않아, 변경 뒤 완료해도 하루 목록의 다른 자리를 바꾸지 않는다.
+     */
+    fun proposeChange(
+        active: ActiveDelivery,
+        traveled: Observation<ObservedDistance>,
+        remaining: Observation<EstimatedRouteDistance>,
+        destination: DestinationKey,
+        content: GameContentSnapshot,
+        shopLevel: Int,
+        today: LocalDate,
+        random: Random,
+    ): ContractResult<DeliveryChangeOffer> {
+        if (shopLevel < 1) return ContractResult.Failure(ContractError.INVALID_INPUT)
+        val moved = when (traveled) {
+            is Observation.Available -> traveled.value
+            is Observation.Missing -> return ContractResult.Failure(missing(traveled.reason))
+        }
+        val route = when (remaining) {
+            is Observation.Available -> remaining.value
+            is Observation.Missing -> return ContractResult.Failure(missing(remaining.reason))
+        }
+        val source = active.proposed.estimated.source
+        if (moved.source != source || route.source != source) return ContractResult.Failure(ContractError.INVALID_INPUT)
+        if (route.meters == 0L || moved.meters > Long.MAX_VALUE - route.meters) return ContractResult.Failure(ContractError.INVALID_INPUT)
+        val combined = moved.meters + route.meters
+        val bandIndex = rules.bandIndexOf(combined)
+        val band = rules.bands[bandIndex]
+        val unlocked = content.unlockedAt(shopLevel)
+        val offers = ArrayList<DeliveryOffer>()
+        when (active.offer) {
+            is DeliveryOffer.Income -> if (combined >= rules.incomeMinMeters) {
+                for (vehicle in unlocked.shuffled(random).take(rules.incomeOfferCount)) {
+                    offers += incomeOffer(vehicle, band, offers.size, CHANGE_PREFIX)
+                        ?: return ContractResult.Failure(ContractError.INVALID_INPUT)
+                }
+            }
+            is DeliveryOffer.Purchase -> for (vehicle in unlocked.shuffled(random).take(rules.purchaseOfferCount)) {
+                offers += purchaseOffer(vehicle, band, offers.size, random, lowerRarity = true, prefix = CHANGE_PREFIX)
+                    ?: return ContractResult.Failure(ContractError.INVALID_INPUT)
+            }
+        }
+        val list = DeliveryList(
+            bandIndex, source, today, content.catalog.contentVersion, rules.ruleVersion, offers.frozen(), offers.size,
+        )
+        return ContractResult.Success(
+            DeliveryChangeOffer(active.requestId, moved.meters, combined, DeliveryProposed(destination, route, list, list.offers)),
+        )
+    }
+
+    private fun missing(reason: MissingReason) =
+        if (reason == MissingReason.PERMISSION_DENIED) ContractError.PERMISSION_DENIED else ContractError.DATA_UNAVAILABLE
+
     private fun newList(
         bandIndex: Int,
         source: InputSource,
@@ -208,15 +268,28 @@ class DeliveryProposal(private val rules: DeliveryRules) {
         )
     }
 
-    private fun incomeOffer(vehicle: VehicleGameData, band: DeliveryBand, number: Int): DeliveryOffer.Income? {
+    private fun incomeOffer(vehicle: VehicleGameData, band: DeliveryBand, number: Int, prefix: String = OFFER_PREFIX): DeliveryOffer.Income? {
         val reward = rules.incomeReward(vehicle.price, band) ?: return null
-        return DeliveryOffer.Income(DeliveryOfferId("offer-$number"), vehicle.vehicleId, reward)
+        return DeliveryOffer.Income(DeliveryOfferId("$prefix$number"), vehicle.vehicleId, reward)
     }
 
-    private fun purchaseOffer(vehicle: VehicleGameData, band: DeliveryBand, number: Int, random: Random): DeliveryOffer.Purchase? {
-        val rarity = pickRarity(band, random)
+    private fun purchaseOffer(
+        vehicle: VehicleGameData,
+        band: DeliveryBand,
+        number: Int,
+        random: Random,
+        lowerRarity: Boolean = false,
+        prefix: String = OFFER_PREFIX,
+    ): DeliveryOffer.Purchase? {
+        val picked = pickRarity(band, random)
+        val rarity = if (lowerRarity) Rarity.entries[(picked.ordinal - 1).coerceAtLeast(0)] else picked
         val price = rules.purchasePrice(vehicle.price, rarity) ?: return null
-        return DeliveryOffer.Purchase(DeliveryOfferId("offer-$number"), vehicle.vehicleId, rarity, price)
+        return DeliveryOffer.Purchase(DeliveryOfferId("$prefix$number"), vehicle.vehicleId, rarity, price)
+    }
+
+    private companion object {
+        const val OFFER_PREFIX = "offer-"
+        const val CHANGE_PREFIX = "change-"
     }
 
     private fun pickRarity(band: DeliveryBand, random: Random): Rarity {
