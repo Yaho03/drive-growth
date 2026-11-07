@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/private/tmp/results-onboarding-evidence/process-restart.py", line 40, in <module>
+    launch();nodes=wait('isolate-after-process-restart','목록으로');after=database('isolate-db-after-restart')
+                   ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/results-onboarding-evidence/process-restart.py", line 19, in wait
+    if time.monotonic()>end:raise AssertionError(texts(nodes))
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ['뒤로', '가게', '보유 차량', '도감', '미확인 정산', '첫 차량 안내', '드라이브 키우기', '모의 원장 · fixture-content-v0', '잔액 660 · 보유 차량 7대', '새로고침']

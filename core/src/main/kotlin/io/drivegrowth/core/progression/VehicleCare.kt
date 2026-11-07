@@ -1,11 +1,19 @@
 package io.drivegrowth.core.progression
 
+import io.drivegrowth.core.contract.Rarity
+import java.math.BigInteger
+
 // 수치는 PRD "렌터카 영업·차량·시설"의 시험값. 금액은 게임머니 정수, 퍼센트 계산은 내림.
 // ponytail: 반올림 규칙은 PRD 미정이라 내림으로 고정, 산식 확정 시 이 파일만 바꾼다.
 data class VehicleCareRules(
     val maxLevel: Int = 20,
     val levelUpCostPercentPerLevel: Int = 2,
-    val materialLevels: Int = 3,
+    /** 레벨업·수리 비용 배율(%). PRD 2026-11-05: 일반 1.0·고급 1.05·희귀 1.1·전설 1.15. */
+    val costMultiplierPercent: Map<Rarity, Int> =
+        mapOf(Rarity.COMMON to 100, Rarity.ADVANCED to 105, Rarity.RARE to 110, Rarity.LEGEND to 115),
+    /** 재료 희귀도별 레벨 진행량(100 = 1레벨). PRD 2026-11-05: 100·150·250·400. */
+    val materialProgressPercent: Map<Rarity, Int> =
+        mapOf(Rarity.COMMON to 100, Rarity.ADVANCED to 150, Rarity.RARE to 250, Rarity.LEGEND to 400),
     val rentBonusPercentPerLevel: Int = 2,
     val rentPenaltyPercentPerAccident: Int = 3,
     val maxRentPenaltyPercent: Int = 15,
@@ -17,21 +25,38 @@ data class VehicleCareRules(
     val scrapPercent: Int = 20,
 )
 
+data class LevelProgress(val level: Int, val progressPercent: Int)
+
 enum class VehicleActivity { IDLE, RENTED, RETURNING, NEEDS_REPAIR }
 enum class VehicleAction { LEVEL_UP, USE_MATERIAL, SELL, SCRAP, REPAIR }
 
 class VehicleCare(private val rules: VehicleCareRules = VehicleCareRules()) {
-    fun levelUpCost(price: Long, level: Int): Long {
+    /** 차종 가격 × 2% × 현재 레벨 × 희귀도 비용 배율. 한 번만 내림한다. */
+    fun levelUpCost(price: Long, level: Int, rarity: Rarity): Long {
         requireLevel(level)
         require(level < rules.maxLevel) { "최대 레벨은 레벨업할 수 없다" }
-        return percentOf(price, rules.levelUpCostPercentPerLevel.toLong() * level)
+        require(price >= 0) { "금액은 0 이상" }
+        val percentTimes100 = rules.levelUpCostPercentPerLevel.toLong() * level * rules.costMultiplierPercent.getValue(rarity)
+        // 중간 곱이 Long을 넘어도 최종 비용이 Long 안이면 계산한다. 최종값이 넘으면 ArithmeticException.
+        return BigInteger.valueOf(price).multiply(BigInteger.valueOf(percentTimes100))
+            .divide(BigInteger.valueOf(10_000)).longValueExact()
     }
 
-    // 최대 레벨을 넘는 레벨은 버린다. 이미 최대 레벨이면 재료를 쓸 수 없다.
-    fun levelAfterMaterial(level: Int): Int {
-        requireLevel(level)
-        require(level < rules.maxLevel) { "최대 레벨 차량에는 재료를 쓸 수 없다" }
-        return minOf(level + rules.materialLevels, rules.maxLevel)
+    /** 게임머니 레벨업은 한 레벨 올리고 진행량은 유지한다. 최대 레벨이 되면 진행량은 0. */
+    fun afterLevelUp(current: LevelProgress): LevelProgress {
+        requireProgress(current)
+        require(current.level < rules.maxLevel) { "최대 레벨은 레벨업할 수 없다" }
+        val level = current.level + 1
+        return LevelProgress(level, if (level == rules.maxLevel) 0 else current.progressPercent)
+    }
+
+    /** 재료 희귀도만큼 진행량을 채우고 남는 진행량은 다음 레벨로 넘긴다. 최대 레벨을 넘는 진행량은 버린다. */
+    fun afterMaterial(current: LevelProgress, materialRarity: Rarity): LevelProgress {
+        requireProgress(current)
+        require(current.level < rules.maxLevel) { "최대 레벨 차량에는 재료를 쓸 수 없다" }
+        val total = current.level * 100 + current.progressPercent + rules.materialProgressPercent.getValue(materialRarity)
+        val level = minOf(total / 100, rules.maxLevel)
+        return LevelProgress(level, if (level == rules.maxLevel) 0 else total % 100)
     }
 
     // B(영업)가 기본 대여료에 곱하는 배율(%). 레벨 1이 기준 100.
@@ -61,6 +86,10 @@ class VehicleCare(private val rules: VehicleCareRules = VehicleCareRules()) {
     }
 
     private fun requireLevel(level: Int) = require(level in 1..rules.maxLevel) { "레벨은 1..${rules.maxLevel}" }
+    private fun requireProgress(p: LevelProgress) {
+        requireLevel(p.level)
+        require(p.progressPercent in 0..99) { "진행량은 0..99" }
+    }
     private fun Int.nonNegative(): Int = also { require(it >= 0) { "사고 횟수는 0 이상" } }
     private fun percentOf(amount: Long, percent: Long): Long {
         require(amount >= 0) { "금액은 0 이상" }

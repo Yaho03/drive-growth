@@ -1,0 +1,4 @@
+--------- beginning of main
+11-07 03:52:52.233 16038 16038 I Shop55RestoreC: PASS firstRestore loading=true staleSubmit=0 oldBalanceHidden=true
+11-07 03:52:53.582 16320 16320 I Shop55RestoreC: PASS firstRestore loading=true staleSubmit=0 oldBalanceHidden=true
+11-07 03:52:53.616 16320 16320 I Shop55RestoreC: PASS latestRevision=5 latestBalance=900

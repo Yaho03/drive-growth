@@ -11,14 +11,16 @@ import io.drivegrowth.core.contract.VehicleDefinition
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.progression.GachaRules
 import io.drivegrowth.core.contract.Rarity
+import java.math.BigInteger
 import java.util.Collections
 import java.util.EnumMap
 
 // 차량 사실(vehicles.csv)과 별도로 관리하는 게임용 값. 실제 판매가·실차 능력치가 아니다.
+// 희귀도는 차종이 아니라 보유 개체(OwnedVehicle)가 가진다(PRD 2026-11-05).
 data class VehicleGameData(
     val vehicleId: VehicleId,
+    /** 차종 가격 = price_unit × 가격 비율. 레벨업·수리 비용과 「가장 비싼 차」의 기준. */
     val price: GameMoney,
-    val rarity: Rarity,
     val unlockShopLevel: Int,
 )
 
@@ -30,7 +32,7 @@ data class GameContentSnapshot(
     val vehicles: List<VehicleGameData>,
     val gacha: GachaRules,
 ) {
-    /** 가게 레벨에서 해금된 차량. 희귀도별 후보 구성과 보장 회차 거절은 #47에서 처리한다. */
+    /** 가게 레벨에서 해금된 차종. 가챠는 희귀도를 먼저 뽑고 이 중 하나를 고른다(#47). */
     fun unlockedAt(shopLevel: Int): List<VehicleGameData> = vehicles.filter { it.unlockShopLevel <= shopLevel }
 }
 
@@ -58,16 +60,18 @@ sealed interface ContentLoad {
  * # content_version=...
  * # rule_version=...
  * # trial=true
+ * # price_unit=8000        (가격 비율 100%의 금액. 수익 단위(#44)가 정해지면 이 값만 바꾼다)
  * # gacha_weights=COMMON:747,ADVANCED:200,RARE:50,LEGEND:3   (천분율, 합 1000)
  * # gacha_pity=30
  * # gacha_guaranteed_from=RARE
- * vehicle_id,game_price,rarity,unlock_shop_level
- * hyundai_casper,8000,COMMON,1
+ * vehicle_id,price_ratio_percent,unlock_shop_level
+ * hyundai_casper,100,1      (가격 비율 1.0 = 100)
  * ```
  */
 object GameContentLoader {
-    private const val CONTENT_HEADER = "vehicle_id,game_price,rarity,unlock_shop_level"
-    private val META_KEYS = setOf("content_version", "rule_version", "trial", "gacha_weights", "gacha_pity", "gacha_guaranteed_from")
+    private val HUNDRED = BigInteger.valueOf(100)
+    private const val CONTENT_HEADER = "vehicle_id,price_ratio_percent,unlock_shop_level"
+    private val META_KEYS = setOf("content_version", "rule_version", "trial", "price_unit", "gacha_weights", "gacha_pity", "gacha_guaranteed_from")
 
     fun load(factsCsv: String, contentText: String): ContentLoad = try {
         ContentLoad.Loaded(parse(readFacts(factsCsv), contentText))
@@ -105,18 +109,24 @@ object GameContentLoader {
         }
         require(meta.keys == META_KEYS) { "누락된 메타 키: ${META_KEYS - meta.keys}" }
 
+        val priceUnit = meta.getValue("price_unit").toLong()
+        require(priceUnit > 0) { "price_unit은 양수" }
         val body = lines.dropWhile { it.startsWith("#") }
         require(body.firstOrNull() == CONTENT_HEADER) { "콘텐츠 열 머리는 $CONTENT_HEADER" }
         val vehicles = body.drop(1).map { line ->
             val cols = line.split(',')
-            require(cols.size == 4) { "콘텐츠 열 개수 불일치: $line" }
+            require(cols.size == 3) { "콘텐츠 열 개수 불일치: $line" }
             val id = VehicleId(cols[0])
             require(id in facts) { "사실 CSV에 없는 vehicle_id: ${id.value}" }
-            val price = cols[1].toLong()
-            require(price > 0) { "게임 가격은 양수: ${id.value}" }
-            val level = cols[3].toInt()
+            val ratio = cols[1].toInt()
+            require(ratio > 0) { "가격 비율은 양수: ${id.value}" }
+            val level = cols[2].toInt()
             require(level >= 1) { "해금 가게 레벨은 1 이상: ${id.value}" }
-            VehicleGameData(id, GameMoney(price), Rarity.valueOf(cols[2]), level)
+            // 내림은 마지막에 한 번. 중간 곱이 Long을 넘어도 최종값이 표현 가능하면 계산한다.
+            val price = BigInteger.valueOf(priceUnit).multiply(BigInteger.valueOf(ratio.toLong())).divide(HUNDRED)
+            require(price.bitLength() < Long.SIZE_BITS) { "차종 가격이 지원 범위(Long)를 넘음: ${id.value}" }
+            require(price.signum() > 0) { "차종 가격은 1 이상(단위×비율 내림 결과): ${id.value}" }
+            VehicleGameData(id, GameMoney(price.toLong()), level)
         }
         require(vehicles.isNotEmpty()) { "콘텐츠 차량이 없음" }
         require(vehicles.map { it.vehicleId }.toSet().size == vehicles.size) { "콘텐츠 중복 vehicle_id" }
@@ -124,13 +134,9 @@ object GameContentLoader {
         val gacha = GachaRules(parseWeights(meta.getValue("gacha_weights")), meta.getValue("gacha_pity").toInt(),
             Rarity.valueOf(meta.getValue("gacha_guaranteed_from")))
         // PRD: 보장은 희귀 이상. 기준을 그 아래로 내리는 콘텐츠는 거절한다.
+        // 모든 차종이 모든 희귀도로 나오므로 보장 후보는 "해금 차종 1종 이상"이면 되고, 이는 차량이 하나라도
+        // 있으면 첫 해금 레벨부터 성립한다. 보장 희귀도의 가중치 > 0은 GachaRules가 검사한다.
         require(gacha.guaranteedFrom >= Rarity.RARE) { "보장 희귀도는 RARE 이상" }
-        // 가챠가 열리는 첫 레벨부터 실제로 뽑힐 수 있는(가중치 > 0) 보장 대상 차량이 있어야
-        // 이후 모든 레벨에서도 있다(해금은 줄지 않음).
-        val firstLevel = vehicles.minOf { it.unlockShopLevel }
-        require(vehicles.any {
-            it.unlockShopLevel == firstLevel && it.rarity >= gacha.guaranteedFrom && (gacha.weights[it.rarity] ?: 0) > 0
-        }) { "가게 레벨 $firstLevel 에 해금되고 가중치가 양수인 ${gacha.guaranteedFrom} 이상 차량이 없음" }
 
         return GameContentSnapshot(
             catalog = VehicleCatalogSnapshot(

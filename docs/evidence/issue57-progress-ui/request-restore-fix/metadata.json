@@ -1,0 +1,12 @@
+{
+  "source_head": "0930bd3e39a5d1aca3e63f1b4556408b93fd4553",
+  "package": "io.drivegrowth.app.progress57",
+  "test_target": "io.drivegrowth.app.progress57",
+  "app_sha256": "9f18ad1a9fcff0183b51fd6b194e0f8fce502a9f4e4213b1a691f4f775c698bb",
+  "test_apk_sha256": "130774e9ae2b0b7763ac9817f6b0d316ef821c19ef7c3270d5698b5b5116a1aa",
+  "targeted_device_tests": 1,
+  "seconds": 0.189,
+  "scenario": "claim -> restore pre-claim UI -> original Pending/request retained; different restored Pending enters query recovery; Activity Bundle retains two refs/two request keys; no new claim",
+  "scope": "fixed-input isolated Android View/temporary Activity; no actual reward/DB/SDK recovery",
+  "cleanup": "own two packages removed; product APK and six file hashes unchanged; user10/1080x600/120dpi/fontScale=null; original navigation resumed; no instrumentation/forward; original AVD/ADB5038 retained"
+}

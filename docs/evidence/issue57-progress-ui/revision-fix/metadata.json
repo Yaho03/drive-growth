@@ -1,0 +1,12 @@
+{
+  "source_head": "4ad549dbbda615928d91dfd1b1d417422b0e628d",
+  "package": "io.drivegrowth.app.progress57",
+  "test_target": "io.drivegrowth.app.progress57",
+  "app_sha256": "edc80b33f05913a7fc6ebdf686f94f956ef478be210ec0bce3dd5a8cacfe49f9",
+  "test_apk_sha256": "ba91b66d0e41df15ab59fff3fd8bf239826861016f4f02dd74558276b9b89469",
+  "targeted_device_tests": 1,
+  "seconds": 0.119,
+  "scenario": "revision5 CLAIMED -> removed -> Activity recreate/Bundle restore -> revision1 CLAIMABLE rejected; max=5",
+  "scope": "isolated fixed-input Android View and temporary Activity serialization; no actual reward/DB/SDK evidence",
+  "cleanup": "own two packages removed; product APK and six file hashes unchanged; user10/1080x600/120dpi/fontScale=null; original navigation resumed; no instrumentation/forward; original AVD/ADB5038 retained"
+}

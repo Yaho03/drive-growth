@@ -6,39 +6,58 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.widget.Button
+import android.view.View
+import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
-import io.drivegrowth.app.data.AssetGameContent
-import io.drivegrowth.app.data.SqliteGameChangeStore
+import io.drivegrowth.app.host.GarageHostMapper
+import io.drivegrowth.app.host.HostNavigation
+import io.drivegrowth.app.host.HostPage
+import io.drivegrowth.app.host.HostQueryController
+import io.drivegrowth.app.host.HostQueryState
+import io.drivegrowth.app.host.HostSession
+import io.drivegrowth.app.host.ResultsHostMapper
+import io.drivegrowth.app.host.ResultsStateBundle
+import io.drivegrowth.app.ui.results.ResultsEvent
+import io.drivegrowth.app.ui.results.ResultsView
+import io.drivegrowth.app.ui.onboarding.OnboardingEvent
+import io.drivegrowth.app.ui.onboarding.OnboardingScreenState
+import io.drivegrowth.app.ui.onboarding.OnboardingView
+import io.drivegrowth.app.ui.garage.CollectionScreenState
+import io.drivegrowth.app.ui.garage.CollectionView
+import io.drivegrowth.app.ui.garage.GarageEvent
+import io.drivegrowth.app.ui.garage.GarageScreenState
+import io.drivegrowth.app.ui.garage.GarageStyle
+import io.drivegrowth.app.ui.garage.GarageView
 import io.drivegrowth.app.vehicle.ForegroundInteraction
 import io.drivegrowth.app.vehicle.VehicleInput
-import io.drivegrowth.core.content.ContentLoad
-import io.drivegrowth.core.content.GameContentSnapshot
+import io.drivegrowth.core.contract.ContractError
 import io.drivegrowth.core.contract.ContractResult
-import io.drivegrowth.core.contract.InputSource
+import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.contract.Observation
+import io.drivegrowth.core.contract.OwnedVehicleId
+import io.drivegrowth.core.contract.Revision
 import io.drivegrowth.core.contract.VehicleInteraction
-import java.util.concurrent.Executors
+import io.drivegrowth.core.progression.VehicleAction
 
 class MainActivity : Activity() {
-    private enum class Page { HOME, GARAGE, RESULTS }
-    private sealed interface Screen {
-        data object Restricted : Screen
-        data object Loading : Screen
-        data object RecoverableError : Screen
-        data class Content(val snapshot: GameContentSnapshot, val balance: Long,
-            val vehicles: List<String>, val results: List<String>) : Screen
-    }
-
     private val handler = Handler(Looper.getMainLooper())
-    private val worker = Executors.newSingleThreadExecutor()
     private val interaction = ForegroundInteraction()
     private var input: VehicleInput? = null
-    private var page = Page.HOME
-    private var screen: Screen = Screen.Restricted
-    private var generation = 0
+    private var navigation = HostNavigation()
+    private var screen: HostQueryState = HostQueryState.Restricted
+    private val mapper = GarageHostMapper()
+    private val resultsMapper = ResultsHostMapper()
+    private lateinit var results: ResultsView
+    private lateinit var onboarding: OnboardingView
+    private var pendingOnboardingId: VehicleId? = null
+    private lateinit var queries: HostQueryController
+    private lateinit var session: HostSession
+    private lateinit var style: GarageStyle
+    private lateinit var garage: GarageView
+    private lateinit var collection: CollectionView
+    private lateinit var body: FrameLayout
+    private lateinit var chrome: LinearLayout
     private var active = false
     private lateinit var panel: LinearLayout
     private val watchdog = object : Runnable {
@@ -51,14 +70,33 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        page = Page.entries.firstOrNull { it.name == savedInstanceState?.getString("page") } ?: Page.HOME
-        panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            val padding = (16 * resources.displayMetrics.density).toInt()
-            setPadding(padding, padding, padding, padding)
+        navigation = restoreNavigation(savedInstanceState)
+        style = GarageStyle(this)
+        garage = GarageView(this, ::onGarageEvent).also { it.restoreSelection(navigation.selectedVehicleId) }
+        collection = CollectionView(this, ::refresh)
+        results = ResultsView(this, ::onResultsEvent)
+        onboarding = OnboardingView(this, ::onOnboardingEvent)
+        onboarding.restoreSelection(savedInstanceState?.getString("onboardingSelection")?.let(::VehicleId))
+        pendingOnboardingId = savedInstanceState?.getString("onboardingPending")?.let(::VehicleId)
+        val deliveryHandler = handler
+        session = lastNonConfigurationInstance as? HostSession ?: HostSession(applicationContext, { deliveryHandler.post(it) },
+            ResultsStateBundle.decode(savedInstanceState?.getBundle("results")))
+        results.restoreUiState(session.results.uiState)
+        queries = session.queries
+        panel = style.column().apply { setBackgroundColor(style.base) }
+        chrome = style.column().apply { setPadding(style.dp(16), 0, style.dp(16), 0) }
+        body = FrameLayout(this)
+        panel.addView(chrome)
+        panel.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
+        setContentView(panel)
+        queries.attach {
+            screen = it
+            render()
+            if (it is HostQueryState.Content || it is HostQueryState.Failure) {
+                session.results.completeQuery()
+                results.completeRetry()
+            }
         }
-        setContentView(ScrollView(this).apply { addView(panel) })
-        render()
         if (savedInstanceState == null) {
             val permissions = arrayOf("android.car.permission.CAR_SPEED", "android.car.permission.CAR_POWERTRAIN")
                 .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
@@ -81,6 +119,11 @@ class MainActivity : Activity() {
         setVisible(true)
         if (active) return
         active = true
+        if (results.uiState != session.results.uiState) results.restoreUiState(session.results.uiState)
+        session.results.attach { id, result ->
+            updateAccess()
+            results.completeMarkViewed(id, result)
+        }
         try {
             input = VehicleInput(this, { if (active) { interaction.accept(it); updateAccess() } }, {}).also { it.start() }
         } catch (_: LinkageError) {
@@ -95,6 +138,8 @@ class MainActivity : Activity() {
     }
 
     private fun stopObserving() {
+        session.results.remember(results.uiState)
+        session.results.detach()
         active = false
         handler.removeCallbacks(watchdog)
         interaction.reset()
@@ -104,12 +149,26 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        worker.shutdownNow()
+        queries.detach()
+        session.results.detach()
+        if (!isChangingConfigurations) session.release()
         super.onDestroy()
     }
 
+    override fun onRetainNonConfigurationInstance(): Any = session
+
     override fun onSaveInstanceState(outState: Bundle) {
-        outState.putString("page", page.name)
+        session.results.remember(results.uiState)
+        outState.putBundle("results", ResultsStateBundle.encode(session.results.uiState))
+        outState.putString("onboardingSelection", onboarding.selectedVehicleId?.value)
+        outState.putString("onboardingPending", (onboarding.pendingVehicleId ?: pendingOnboardingId)?.value)
+        outState.putString("page", navigation.page.name)
+        outState.putString("selectedVehicle", navigation.selectedVehicleId?.value)
+        navigation.pendingGarageRequest?.let {
+            outState.putString("pendingVehicle", it.id.value)
+            outState.putInt("pendingRevision", it.revision.value)
+            outState.putString("pendingAction", it.action.name)
+        }
         super.onSaveInstanceState(outState)
     }
 
@@ -117,100 +176,171 @@ class MainActivity : Activity() {
         interaction.state(SystemClock.elapsedRealtime()) == Observation.Available(VehicleInteraction.ALLOWED)
 
     private fun updateAccess() {
-        if (!allowed()) {
-            if (screen != Screen.Restricted) {
-                generation++
-                show(Screen.Restricted)
-            }
-        } else if (screen == Screen.Restricted) {
-            refresh()
-        }
+        queries.setControlsEnabled(allowed())
     }
 
     private fun refresh() {
-        if (!allowed() || screen == Screen.Loading) return
-        val request = ++generation
-        show(Screen.Loading)
-        worker.execute {
-            val result = readContent()
-            handler.post {
-                if (request == generation && allowed()) show(result)
-            }
-        }
-    }
-
-    private fun readContent(): Screen {
-        val snapshot = (AssetGameContent(assets).load() as? ContentLoad.Loaded)?.snapshot
-            ?: return Screen.RecoverableError
-        return SqliteGameChangeStore(applicationContext, InputSource.SIMULATION).use { store ->
-            val balance = (store.balance() as? ContractResult.Success)?.value ?: return Screen.RecoverableError
-            val owned = (store.listOwnedVehicles() as? ContractResult.Success)?.value ?: return Screen.RecoverableError
-            val settlements = (store.listUnviewedSettlements() as? ContractResult.Success)?.value
-                ?: return Screen.RecoverableError
-            val names = snapshot.catalog.vehicles.associate { it.vehicleId to it.displayName }
-            Screen.Content(snapshot, balance.units, owned.map { names[it.vehicleId] ?: it.vehicleId.value },
-                settlements.map { "정산 ${it.settlementId.value} · 잔액 ${it.balance.units}" })
-        }
-    }
-
-    private fun show(value: Screen) {
-        screen = value
-        render()
+        if (allowed() && screen != HostQueryState.Loading) queries.refresh() else updateAccess()
     }
 
     private fun render() {
-        panel.removeAllViews()
-        when (val current = screen) {
-            Screen.Restricted -> text("주차 후 조작이 허용되면 이용할 수 있습니다.")
-            Screen.Loading -> text("콘텐츠를 불러오는 중입니다.")
-            Screen.RecoverableError -> {
-                text("콘텐츠 또는 저장 데이터를 읽지 못했습니다.")
-                button("다시 시도", ::refresh)
-            }
-            is Screen.Content -> {
-                text("드라이브 키우기", 24f)
-                text("모의 원장 · ${if (current.snapshot.trial) "시험용 콘텐츠" else "게임 콘텐츠"} · ${current.snapshot.catalog.contentVersion.value}")
-                button("가게") { select(Page.HOME) }
-                button("보유 차량") { select(Page.GARAGE) }
-                button("미확인 정산") { select(Page.RESULTS) }
-                when (page) {
-                    Page.HOME -> text("잔액 ${current.balance} · 보유 차량 ${current.vehicles.size}대")
-                    Page.GARAGE -> rows(current.vehicles, "보유 차량이 없습니다.")
-                    Page.RESULTS -> rows(current.results, "미확인 정산이 없습니다.")
+        val enabled = allowed()
+        val garageState = when (val current = screen) {
+            is HostQueryState.Content -> mapper.garage(current.snapshot)
+            is HostQueryState.Failure -> GarageScreenState.Error("조회 실패 (${current.error})")
+            else -> GarageScreenState.Loading
+        }
+        val collectionState = when (val current = screen) {
+            is HostQueryState.Content -> mapper.collection(current.snapshot, current.snapshot.collectionHistory)
+            is HostQueryState.Failure -> CollectionScreenState.Error("조회 실패 (${current.error})")
+            else -> CollectionScreenState.Loading
+        }
+        garage.render(garageState, enabled)
+        collection.render(collectionState, enabled)
+        results.render(resultsMapper.map(screen), enabled)
+        onboarding.render(unavailableOnboarding(), enabled)
+        chrome.removeAllViews()
+        if (!enabled) {
+            showBody(style.text("주차 후 조작이 허용되면 이용할 수 있습니다."))
+            return
+        }
+        val links = style.row()
+        links.addView(style.button("뒤로") { onBackPressed() })
+        listOf(HostPage.HOME to "가게", HostPage.GARAGE to "보유 차량", HostPage.COLLECTION to "도감",
+            HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내").forEach { (page, label) ->
+            links.addView(style.button(label, primary = navigation.page == page) { select(page) })
+        }
+        chrome.addView(HorizontalScrollView(this).apply { addView(links) })
+        navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE }?.let {
+            chrome.addView(style.text("관리 명령이 연결되지 않아 실행할 수 없어요. 이 요청은 실행되지 않았어요."))
+            chrome.addView(style.button("준비 요청 닫기") { cancelPreparation() })
+        }
+        when (navigation.page) {
+            HostPage.GARAGE -> showBody(garage)
+            HostPage.COLLECTION -> showBody(collection)
+            HostPage.RESULTS -> showBody(results)
+            HostPage.ONBOARDING -> showBody(onboarding)
+            else -> {
+                val page = style.column().apply { setPadding(style.dp(24), style.dp(16), style.dp(24), style.dp(16)) }
+                when (val current = screen) {
+                    HostQueryState.Restricted -> page.addView(style.text("주차 후 조작이 허용되면 이용할 수 있습니다."))
+                    HostQueryState.Loading -> page.addView(style.text("콘텐츠를 불러오는 중입니다."))
+                    is HostQueryState.Failure -> {
+                        page.addView(style.text("콘텐츠 또는 저장 데이터를 읽지 못했습니다. (${current.error})"))
+                        page.addView(style.button("다시 시도", onClick = ::refresh))
+                    }
+                    is HostQueryState.Content -> {
+                        val data = current.snapshot
+                        when (navigation.page) {
+                            HostPage.HOME -> {
+                                page.addView(style.text("드라이브 키우기", 32, bold = true))
+                                page.addView(style.text("모의 원장 · ${data.content.catalog.contentVersion.value}"))
+                                page.addView(style.text("잔액 ${data.balance.units} · 보유 차량 ${data.ownedVehicles.size}대"))
+                            }
+                            else -> Unit
+                        }
+                        page.addView(style.button("새로고침", onClick = ::refresh))
+                    }
                 }
-                button("새로고침", ::refresh)
+                showBody(style.scroll(page))
             }
         }
     }
 
-    private fun rows(values: List<String>, empty: String) {
-        if (values.isEmpty()) text(empty) else values.forEach { text(it) }
+    private fun showBody(view: View) {
+        if (body.childCount == 1 && body.getChildAt(0) === view) return
+        body.removeAllViews()
+        body.addView(view, FrameLayout.LayoutParams(-1, -1))
     }
 
-    private fun text(value: String, size: Float = 18f) {
-        panel.addView(TextView(this).apply { text = value; textSize = size })
-    }
-
-    private fun button(label: String, action: () -> Unit) {
-        panel.addView(Button(this).apply {
-            text = label
-            setOnClickListener { if (allowed()) action() else updateAccess() }
-        })
-    }
-
-    private fun select(value: Page) {
-        page = value
+    private fun select(page: HostPage) {
+        if (!allowed()) { updateAccess(); return }
+        navigation.page = page
         render()
+    }
+
+    private fun onResultsEvent(event: ResultsEvent) {
+        if (!allowed()) {
+            updateAccess()
+            // View가 callback 전에 만든 Pending은 실제 제출 상태로 되돌린다.
+            results.restoreUiState(session.results.uiState)
+            return
+        }
+        session.results.remember(results.uiState)
+        when (event) {
+            is ResultsEvent.SelectResult, ResultsEvent.CloseDetail -> Unit
+            ResultsEvent.Retry -> refresh()
+            is ResultsEvent.MarkViewed -> {
+                val snapshot = (screen as? HostQueryState.Content)?.snapshot
+                if (!session.results.markViewed(event.id, snapshot, allowed())) {
+                    results.completeMarkViewed(event.id, ContractResult.Failure(ContractError.STATE_CONFLICT))
+                }
+            }
+        }
+    }
+
+    private fun unavailableOnboarding() = OnboardingScreenState.Unavailable(
+        if (pendingOnboardingId != null) "이전 요청의 지급 상태를 확인할 수 없어요. 초기 지급 조회가 아직 연결되지 않았어요."
+        else "초기 지급 이력 조회가 연결되지 않아 신규 프로필 여부를 확인할 수 없어요",
+    )
+
+    private fun onOnboardingEvent(event: OnboardingEvent) {
+        if (!allowed()) { updateAccess(); return }
+        when (event) {
+            OnboardingEvent.GoToShop, OnboardingEvent.Previous -> select(HostPage.HOME)
+            else -> Unit // 초기 지급 계약 미지원에서는 선택·확정·재시도를 실행하지 않는다.
+        }
+    }
+
+    private fun onGarageEvent(event: GarageEvent) {
+        if (!allowed()) { updateAccess(); return }
+        when (event) {
+            is GarageEvent.SelectVehicle -> navigation.selectedVehicleId = event.id
+            GarageEvent.CloseDetail -> navigation.selectedVehicleId = null
+            GarageEvent.Retry -> refresh()
+            is GarageEvent.RequestAction -> {
+                val current = (screen as? HostQueryState.Content)?.snapshot?.ownedVehicles
+                    ?.find { it.ownedVehicleId == event.id && it.revision == event.revision }
+                if (current == null || navigation.pendingGarageRequest != null) {
+                    garage.completeRequest()
+                    return
+                }
+                navigation.pendingGarageRequest = event
+                render()
+            }
+        }
+    }
+
+    private fun cancelPreparation() {
+        if (!allowed()) { updateAccess(); return }
+        navigation.pendingGarageRequest = null
+        garage.completeRequest()
+        render()
+    }
+
+    private fun restoreNavigation(saved: Bundle?): HostNavigation {
+        val page = HostPage.entries.firstOrNull { it.name == saved?.getString("page") } ?: HostPage.HOME
+        val selected = saved?.getString("selectedVehicle")?.takeIf { it.isNotBlank() }?.let(::OwnedVehicleId)
+        val id = saved?.getString("pendingVehicle")?.takeIf { it.isNotBlank() }?.let(::OwnedVehicleId)
+        val action = VehicleAction.entries.firstOrNull { it.name == saved?.getString("pendingAction") }
+        val revision = saved?.getInt("pendingRevision", -1) ?: -1
+        val pending = if (id != null && action != null && revision >= 0)
+            GarageEvent.RequestAction(id, Revision(revision), action) else null
+        return HostNavigation(page, selected, pending)
     }
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        if (allowed() && screen is Screen.Content && page != Page.HOME) select(Page.HOME)
-        else {
-            // 다중 창에서 Task를 뒤로 보내도 RESUMED·표시가 유지되는 경우를 함께 처리한다.
-            stopObserving()
-            setVisible(false)
-            moveTaskToBack(true)
+        if (allowed()) {
+            if (navigation.pendingGarageRequest != null) { cancelPreparation(); return }
+            if (navigation.page == HostPage.GARAGE && garage.closeDetail()) return
+            if (navigation.page == HostPage.RESULTS && results.closeDetail()) return
+            if (navigation.page == HostPage.ONBOARDING && onboarding.handleBack()) return
+            if (!navigation.back()) { render(); return }
         }
+        // 다중 창에서 Task를 뒤로 보내도 RESUMED·표시가 유지되는 경우를 함께 처리한다.
+        stopObserving()
+        setVisible(false)
+        moveTaskToBack(true)
     }
 }
