@@ -230,12 +230,12 @@ class DeliveryChangeLedgerTest : InstrumentationTestCase() {
         })
     })
 
-    private fun assertStorageFailureKeepsRows(vararg calls: () -> ContractResult<*>) {
+    private fun assertStorageFailureKeepsRows(vararg calls: () -> ContractResult<*>, label: String = "") {
         val before = dump()
-        calls.forEach { assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), it()) }
+        calls.forEach { assertEquals(label, ContractResult.Failure(ContractError.STORAGE_FAILURE), it()) }
         reopen()
-        calls.forEach { assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), it()) }
-        assertEquals(before, dump())
+        calls.forEach { assertEquals(label, ContractResult.Failure(ContractError.STORAGE_FAILURE), it()) }
+        assertEquals(label, before, dump())
     }
 
     /** 처음 순회와 그 뒤 순회 결과가 다른 목록. 입력을 한 번만 읽는지 확인한다. */
@@ -285,11 +285,13 @@ class DeliveryChangeLedgerTest : InstrumentationTestCase() {
             "UPDATE delivery_changes SET active = '$cheaperActive'",
             "UPDATE delivery_changes SET command = replace(command, '\"fee\":10', '\"fee\":\"10\"')",
             "UPDATE settlements SET result = replace(result, '\"amount\":500', '\"amount\":400') WHERE request_id = 'delivery/r1/change'",
-            "UPDATE settlements SET result = replace(result, '\"request\":\"delivery/r1/change\"', '\"request\":\"other\"') WHERE request_id = 'delivery/r1/change'",
+            "UPDATE settlements SET result = replace(result, '\"request\":\"delivery\\/r1\\/change\"', '\"request\":\"other\"') WHERE request_id = 'delivery/r1/change'",
             "DELETE FROM settlements WHERE request_id = 'delivery/r1/change'",
         )) {
+            val clean = dump()
             sql("PRAGMA ignore_check_constraints = ON", corruption, "PRAGMA ignore_check_constraints = OFF")
-            assertStorageFailureKeepsRows(*calls)
+            assertTrue("손상이 들어가지 않음: $corruption", dump() != clean)
+            assertStorageFailureKeepsRows(*calls, label = corruption)
             sql("DELETE FROM delivery_changes", "INSERT INTO delivery_changes SELECT * FROM backup",
                 "DELETE FROM settlements WHERE request_id = 'delivery/r1/change'", "INSERT INTO settlements SELECT * FROM settle_backup")
         }
@@ -390,6 +392,6 @@ class DeliveryChangeLedgerTest : InstrumentationTestCase() {
             } finally { pool.shutdownNow(); other.close() }
         }
         val cars = owned().size
-        assertEquals(30_000 - 3_000 * 3 + 2_700 * (3 - cars), balance())
+        assertEquals((30_000 - 3_000 * 3 + 2_700 * (3 - cars)).toLong(), balance())
     }
 }
