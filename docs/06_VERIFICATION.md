@@ -610,3 +610,26 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w \
 - 신호·권한·창·야간 설정은 이 추가 시험에서 변경하지 않았다. worker 재개·디버거 분리·포워딩 제거 후 제품 시험 프로세스와 이번 AVD만 종료했고 기존 ADB5038 서버를 유지했다. 데이터 삭제·초기화는 하지 않았다.
 
 이번 입력·수명주기 변경에서 차단 결함은 발견되지 않았다. PR 검토·사용자 머지 지시와 최종 원격 커밋/CI는 PR #105에서 관리하며 AI 검토를 사람 승인으로 표시하지 않는다. 위 SDK 내부 잠금·실제 서비스 장애 주입·센서 시각·공식 폼 팩터·실차 한계는 유지한다. 실제 명령 중복·저장 성공 경계, #103 표시 UI의 제품 탐색 연결과 후속 기능 통합은 #51·#52·#28에 남긴다. README의 화면 병렬 작업표는 같은 인계를 반영한다.
+
+## #54 결과·기록 독립 표시 UI 본인 검증 — 2026-11-07
+
+새 `app/54-results-ui` worktree를 main `3b547e5`에서 시작하고 게시 전 #105가 머지된 main `6adf357b6d568067f60d0e0982fbfc015856a35c`를 정상 통합했다. #54의 독립 표시 구간만 구현했으며 #51 직접 차단 관계나 #54 전체 완료 상태를 바꾸지 않는다. 입력·이벤트·복원·미지원 범위는 [화면 명세의 #54 절](09_UI_UX_SPEC.md#54-결과기록-독립-표시-ui-연결점)을 따른다.
+
+시안 `4m-settlement.png`, `4n-settlement-detail.png`, `4y-landscape-settlement.png`와 차고 `4v-landscape-garage.png`를 직접 열어 대조했다. 기존 Views 스타일과 시스템 글꼴만 사용하고 시안의 이미지·로고·캐릭터·예시 경제값을 앱 자산/제품 규칙으로 넣지 않았다. 확정 잔액은 이번 수익과 구분한다. 전체 history와 세부 수익/리뷰/가상 사고가 현재 Settlement에 없음을 명시한다.
+
+| 본인 검사 | 실제 결과·범위 |
+|---|---|
+| 상태·동작 단위 회귀 | API 구현 전 미구현 참조의 compile 실패를 확인한 후 `ResultsInteractionTest`12개 통과. exact/stale ID, 재렌더/닫기 후 중복 방지, 동기 응답, 실패→재요청→성공, 제한, 재조회 명시 해제, 외부 보존/복원·입력 변경 격리 확인 |
+| 최신 main 기반 `:core:test :app:testDebugUnitTest` | core97개·app38개 통과, 실패·오류·생략0. app에는 신규12개 포함 |
+| `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` | 성공. Lint오류0·경고15(신규 ResultsView의 callback 필수 생성자에 대한 ViewConstructor1개 포함). 장치 시험 APK 컴파일 성공 |
+| 정식 `ResultsViewTest` 장치 실행 | **6개 통과**, 1.415초. 실제 위젯에서 금액/잔액·취득액0·출처/ID, 명시적 열람 응답·재시도, 제한/이전버튼 차단, Loading/빈/Missing/Unsupported/Error, 복원/없는선택, 긴텍스트·스크롤 확인 |
+| 임시 실제 window 부착 시험 | **1개 통과**, 1.039초. Activity에 부착한 480dp 결과 View의 Loading/제한 전환 후 스크롤700 유지와 상세 선택·폭 복귀 후 ID 유지 확인. 시험 host/Manifest 추가는 독립 사본에만 존재 |
+| 실제 Android 화면 | [기본 목록](evidence/issue54-results-ui/default-window.png), [480dp 상세](evidence/issue54-results-ui/narrow-detail.png), [제한](evidence/issue54-results-ui/restricted.png)을 캡처하고 직접 확인. 고정 시험 입력임을 표시. HTML/시안 렌더가 아님 |
+
+환경은 JDK17·기존 SDK35/Build Tools35·API34 ARM64 Pleos AVD다. 메인이 #105 종료와 B 사용 순서를 확인한 뒤, 기존 AVD가 꺼진 상태에서 데이터 보존·host GPU·RAM4096·기존 port5556/ADB5038로 1회 기동했다. user10·1080×600·120dpi에서 새 격리 패키지 `io.drivegrowth.verify54results`를 사용했다. 기본 앱 창 약936×584dp와 내부480dp 뷰포트의 실제 화면 확인을 **물리 디스플레이 폼 팩터 전체 검증으로 확대하지 않는다**. 1360dp 두 영역은 정식 시험의 미부착 위젯 layout 검사이며, 실제 넓은 window/preset 검증은 남아 있다.
+
+[장치 실행 로그6개](evidence/issue54-results-ui/view-tests-6.txt), [부착 시험 로그](evidence/issue54-results-ui/attached-window-test.txt), [소스·APK 대응](evidence/issue54-results-ui/source-apk-metadata.json)을 보존했다. 장치 앱 APK는 `bfc4fe7c06c696901a89c897fb4dc04eadd619a496fd29f4e9f93a005624d92c`, 시험 APK는 `563614bfa7f592eb59d986f1571d0f8d0c3e013ce6c1478fdfe9afdf15f9abb3`이며 설치본 해시도 대조했다. 원격 제품 Manifest/applicationId/서명·공통 탐색·core·SQLite는 바꾸지 않았다.
+
+장치 사용 종료를 메인에 전달했다. 자기 격리 앱/시험 패키지와 임시 XML만 제거했다. 제품 APK 경로·SHA `793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9` 전후 동일, 제품 데이터 삭제/앱 삭제/AVD 초기화 없음. user10·크기·밀도·night no·빈 forward 목록 유지, active instrumentation 없음·boot_completed1·car_service found, AVD 켜둠. 기어·권한·전역 창/글꼴·서버 설정을 변경하지 않았다. 이후 다른 세션의 장치 사용을 위해 adb 조작을 중단했다.
+
+**남은 연결:** 실제 HostSnapshot/SQLite 미확인 조회·markViewed 응답·Activity 재생성과 프로세스 재시작을 잇는 제품 호스트 연결, 전체 과거 기록 API, #39/#42/#43의 실제 확정 수익/상세, 실제 넓은 창·플랫폼 gate·실차 검증은 이번 독립 표시 시험의 완료 범위가 아니다. View가 지급·수익 계산·원장 쓰기를 하지 않으므로 fixture 표시 성공을 실제 영업·저장/재실행 성공으로 바꾸지 않는다.

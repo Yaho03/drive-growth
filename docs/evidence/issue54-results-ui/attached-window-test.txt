@@ -1,0 +1,5 @@
+io.drivegrowth.app.ui.results.ResultsAttachedWindowTest:.
+Test results for InstrumentationTestRunner=.
+Time: 1.039
+
+OK (1 test)

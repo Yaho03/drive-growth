@@ -121,6 +121,19 @@ collection.render(mappedCollectionState, controlsEnabled = allowedByCommonShell)
 
 위 예시의 호스트 함수는 연결 책임을 나타낸다. MainActivity·공통 탐색·공통 계약·DB·Gradle·제품 Manifest는 이 표시 UI에서 수정하지 않았다. 장치 회귀용 debug Activity·Manifest는 제품 탐색과 분리한다. #51 연결, 실제 차량 데이터/명령/저장·재실행과 제품 화면 검증은 #52 전체 완료 조건으로 남긴다. 실행 결과와 기기 시험 인계는 [06 검증 문서](06_VERIFICATION.md#52-차고도감-표시-ui-부분-검증)를 따른다.
 
+### #54 결과·기록 독립 표시 UI 연결점
+
+2026-11-07, `ui.results.ResultsView(context, onEvent)`를 독립 표시 구간으로 제공한다. 시안 `4m-settlement.png`·`4n-settlement-detail.png`·`4y-landscape-settlement.png`를 직접 대조했고 기존 차고의 배경/카드/버튼을 따른다. 시안의 금액·리뷰·가상 사고·영업 시간 구간을 구현 데이터로 복사하지 않는다. 새 이미지·로고·캐릭터 자산은 쓰지 않는다.
+
+- `render(ResultsScreenState, controlsEnabled)`는 Loading, Content(빈 목록 포함), Error, Missing, Unsupported를 구분한다. 제한되면 정산 내용과 버튼을 제거하며 이전 버튼 callback도 막는다. 호스트의 허용 판단만 쓰고 View가 차량 SDK를 조회하지 않는다.
+- `Content`는 원본 `Settlement`와 선택적인 차종명을 가진 `ResultPresentation` 목록, 입력 구분 `STORED/FIXTURE`를 받는다. 정산/거래/요청 ID·출처·규칙 버전·확정 시각·재화 변화·당시 차량 snapshot을 보존한다. `balance`는 **정산 후 확정 잔액**이고 수익 합계가 아니다. 시각은 제공된 EpochMillis를 기기 시간대와 함께 표시한다. 차종명 미제공을 이름으로 추정하지 않는다.
+- 실제 SQLite의 `listUnviewedSettlements()`만 연결할 수 있으며 전체 과거 기록은 현재 미지원이다. 렌트/시설 등의 세부 수익·리뷰·단골·가상 사고·미확정 의뢰 상태는 현재 Settlement에 없다. Missing은 미확정/정보 누락 안내이며 확정 성공을 만들지 않는다. 세부금액을 0으로 채우거나 새 결과 모델/원장을 만들지 않는다.
+- `SelectResult(SettlementId)`, `CloseDetail`, `Retry`, `MarkViewed(SettlementId)` 이벤트를 호스트에 전달한다. `closeDetail(): Boolean`과 `restoreSelection(SettlementId?)`를 공통 Back/복원에 연결한다. `uiState` 불변 스냅샷을 View 밖에 보존하고 새 View의 `restoreUiState`로 선택·진행 중 상태를 복원한다. Pending 복원 뒤 기존 요청의 응답 연결은 호스트 책임이다.
+- `completeMarkViewed(id, ContractResult<Unit>)`의 명시적 성공 전에 열람 저장 완료로 바꾸지 않는다. 같은 요청은 재렌더/상세 닫기로 잠금이 해제되지 않으며 처리 중 추가 열람 요청을 막는다. 실패는 재요청 가능하다. 조회 재시도 잠금은 `completeRetry()`로 해제한다. 화면을 열거나 열람 확인해도 재지급하지 않는다. 성공 후 미확인 목록 재조회는 호스트가 수행한다.
+- 1000dp 이상은 목록·상세 두 영역, 좁은 폭은 선택 전 목록/선택 후 상세 한 영역이다. 모든 긴 내용과 버튼은 스크롤 가능하며 Loading/Error/제한 전환으로 콘텐츠 스크롤 위치를 덮지 않는다. 목록이 짧아지면 ScrollView 유효 범위로 복원된다.
+
+호스트의 최소 입력 예: `snapshot.unviewedSettlements.map { ResultPresentation(it, vehicleName = null) }`을 `Content(..., ResultsOrigin.STORED)`로 주입한다. `MarkViewed.id`를 메인 스레드 밖의 기존 `markViewed(id)`에 전달하고 결과를 UI 스레드에서 `completeMarkViewed`로 돌려준다. 초기 읽기/재조회 실패는 Error, 조회 API 자체가 없으면 Unsupported다. `ResultsPreviewStates`는 debug 전용이며 여러 거래 유형·같은 표시명/별도ID·무료 차량·누락·긴 문구·빈 목록·읽기/열람 실패와 성공을 결정적으로 제공한다. 이는 실제 저장/영업 연결이 아니다. 공유 호스트·탐색·Manifest 등록은 #51 담당이 소유한다.
+
 ### 요청 확인과 Back
 
 비용·소비가 있는 요청의 확인 패널은 대상 개체, 비용, 예상 결과, 되돌릴 수 없는 변화, `확정/돌아가기`를 표시한다. 서버/저장 요청 전에 확인을 완료한다. 재시도는 같은 요청 ID를 재사용하며 버튼을 새 요청으로 반복 전송하지 않는다.
