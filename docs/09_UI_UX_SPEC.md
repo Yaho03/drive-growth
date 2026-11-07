@@ -78,6 +78,42 @@ flowchart LR
 
 가게는 전체 보기와 차량 중심 보기를 전환해 수집 결과를 확인하게 한다. 사용자 입력 한 번에 하나의 명령만 보내며 상태 갱신을 받아 화면을 다시 그린다. 무거운 연산·저장·거래를 View 내부에서 수행하지 않는다. 기능별 화면과 공통 탐색의 파일 담당은 #25에서 정한다.
 
+### #53 탁송 독립 표시 UI 연결점
+
+2026-11-07 최신 main `b6631a4`의 `DeliveryProposed`·`DeliveryOffer`·`ActiveDelivery`를 사용하는 독립 Android Views를 추가했다. 화면 기준은 #24 [동의 댓글](https://github.com/Yaho03/drive-growth/issues/24#issuecomment-6705490205)이며 저장 책임은 #37 [조율 댓글](https://github.com/Yaho03/drive-growth/issues/37#issuecomment-6705230075)을 따른다. `wireframes.svg`와 ui-v3 `4h/4i/4j/4k/4l/4w/4x`를 직접 확인해 기존 `GarageStyle`의 어두운 배경·카드·파란 버튼을 재사용했다. 차량·캐릭터·로고·3D 그림은 추가하지 않았다. 시안 금액·진행률·후보 수를 제품 규칙으로 옮기지 않는다.
+
+- 진입점은 `DeliveryView(context, onRequest, restored)`이며 `render(DeliveryFrame, controlsEnabled)`, `complete(DeliveryRequest, DeliveryFrame)`, `saveUiState()`, `handleBack()`, `release()`를 제공한다. 호스트가 허용한 게임 영역에만 붙이며 차량 신호·gate·SDK·DB·경제 계산을 View에서 실행하지 않는다. false이면 게임 정보와 버튼을 제거한다. 해제 후 입력·응답은 폐기한다.
+- 화면은 `Loading`, `Unsupported`, `Failure`, `Destination`, `Offers`, `Active`, `ChangeReview`, `AbandonReview`, `AwaitingResult`다. 빈 후보는 정상 빈 목록이며 경로 실패/미지원과 구분한다. 목적지·출처·실제 관측 거리·진행 정보 누락은 확인 불가로 표시한다. 예상 경로 거리와 실제 관측 거리를 따로 표시하며 누락을 0·도착·지급 성공으로 바꾸지 않는다.
+- Offers는 `proposed.offers`만 표시하고 목록 안의 `offer-N`만으로 다른 날짜/구간의 후보를 식별하지 않는다. 로컬 상세에서 유형·구매 희귀도·금액·확정 조건을 확인한 뒤 `Select(proposed, offerId)`를 요청한다. 수익 탁송은 차량을 구매하지 않으며 기본 주행 수익과 별도인 완료 보상이다. 구매는 선택 확정 때 전액 결제·도착 후 차량 수령이라는 흐름을 안내한다. 실제 저장 전에 잔액·보유 차량을 바꾸지 않는다.
+- 후보별 `DeliveryAvailability`와 확인 조건은 호스트가 공급한다. 정보 누락·비허용·중복 후보 ID는 확정 불가다. Active 화면에서는 새 후보 선택이 없으며 변경 기회·불가 이유와 포기 조건 확인만 제공한다. 같은 구간의 일일 목록·완료 슬롯만 교체·포기 후 목록 유지·자정 재생성은 호스트/#37 규칙이며 UI가 목록을 재추첨하지 않는다. 후보 수·최소 거리·km당 수익을 UI 상수로 만들지 않았다.
+- 변경 확인은 기존 의뢰와 새 제안의 차량·희귀도·거리 및 공급자가 계산한 `DeliveryMoneyUi(direction, amount)`를 비교한다. 구매 변경 차액과 포기 수수료를 구분한다. 포기 확인은 공급된 수수료·환급액·결과 설명을 별도로 표시한다. 금액·희귀도 변경 안내·확정 조건이 누락되면 확정을 차단한다. 수익 변경/포기처럼 금전 이동이 없는 경우도 공급자가 확인한 0 또는 설명을 전달해야 하며 View가 대신 계산하지 않는다.
+- callback은 실행 요청일 뿐 저장 성공이 아니다. `DeliveryRequest.sequence`는 UI 응답 상관값, `DeliveryFrame.version`은 호스트의 단조 증가 화면 공급 순서다. 공통 `Revision`·DB 버전·경제 `RequestId`로 사용하지 않는다. 경제 요청 ID와 전체 정규화 명령·재시도 이력·원자 결제/선택 저장은 호스트/#37 책임이다. 후보·명령·복원 입력의 목록을 복사해 원본 변경으로 확인한 내용이 바뀌지 않게 한다.
+- 요청 직후 Pending을 그린 뒤 callback을 한 번 보낸다. 일반 render·같은 화면 재표시·새 문구는 Pending을 해제하지 않는다. 호스트는 실제 조회/명령 결과가 있을 때 **현재 미확정 요청과 같은 request 객체 값**, 현재 frame보다 큰 version으로 `complete`한다. 이전 요청의 응답·오래된 frame은 거절한다. 실패도 명시적 응답으로 해제한 뒤 재시도한다. 이 UI 상관 검사는 저장 거래의 요청 동일성 검사를 대체하지 않는다.
+- 제한 중 complete는 상태만 보관하고 화면을 다시 열거나 허용을 복원하지 않는다. 호스트는 숨김·화면 이탈 시에도 controlsEnabled=false를 전달하거나 View를 release하고, 동일 프로필/요청의 최신 결과만 해당 인스턴스에 전달해야 한다. 새로운 프로필은 새 인스턴스·새 호스트 세션을 사용한다. 이전 View의 callback을 새 화면에 연결하지 않는다.
+- 후보 상세의 Back은 선택만 닫는다. 변경/포기 검토의 Back은 `ExitReview`이며 `Abandon`과 다르다. Pending Back은 공통 호스트로 넘기므로 호스트가 앱 숨김/탐색을 진행할 수 있다. 화면 이동·확인 취소만으로 의뢰를 포기하거나 결제를 취소하지 않는다. stale 버튼은 그리기 세대가 달라지면 동작하지 않는다.
+- 호스트는 `saveUiState()`와 실제 경제 requestId/처리 상태를 기존 복원 경계에 보존한다. 재생성된 View는 제한 상태로 시작하며 현재 gate를 확인한 render 전 조작하지 않는다. 미확정 요청은 재전송하지 않고 같은 요청 응답을 연결한다. 로컬 상세 ID는 같은 frame version에서만 복원하며 후보 목록/일자/구간이 바뀌면 다시 확인한다. 이 메모리 상태 API만으로 프로세스 복원·저장 완료를 주장하지 않는다.
+
+호스트 연결 예시(함수명은 호스트의 연결 책임을 나타내며 이번 변경에 구현하지 않았다):
+
+```kotlin
+val delivery = DeliveryView(context, onRequest = { request ->
+    // 원본 제안/선택 문맥을 유지하고 경제 requestId를 기존 호스트에서 관리한다.
+    submitOrLoadThroughExistingHost(request) { resultFrame ->
+        // 호스트가 프로필·요청·응답 순서를 확인한 뒤 main thread에서 전달한다.
+        deliveryResultConsumer(request, resultFrame)
+    }
+})
+delivery.render(DeliveryFrame(1, DeliveryScreen.Unsupported("목적지 입력 연결을 확인할 수 없어요.")), allowed)
+// 실제 결과 수신 후: delivery.complete(request, nextFrame)
+// 숨김/제한: 현재 frame을 controlsEnabled=false로 render. 폐기: delivery.release().
+```
+
+본문은 긴 문구와 다수 후보를 스크롤한다. 변경 전후 비교는 폭 760dp 이상에서 2열, 그 미만에서 1열이다. 760dp는 구현 분기값이며 공식 폼 팩터 인증이나 실제 가독성 시험 결과가 아니다.
+
+전용 debug `DeliveryPreviewStates`는 정상·빈 후보·누락·실패·미지원·활성·변경·포기·확인 대기·다수 후보·긴 문구의 고정 입력이다. 실제 SDK·DB·선택 저장·차량 지급 성공을 의미하지 않는다. MainActivity/탐색/Manifest/공통 계약/저장은 수정하지 않았다. 실제 표시 후보의 발견 키·목록/콘텐츠/규칙 버전·출처 전달과 검토·머지된 #116 API 저장, 실제 목적지 입력과 #37–#39 저장·변경·포기·도착 정산, 기존 host의 requestId 보존/재실행 연결, 실제 gate/CCP와 기기 가독성 검증은 #53 전체 완료 조건으로 남긴다.
+
+#53 원head `5b26c41`의 독립 검토에서는 B가 입력 경계16개와 격리 Android View6개+네이티브 호스트1개를 확인했다. 실제320dp와 CCP 가용936dp에서 구매 확인 터치·제한/Pending·같은 Activity 내 View 교체 복원을 확인했으며, 호스트 폭/캡처 보완 후 호스트1개를 재실행했다. Activity 자체 재생성·경제 요청/DB 영속 복원·실제 gate/CCP 조작 성공은 아니다. 원본 제품/시험 소스는 유지했고 실행별 APK·호스트 역할·화면·원복은 [06의 독립 검증 근거](06_VERIFICATION.md#53-독립-검토격리-장치-실행-근거-반영)를 따른다.
+
 ### 첫 실행
 
 최초 실행에서 저장 조회·주차 허용 확인 후 첫 안내를 연다. 캐스퍼·아반떼 선택 후보, 첫 지급 희귀도 일반·취득 기준액 0, 개업 선물 뽑기권과 초기 재화/공간은 [PRD의 시작 경험·주요 기능](01_PRD.md#시작-경험과-주요-기능)을 따른다. 설계는 **안내→후보 비교→선택 확인→저장 성공→가게**로 잡고 확인 후 선택 취소 불가와 프로필당 1회 지급을 표시한다. 첫 성장의 순서·비용 등 남은 결정은 #24에서 정하며 화면 예시로 확정하지 않는다. 재실행은 초기 지급을 반복하지 않아야 한다. 차량 신호/권한 안내를 주행 중 튜토리얼 관문으로 띄우지 않는다.
@@ -183,6 +219,24 @@ collection.render(mappedCollectionState, controlsEnabled = allowedByCommonShell)
 - 기준 main에는 #50의 프로필 초기화 조회·지급 확정/마커 API가 없으므로 온보딩은 무행동 `Unavailable`만 공급한다. 보유 0대·저장된 선택/진행 ID로 Intro/후보/Completed를 만들지 않는다. 선택/진행 ID가 Android 저장 상태에 있으면 보존하되 지급 여부 미확인을 안내한다. Retry의 단계 계약·프로필/requestId/같은 차종 이전 시도 검사는 위 #56 계약이며 실제 #50 연결/재실행 검증은 남아 있다.
 
 실제 실행 범위와 미검증 항목은 [호스트 연결 검증](06_VERIFICATION.md#정산첫-실행-실제-호스트-연결-검증--2026-11-07)을 따른다.
+
+
+### #55 가게·시설·꾸미기 표시 UI 연결점
+
+2026-11-07 `app/ui/shop/ShopView`를 Android Views로 추가했다. `wireframes.svg`와 `ui-v3/4a-shop-home.png`, `4o-facilities.png`, `4u-landscape-shop-home.png`, `4z-landscape-facilities.png`를 직접 확인해 어두운 카드·큰 버튼·전체/차량 보기와 시설 조건 표시를 적용한다. 시안 홈의 누락된 세차장 문구를 이미지로 재사용하지 않고 실제 텍스트로 표시한다. `shop_vehicle.xml`은 이번에 작성한 자체 중립 도형이며 외부 실차·캐릭터·로고를 포함하지 않는다. 3D 자산·자유 배치 엔진은 추가하지 않았다.
+
+- 호스트는 `ShopScreenState.Content`에 확정 이름·레벨·보유수·공간·잔액·간판/색상·차량 표시 목록과 확장·시설·장식 `ShopOption`을 제공한다. 누락 숫자는 null로 전달하며 0으로 채우지 않는다. 세 시설은 공통 `Facility`로 식별하고, 누락 시설은 정보 미제공으로 표시한다. 시설 해금·효과·가격·행동 허용은 공급값이다. UI에서 `unlocked`·경제 계산을 다시 실행하지 않는다.
+- 확장은 공통 `ShopExpansion`, 시설은 `FacilityOffer`를 `ShopCommand`로 감싼다. 금액·ruleVersion·trial 표시와 명령 payload의 불일치는 생성 시 거절한다. 장식은 공급자가 승인한 decorationId·간판/색상 표시안만 전달한다. 보유·구입·배치 규칙과 실제 장식 저장 API는 미연결이며 시험 품목을 제품 품목으로 확정하지 않는다.
+- `revision`은 호스트 표시 snapshot의 신선도 표식이다. 현재 `RentalLedger.shop()`의 `ShopState`에는 이 값이 없으므로 실제 어댑터가 조회 일관성과 갱신 표식을 공급해야 한다. 차량 revision을 가게 revision으로 대입하지 않는다. 최근 수락 revision을 uiState에 보존해 낮은 Content는 Loading/Failure·View 재생성 뒤에도 거절한다. 낮은 입력의 false gate는 적용하지만 오래된 true는 제한을 풀지 않는다. 새 프로필은 새 View/호스트 세션으로 시작하며 이전 프로필의 uiState를 복원하지 않는다. 이 표식은 DB 원자성·조건 재검사·revision 검사·저장 책임을 대체하지 않는다.
+- `ShopEvent.Submit(ShopRequest)`에는 선택 당시 revision·전체 옵션·거래 requestId·UI attemptId가 들어간다. 호스트는 공통 거래에 같은 requestId와 명령을 전달하고, 같은 요청 객체로 `complete(request, result)`를 호출한다. 실패 뒤 동일 옵션 재시도는 거래 requestId를 유지하고 attemptId만 바꿔 이전 시도의 늦은 응답을 무시한다. 같은 snapshot에서 다른 실패 옵션을 오가도 선택별 requestId를 유지하며 맵을 방어 복사해 uiState 복원에 포함한다. 새 revision을 수락하면 이전 revision의 키만 제거한다. 다른 요청 응답도 무시한다.
+- 미리보기·취소·실패·제한으로 확정 입력을 변경하지 않는다. 성공 응답은 처리 응답 수신으로 표시하고 그 snapshot의 추가 요청을 막는다. 호스트가 저장 확정을 확인한 새 snapshot을 `render`해야 잔액·외형·공간·시설이 바뀐다. 조회 중·제한 중 재표시만으로 Pending을 풀지 않는다. 오래된 선택·가격·허용 변경은 확인을 거절한다.
+- 호스트는 `uiState`를 View 수명 밖에 보관하고 새 View에서 `restoreUiState`한다. 복원 자체는 요청·저장·재지급을 하지 않는다. 미리보기의 `handleBack()`을 먼저 적용하고, 처리 중 요청의 부모 탐색은 공통 호스트가 결정한다. 프로세스 종료 후 미완료 요청 복원·실제 저장 재조회는 호스트 연결 때 검증한다.
+- `controlsEnabled=false`이면 게임 내용·버튼을 제거하고 이전 버튼 callback도 gate를 재검사한다. 폭 1000dp 이상은 장면/관리 두 열, 좁은 폭은 단일 세로 스크롤이다. Loading/Empty/Failure/Unsupported와 요청 Pending을 구분한다.
+
+표시 예제는 `ShopPreviewStates.normal()`·`missing()`이며 시험 잠금·무료 장식·비용·효과를 명시한다. #24 경제 제안 댓글과 환석 동의는 전원 채택이나 콘텐츠 반영 증거로 사용하지 않는다. MainActivity·탐색/gate·실제 #44 구매/확장·꾸미기 영속화는 이번 변경에 연결하지 않았다. #55 전체 완료와 앱 종료 뒤 금액/배치 일치는 실제 연결 및 #28 검증에 남는다.
+
+
+#55 수정본의 실제 격리 View·네이티브 호스트 표적8개와 별도 C 재검토15개의 근거는 [06 수정본 검증](06_VERIFICATION.md#55-수정본-기기-표적독립-재검토-및-게시-근거)을 따른다. UI 상태 객체를 새 View에 복원한 시험이며 제품 Activity/프로세스 영속 복원은 아니다. 실제 CCP 가용폭936dp에서는 두 열 분기(1000dp 이상)를 실행하지 못했으므로 공식 폼팩터 전체 완료로 해석하지 않는다.
 
 ### #57 퀘스트·업적·휴식 독립 표시 UI
 

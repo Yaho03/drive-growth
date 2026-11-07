@@ -68,9 +68,11 @@ class InMemoryGameChangeStore(
     vehicles: List<OwnedVehicle>,
     initialBalance: GameMoney = GameMoney(0),
     private val confirmedAt: EpochMillis = RentalContractFixtures.time,
-) : GameChangeStore {
+    private var gachaState: GachaState? = null,
+) : GachaChangeStore {
     private val vehiclesById = vehicles.associateBy { it.ownedVehicleId }.toMutableMap()
     private val committed = mutableMapOf<RequestId, Pair<GameChange, Settlement>>()
+    private val gachaCommitted = mutableMapOf<RequestId, GachaSettlement>()
     private var balance = initialBalance
     var nextCommitFailure: ContractError? = null
 
@@ -80,9 +82,12 @@ class InMemoryGameChangeStore(
 
     @Synchronized
     override fun commitGameChange(change: GameChange): ContractResult<Settlement> {
+        if (change.requestId in gachaCommitted) return failure(ContractError.STATE_CONFLICT)
         committed[change.requestId]?.let { (original, result) ->
             return if (original == change) ContractResult.Success(result) else failure(ContractError.STATE_CONFLICT)
         }
+        val authority = gachaState?.authority
+        if (authority != null && change.source != authority.source) return failure(ContractError.INVALID_INPUT)
         nextCommitFailure?.let {
             nextCommitFailure = null
             return failure(it)
@@ -93,6 +98,9 @@ class InMemoryGameChangeStore(
             is VehicleWrite.Add -> {
                 val vehicle = write.vehicle
                 if (vehicle.ownedVehicleId in vehiclesById) return failure(ContractError.STATE_CONFLICT)
+                // 명시적으로 구성한 권위 공간은 예전 Add 진입점과도 공유한다.
+                if (authority != null && vehiclesById.values.count { it.lifecycle == VehicleLifecycle.OWNED } >= authority.garageCapacity)
+                    return failure(ContractError.CAPACITY_EXCEEDED)
                 if (vehicle.revision != Revision(0) || vehicle.lifecycle != VehicleLifecycle.OWNED) {
                     return failure(ContractError.INVALID_INPUT)
                 }
@@ -143,6 +151,58 @@ class InMemoryGameChangeStore(
         if (updatedVehicle != null) vehiclesById[updatedVehicle.ownedVehicleId] = updatedVehicle
         committed[change.requestId] = change to result
         return ContractResult.Success(result)
+    }
+
+    @Synchronized
+    override fun readGachaState(): ContractResult<GachaState> =
+        gachaState?.let { ContractResult.Success(it) } ?: failure(ContractError.DATA_UNAVAILABLE)
+
+    @Synchronized
+    override fun commitGacha(command: GachaCommand): ContractResult<GachaSettlement> {
+        gachaCommitted[command.requestId]?.let { original ->
+            return if (original.command == command) ContractResult.Success(original) else failure(ContractError.STATE_CONFLICT)
+        }
+        if (command.requestId in committed) return failure(ContractError.STATE_CONFLICT)
+        val state = gachaState ?: return failure(ContractError.DATA_UNAVAILABLE)
+        val authority = state.authority
+        val progress = state.progress
+        if (command.source != authority.source) return failure(ContractError.INVALID_INPUT)
+        if (command.contentVersion != authority.contentVersion || command.ruleVersion != authority.ruleVersion ||
+            command.expectedRevision != progress.revision || command.drawsSinceGuarantee != progress.drawsSinceGuarantee ||
+            command.shopLevel != authority.shopLevel || command.garageCapacity != authority.garageCapacity)
+            return failure(ContractError.STATE_CONFLICT)
+        if (vehiclesById.values.count { it.lifecycle == VehicleLifecycle.OWNED } >= authority.garageCapacity)
+            return failure(ContractError.CAPACITY_EXCEEDED)
+        if (progress.revision.value == Int.MAX_VALUE) return failure(ContractError.INVALID_INPUT)
+        if (authority.unlockedVehicles.isEmpty()) return failure(ContractError.DATA_UNAVAILABLE)
+
+        val award = command.award
+        val vehicle = award.vehicle
+        val price = if (command.ticket == GachaTicketUse.PURCHASED) authority.purchasePrice else GameMoney(0)
+        val guaranteed = progress.drawsSinceGuarantee + 1 == authority.pity
+        val nextCounter = if (vehicle.rarity >= authority.guaranteedFrom) 0 else progress.drawsSinceGuarantee + 1
+        if (vehicle.vehicleId !in authority.unlockedVehicles || vehicle.rarity !in authority.eligibleRarities ||
+            vehicle.revision != Revision(0) || vehicle.lifecycle != VehicleLifecycle.OWNED ||
+            vehicle.acquisitionSource != VehicleAcquisitionSource.GACHA || vehicle.level != 1 || vehicle.levelProgressPercent != 0 ||
+            vehicle.acquisitionCost != price || award.guaranteed != guaranteed || award.nextCounter != nextCounter ||
+            (guaranteed && vehicle.rarity < authority.guaranteedFrom)) return failure(ContractError.INVALID_INPUT)
+        if (command.ticket == GachaTicketUse.FREE && progress.freeTickets == 0L)
+            return failure(ContractError.INSUFFICIENT_FUNDS)
+        val updatedProgress = GachaProgress(Revision(progress.revision.value + 1), nextCounter,
+            progress.freeTickets - if (command.ticket == GachaTicketUse.FREE) 1 else 0)
+        val change = GameChange(command.requestId, TransactionKind.GARAGE, command.source, command.ruleVersion,
+            money = if (command.ticket == GachaTicketUse.PURCHASED) MoneyChange(MoneyDirection.DEBIT, price) else null,
+            vehicle = VehicleWrite.Add(vehicle))
+        // 같은 락·잔액·차량·기존 정산을 재사용한다. 모든 검증/실패는 변경 전에 끝낸다.
+        return when (val result = commitGameChange(change)) {
+            is ContractResult.Failure -> result
+            is ContractResult.Success -> {
+                val receipt = GachaSettlement(command, result.value, updatedProgress)
+                gachaState = state.copy(progress = updatedProgress)
+                gachaCommitted[command.requestId] = receipt
+                ContractResult.Success(receipt)
+            }
+        }
     }
 
     private fun failure(error: ContractError) = ContractResult.Failure(error)
