@@ -5,22 +5,32 @@ import android.database.sqlite.SQLiteDatabase
 import io.drivegrowth.core.contract.ContentVersion
 import io.drivegrowth.core.contract.ContractError
 import io.drivegrowth.core.contract.ContractResult
+import io.drivegrowth.core.contract.DeliveryArrivalEvidence
+import io.drivegrowth.core.contract.EpochMillis
 import io.drivegrowth.core.contract.EstimatedRouteDistance
 import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.InputSource
+import io.drivegrowth.core.contract.Observation
 import io.drivegrowth.core.contract.Rarity
 import io.drivegrowth.core.contract.RequestId
+import io.drivegrowth.core.contract.RouteId
 import io.drivegrowth.core.contract.RuleVersion
 import io.drivegrowth.core.contract.Settlement
 import io.drivegrowth.core.contract.VehicleId
+import io.drivegrowth.core.contract.VehicleLifecycle
 import io.drivegrowth.core.delivery.ActiveDelivery
+import io.drivegrowth.core.delivery.DeliveryInProgress
 import io.drivegrowth.core.delivery.DeliveryList
 import io.drivegrowth.core.delivery.DeliveryOffer
 import io.drivegrowth.core.delivery.DeliveryOfferId
+import io.drivegrowth.core.delivery.DeliveryOutcome
 import io.drivegrowth.core.delivery.DeliveryProposed
 import io.drivegrowth.core.delivery.DeliverySelected
 import io.drivegrowth.core.delivery.DeliverySelection
+import io.drivegrowth.core.delivery.DeliverySettlement
 import io.drivegrowth.core.delivery.DestinationKey
+import io.drivegrowth.core.delivery.HeldVehicle
+import io.drivegrowth.core.delivery.HoldOutcome
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -37,7 +47,23 @@ data class DeliveryCommit(
 )
 
 /**
- * 탁송 하루 목록, 활성 의뢰, 선택 요청 이력을 공용 원장과 같은 DB 트랜잭션으로 저장한다.
+ * 도착 정산의 확정 결과.
+ *
+ * @param settlement 지급·환급의 공용 정산. 확인 대기·임시 보관·수익 만료는 돈과 차량이 바뀌지 않아 null이다.
+ */
+data class ArrivalCommit(
+    val outcome: DeliveryOutcome,
+    val settlement: Settlement?,
+)
+
+/** 임시 보관 처리의 확정 결과. 계속 보관이면 settlement가 null이다. */
+data class HoldCommit(
+    val outcome: HoldOutcome,
+    val settlement: Settlement?,
+)
+
+/**
+ * 탁송 하루 목록, 활성 의뢰, 선택 요청 이력, 경로 세대, 도착 정산 결과, 임시 보관 차량을 공용 원장과 같은 DB 트랜잭션으로 저장한다.
  *
  * 선택 요청 이력은 의뢰가 끝난 뒤에도 남는다. 같은 요청을 다시 보내면 당시 결과를 돌려주고 끝난 의뢰를 다시 활성화하지 않는다.
  * 공용 store 연결, 테이블 생성 호출, DB 버전 이전은 #122에서 통합한다.
@@ -60,6 +86,13 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
             db.execSQL(
                 "CREATE TABLE delivery_active (id INTEGER PRIMARY KEY CHECK (id = 1), request_id TEXT NOT NULL UNIQUE)",
             )
+            db.execSQL(
+                "CREATE TABLE delivery_routes (request_id TEXT PRIMARY KEY NOT NULL, route TEXT NOT NULL, started_at INTEGER NOT NULL)",
+            )
+            db.execSQL(
+                "CREATE TABLE delivery_outcomes (request_id TEXT PRIMARY KEY NOT NULL, kind TEXT NOT NULL, settle_request TEXT)",
+            )
+            db.execSQL("CREATE TABLE delivery_held (request_id TEXT PRIMARY KEY NOT NULL, payload TEXT NOT NULL)")
         }
     }
 
@@ -146,6 +179,155 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
             })
             ContractResult.Success(DeliveryCommit(selected, settlement))
         }
+
+    /**
+     * 활성 의뢰의 경로를 시작하거나 새 경로 세대로 바꾼다. 미도착 기한의 시작 시각은 처음 값을 유지한다.
+     * 활성 의뢰가 없으면 DATA_UNAVAILABLE, 다른 요청이면 STATE_CONFLICT다.
+     */
+    fun beginRoute(requestId: RequestId, route: RouteId, at: EpochMillis): ContractResult<DeliveryInProgress> = store.atomic { db ->
+        val active = readActive(db) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
+        if (active.requestId != requestId) return@atomic failure(ContractError.STATE_CONFLICT)
+        val started = readRoute(db, requestId)?.second ?: at
+        db.insertWithOnConflict("delivery_routes", null, ContentValues().apply {
+            put("request_id", requestId.value)
+            put("route", route.value)
+            put("started_at", started.value)
+        }, SQLiteDatabase.CONFLICT_REPLACE)
+        ContractResult.Success(DeliveryInProgress(active, route, started))
+    }
+
+    /** 경로까지 시작한 활성 의뢰. 활성 의뢰가 없거나 경로를 아직 시작하지 않았으면 null이다. */
+    fun inProgress(): ContractResult<DeliveryInProgress?> = store.atomic { db ->
+        val active = readActive(db) ?: return@atomic ContractResult.Success(null)
+        val route = readRoute(db, active.requestId) ?: return@atomic ContractResult.Success(null)
+        ContractResult.Success(DeliveryInProgress(active, route.first, route.second))
+    }
+
+    /**
+     * 활성 의뢰의 도착을 정산한다. [DeliverySettlement]의 결과와 지급·환급, 활성 의뢰 종료, 완료한 자리 교체, 임시 보관 기록을 한 트랜잭션으로 확정한다.
+     * 빈 칸 수는 같은 트랜잭션 안에서 가게 용량과 보유 차량으로 계산한다.
+     *
+     * @param nextList 완료한 자리를 채운 목록을 만드는 함수. 보통 `DeliveryProposal.replaceCompleted`에 콘텐츠·가게 레벨·난수를 묶어 넘긴다.
+     * @return 확인 대기면 아무것도 바꾸지 않는다. 활성 의뢰나 경로가 없으면 DATA_UNAVAILABLE이다.
+     */
+    fun settleArrival(
+        settlement: DeliverySettlement,
+        evidence: Observation<DeliveryArrivalEvidence>,
+        now: EpochMillis,
+        nextList: (DeliveryList, DeliveryOfferId) -> ContractResult<DeliveryList>,
+    ): ContractResult<ArrivalCommit> = store.atomic { db ->
+        val active = readActive(db) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
+        val route = readRoute(db, active.requestId) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
+        val progress = DeliveryInProgress(active, route.first, route.second)
+        val outcome = when (val result = settlement.resolve(progress, evidence, now, freeSlots(db))) {
+            is ContractResult.Failure -> return@atomic result
+            is ContractResult.Success -> result.value
+        }
+        val change = when (outcome) {
+            is DeliveryOutcome.AwaitingEvidence -> return@atomic ContractResult.Success(ArrivalCommit(outcome, null))
+            is DeliveryOutcome.IncomeCompleted -> outcome.change
+            is DeliveryOutcome.VehicleDelivered -> outcome.change
+            is DeliveryOutcome.PurchaseRefunded -> outcome.change
+            is DeliveryOutcome.VehicleHeld, DeliveryOutcome.IncomeExpired -> null
+        }
+        val recorded = change?.let {
+            when (val result = store.record(db, it, LedgerJson.command(it).toString())) {
+                is ContractResult.Failure -> return@atomic result
+                is ContractResult.Success -> result.value
+            }
+        }
+        if (outcome is DeliveryOutcome.VehicleHeld) {
+            db.insertOrThrow("delivery_held", null, ContentValues().apply {
+                put("request_id", active.requestId.value)
+                put("payload", DeliveryJson.held(outcome.held).toString())
+            })
+        }
+        val completed = outcome is DeliveryOutcome.IncomeCompleted || outcome is DeliveryOutcome.VehicleDelivered ||
+            outcome is DeliveryOutcome.VehicleHeld
+        if (completed) replaceCompletedSlot(db, active, nextList)?.let { return@atomic it }
+        finishActive(db, active.requestId).let { if (it is ContractResult.Failure) return@atomic it }
+        db.delete("delivery_routes", "request_id = ?", arrayOf(active.requestId.value))
+        db.insertOrThrow("delivery_outcomes", null, ContentValues().apply {
+            put("request_id", active.requestId.value)
+            put("kind", outcome::class.simpleName)
+            put("settle_request", recorded?.transaction?.requestId?.value)
+        })
+        ContractResult.Success(ArrivalCommit(outcome, recorded))
+    }
+
+    /** 임시 보관 중인 차량. */
+    fun held(): ContractResult<List<HeldVehicle>> = store.atomic { db ->
+        db.rawQuery("SELECT request_id, payload FROM delivery_held ORDER BY request_id", null).use {
+            val list = ArrayList<HeldVehicle>()
+            while (it.moveToNext()) {
+                val held = DeliveryJson.held(JSONObject(it.getString(1)))
+                if (held.requestId.value != it.getString(0)) throw JSONException("보관 요청 ID 불일치")
+                list += held
+            }
+            ContractResult.Success(list)
+        }
+    }
+
+    /**
+     * 임시 보관 차량을 처리한다. 수령·환급은 지급 또는 환급과 보관 기록 정리를 한 트랜잭션으로 확정한다.
+     * 보관 기록이 없으면 DATA_UNAVAILABLE이다.
+     */
+    fun resolveHold(settlement: DeliverySettlement, requestId: RequestId, now: EpochMillis): ContractResult<HoldCommit> =
+        store.atomic { db ->
+            val held = db.rawQuery("SELECT payload FROM delivery_held WHERE request_id = ?", arrayOf(requestId.value)).use {
+                if (it.moveToFirst()) DeliveryJson.held(JSONObject(it.getString(0))) else null
+            } ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
+            if (held.requestId != requestId || held.source != store.source) throw JSONException("보관 기록 불일치")
+            val outcome = when (val result = settlement.resolveHold(held, now, freeSlots(db))) {
+                is ContractResult.Failure -> return@atomic result
+                is ContractResult.Success -> result.value
+            }
+            val change = when (outcome) {
+                is HoldOutcome.StillHeld -> return@atomic ContractResult.Success(HoldCommit(outcome, null))
+                is HoldOutcome.Claimed -> outcome.change
+                is HoldOutcome.Refunded -> outcome.change
+            }
+            val recorded = when (val result = store.record(db, change, LedgerJson.command(change).toString())) {
+                is ContractResult.Failure -> return@atomic result
+                is ContractResult.Success -> result.value
+            }
+            db.delete("delivery_held", "request_id = ?", arrayOf(requestId.value))
+            ContractResult.Success(HoldCommit(outcome, recorded))
+        }
+
+    /** 완료한 의뢰가 아직 저장된 목록에 있으면 그 자리만 바꾼다. 날짜가 지나 목록이 없거나 이미 바뀌었으면 건너뛴다. */
+    private fun replaceCompletedSlot(
+        db: SQLiteDatabase,
+        active: ActiveDelivery,
+        nextList: (DeliveryList, DeliveryOfferId) -> ContractResult<DeliveryList>,
+    ): ContractResult.Failure? {
+        val stored = readList(db, active.proposed.list) ?: return null
+        if (stored.offers.none { it.id == active.offer.id }) return null
+        val updated = when (val result = nextList(stored, active.offer.id)) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
+        }
+        if (updated == stored) return null
+        return replaceList(db, stored, updated) as? ContractResult.Failure
+    }
+
+    /** 같은 트랜잭션 안의 빈 칸 수. 대여 중 차량도 소유 중이라 칸을 차지한다. */
+    private fun freeSlots(db: SQLiteDatabase): Int {
+        val capacity = db.rawQuery("SELECT capacity FROM shop WHERE id = 1", null).use {
+            if (!it.moveToFirst()) throw JSONException("가게 용량 누락")
+            it.getInt(0)
+        }
+        val owned = db.rawQuery("SELECT payload FROM vehicles", null).use {
+            var count = 0
+            while (it.moveToNext()) if (LedgerJson.vehicle(JSONObject(it.getString(0))).lifecycle == VehicleLifecycle.OWNED) count++
+            count
+        }
+        return (capacity - owned).coerceAtLeast(0)
+    }
+
+    private fun readRoute(db: SQLiteDatabase, requestId: RequestId): Pair<RouteId, EpochMillis>? = db.rawQuery(
+        "SELECT route, started_at FROM delivery_routes WHERE request_id = ?", arrayOf(requestId.value),
+    ).use { if (it.moveToFirst()) RouteId(it.getString(0)) to EpochMillis(it.getLong(1)) else null }
 
     /** 활성 의뢰를 끝낸다. #38 포기·#39 완료와 같은 트랜잭션에서 호출하는 연결점이며 선택 이력은 남긴다. */
     internal fun finishActive(db: SQLiteDatabase, requestId: RequestId): ContractResult<Unit> {
@@ -296,6 +478,19 @@ internal object DeliveryJson {
     /** 선택 명령. 목록 키·목적지·거리·출처·버전·후보 전체와 고른 의뢰를 함께 비교한다. */
     fun command(requestId: RequestId, offerId: DeliveryOfferId, proposed: DeliveryProposed): JSONObject =
         JSONObject().put("request", requestId.value).put("offer", offerId.value).put("proposed", proposed(proposed))
+
+    fun held(h: HeldVehicle): JSONObject = JSONObject().put("request", h.requestId.value).put("source", h.source.name)
+        .put("vehicle", LedgerJson.vehicle(h.vehicle)).put("price", h.price.units)
+        .put("heldAt", h.heldAt.value).put("deadline", h.deadline.value)
+
+    fun held(j: JSONObject) = HeldVehicle(
+        RequestId(j.getString("request")),
+        InputSource.valueOf(j.getString("source")),
+        LedgerJson.vehicle(j.getJSONObject("vehicle")),
+        GameMoney(long(j, "price", 0, Long.MAX_VALUE)),
+        EpochMillis(long(j, "heldAt", Long.MIN_VALUE, Long.MAX_VALUE)),
+        EpochMillis(long(j, "deadline", Long.MIN_VALUE, Long.MAX_VALUE)),
+    )
 
     private fun offers(list: List<DeliveryOffer>) = JSONArray().apply { list.forEach { put(offer(it)) } }
 
