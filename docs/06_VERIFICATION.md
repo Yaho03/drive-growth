@@ -1173,3 +1173,32 @@ JDK17·기존 Android SDK35·Gradle8.11.1, `--offline --no-daemon`을 사용했�
 빌드 제품 APK SHA-256 `f0f6356d2475c1019a9d65b39980dd953f8ee7e1bab06684d0ef9ae5c57a0cdb`, 시험 APK `4310fce12bf60de7bd6567c57f8eb603d98aff80a156dc14d09ff1069cc66c10`이며 설치본 해시가 아니다. 원본 로컬 로그는 `/private/tmp/gacha52-red.log`, `gacha52-state-green.log`, `gacha52-view-check.log`, `gacha52-expanded-tests.log`, `gacha52-final-check.log`다.
 
 실제 #47 추첨/차감/차량·티켓/보장 저장, #121/#122 공통 거래·실패 복구/재실행, MainActivity/탐색/공통 gate/발견 기록 연결·실차/공식 폼팩터는 미완료다. debug 고정 결과는 실제 획득이 아니고 확정 결과 모양의 시험 입력이다. #52 전체 종료·체크/라벨/담당/차단 관계는 변경하지 않는다. 본인검증 커밋을 독립 검토에 인계하고 PR은 검증 전 게시하지 않는다. 사용자 동결 지시대로 이미 착수한 #52와 인계된 #55 결함 외 새 작업은 시작하지 않는다.
+
+
+### #52 가챠 두 P2 수정과 최신 main 통합 — 2026-11-07
+
+독립 검증 A의 원본 `a4625484b78a5c0619c004d86b3067c5640761a2` 검토는 기존 정식 단위16개 통과 뒤 추가4개 중 assertion3개 실패로 **두 P2**를 확인했다. 미해소 경제 RequestId를 새 옵션 ID/변경 비용 또는 기존 다른 옵션으로 옮기면 원래 의도 대조를 우회했고, 같은 정산의 첫 차고 이동 완료가 두 번째 이동 중 늦게 오면 두 번째 잠금을 해제했다. 실제 차감·중복 지급이나 DB 실패 재현은 아니다. 검토 원문·metadata와 독립 추가 소스는 로컬 `/private/tmp/gacha52-review-a-evidence/`에 보존했다.
+
+기존 B가 소유권 반환·작업 정지를 확인한 뒤 A 구현이 기존 미커밋 제품4파일과 신규 회귀 파일을 그대로 인계받아 완성했다. 인계된 신규 회귀의 수정 전 assertion3개 실패(`/private/tmp/gacha52-boundary-red.log`)와 수정 후 Gacha 단위 성공(`/private/tmp/gacha52-boundary-green.log`) 원문을 읽었다. 제품 수정 커밋은 `10cd845`다.
+
+- 기존 옵션 ID별 보존 원문 검사를 유지하면서 모든 reservation에서 같은 경제 RequestId의 전체 `GachaDrawInput`을 대조한다. 옵션 ID·표시 세대·가격·다른 옵션으로 재결합해 우회하지 못한다. 정상 A/B/A는 보존 경제 키와 새 attemptId로 재시도하며, 호스트의 확정 실패 조회 뒤 명시적 해소는 유지한다. Pending/성공 조회 대기 키는 해소하지 않는다.
+- `GachaGarageRequest(settlementId, ownedVehicleId, token)`을 OpenGarage 이벤트·현재 Pending·완료·새 View 생성자 복원에 함께 보존한다. 경제 RequestId와 별도인 이동 시도 token을 포함한 현재 요청 전체가 일치해야 잠금을 해제한다. 같은 정산의 이전 완료·복원 뒤 이전 완료는 현재 이동을 끝내지 못하고, 현재 완료 뒤에는 다시 이동할 수 있다.
+- 정식 단위 회귀4개는 키 이동2건·명시적 실패 해소, 차고 두 번째 이동/복원/정확 완료, Pending·성공 대기 키 보존을 확인한다. Android View 회귀2개는 실패 키의 다른 옵션 이동을 새 View에서 막는 버튼 동작과, 두 번째 차고 이동 복원 후 옛 완료가 잠금을 유지하는 버튼 동작을 확인하도록 추가했다. 임의 sleep·SDK·새 의존성은 사용하지 않는다.
+
+최신 main `f14c1933592515ab938d39fefba68b3be31cae6a`(PR #130 포함)를 일반 병합했다. 06·09의 같은 위치에 추가된 기록 충돌은 양쪽 기록을 모두 보존해 해결했고 #124/#125/#126/#127/#129/#130의 기존 제품·시험·증거를 유지했다. README 상단 임시 표는 표시 UI 부분 인계와 공통 제공/실제 소비·SQLite 미제공 범위를 맞췄다. 공통 타입·DB·경제·MainActivity/SDK·Gradle/CI를 새로 수정하지 않았으며 이미 제공된 공통 계약을 재구현하지 않았다.
+
+| 수정·통합 후 직접 실행 | 실제 결과 |
+|---|---|
+| `:app:testDebugUnitTest --tests '*Gacha*' :app:assembleDebugAndroidTest --offline` | 정식16+신규회귀4=20개 통과, 시험 APK 컴파일 성공. 로컬 `gacha52-handoff-targeted.log` |
+| `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest --offline` | BUILD SUCCESSFUL 12초, core225·app139 전부 통과(실패/오류/생략0). Gacha20개 포함. 로컬 `/private/tmp/gacha52-handoff-full.log` |
+| Lint | 오류0·경고20. 최신 main의 기존19개와 GachaView의 프로그램 생성자 안내1개이며 오류를 억제하지 않음 |
+| `python3 scripts/check_repository.py`·`git diff --check` | 통과. 필수21·문서26·로컬링크326. 문서 최종 수정 뒤 재확인 |
+| `GachaViewTest` | 기존7+신규2=9개 컴파일. **수정본 기기 실행은 미실행**이며 검증 A에 고정 소스·시험 APK와 인계 |
+
+빌드 환경은 JDK17·기존 Android SDK35·Gradle8.11.1/Kotlin2.2.21/AGP8.10.1이다. 수정/통합 APK SHA-256은 `e72187ff2f1d2513feec57cde9552d6d4da5be41cdc92f920492b3ef8575a5fd`, 시험 APK는 `ff89ee36ba56d7712e37ece4897c0ead8e8bc0e480780cb67a39a662efdcc43c`이며 설치본 해시가 아니다. 빌드 후 변경은 README·06·09 설명뿐이다.
+
+독립 검증 A는 **수정 전 a462548**에서 정식 View7개와 추가 실제 호스트2개를 최종 통과했다. 최초 추가 호스트의 잘못된 좌표 오류는 시험 수정 뒤 해당1개만 재실행했고 이 도구 오류도 원로그에 남겼다. 320/936dp 실제 호스트·고정 입력 터치·새 View 생성자 복원이며 제품 Activity/프로세스 저장이나 실제 SDK/경제 시험은 아니다. 이 9개 실행을 수정본의 기기 통과로 옮겨 쓰지 않는다. A의 당시 종료 기록상 자기 격리 패키지만 제거했고 제품 APK/파일6개·권한·사용자10·기어/전역 창 설정을 보존해 내비 전면으로 반환했다. **이번 마무리 세션은 adb 조회·설치·AVD·설정·제품 데이터를 전혀 조작하지 않았다.**
+
+보조 코드 검토 APPROVE·구조 CLEAR를 회수했다. 검토 head `f8e4449`와 제품 수정 `10cd845`의 Gacha 소스가 동일하며 추가 필수 결함은 없었다. 두 lane은 원인·수정·시험 소스와 기존 red/green/XML을 읽은 검토이고 Gradle/기기를 새로 실행하지 않았으며 사람 승인으로 표시하지 않는다.
+
+실제 #47 소비·티켓/보장/차량 지급·#122 SQLite·발견 저장·호스트 탐색/gate 연결·Activity Bundle/프로세스 복원·공식 폼팩터/실차는 미완료다. 이미 제공된 #126 가챠 메모리 참조와 #127 재료 순수 검증을 미제공으로 되돌리지 않으며 UI의 실제 연결과 구분한다. 이번 결과는 #52 전체 완료가 아니다. 수정본 장치 검증·정확한 원격 head/CI/PR/main 반영은 메인이 이어 기록하며 구현 세션은 로컬 고정 커밋/PR 본문 인계 후 새 기능을 시작하지 않는다.
