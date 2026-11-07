@@ -1,6 +1,7 @@
 package io.drivegrowth.app.data
 
 import android.content.ContentValues
+import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import io.drivegrowth.core.contract.ContentVersion
 import io.drivegrowth.core.contract.ContractError
@@ -8,6 +9,7 @@ import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.DeliveryArrivalEvidence
 import io.drivegrowth.core.contract.EpochMillis
 import io.drivegrowth.core.contract.EstimatedRouteDistance
+import io.drivegrowth.core.contract.GameChange
 import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.InputSource
 import io.drivegrowth.core.contract.Observation
@@ -18,6 +20,7 @@ import io.drivegrowth.core.contract.RuleVersion
 import io.drivegrowth.core.contract.Settlement
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.contract.VehicleLifecycle
+import io.drivegrowth.core.contract.VehicleWrite
 import io.drivegrowth.core.delivery.ActiveDelivery
 import io.drivegrowth.core.delivery.DeliveryInProgress
 import io.drivegrowth.core.delivery.DeliveryList
@@ -35,6 +38,7 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.time.LocalDate
+import java.time.format.DateTimeParseException
 
 /**
  * 탁송 선택의 확정 결과.
@@ -141,23 +145,26 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
      * - 같은 요청 ID·다른 내용, 또는 공용 정산에 이미 있는 요청 ID는 STATE_CONFLICT이고 바꾸지 않는다.
      * - 제시 목록이 저장되지 않았으면 DATA_UNAVAILABLE, 저장된 목록과 다르면 STATE_CONFLICT다. 다시 뽑은 목록으로 고르지 못하게 한다.
      * - 구매는 결제 정산, 선택 이력, 활성 의뢰를 한 트랜잭션으로 확정한다.
+     * - 입력은 처음에 한 번만 읽어 고정한다. 명령 기록·저장 목록 대조·선택·결제·활성 기록이 모두 같은 값을 쓴다.
+     * - 재생할 때 저장된 활성 의뢰와 결제 정산이 원래 명령과 맞지 않으면 STORAGE_FAILURE이고 원본을 바꾸지 않는다.
      */
     fun select(proposed: DeliveryProposed, offerId: DeliveryOfferId, requestId: RequestId): ContractResult<DeliveryCommit> =
         store.atomic { db ->
-            if (proposed.estimated.source != store.source || proposed.list.source != store.source) {
+            val request = DeliveryJson.proposed(DeliveryJson.proposed(proposed))
+            if (request.estimated.source != store.source || request.list.source != store.source) {
                 return@atomic failure(ContractError.INVALID_INPUT)
             }
-            val command = DeliveryJson.command(requestId, offerId, proposed).toString()
+            val command = DeliveryJson.command(requestId, offerId, request).toString()
             readRequest(db, requestId)?.let { previous ->
                 if (previous.command != command) return@atomic failure(ContractError.STATE_CONFLICT)
-                return@atomic replay(db, previous, offerId)
+                return@atomic replay(db, previous)
             }
             if (hasSettlement(db, requestId)) return@atomic failure(ContractError.STATE_CONFLICT)
-            val stored = readList(db, proposed.list) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
-            if (!sameList(stored, proposed.list)) return@atomic failure(ContractError.STATE_CONFLICT)
+            val stored = readList(db, request.list) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
+            if (!sameList(stored, request.list)) return@atomic failure(ContractError.STATE_CONFLICT)
 
             val current = readActive(db)
-            val selected = when (val result = DeliverySelection.select(proposed, offerId, requestId, store.readBalance(db), current)) {
+            val selected = when (val result = DeliverySelection.select(request, offerId, requestId, store.readBalance(db), current)) {
                 is ContractResult.Failure -> return@atomic result
                 is ContractResult.Success -> result.value
             }
@@ -335,17 +342,15 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         return if (removed == 1) ContractResult.Success(Unit) else failure(ContractError.STATE_CONFLICT)
     }
 
-    private class StoredRequest(val command: String, val active: ActiveDelivery, val paid: Boolean)
+    /** 원래 명령에서 다시 계산해 저장값과 대조를 마친 선택 이력. */
+    private class StoredRequest(val command: String, val selected: DeliverySelected) {
+        val active: ActiveDelivery get() = selected.active
+    }
 
-    private fun replay(db: SQLiteDatabase, previous: StoredRequest, offerId: DeliveryOfferId): ContractResult<DeliveryCommit> {
-        val active = previous.active
-        val selected = when (val result = DeliverySelection.select(active.proposed, offerId, active.requestId, GameMoney(0), active)) {
-            is ContractResult.Failure -> throw JSONException("저장된 선택 재생 실패: ${result.error}")
-            is ContractResult.Success -> result.value
-        }
-        val settlement = if (previous.paid) readSettlement(db, active.requestId) else null
-        if (previous.paid != (selected.payment != null)) throw JSONException("결제 기록 불일치")
-        return ContractResult.Success(DeliveryCommit(selected, settlement))
+    /** 대조를 마친 선택 이력과 공용 결제 정산을 돌려준다. 정산이 원래 결제와 맞지 않으면 손상이다. */
+    private fun replay(db: SQLiteDatabase, previous: StoredRequest): ContractResult<DeliveryCommit> {
+        val settlement = previous.selected.payment?.let { readRecordedSettlement(db, it) ?: throw JSONException("구매 결제 정산 누락") }
+        return ContractResult.Success(DeliveryCommit(previous.selected, settlement))
     }
 
     private fun listValues(list: DeliveryList) = ContentValues().apply {
@@ -369,7 +374,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
     private fun readList(db: SQLiteDatabase, keyOf: DeliveryList): DeliveryList? =
         db.rawQuery("SELECT payload FROM delivery_lists WHERE $KEY", key(keyOf)).use {
             if (!it.moveToFirst()) return@use null
-            DeliveryJson.list(JSONObject(it.getString(0))).also { stored ->
+            DeliveryJson.list(JSONObject(it.text(0))).also { stored ->
                 if (stored.createdOn != keyOf.createdOn || stored.band != keyOf.band || stored.source != keyOf.source ||
                     stored.contentVersion != keyOf.contentVersion || stored.ruleVersion != keyOf.ruleVersion
                 ) {
@@ -385,9 +390,9 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
     ).use {
         val lists = ArrayList<DeliveryList>()
         while (it.moveToNext()) {
-            val list = DeliveryJson.list(JSONObject(it.getString(3)))
-            if (list.createdOn != day || list.source != store.source || list.band != it.getInt(0) ||
-                list.contentVersion.value != it.getString(1) || list.ruleVersion.value != it.getString(2)
+            val list = DeliveryJson.list(JSONObject(it.text(3)))
+            if (list.createdOn != day || list.source != store.source || list.band.toLong() != it.integer(0) ||
+                list.contentVersion.value != it.text(1) || list.ruleVersion.value != it.text(2)
             ) {
                 throw JSONException("목록 키 불일치")
             }
@@ -400,27 +405,74 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         "SELECT command, active, paid FROM delivery_requests WHERE request_id = ?", arrayOf(requestId.value),
     ).use {
         if (!it.moveToFirst()) return@use null
-        val active = DeliveryJson.active(JSONObject(it.getString(1)))
-        if (active.requestId != requestId) throw JSONException("선택 이력 요청 ID 불일치")
-        StoredRequest(it.getString(0), active, it.getInt(2) == 1)
+        val command = it.text(0)
+        val activeJson = it.text(1)
+        val paid = it.flag(2)
+        val stored = JSONObject(command)
+        if (stored.getString("request") != requestId.value) throw JSONException("선택 이력 요청 ID 불일치")
+        val proposed = DeliveryJson.proposed(stored.getJSONObject("proposed"))
+        val offerId = DeliveryOfferId(stored.getString("offer"))
+        if (DeliveryJson.command(requestId, offerId, proposed).toString() != command) throw JSONException("선택 명령 형식 오류")
+        // 저장된 활성 의뢰·결제 여부는 파싱만 믿지 않고 원래 명령에서 다시 계산한 값과 같아야 한다.
+        val selected = when (val result = DeliverySelection.select(proposed, offerId, requestId, GameMoney(Long.MAX_VALUE), null)) {
+            is ContractResult.Failure -> throw JSONException("저장된 선택 재생 실패: ${result.error}")
+            is ContractResult.Success -> result.value
+        }
+        if (activeJson != DeliveryJson.active(selected.active).toString()) throw JSONException("활성 의뢰가 원래 명령과 다름")
+        if (paid != (selected.payment != null)) throw JSONException("결제 기록 불일치")
+        StoredRequest(command, selected)
     }
 
     private fun readActive(db: SQLiteDatabase): ActiveDelivery? {
         val requestId = db.rawQuery("SELECT request_id FROM delivery_active WHERE id = 1", null).use {
-            if (it.moveToFirst()) RequestId(it.getString(0)) else null
+            if (it.moveToFirst()) RequestId(it.text(0)) else null
         } ?: return null
         return (readRequest(db, requestId) ?: throw JSONException("활성 의뢰의 선택 이력 누락")).active
     }
 
     private fun hasSettlement(db: SQLiteDatabase, requestId: RequestId): Boolean =
         db.rawQuery("SELECT 1 FROM settlements WHERE request_id = ?", arrayOf(requestId.value)).use { it.moveToFirst() }
-
-    private fun readSettlement(db: SQLiteDatabase, requestId: RequestId): Settlement =
-        db.rawQuery("SELECT result FROM settlements WHERE request_id = ?", arrayOf(requestId.value)).use {
-            if (!it.moveToFirst()) throw JSONException("구매 결제 정산 누락")
-            LedgerJson.settlement(JSONObject(it.getString(0)))
-        }
 }
+
+/**
+ * [change]로 확정된 공용 정산을 읽는다. 없으면 null이다.
+ * 정산 행의 명령이 [change]와 같고, 결과의 정산 ID·요청 ID·종류·출처·규칙 버전·금액·방향·차량 ID가 [change]와 맞아야 한다.
+ * 하나라도 다르면 파싱에 성공해도 손상으로 본다.
+ */
+internal fun readRecordedSettlement(db: SQLiteDatabase, change: GameChange): Settlement? =
+    db.rawQuery("SELECT settlement_id, command, result FROM settlements WHERE request_id = ?", arrayOf(change.requestId.value)).use {
+        if (!it.moveToFirst()) return@use null
+        if (it.text(1) != LedgerJson.command(change).toString()) throw JSONException("정산 명령이 원래 거래와 다름")
+        val settlement = LedgerJson.settlement(JSONObject(it.text(2)))
+        val t = settlement.transaction
+        if (settlement.settlementId.value != it.text(0) || t.requestId != change.requestId || t.kind != change.kind ||
+            t.source != change.source || t.ruleVersion != change.ruleVersion || t.money != change.money
+        ) {
+            throw JSONException("정산 결과가 원래 거래와 다름")
+        }
+        val vehicleId = when (val write = change.vehicle) {
+            null -> null
+            is VehicleWrite.Add -> write.vehicle.ownedVehicleId
+            is VehicleWrite.Update -> write.ownedVehicleId
+        }
+        if (settlement.changedVehicle?.ownedVehicleId != vehicleId) throw JSONException("정산 차량이 원래 거래와 다름")
+        settlement
+    }
+
+/** TEXT 칸만 받는다. NULL·정수·실수·BLOB은 손상으로 본다. */
+internal fun Cursor.text(index: Int): String {
+    if (getType(index) != Cursor.FIELD_TYPE_STRING) throw JSONException("문자열 칸 형식 오류")
+    return getString(index)
+}
+
+/** INTEGER 칸만 받는다. TEXT·실수·NULL을 0이나 절삭 정수로 바꾸지 않는다. */
+internal fun Cursor.integer(index: Int, min: Long = Long.MIN_VALUE, max: Long = Long.MAX_VALUE): Long {
+    if (getType(index) != Cursor.FIELD_TYPE_INTEGER) throw JSONException("정수 칸 형식 오류")
+    return getLong(index).also { if (it !in min..max) throw JSONException("정수 칸 범위 오류") }
+}
+
+/** INTEGER 0 또는 1만 받는다. */
+internal fun Cursor.flag(index: Int): Boolean = integer(index, 0, 1) == 1L
 
 /** 필드 순서가 고정된 탁송 표현. 정수는 형식과 범위를 검사하고 자동 변환하지 않는다. */
 internal object DeliveryJson {
@@ -450,7 +502,7 @@ internal object DeliveryJson {
     fun list(j: JSONObject) = DeliveryList(
         long(j, "band", 0, Int.MAX_VALUE.toLong()).toInt(),
         InputSource.valueOf(j.getString("source")),
-        LocalDate.parse(j.getString("createdOn")),
+        date(j.getString("createdOn")),
         ContentVersion(j.getString("content")),
         RuleVersion(j.getString("rule")),
         offers(j.getJSONArray("offers")),
@@ -491,6 +543,13 @@ internal object DeliveryJson {
         EpochMillis(long(j, "heldAt", Long.MIN_VALUE, Long.MAX_VALUE)),
         EpochMillis(long(j, "deadline", Long.MIN_VALUE, Long.MAX_VALUE)),
     )
+
+    /** 잘못된 날짜는 기본값으로 바꾸지 않고 저장 손상으로 돌려준다. */
+    fun date(raw: String): LocalDate = try {
+        LocalDate.parse(raw)
+    } catch (error: DateTimeParseException) {
+        throw JSONException("날짜 형식 오류: $raw")
+    }
 
     private fun offers(list: List<DeliveryOffer>) = JSONArray().apply { list.forEach { put(offer(it)) } }
 
