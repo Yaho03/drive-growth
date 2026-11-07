@@ -1,11 +1,16 @@
 package io.drivegrowth.app.host
 
 import android.app.Instrumentation
+import android.app.ActivityManager
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Rect
+import android.os.SystemClock
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
+import android.view.MotionEvent
 import android.widget.Button
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
@@ -18,6 +23,7 @@ import io.drivegrowth.core.contract.*
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.Executor
 
 /** 격리 DB의 저장 결과와 실제 MainActivity/SDK P gate를 연결한다. gate reset 한 단계만 제어 입력이다. */
 @Suppress("DEPRECATION")
@@ -35,6 +41,32 @@ class ResultsHostActivityTest : InstrumentationTestCase() {
     private fun button(activity: MainActivity, label: String) = descendants(activity.window.decorView)
         .filterIsInstance<Button>().first { it.text.toString() == label }
     private fun results(activity: MainActivity) = descendants(activity.window.decorView).filterIsInstance<ResultsView>().single()
+    private fun tap(button: Button) {
+        ui { button.requestRectangleOnScreen(Rect(0, 0, button.width, button.height), true) }
+        instrumentation.waitForIdleSync()
+        val visible = ui { Rect().also {
+            assertTrue(button.getGlobalVisibleRect(it))
+            assertEquals("네이티브 터치 전에 버튼 전체 높이가 보여야 한다", button.height, it.height())
+            assertEquals(button.width, it.width())
+            val screen = IntArray(2)
+            button.getLocationOnScreen(screen)
+            it.set(screen[0], screen[1], screen[0] + button.width, screen[1] + button.height)
+        } }
+        val now = SystemClock.uptimeMillis()
+        instrumentation.sendPointerSync(MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN,
+            visible.exactCenterX(), visible.exactCenterY(), 0))
+        instrumentation.sendPointerSync(MotionEvent.obtain(now, now + 1, MotionEvent.ACTION_UP,
+            visible.exactCenterX(), visible.exactCenterY(), 0))
+        instrumentation.waitForIdleSync()
+    }
+    private fun screenshot(activity: MainActivity, name: String) {
+        val framed = CountDownLatch(1)
+        ui { activity.window.decorView.postOnAnimation { activity.window.decorView.postOnAnimation { framed.countDown() } } }
+        assertTrue("전환 화면의 실제 프레임을 기다린다", framed.await(3, TimeUnit.SECONDS))
+        instrumentation.targetContext.openFileOutput(name, 0).use {
+            assertTrue(instrumentation.uiAutomation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it))
+        }
+    }
     private fun awaitUi(activity: MainActivity, description: String, condition: () -> Boolean) {
         val ready = CountDownLatch(1)
         val root = activity.window.decorView
@@ -79,6 +111,10 @@ class ResultsHostActivityTest : InstrumentationTestCase() {
                 assertTrue("재생성은 이전 차량 허용을 재사용하지 않는다", texts(current).contains("주차 후 조작이 허용되면 이용할 수 있습니다."))
             }
             awaitUi(current, "새 P 판정 뒤 정산 선택 ID가 복원돼야 한다") { current.window.decorView.findViewWithTag<View>(markTag) != null }
+            val root = ui { current.findViewById<ViewGroup>(android.R.id.content).getChildAt(0) }
+            val narrowWidth = (320 * current.resources.displayMetrics.density).toInt()
+            ui { root.layoutParams = root.layoutParams.apply { width = narrowWidth }; root.requestLayout() }
+            awaitUi(current, "실제 호스트를 320dp 폭으로 배치한다") { root.width == narrowWidth }
             val view = ui { results(current) }
             ui {
                 // watchdog 전 gate 만료를 결정적으로 재현한다. 실제 SDK D 입력으로 기록하지 않는다.
@@ -89,17 +125,47 @@ class ResultsHostActivityTest : InstrumentationTestCase() {
             }
             assertTrue((source.read() as ContractResult.Success).value.unviewedSettlements.any { it.settlementId == stored.settlementId })
             awaitUi(current, "재허용 뒤 같은 ID를 다시 열람 처리할 수 있어야 한다") { current.window.decorView.findViewWithTag<Button>(markTag)?.isEnabled == true }
-            ui { current.window.decorView.findViewWithTag<Button>(markTag).performClick() }
-            awaitUi(current, "실제 저장 성공 응답 뒤에만 Done이어야 한다") { view.uiState.readStates[stored.settlementId] == ResultsReadState.Done }
+            val markButton = ui { current.window.decorView.findViewWithTag<Button>(markTag) }
+            ui { markButton.requestRectangleOnScreen(Rect(0, 0, markButton.width, markButton.height), true) }
+            instrumentation.waitForIdleSync()
+            screenshot(current, "host-narrow-mark.png")
+            val session = retained as HostSession
+            val worker = HostSession::class.java.getDeclaredField("worker").apply { isAccessible = true }.get(session) as Executor
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val completed = CountDownLatch(1)
+            worker.execute { entered.countDown(); check(release.await(10, TimeUnit.SECONDS)) }
+            assertTrue(entered.await(3, TimeUnit.SECONDS))
+            try {
+                tap(markButton)
+                ui {
+                    assertEquals(ResultsReadState.Pending, session.results.uiState.readStates[stored.settlementId])
+                    current.onBackPressed()
+                    assertNull(results(current).selectedSettlementId)
+                    current.onBackPressed()
+                    assertTrue(texts(current).contains("드라이브 키우기"))
+                    current.onBackPressed()
+                }
+                release.countDown()
+                // 같은 worker의 저장 후 main 전달보다 뒤에 완료 표식을 둔다. UI thread는 기다리지 않는다.
+                worker.execute { instrumentation.runOnMainSync { completed.countDown() } }
+                assertTrue(completed.await(5, TimeUnit.SECONDS))
+                ui {
+                    assertEquals(ResultsReadState.Done, session.results.uiState.readStates[stored.settlementId])
+                    assertTrue("숨김 중 저장 응답이 게임 UI를 되살리지 않는다", texts(current).contains("주차 후 조작이 허용되면 이용할 수 있습니다."))
+                }
+            } finally { release.countDown() }
             val after = (source.read() as ContractResult.Success).value
             assertFalse(after.unviewedSettlements.any { it.settlementId == stored.settlementId })
             assertEquals(before.balance, after.balance)
             assertEquals(before.ownedVehicles, after.ownedVehicles)
             SqliteGameChangeStore(context, InputSource.SIMULATION).use { assertEquals(ContractResult.Success(stored), it.commitGameChange(command)) }
-            ui { current.onBackPressed(); assertNull(results(current).selectedSettlementId) }
-            ui { current.onBackPressed() }
-            awaitUi(current, "상세→목록→가게 Back") { texts(current).contains("드라이브 키우기") }
-            ui { button(current, "첫 차량 안내").performClick() }
+            ui { current.getSystemService(ActivityManager::class.java).appTasks.first {
+                it.taskInfo.persistentId == current.taskId
+            }.moveToFront() }
+            awaitUi(current, "저장 후 사용자 복귀에서 새 gate·조회로 가게를 복원한다") { texts(current).contains("드라이브 키우기") }
+            tap(ui { button(current, "첫 차량 안내") })
+            screenshot(current, "host-narrow-onboarding.png")
             ui {
                 assertEquals(1, descendants(current.window.decorView).filterIsInstance<OnboardingView>().size)
                 assertTrue(texts(current).any { it.contains("초기 지급 이력 조회가 연결되지 않아") })
