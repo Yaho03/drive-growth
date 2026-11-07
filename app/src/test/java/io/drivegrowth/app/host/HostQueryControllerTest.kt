@@ -112,4 +112,29 @@ class HostQueryControllerTest {
         assertEquals(HostQueryState.Loading, seen.last())
         assertEquals(1, worker.pending.size)
     }
+
+    @Test fun recreationReusesInFlightWorkButNeverRestoresOldPermissionOrOldCallback() {
+        val worker = Tasks()
+        val main = Tasks()
+        val first = mutableListOf<HostQueryState>()
+        val next = mutableListOf<HostQueryState>()
+        val host = HostQueryController(worker, main, { ContractResult.Success(snapshot()) }, first::add)
+        host.setControlsEnabled(true)
+        val oldCount = first.size
+        repeat(100) {
+            host.detach()
+            host.attach(next::add)
+        }
+        assertEquals(HostQueryState.Restricted, next.last())
+        assertEquals(1, worker.pending.size)
+        worker.runNext()
+        main.runNext()
+        assertEquals(oldCount, first.size)
+        assertEquals(HostQueryState.Restricted, next.last())
+        assertTrue(worker.pending.isEmpty())
+        host.setControlsEnabled(true)
+        worker.runNext()
+        main.runNext()
+        assertTrue(next.last() is HostQueryState.Content)
+    }
 }

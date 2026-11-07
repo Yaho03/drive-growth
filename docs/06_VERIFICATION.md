@@ -558,9 +558,10 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w \
 로컬 자동 검증:
 
 - 먼저 미구현 타입을 사용하는 mapper/controller/탐색 회귀를 실행해 컴파일 실패를 확인한 뒤 구현했다. 제어 실행기를 사용하며 임의 sleep을 쓰지 않는다. 로컬 red/green 로그는 `/private/tmp/garage-host-*.txt`에 보존하며 실제 SDK 입력 시험과 구분한다.
-- 신규 host 회귀 10개: 같은 차종의 다른 개체/revision·공통 필드, 손상 참조/중복 ID/빈 보유, 명시 이력만 사용하는 도감과 미지원 오류, 원본 Settlement 유지, 제한 뒤 늦은 성공 폐기, release/재시작 세대, 반복 100회 요청의 작업 1개 유지, 실패/재시도, 준비 요청/선택 복원과 Back 순서를 확인했다.
+- 신규 host 회귀 11개: 같은 차종의 다른 개체/revision·공통 필드, 손상 참조/중복 ID/빈 보유, 명시 이력만 사용하는 도감과 미지원 오류, 원본 Settlement 유지, 제한 뒤 늦은 성공 폐기, release/재시작 세대, 반복 100회 요청의 작업 1개 유지, 실패/재시도, 준비 요청/선택 복원과 Back 순서를 확인했다. 추가 100회 detach/attach 회귀는 구성 변경 사이 기존 작업 하나·이전 callback 폐기·허용 상태 미복원을 확인한다. 실제 Activity 구성 변경 시험과 구분한다.
 - 최초 Activity 연결 뒤 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug` 성공(core 97개·app 35개). 이후 원본 데이터 보존 회귀를 더한 `:app:testDebugUnitTest :app:assembleDebugAndroidTest` 성공. 저장소 검사(필수 21개·문서 26개·로컬 링크 222개)와 `git diff --check` 통과. 이후 변경의 최종 재검사는 게시 전 결과로 갱신한다.
 - 별도 읽기 전용 AI 검토에서 gate/Back/복원/세대 제어 결함은 발견하지 못했고, 상위 조회 예외의 오분류·진단 소실 1건을 수정했다. 예상 저장 오류·권한 거부·기타 공급 실패를 구분하고 예외 종류/단계만 진단한다. 사람 리뷰나 실제 장치 실행으로 간주하지 않는다.
+- 이후 구성 변경 사이 application Context 기반 `HostSession`의 worker/source/controller만 유지하고 화면 callback을 해제하도록 보완했다. 새 화면은 제한 상태에서 시작한다. 이 변경의 app 단위 37개·APK 빌드·lint가 통과했으며 별도 읽기 검토에서 추가 결함은 발견하지 못했다. 새 의존성 없이 플랫폼의 Activity non-configuration 보존 API를 사용한다.
 
 현재 실제 기기 시험은 **미실행**이다. 메인이 배정한 B의 #54 격리 시험 순서를 지켜 이 작업에서는 adb 조회·설치·AVD 실행·신호/권한/창 설정을 조작하지 않았다. 준비 후 메인과 사용 시간을 조율해 실제 차고/도감 탐색, 터치 Back/일반·CCP Back, 숨김·복귀·Activity 복원, 조회 실패, 실제 SDK 제한과 창 크기를 확인해야 한다. 고정 시험 입력으로 확인한 상세/도감 이력과 실제 원장·실제 SDK 시험은 구분한다. 관리 명령은 현재 비활성/미연결이며 거래 성공·재실행 복구 또는 #51/#52 전체 완료를 주장하지 않는다.
 

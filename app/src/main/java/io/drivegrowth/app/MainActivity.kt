@@ -15,7 +15,7 @@ import io.drivegrowth.app.host.HostNavigation
 import io.drivegrowth.app.host.HostPage
 import io.drivegrowth.app.host.HostQueryController
 import io.drivegrowth.app.host.HostQueryState
-import io.drivegrowth.app.host.StoredHostSource
+import io.drivegrowth.app.host.HostSession
 import io.drivegrowth.app.ui.garage.CollectionScreenState
 import io.drivegrowth.app.ui.garage.CollectionView
 import io.drivegrowth.app.ui.garage.GarageEvent
@@ -29,17 +29,16 @@ import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.contract.Revision
 import io.drivegrowth.core.contract.VehicleInteraction
 import io.drivegrowth.core.progression.VehicleAction
-import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
-    private val worker = Executors.newSingleThreadExecutor()
     private val interaction = ForegroundInteraction()
     private var input: VehicleInput? = null
     private var navigation = HostNavigation()
     private var screen: HostQueryState = HostQueryState.Restricted
     private val mapper = GarageHostMapper()
     private lateinit var queries: HostQueryController
+    private lateinit var session: HostSession
     private lateinit var style: GarageStyle
     private lateinit var garage: GarageView
     private lateinit var collection: CollectionView
@@ -61,19 +60,16 @@ class MainActivity : Activity() {
         style = GarageStyle(this)
         garage = GarageView(this, ::onGarageEvent).also { it.restoreSelection(navigation.selectedVehicleId) }
         collection = CollectionView(this, ::refresh)
-        val source = StoredHostSource(this)
         val deliveryHandler = handler
-        queries = HostQueryController(worker, { deliveryHandler.post(it) }, source::read) {
-            screen = it
-            render()
-        }
+        session = lastNonConfigurationInstance as? HostSession ?: HostSession(applicationContext) { deliveryHandler.post(it) }
+        queries = session.queries
         panel = style.column().apply { setBackgroundColor(style.base) }
         chrome = style.column().apply { setPadding(style.dp(16), 0, style.dp(16), 0) }
         body = FrameLayout(this)
         panel.addView(chrome)
         panel.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(panel)
-        render()
+        queries.attach { screen = it; render() }
         if (savedInstanceState == null) {
             val permissions = arrayOf("android.car.permission.CAR_SPEED", "android.car.permission.CAR_POWERTRAIN")
                 .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
@@ -119,10 +115,12 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        queries.release()
-        worker.shutdownNow()
+        queries.detach()
+        if (!isChangingConfigurations) session.release()
         super.onDestroy()
     }
+
+    override fun onRetainNonConfigurationInstance(): Any = session
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("page", navigation.page.name)

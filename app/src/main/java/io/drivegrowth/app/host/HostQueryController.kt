@@ -28,6 +28,21 @@ class HostQueryController(
     private var inFlight = false
     private var requested = false
 
+    /** 같은 조회 작업에 새 화면만 연결한다. 이전 화면의 허용 판정은 물려주지 않는다. */
+    fun attach(listener: (HostQueryState) -> Unit) {
+        if (released) return
+        detach()
+        onState = listener
+        listener(HostQueryState.Restricted)
+    }
+
+    fun detach() {
+        generation++
+        enabled = false
+        requested = false
+        onState = null
+    }
+
     fun setControlsEnabled(value: Boolean) {
         if (released || value == enabled) return
         enabled = value
