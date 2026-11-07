@@ -597,3 +597,16 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w \
 메인 통합 worktree에서 JDK17·기존 SDK로 `./gradlew --offline --no-daemon :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`를 실행했다. core97개·app11개가 실패·오류·생략0으로 통과했고 앱·시험 APK 빌드 및 Lint(오류0·경고13)가 성공했다. 저장소 검사와 `git diff --check`도 통과했다. 기존 02·06 기록을 보존하고 09 연결 설명과 README의 구현 범위를 맞췄다. 실제 최종 커밋과 원격 CI 결과는 PR #103에서 확인한다.
 
 이번 통합은 adb·에뮬레이터를 사용하지 않았다. 위 SQLite26개·격리 UI10개의 실제 장치 근거를 새 조합의 제품 앱·경제 명령·저장/재실행 시험으로 확대하지 않는다. #46의 활동·영속 도감·migration·다중 개체 거래, #52의 #51 탐색·주행 제한·실제 명령 연결과 #28 통합 흐름은 남아 있다. #105 차량 입력·Back 변경은 이 통합에 포함하지 않는다.
+
+
+### PR #105 독립 최종 검토와 인계 — 2026-11-07
+
+검증 C가 최종 코드 `055649180ef265789da914bd36d83f390108b2d5`를 검토했다. 작성자의 기기 시험 head `e165098` 이후 app/core diff가 없고, 보존된 앱 `793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9`·시험 APK `09cc28008de8e89dc7533db34e041b6aabeb80166338e5651ee41f42a4fb65c2`와 실제 설치본이 일치함을 시작·종료 시 대조했다. fresh 빌드는 DEX 분할 순서 때문에 전체 해시가 달랐으며 DEX 내용 집합·다른 항목의 동일성을 확인했다. 추가 장치 시험에는 정확한 보존 APK를 사용했고 서로 같은 해시라고 기록하지 않았다.
+
+- 새 Queue 회귀 15개를 직접 실행하고 빌드·Lint(오류0·경고14)·저장소·diff 검사를 확인했다. 메인에서도 별도 최종 worktree에서 Queue15개 실패·오류·생략0과 저장소·diff를 확인했다.
+- 작성자의 장치47개와 실제 D/P·권한·Back·선택 복원 근거는 최종 소스·APK·로그·화면을 대조해 활용했고 일괄 재실행하지 않았다.
+- 정확한 793e 설치본에서 `VehicleInputDelayTest`·`NavigationTest`를 추가 실행해 [2개 통과, 1.147초](evidence/pr105-vehicle-input-stall/final-review-targeted-2.txt)를 확인했다.
+- 실제 제품의 SDK worker 하나만 통제해 중지한 동안 새 표본 만료로 제한 전환, 일반 Back의 창 숨김, 같은 Activity 재진입의 제한 유지, worker 재개·디버거 분리 후 새 P 관측으로 콘텐츠 복귀를 확인했다. 실제 CarService/VHAL 장애 주입과 구분한다. 로컬 원본은 `/private/tmp/pr105-final-verification-evidence/worker-pause-jdwp.txt`와 해당 화면·metadata에 보존했다.
+- 신호·권한·창·야간 설정은 이 추가 시험에서 변경하지 않았다. worker 재개·디버거 분리·포워딩 제거 후 제품 시험 프로세스와 이번 AVD만 종료했고 기존 ADB5038 서버를 유지했다. 데이터 삭제·초기화는 하지 않았다.
+
+이번 입력·수명주기 변경에서 차단 결함은 발견되지 않았다. PR 검토·사용자 머지 지시와 최종 원격 커밋/CI는 PR #105에서 관리하며 AI 검토를 사람 승인으로 표시하지 않는다. 위 SDK 내부 잠금·실제 서비스 장애 주입·센서 시각·공식 폼 팩터·실차 한계는 유지한다. 실제 명령 중복·저장 성공 경계, #103 표시 UI의 제품 탐색 연결과 후속 기능 통합은 #51·#52·#28에 남긴다. README의 화면 병렬 작업표는 같은 인계를 반영한다.

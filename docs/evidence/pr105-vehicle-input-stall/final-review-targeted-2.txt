@@ -1,0 +1,9 @@
+
+io.drivegrowth.app.vehicle.VehicleInputDelayTest:.
+io.drivegrowth.app.NavigationTest:.
+Test results for InstrumentationTestRunner=..
+Time: 1.147
+
+OK (2 tests)
+
+
