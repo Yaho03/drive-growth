@@ -80,4 +80,19 @@ class ProgressViewTest : InstrumentationTestCase() {
             assertTrue(all(view).filterIsInstance<TextView>().all { it.measuredWidth <= width })
         }
     }
+    fun testRemovedRevisionGuardSurvivesViewReplacement() = onUi {
+        val events = mutableListOf<ProgressEvent>(); val first = ProgressView(instrumentation.targetContext, events::add)
+        val normal = ProgressPreviewStates.normal
+        val confirmed = normal.copy(entries = normal.entries.map {
+            if (it.key == ProgressPreviewStates.firstKey) it.copy(revision = 5, status = RewardStatus.CLAIMED) else it
+        })
+        first.render(confirmed, true)
+        first.render(normal.copy(sequence = 2, entries = emptyList()), true)
+        val replacement = ProgressView(instrumentation.targetContext, events::add)
+        replacement.restoreUiState(first.uiState)
+        assertFalse(replacement.render(normal.copy(sequence = 3), true))
+        assertTrue(events.none { it is ProgressEvent.ClaimReward })
+        assertTrue(all(replacement).none { it is Button })
+    }
+
 }

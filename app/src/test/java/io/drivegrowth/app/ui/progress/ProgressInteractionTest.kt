@@ -93,4 +93,46 @@ class ProgressInteractionTest {
         assertFalse(ui.retry()); ui.completeRetry(); assertTrue(ui.retry())
         ui.render(ProgressScreenState.Unsupported("미지원"), true); ui.completeRetry(); assertFalse(ui.retry())
     }
+    @Test fun removedKeyRetainsHighestAcceptedRevisionAndCannotClaimOldState() {
+        val events = mutableListOf<ProgressEvent>(); val ui = interaction(events)
+        ui.render(content(1, listOf(item(5, "received-5", RewardStatus.CLAIMED))), true)
+        ui.render(content(2, emptyList()), true)
+        assertFalse(ui.render(content(3, listOf(item(1, "unused-old-offer"))), true))
+        ui.select(key)
+        assertNull(ui.selectedItem); assertFalse(ui.claim())
+        assertTrue(events.none { it is ProgressEvent.ClaimReward })
+        assertTrue(ui.render(content(4, listOf(item(6, "new-offer"))), true))
+        ui.select(key); assertTrue(ui.claim())
+    }
+    @Test fun restoredViewRetainsRemovedRevisionsButAllowsANewPeriod() {
+        val events = mutableListOf<ProgressEvent>(); val first = interaction(events)
+        first.render(content(1, listOf(item(5, "received-5", RewardStatus.CLAIMED))), true)
+        first.render(content(2, emptyList()), true)
+        val restored = interaction(events); restored.restoreUiState(first.uiState)
+        assertFalse(restored.render(content(3, listOf(item(1, "old-offer"))), true))
+        restored.select(key); assertFalse(restored.claim())
+        val nextPeriod = key.copy(periodId = "next-fixture-day")
+        assertTrue(restored.render(content(4, listOf(item().copy(key = nextPeriod))), true))
+        restored.select(nextPeriod); assertTrue(restored.claim())
+        assertEquals(nextPeriod, events.filterIsInstance<ProgressEvent.ClaimReward>().single().key)
+    }
+
+    @Test fun revisionHistoryIsDefensiveAndRestoringOlderUiStateCannotEraseIt() {
+        val source = mutableMapOf(key to 5L); val ui = interaction(mutableListOf())
+        ui.restoreUiState(ProgressUiState(acceptedRevisions = source)); source.clear()
+        assertThrows(UnsupportedOperationException::class.java) { (ui.uiState.acceptedRevisions as MutableMap).clear() }
+        ui.restoreUiState(ProgressUiState(acceptedRevisions = mapOf(key to 1L)))
+        assertFalse(ui.render(content(3, listOf(item(1))), true))
+        assertEquals(5L, ui.uiState.acceptedRevisions[key])
+    }
+
+    @Test fun rejectedSnapshotStillAppliesTheCurrentGateSeparately() {
+        val events = mutableListOf<ProgressEvent>(); val ui = interaction(events)
+        ui.render(content(5), true); ui.select(key)
+        ui.render(content(5), false)
+        assertFalse(ui.render(content(4), true))
+        assertTrue(ui.controlsEnabled); assertTrue(ui.claim())
+        assertEquals(1, events.filterIsInstance<ProgressEvent.ClaimReward>().size)
+    }
+
 }

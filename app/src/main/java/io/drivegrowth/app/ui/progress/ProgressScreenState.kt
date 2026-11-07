@@ -66,6 +66,8 @@ data class ProgressUiState(
     val requestedKeys: Set<String> = emptySet(),
     val pending: ClaimReference? = null,
     val retryPending: Boolean = false,
+    /** 같은 프로필에서 수락한 목표·기간별 최대 revision. 목록 소멸로 지우지 않는다. */
+    val acceptedRevisions: Map<ProgressKey, Long> = emptyMap(),
 )
 sealed interface ProgressEvent {
     data class Select(val key: ProgressKey) : ProgressEvent
@@ -87,8 +89,8 @@ class ProgressInteraction(private val onEvent: (ProgressEvent) -> Unit) {
         if (value is ProgressScreenState.Content) {
             val previous = latest
             if (previous != null && (value.sequence < previous.sequence ||
-                    value.sequence == previous.sequence && value != previous ||
-                    value.entries.any { item -> previous.entries.any { it.key == item.key && it.revision > item.revision } })) return false
+                    value.sequence == previous.sequence && value != previous)) return false
+            if (value.entries.any { it.revision < (uiState.acceptedRevisions[it.key] ?: -1L) }) return false
             val frozen = value.copy(entries = Collections.unmodifiableList(ArrayList(value.entries)),
                 rest = value.rest?.copy(conditions = Collections.unmodifiableList(ArrayList(value.rest.conditions))))
             val pending = uiState.pending
@@ -97,11 +99,18 @@ class ProgressInteraction(private val onEvent: (ProgressEvent) -> Unit) {
                 updated.status in listOf(RewardStatus.CLAIMED, RewardStatus.FAILED, RewardStatus.EXPIRED, RewardStatus.UNSUPPORTED)) {
                 update(uiState.copy(pending = null))
             }
+            update(uiState.copy(acceptedRevisions = uiState.acceptedRevisions + frozen.entries.associate { it.key to it.revision }))
             latest = frozen; state = frozen
         } else state = value
         return true
     }
-    fun restoreUiState(value: ProgressUiState) { update(value) }
+    fun restoreUiState(value: ProgressUiState) {
+        val revisions = LinkedHashMap(uiState.acceptedRevisions)
+        value.acceptedRevisions.forEach { (key, revision) ->
+            revisions[key] = maxOf(revisions[key] ?: -1L, revision)
+        }
+        update(value.copy(acceptedRevisions = revisions))
+    }
     fun select(key: ProgressKey) {
         if (!controlsEnabled || (state as? ProgressScreenState.Content)?.entries?.none { it.key == key } != false) return
         update(uiState.copy(selectedKey = key)); onEvent(ProgressEvent.Select(key))
@@ -132,5 +141,8 @@ class ProgressInteraction(private val onEvent: (ProgressEvent) -> Unit) {
         update(uiState.copy(retryPending = true)); onEvent(ProgressEvent.Retry); return true
     }
     fun completeRetry() { update(uiState.copy(retryPending = false)) }
-    private fun update(value: ProgressUiState) { uiState = value.copy(requestedKeys = Collections.unmodifiableSet(LinkedHashSet(value.requestedKeys))) }
+    private fun update(value: ProgressUiState) {
+        uiState = value.copy(requestedKeys = Collections.unmodifiableSet(LinkedHashSet(value.requestedKeys)),
+            acceptedRevisions = Collections.unmodifiableMap(LinkedHashMap(value.acceptedRevisions)))
+    }
 }

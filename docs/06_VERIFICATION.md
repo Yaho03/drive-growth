@@ -935,3 +935,15 @@ debug 전용 `ProgressPreviewStates`는 실제 원장·DB·차량·위치·주�
 시험 뒤 자기 격리 패키지2개만 제거했다. [제품 파일 전](evidence/issue57-progress-ui/product-hashes-before.txt)/[후](evidence/issue57-progress-ui/product-hashes-after.txt)의 6개 해시와 [제품 APK](evidence/issue57-progress-ui/product-apk-after.txt) `793e1db8…`가 동일하다. 권한·기어·전역 크기/밀도/글꼴은 변경하지 않았다. [종료 상태](evidence/issue57-progress-ui/state-after.txt)는 user10/boot완료/1080×600/120dpi/fontScale설정null, 원래 내비 복귀, 활성 instrumentation·추가 forward 없음이다. 기존 AVD PID64177·ADB5038 PID66071을 유지하고 기기 반환을 보고했으며 이후 추가 adb를 실행하지 않는다. 임시 호스트·init-script·원본 APK/로그는 `/private/tmp/progress-device-host/`·`/private/tmp/progress-device-evidence/`에 보존했다.
 
 09에 공급 상태/이벤트/복원 예시를 남겼다. 경민 #45의 실제 목표·기간·진행/청구·영속 수령 API, 정원 #40의 장소/P/시간 증거·원자 저장·출발 감지와 수익 연결, 환석 #51의 탐색·gate/프로필/요청 세대·수명주기 연결은 후속 범위다. 휴식 시간을 UI가 합산/소모하지 않고 짧은 P 합산·일반 주차 중 소모 제안을 확정하지 않았다. #57 전체 체크·ready/Blocked by·담당·종료는 바꾸지 않는다. 최신 운영 지시에 따라 이 로컬 결과는 독립 검증 인계 전이며 PR 게시·CI·main 머지는 아직 하지 않는다.
+
+### #57 독립 검토 수정 — 소멸 항목의 revision 역행 방어
+
+2026-11-07, A의 독립 검토가 초기 구현 `339e2b369162efb31614719a98ab138dba291ae8`에서 같은 목표·기간 키의 revision5/수령 상태 → 빈 목록 → revision1/청구 가능 상태가 수락되는 P2를 재현했다. 직전 목록만 비교해 소멸 전 revision을 잊은 것이 원인이었다. 실제 DB 중복 지급 재현이 아니라 표시 역행과 청구 이벤트 허용 경계의 문제다.
+
+- **수정 전:** 정식 회귀 `removedKeyRetainsHighestAcceptedRevisionAndCannotClaimOldState`, `restoredViewRetainsRemovedRevisionsButAllowsANewPeriod` 2개를 실행해 모두 assertion 실패를 확인했다. `/private/tmp/progress-revision-red.txt`에 보존했다.
+- **수정:** `ProgressUiState.acceptedRevisions`에 목표·기간 키별 최대 수락 revision을 유지한다. 항목 소멸로 지우지 않으며, 더 낮은 항목을 포함한 Content는 전체 거절한다. 같은 키의 더 높은 revision과 다른 기간 키는 허용한다. View 교체 때 이 맵도 복원하며 방어 복사/읽기 전용 맵으로 외부 변경을 막는다. 같은 View에 오래된 복원 상태를 주어도 최대값은 낮아지지 않는다. 실제 원장/청구/경제 계약은 변경하지 않았다.
+- **수정 후 직접 실행:** `:app:testDebugUnitTest --tests '*ProgressInteractionTest'` 14개 통과, 실패·오류·생략0. 기존10개(Pending·실패 복구·늦은 확인/결과·제한·View 교체)와 추가4개(소멸 뒤 역행/청구0·높은 revision, View 교체/새 기간, 맵 방어/오래된 복원, 데이터 거절과 별개인 현재 gate 적용)를 포함한다.
+- **자동 검사:** `:app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` 성공, Lint 오류0·경고17. 기존4개와 신규 `testRemovedRevisionGuardSurvivesViewReplacement`를 포함한 기기 시험5개를 컴파일했다. 저장소·diff 검사도 통과했다. 로그는 `/private/tmp/progress-revision-validation.txt`다. core/휴식 계산·View 배치/문구는 수정하지 않아 전체 core/앱 및 무관한 검사를 반복하지 않았다.
+- **실제 기기 범위:** 위 표·화면·APK metadata의 기기4개/터치/Activity 재생성 증거는 수정 전 `339e2b3`의 실행 근거로 보존한다. 새 최대 revision 맵은 JVM의 전체 `uiState` 복원으로 검증했으며 새 기기 시험5개와 Activity Bundle 직렬화의 실행 성공으로 바꾸지 않는다. 현재 기기는 B 단독 배정이므로 이번 수정에서 adb/기기 조작은 하지 않았다. 로직과 복원 데이터 추가에 한정되어 새 슬롯을 요구하지 않으며 실제 호스트 연결 시 `acceptedRevisions` 전체의 Activity/프로세스 보존은 확인해야 한다.
+
+09의 #57 복원 계약에 최대 revision 맵의 수명주기·동일 프로필 범위, View 내부 sequence 비교와 호스트의 조회 세대 책임을 구분했다. A의 같은 재현·영향 경계 재검토에 새 로컬 커밋을 인계하며, PR 게시/CI/main 머지는 계속 대기한다. #55·#53·공통 타입·DB·MainActivity는 수정하지 않았다.
