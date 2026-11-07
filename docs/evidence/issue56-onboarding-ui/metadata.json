@@ -57,5 +57,20 @@
     }
   ],
   "capture_limits": "첫 캡처는 전환 직전/OEM 내비 창이 섞여 로컬 first-pass-captures에 보존하고 성공 화면으로 사용하지 않았다. 제품 변경 없이 임시 캡처 시점만 보완했다.",
-  "restoration": "격리 앱/.test만 제거, 제품 APK 793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9 전후 동일. 사용자·권한·기어·전역창·서버·night 변경 없음, forward 빈 목록, AVD 유지. 장치 사용 종료."
+  "restoration": "격리 앱/.test만 제거, 제품 APK 793e1db80c6ccda9c359cd13b18bc6f41cc05f6e4663753f91542ff740510bd9 전후 동일. 사용자·권한·기어·전역창·서버·night 변경 없음, forward 빈 목록, AVD 유지. 장치 사용 종료.",
+  "verification_sources": {
+    "OnboardingPreviewActivity.kt": {
+      "local_archive": "/private/tmp/onboarding56-evidence/OnboardingPreviewActivity.kt",
+      "sha256": "0dce5d9f1cd35b327a62047d13cc92414f8f02f06e11f2769d419f94005d8e29"
+    },
+    "OnboardingAttachedTest-12.kt": {
+      "local_archive": "/private/tmp/onboarding56-evidence/OnboardingAttachedTest-12.kt",
+      "sha256": "dcd8bb935496079b962ccba6b2f39b4ce2288eb59e6be31b73493f48f0df87e9"
+    },
+    "OnboardingAttachedTest-touch.kt": {
+      "local_archive": "/private/tmp/onboarding56-evidence/OnboardingAttachedTest-touch.kt",
+      "sha256": "622168fda179c1f1d08f1b071775a68e2aa236c665d4b60a86342da16708f904"
+    }
+  },
+  "verification_sources_note": "12개 실행 뒤 추가 터치 메서드/해당 import를 덧붙인 임시 시험을 별도 보존했다. 12개 버전은 그 추가분을 제거한 원본이며 제품/정식6개시험은 두 실행 모두 source_head와 동일하다. 임시 호스트는 두 실행에서 동일하다."
 }
