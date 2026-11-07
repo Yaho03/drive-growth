@@ -1,6 +1,13 @@
 package io.drivegrowth.core.progression
 
+import io.drivegrowth.core.contract.GameMoney
+import io.drivegrowth.core.contract.OwnedVehicle
+import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.contract.Rarity
+import io.drivegrowth.core.contract.Revision
+import io.drivegrowth.core.contract.VehicleAcquisitionSource
+import io.drivegrowth.core.contract.VehicleId
+import io.drivegrowth.core.contract.VehicleLifecycle
 import io.drivegrowth.core.progression.VehicleAction.*
 import io.drivegrowth.core.progression.VehicleActivity.*
 import org.junit.Assert.*
@@ -53,27 +60,49 @@ class VehicleCareTest {
         assertEquals(85, care.rentPercent(1, 10))
     }
 
-    @Test fun `수리비는 차값의 5퍼센트이고 소수는 내린다`() {
-        assertEquals(500L, care.repairCost(10_000))
-        assertEquals(49L, care.repairCost(999))
+    private fun owned(cost: Long, level: Int = 1, source: VehicleAcquisitionSource = VehicleAcquisitionSource.GACHA,
+                      rarity: Rarity = Rarity.COMMON) =
+        OwnedVehicle(OwnedVehicleId("v"), VehicleId("hyundai_casper"), level, Revision(0), VehicleLifecycle.OWNED,
+            if (source == VehicleAcquisitionSource.INITIAL_GRANT) Rarity.COMMON else rarity, 0, GameMoney(cost), source)
+
+    @Test fun `수리비는 차종 가격의 5퍼센트에 희귀도 비용 배율을 곱하고 마지막에 내린다`() {
+        assertEquals(500L, care.repairCost(10_000, Rarity.COMMON))
+        assertEquals(525L, care.repairCost(10_000, Rarity.ADVANCED))
+        assertEquals(550L, care.repairCost(10_000, Rarity.RARE))
+        assertEquals(575L, care.repairCost(10_000, Rarity.LEGEND))
+        assertEquals(49L, care.repairCost(999, Rarity.COMMON))   // 49.95 → 49
+        assertEquals(57L, care.repairCost(999, Rarity.LEGEND))   // 57.4425 → 57
+        assertEquals(Long.MAX_VALUE / 10_000 * 575 + Long.MAX_VALUE % 10_000 * 575 / 10_000,
+            care.repairCost(Long.MAX_VALUE, Rarity.LEGEND)) // 중간 곱은 Long 초과
     }
 
-    @Test fun `판매가는 60퍼센트에서 사고당 5퍼센트포인트 내려가고 사고 3회부터는 판매할 수 없다`() {
-        assertEquals(6_000L, care.salePrice(10_000, 0))
-        assertEquals(5_000L, care.salePrice(10_000, 2))
+    @Test fun `판매가는 실제 취득액 기준으로 사고당 5퍼센트포인트 빼고 레벨당 1퍼센트포인트 더한다`() {
+        // PRD·06 기대값: 구입 뽑기권(500)·무료권·첫 지급 Lv1 → 300·0·0, Lv20 사고 없음 → 395(79%)
+        assertEquals(300L, care.salePrice(owned(500), 0))
+        assertEquals(0L, care.salePrice(owned(0), 0))
+        assertEquals(0L, care.salePrice(owned(0, source = VehicleAcquisitionSource.INITIAL_GRANT), 0))
+        assertEquals(395L, care.salePrice(owned(500, level = 20), 0))
+        assertEquals(250L, care.salePrice(owned(500), 2))             // 50%
+        assertEquals(345L, care.salePrice(owned(500, level = 20), 2)) // 50% + 19%p = 69%
+        // 희귀도는 판매가에 영향 없음
+        assertEquals(care.salePrice(owned(500), 1), care.salePrice(owned(500, rarity = Rarity.LEGEND), 1))
         assertFalse(care.canSell(3))
-        assertThrows(IllegalArgumentException::class.java) { care.salePrice(10_000, 3) }
+        assertThrows(IllegalArgumentException::class.java) { care.salePrice(owned(500), 3) }
     }
 
-    @Test fun `판매가는 최저 30퍼센트 아래로 내려가지 않는다`() {
+    @Test fun `판매가는 사고 감액이 최저 30퍼센트에서 멈추고 레벨 가산은 그 위에 더한다`() {
         val lenient = VehicleCare(VehicleCareRules(scrapOnlyAccidents = 100))
-        assertEquals(3_500L, lenient.salePrice(10_000, 5))
-        assertEquals(3_000L, lenient.salePrice(10_000, 6))
-        assertEquals(3_000L, lenient.salePrice(10_000, 8))
+        assertEquals(3_500L, lenient.salePrice(owned(10_000), 5))
+        assertEquals(3_000L, lenient.salePrice(owned(10_000), 6))
+        assertEquals(3_000L, lenient.salePrice(owned(10_000), 8))
+        assertEquals(4_900L, lenient.salePrice(owned(10_000, level = 20), 8)) // 30% + 19%p
     }
 
-    @Test fun `폐차 금액은 구매가의 20퍼센트다`() {
-        assertEquals(2_000L, care.scrapValue(10_000))
+    @Test fun `폐차 금액은 실제 취득액의 20퍼센트이고 무료 취득은 0이다`() {
+        assertEquals(100L, care.scrapValue(owned(500)))
+        assertEquals(100L, care.scrapValue(owned(500, level = 20)))
+        assertEquals(0L, care.scrapValue(owned(0, source = VehicleAcquisitionSource.INITIAL_GRANT)))
+        assertEquals(Long.MAX_VALUE / 5, care.scrapValue(owned(Long.MAX_VALUE)))
     }
 
     @Test fun `대여 중이거나 반납 중인 차는 아무 행동도 할 수 없다`() {
@@ -91,7 +120,7 @@ class VehicleCareTest {
     }
 
     @Test fun `음수 금액과 음수 사고 횟수와 범위 밖 레벨은 거절한다`() {
-        assertThrows(IllegalArgumentException::class.java) { care.repairCost(-1) }
+        assertThrows(IllegalArgumentException::class.java) { care.repairCost(-1, Rarity.COMMON) }
         assertThrows(IllegalArgumentException::class.java) { care.rentPercent(1, -1) }
         assertThrows(IllegalArgumentException::class.java) { care.rentPercent(0, 0) }
         assertThrows(IllegalArgumentException::class.java) { care.rentPercent(21, 0) }
