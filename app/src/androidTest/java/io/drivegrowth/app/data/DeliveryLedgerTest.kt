@@ -295,13 +295,23 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
     fun testPaidOutsideZeroOrOneOrNotIntegerIsStorageFailure() {
         ok(select(purchase, "r1"))
         // CHECK 제약 때문에 정상 API로는 만들 수 없는 손상값을 일부러 만든다.
+        // 이런 값은 다시 열 때 저장소 전체 검사(quick_check)에도 걸리므로, 같은 연결에서 이 원장의 대조를 먼저 확인한다.
+        val tables = listOf("delivery_requests", "delivery_active", "settlements", "account", "delivery_lists")
         for (raw in listOf("2", "-1", "'broken'", "X'01'")) {
             sql("PRAGMA ignore_check_constraints = ON", "UPDATE delivery_requests SET paid = $raw WHERE request_id = 'r1'",
                 "PRAGMA ignore_check_constraints = OFF")
-            assertStorageFailureKeepsRows { select(purchase, "r1") }
+            val before = tables.map(::dump)
+            assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), select(purchase, "r1"))
+            assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), ledger.active())
+            assertEquals(before, tables.map(::dump))
+            sql("UPDATE delivery_requests SET paid = 1 WHERE request_id = 'r1'")
+            assertNotNull(ok(select(purchase, "r1")).settlement)
         }
-        sql("UPDATE delivery_requests SET paid = 1 WHERE request_id = 'r1'")
-        assertNotNull(ok(select(purchase, "r1")).settlement)
+        sql("PRAGMA ignore_check_constraints = ON", "UPDATE delivery_requests SET paid = 2 WHERE request_id = 'r1'",
+            "PRAGMA ignore_check_constraints = OFF")
+        reopen()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), select(purchase, "r1"))
+        assertEquals(LedgerFailureReason.CORRUPT, store.lastStorageFailure)
     }
 
     fun testBrokenStoredDateIsStorageFailureNotACrash() {
