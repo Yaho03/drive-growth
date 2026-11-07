@@ -1,5 +1,6 @@
 package io.drivegrowth.core.progression
 
+import io.drivegrowth.core.contract.Rarity
 import io.drivegrowth.core.progression.VehicleAction.*
 import io.drivegrowth.core.progression.VehicleActivity.*
 import org.junit.Assert.*
@@ -8,18 +9,39 @@ import org.junit.Test
 class VehicleCareTest {
     private val care = VehicleCare()
 
-    @Test fun `레벨업 비용은 차값의 2퍼센트에 현재 레벨을 곱한다`() {
-        assertEquals(200L, care.levelUpCost(10_000, 1))
-        assertEquals(1_000L, care.levelUpCost(10_000, 5))
-        assertEquals(3_800L, care.levelUpCost(10_000, 19))
-        assertThrows(IllegalArgumentException::class.java) { care.levelUpCost(10_000, 20) }
+    @Test fun `레벨업 비용은 차값의 2퍼센트에 현재 레벨과 희귀도 비용 배율을 곱하고 마지막에 내린다`() {
+        assertEquals(200L, care.levelUpCost(10_000, 1, Rarity.COMMON))
+        assertEquals(1_000L, care.levelUpCost(10_000, 5, Rarity.COMMON))
+        assertEquals(3_800L, care.levelUpCost(10_000, 19, Rarity.COMMON))
+        assertEquals(1_050L, care.levelUpCost(10_000, 5, Rarity.ADVANCED))
+        assertEquals(1_100L, care.levelUpCost(10_000, 5, Rarity.RARE))
+        assertEquals(4_370L, care.levelUpCost(10_000, 19, Rarity.LEGEND))
+        assertEquals(16L, care.levelUpCost(777, 1, Rarity.ADVANCED)) // 777×2%×1.05 = 16.317 → 16
+        assertThrows(IllegalArgumentException::class.java) { care.levelUpCost(10_000, 20, Rarity.COMMON) }
+        // 중간 곱(price × 200)은 Long을 넘지만 최종 비용은 표현 가능
+        assertEquals(184_467_440_737_095_516L, care.levelUpCost(Long.MAX_VALUE, 1, Rarity.COMMON))
+        assertEquals(Long.MAX_VALUE / 10_000 * 4_370 + Long.MAX_VALUE % 10_000 * 4_370 / 10_000, care.levelUpCost(Long.MAX_VALUE, 19, Rarity.LEGEND))
+        // 기본 규칙의 비용은 차값의 43.7% 이하라 넘지 않는다. 규칙을 바꿔 최종 비용이 Long을 넘으면 잘리지 않고 예외
+        val steep = VehicleCare(VehicleCareRules(levelUpCostPercentPerLevel = 10)) // 19레벨 전설 = 218.5%
+        assertThrows(ArithmeticException::class.java) { steep.levelUpCost(Long.MAX_VALUE, 19, Rarity.LEGEND) }
     }
 
-    @Test fun `중복 재료는 3레벨을 올리고 20에서 멈추며 만렙에는 쓸 수 없다`() {
-        assertEquals(8, care.levelAfterMaterial(5))
-        assertEquals(20, care.levelAfterMaterial(18))
-        assertEquals(20, care.levelAfterMaterial(19))
-        assertThrows(IllegalArgumentException::class.java) { care.levelAfterMaterial(20) }
+    @Test fun `재료는 희귀도별 진행량을 채우고 남는 진행량을 넘기며 20을 넘는 몫은 버린다`() {
+        assertEquals(LevelProgress(6, 0), care.afterMaterial(LevelProgress(5, 0), Rarity.COMMON))
+        assertEquals(LevelProgress(6, 50), care.afterMaterial(LevelProgress(5, 0), Rarity.ADVANCED))
+        assertEquals(LevelProgress(8, 0), care.afterMaterial(LevelProgress(5, 50), Rarity.RARE))
+        assertEquals(LevelProgress(9, 20), care.afterMaterial(LevelProgress(5, 20), Rarity.LEGEND))
+        assertEquals(LevelProgress(8, 40), care.afterMaterial(LevelProgress(6, 90), Rarity.ADVANCED)) // 6.9 + 1.5 = 8.4
+        assertEquals(LevelProgress(20, 0), care.afterMaterial(LevelProgress(19, 0), Rarity.COMMON))
+        assertEquals(LevelProgress(20, 0), care.afterMaterial(LevelProgress(18, 60), Rarity.LEGEND))
+        assertThrows(IllegalArgumentException::class.java) { care.afterMaterial(LevelProgress(20, 0), Rarity.COMMON) }
+        assertThrows(IllegalArgumentException::class.java) { care.afterMaterial(LevelProgress(5, 100), Rarity.COMMON) }
+    }
+
+    @Test fun `게임머니 레벨업은 진행량을 유지하고 20이 되면 진행량을 0으로 한다`() {
+        assertEquals(LevelProgress(6, 40), care.afterLevelUp(LevelProgress(5, 40)))
+        assertEquals(LevelProgress(20, 0), care.afterLevelUp(LevelProgress(19, 70)))
+        assertThrows(IllegalArgumentException::class.java) { care.afterLevelUp(LevelProgress(20, 0)) }
     }
 
     @Test fun `대여료 배율은 레벨당 2퍼센트 오르고 사고당 3퍼센트 내려가며 감소는 15퍼센트까지다`() {
