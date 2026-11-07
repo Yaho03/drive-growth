@@ -40,37 +40,34 @@ data class GachaRequest(
     val drawsSinceGuarantee: Int,
 )
 
-/** change를 저장하기 전의 결과. draw.drawsSinceGuarantee는 저장 성공 후에만 새 카운터로 쓴다. */
+/** 저장 전의 불변 계획. 응답 유실 시 이 값을 그대로 다시 submit한다. draw.drawsSinceGuarantee는 저장 성공 후에만 새 카운터로 쓴다. */
 data class GachaPlan(val change: GameChange, val vehicle: OwnedVehicle, val draw: GachaDraw)
 
 data class GachaResult(val settlement: Settlement, val draw: GachaDraw)
 
 /**
  * 희귀도 추첨 → 해금 차종 선택 → 차감과 새 개체 지급을 거래 한 건으로 저장한다.
- * 추첨 seed와 새 개체 ID를 requestId로 정해 같은 요청을 다시 보내도 같은 거래가 되고, 저장소가 이미 확정한 결과를 돌려준다.
- * 공간·후보·입력 오류는 저장 전에 거절하고, 잔액 부족·저장 실패는 저장소가 거래 전체를 거절한다.
- * ponytail: 보장 카운터 저장은 계약에 자리가 없어 결과로만 돌려준다. 같은 거래에 넣으려면 #33·#34 확장 필요.
+ * `prepare`로 불변 계획(거래 + 추첨 결과)을 만들고 `submit`으로 저장한다. 응답을 잃으면 **보관한 같은 계획을 다시 submit**한다.
+ * 재제출은 현재 공간·후보·보유 조회를 다시 하지 않으므로, 그사이 차고가 차거나 콘텐츠가 바뀌어도 처음 정산과 추첨 결과를 돌려준다.
+ * 공간·후보·입력 오류는 계획 단계에서 거절하고, 잔액 부족·저장 실패는 저장소가 거래 전체를 거절한다.
+ * ponytail: 아래 두 경계는 공통 계약·저장 확장이 필요해 아직 보장하지 않는다(#33·#34 조율, PR #111 본문).
+ *  - 같은 requestId로 카운터 등 입력만 바꾼 새 계획: GameChange에 가챠 입력이 없어 같은 명령으로 재생된다.
+ *  - 마지막 칸의 동시 요청: 공간 검사가 저장과 원자적이지 않다.
+ *  보장 카운터·무료권 저장도 같은 확장 대상이며, 지금은 저장 성공 뒤의 다음 카운터 값만 돌려준다.
  */
 class GachaPull(private val content: GameContentSnapshot) {
     private val gacha = Gacha(content.gacha)
     private val garage = Garage(content.catalog)
 
-    fun pull(store: GameChangeStore, request: GachaRequest): ContractResult<GachaResult> {
-        val owned = when (val result = store.listOwnedVehicles()) {
-            is ContractResult.Failure -> return result
-            is ContractResult.Success -> result.value
-        }
-        val plan = when (val result = prepare(request, owned)) {
-            is ContractResult.Failure -> return result
-            is ContractResult.Success -> result.value
-        }
-        return when (val result = store.commitGameChange(plan.change)) {
+    /** 계획을 저장한다. 같은 계획의 재제출은 저장소가 처음 정산을 재생하고, 추첨 결과는 계획에 보관된 것을 돌려준다. */
+    fun submit(store: GameChangeStore, plan: GachaPlan): ContractResult<GachaResult> =
+        when (val result = store.commitGameChange(plan.change)) {
             is ContractResult.Failure -> result
             is ContractResult.Success -> ContractResult.Success(GachaResult(result.value, plan.draw))
         }
-    }
 
-    internal fun prepare(request: GachaRequest, owned: List<OwnedVehicle>): ContractResult<GachaPlan> {
+    /** owned는 `store.listOwnedVehicles()` 결과. 조회 실패는 호출자가 그대로 전달한다. */
+    fun prepare(owned: List<OwnedVehicle>, request: GachaRequest): ContractResult<GachaPlan> {
         if (request.shopLevel < 1 || request.garageCapacity < 0 ||
             request.drawsSinceGuarantee !in 0 until content.gacha.pity) return fail(ContractError.INVALID_INPUT)
         val current = when (val result = garage.owned(owned)) {
