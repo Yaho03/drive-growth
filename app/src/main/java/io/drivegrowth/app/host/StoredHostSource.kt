@@ -9,6 +9,7 @@ import io.drivegrowth.core.content.ContentLoad
 import io.drivegrowth.core.contract.ContractError
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.InputSource
+import io.drivegrowth.core.contract.SettlementId
 
 /** worker에서 호출하는 읽기 전용 진입점. 기존 개별 조회를 원자적인 일괄 조회로 취급하지 않는다. */
 internal class StoredHostSource(
@@ -48,13 +49,23 @@ internal class StoredHostSource(
                 }
             }
         } catch (error: RuntimeException) {
-            // 예외 메시지나 원장 값은 기록하지 않는다. 실패 응답으로 실행 중 상태를 해제한다.
-            Log.w("StoredHostSource", "$operation failed: ${error.javaClass.simpleName}")
-            ContractResult.Failure(when (error) {
-                is SQLiteException -> ContractError.STORAGE_FAILURE
-                is SecurityException -> ContractError.PERMISSION_DENIED
-                else -> ContractError.DATA_UNAVAILABLE
-            })
+            failure(operation, error)
         }
+    }
+
+    fun markViewed(id: SettlementId): ContractResult<Unit> = try {
+        SqliteGameChangeStore(context, InputSource.SIMULATION).use { it.markViewed(id) }
+    } catch (error: RuntimeException) {
+        failure("mark-viewed", error)
+    }
+
+    private fun failure(operation: String, error: RuntimeException): ContractResult.Failure {
+        // 예외 메시지나 원장 값은 기록하지 않는다. 실패 응답으로 실행 중 상태를 해제한다.
+        Log.w("StoredHostSource", "$operation failed: ${error.javaClass.simpleName}")
+        return ContractResult.Failure(when (error) {
+            is SQLiteException -> ContractError.STORAGE_FAILURE
+            is SecurityException -> ContractError.PERMISSION_DENIED
+            else -> ContractError.DATA_UNAVAILABLE
+        })
     }
 }

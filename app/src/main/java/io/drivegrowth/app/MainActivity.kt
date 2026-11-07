@@ -16,6 +16,13 @@ import io.drivegrowth.app.host.HostPage
 import io.drivegrowth.app.host.HostQueryController
 import io.drivegrowth.app.host.HostQueryState
 import io.drivegrowth.app.host.HostSession
+import io.drivegrowth.app.host.ResultsHostMapper
+import io.drivegrowth.app.host.ResultsStateBundle
+import io.drivegrowth.app.ui.results.ResultsEvent
+import io.drivegrowth.app.ui.results.ResultsView
+import io.drivegrowth.app.ui.onboarding.OnboardingEvent
+import io.drivegrowth.app.ui.onboarding.OnboardingScreenState
+import io.drivegrowth.app.ui.onboarding.OnboardingView
 import io.drivegrowth.app.ui.garage.CollectionScreenState
 import io.drivegrowth.app.ui.garage.CollectionView
 import io.drivegrowth.app.ui.garage.GarageEvent
@@ -24,6 +31,9 @@ import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.garage.GarageView
 import io.drivegrowth.app.vehicle.ForegroundInteraction
 import io.drivegrowth.app.vehicle.VehicleInput
+import io.drivegrowth.core.contract.ContractError
+import io.drivegrowth.core.contract.ContractResult
+import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.contract.Observation
 import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.contract.Revision
@@ -37,6 +47,10 @@ class MainActivity : Activity() {
     private var navigation = HostNavigation()
     private var screen: HostQueryState = HostQueryState.Restricted
     private val mapper = GarageHostMapper()
+    private val resultsMapper = ResultsHostMapper()
+    private lateinit var results: ResultsView
+    private lateinit var onboarding: OnboardingView
+    private var pendingOnboardingId: VehicleId? = null
     private lateinit var queries: HostQueryController
     private lateinit var session: HostSession
     private lateinit var style: GarageStyle
@@ -60,8 +74,14 @@ class MainActivity : Activity() {
         style = GarageStyle(this)
         garage = GarageView(this, ::onGarageEvent).also { it.restoreSelection(navigation.selectedVehicleId) }
         collection = CollectionView(this, ::refresh)
+        results = ResultsView(this, ::onResultsEvent)
+        onboarding = OnboardingView(this, ::onOnboardingEvent)
+        onboarding.restoreSelection(savedInstanceState?.getString("onboardingSelection")?.let(::VehicleId))
+        pendingOnboardingId = savedInstanceState?.getString("onboardingPending")?.let(::VehicleId)
         val deliveryHandler = handler
-        session = lastNonConfigurationInstance as? HostSession ?: HostSession(applicationContext) { deliveryHandler.post(it) }
+        session = lastNonConfigurationInstance as? HostSession ?: HostSession(applicationContext, { deliveryHandler.post(it) },
+            ResultsStateBundle.decode(savedInstanceState?.getBundle("results")))
+        results.restoreUiState(session.results.uiState)
         queries = session.queries
         panel = style.column().apply { setBackgroundColor(style.base) }
         chrome = style.column().apply { setPadding(style.dp(16), 0, style.dp(16), 0) }
@@ -69,7 +89,14 @@ class MainActivity : Activity() {
         panel.addView(chrome)
         panel.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(panel)
-        queries.attach { screen = it; render() }
+        queries.attach {
+            screen = it
+            render()
+            if (it is HostQueryState.Content || it is HostQueryState.Failure) {
+                session.results.completeQuery()
+                results.completeRetry()
+            }
+        }
         if (savedInstanceState == null) {
             val permissions = arrayOf("android.car.permission.CAR_SPEED", "android.car.permission.CAR_POWERTRAIN")
                 .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
@@ -92,6 +119,11 @@ class MainActivity : Activity() {
         setVisible(true)
         if (active) return
         active = true
+        if (results.uiState != session.results.uiState) results.restoreUiState(session.results.uiState)
+        session.results.attach { id, result ->
+            updateAccess()
+            results.completeMarkViewed(id, result)
+        }
         try {
             input = VehicleInput(this, { if (active) { interaction.accept(it); updateAccess() } }, {}).also { it.start() }
         } catch (_: LinkageError) {
@@ -106,6 +138,8 @@ class MainActivity : Activity() {
     }
 
     private fun stopObserving() {
+        session.results.remember(results.uiState)
+        session.results.detach()
         active = false
         handler.removeCallbacks(watchdog)
         interaction.reset()
@@ -116,6 +150,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         queries.detach()
+        session.results.detach()
         if (!isChangingConfigurations) session.release()
         super.onDestroy()
     }
@@ -123,6 +158,10 @@ class MainActivity : Activity() {
     override fun onRetainNonConfigurationInstance(): Any = session
 
     override fun onSaveInstanceState(outState: Bundle) {
+        session.results.remember(results.uiState)
+        outState.putBundle("results", ResultsStateBundle.encode(session.results.uiState))
+        outState.putString("onboardingSelection", onboarding.selectedVehicleId?.value)
+        outState.putString("onboardingPending", (onboarding.pendingVehicleId ?: pendingOnboardingId)?.value)
         outState.putString("page", navigation.page.name)
         outState.putString("selectedVehicle", navigation.selectedVehicleId?.value)
         navigation.pendingGarageRequest?.let {
@@ -158,6 +197,8 @@ class MainActivity : Activity() {
         }
         garage.render(garageState, enabled)
         collection.render(collectionState, enabled)
+        results.render(resultsMapper.map(screen), enabled)
+        onboarding.render(unavailableOnboarding(), enabled)
         chrome.removeAllViews()
         if (!enabled) {
             showBody(style.text("주차 후 조작이 허용되면 이용할 수 있습니다."))
@@ -177,6 +218,8 @@ class MainActivity : Activity() {
         when (navigation.page) {
             HostPage.GARAGE -> showBody(garage)
             HostPage.COLLECTION -> showBody(collection)
+            HostPage.RESULTS -> showBody(results)
+            HostPage.ONBOARDING -> showBody(onboarding)
             else -> {
                 val page = style.column().apply { setPadding(style.dp(24), style.dp(16), style.dp(24), style.dp(16)) }
                 when (val current = screen) {
@@ -194,18 +237,9 @@ class MainActivity : Activity() {
                                 page.addView(style.text("모의 원장 · ${data.content.catalog.contentVersion.value}"))
                                 page.addView(style.text("잔액 ${data.balance.units} · 보유 차량 ${data.ownedVehicles.size}대"))
                             }
-                            HostPage.RESULTS -> {
-                                // #54의 정식 View 연결 전까지 기존 요약만 원본 정산으로 표시한다.
-                                if (data.unviewedSettlements.isEmpty()) page.addView(style.text("미확인 정산이 없습니다."))
-                                data.unviewedSettlements.forEach {
-                                    page.addView(style.text("정산 ${it.settlementId.value} · 잔액 ${it.balance.units}"))
-                                }
-                            }
-                            HostPage.ONBOARDING -> page.addView(style.text("초기 지급 이력 조회가 연결되지 않아 신규 프로필 여부를 확인할 수 없어요"))
                             else -> Unit
                         }
-                        if (navigation.page != HostPage.ONBOARDING)
-                            page.addView(style.button("새로고침", onClick = ::refresh))
+                        page.addView(style.button("새로고침", onClick = ::refresh))
                     }
                 }
                 showBody(style.scroll(page))
@@ -223,6 +257,39 @@ class MainActivity : Activity() {
         if (!allowed()) { updateAccess(); return }
         navigation.page = page
         render()
+    }
+
+    private fun onResultsEvent(event: ResultsEvent) {
+        if (!allowed()) {
+            updateAccess()
+            // View가 callback 전에 만든 Pending은 실제 제출 상태로 되돌린다.
+            results.restoreUiState(session.results.uiState)
+            return
+        }
+        session.results.remember(results.uiState)
+        when (event) {
+            is ResultsEvent.SelectResult, ResultsEvent.CloseDetail -> Unit
+            ResultsEvent.Retry -> refresh()
+            is ResultsEvent.MarkViewed -> {
+                val snapshot = (screen as? HostQueryState.Content)?.snapshot
+                if (!session.results.markViewed(event.id, snapshot, allowed())) {
+                    results.completeMarkViewed(event.id, ContractResult.Failure(ContractError.STATE_CONFLICT))
+                }
+            }
+        }
+    }
+
+    private fun unavailableOnboarding() = OnboardingScreenState.Unavailable(
+        if (pendingOnboardingId != null) "이전 요청의 지급 상태를 확인할 수 없어요. 초기 지급 조회가 아직 연결되지 않았어요."
+        else "초기 지급 이력 조회가 연결되지 않아 신규 프로필 여부를 확인할 수 없어요",
+    )
+
+    private fun onOnboardingEvent(event: OnboardingEvent) {
+        if (!allowed()) { updateAccess(); return }
+        when (event) {
+            OnboardingEvent.GoToShop, OnboardingEvent.Previous -> select(HostPage.HOME)
+            else -> Unit // 초기 지급 계약 미지원에서는 선택·확정·재시도를 실행하지 않는다.
+        }
     }
 
     private fun onGarageEvent(event: GarageEvent) {
@@ -267,6 +334,8 @@ class MainActivity : Activity() {
         if (allowed()) {
             if (navigation.pendingGarageRequest != null) { cancelPreparation(); return }
             if (navigation.page == HostPage.GARAGE && garage.closeDetail()) return
+            if (navigation.page == HostPage.RESULTS && results.closeDetail()) return
+            if (navigation.page == HostPage.ONBOARDING && onboarding.handleBack()) return
             if (!navigation.back()) { render(); return }
         }
         // 다중 창에서 Task를 뒤로 보내도 RESUMED·표시가 유지되는 경우를 함께 처리한다.
