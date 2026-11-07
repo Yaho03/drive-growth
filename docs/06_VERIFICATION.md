@@ -1013,3 +1013,33 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w -e class io.driveg
 - 저장소·diff 검사를 실행했다. red/green 원본 로그는 로컬 `/private/tmp/shop55-first-restore-red.log`, `/private/tmp/shop55-first-restore-green.log`다. 현재 기기 미배정으로 adb/AVD/제품 앱·데이터·설정을 조작하지 않았다.
 
 09의 새 View 첫 복원 양순서와 미지원 반복 복원 경계를 명시했다. 실제 호스트/Activity·프로세스 저장, #44 경제/꾸미기 저장·탐색은 여전히 미연결이다. 고정 수정 커밋을 A 독립 재검토에 인계하며 PR은 검증 전 게시하지 않는다. 사용자 동결 지시대로 이 결함과 이미 착수한 #52 가챠 UI 외 새 작업은 시작하지 않는다.
+
+
+## #121 가챠 공통 계약 첫 부분의 메모리 검증 — 2026-11-07
+
+main `085786a`의 독립 core 브랜치에서 GachaChangeStore·전체 명령/결과·권위 상태와 기존 메모리 원장 공유를 구현했다. 첫 성공 기대 시험을 stub에서 실행해 AssertionError 1건으로 실패를 확인한 뒤 구현했다. 제품 GachaPull/VehicleCare/FirstGrant·SQLite/RentalLedger·UI·SDK·Gradle/CI는 수정하지 않았다. 이 기록은 메모리 참조 구현/소비 예제이며 SQLite·프로세스 재시작 시험이 아니다.
+
+표적 시험은 전체 의미 입력 변경의 충돌·최초 전체 결과 재생, 성장/처분 뒤 원본 snapshot, 실제0 무료권·잔액 부족/저장 실패 무변경, 보장/후보/취득액 검증, 권위 revision/카운터/공간·원시 후보 Set 불변, legacy 요청 ID 충돌 양방향, 동일/서로 다른 요청의 마지막 칸·무료권 경쟁과 실패 재시도를 다룬다. 구성한 권위 상태가 없는 기존 fixture는 새 가챠 상태를 생성하지 않는다. 문서와 관련 이슈의 #123 임시 브랜치 링크는 main 기준으로 갱신했으며 #122의 실제 저장 차단은 유지했다.
+
+로컬 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`는 성공했다. main `085786a` 기준 core212개·표적21개·app71개는 실패/오류/생략0, Lint오류0·경고16이었다. 검증 중 #124가 반영된 main `1a04990`으로 rebase해 공통 코드/시험3개가 처음 구현과 바이트 동일함을 확인하고 같은 검사를 다시 수행했다: core212개·app84개 실패/오류/생략0, APK/Lint성공(오류0·경고17). #124 탁송 표시 UI와 실행 기록을 보존했다. 저장소 검사(필수21·문서26·링크266)와 diff 검사도 통과했다. 독립 코드 검토 APPROVE·구조 CLEAR는 AI 보조 결과이며 사람 승인이 아니다. 정확한 인계 커밋과 추가 독립 검증은 #121에서 추적한다. 다중 재료·초기화/원래 지급 조회·무료권 지급·호열 #111 실제 소비·SQLite는 다음 묶음/담당 작업이며 이 부분 결과로 #121/#47/#122를 닫지 않는다.
+
+
+### #121 가챠 독립 검증 회수와 게시 준비
+
+검토 원본 `08eb3c4819f886381ab62b83473c86d8ebd6cc05`의 코드·참조 fixture·정식 시험3개 blob을 별도 C 검증 worktree에서 직접 대조했다. 독립 실행은 정식21+추가6=27개 실패/오류/생략0이며, 같은 ID의 일반/가챠 경쟁·혼합 마지막 칸·처분 ID 재사용·Long/Int 최대 경계·중첩 award 변경/컬렉션 불변성·미지원/기존 거래 유지까지 확인했다. 판정은 APPROVE·구조상 추가 차단 없음이며 AI 보조 결과다. 이 세션이 27개를 새로 실행한 것으로 표시하지 않는다.
+
+원본 [명령/시험 로그](evidence/issue121-gacha-contract/independent-tests.txt), [커밋·소스/시험 metadata](evidence/issue121-gacha-contract/independent-metadata.json), [독립 추가 시험](evidence/issue121-gacha-contract/GachaIndependentBoundaryTest.kt)을 보존한다. 추가 소스는 정식21개에 편입한 코드가 아니다. 재현은 검증용 독립 사본에서만 해당 소스를 `core/src/test/kotlin/io/drivegrowth/core/contract/`에 복사하고 `:core:test --tests '*GachaChangeStoreTest' --tests '*GachaIndependentBoundaryTest' --offline`로 실행한다. 제품/다른 작업자 폴더에 복사하지 않는다.
+
+가챠 게시 브랜치는 #125가 포함된 main `fbbf98e`에 rebase하며 06 충돌에서 기존 #55 설계/시험/실제 기기 기록과 이 가챠 기록을 모두 보존했다. 검토된 공통3개 파일은 원본과 바이트 동일하다. SQLite·무료권 지급·#111 실제 소비·초기화는 제공하지 않는다. 이미 착수한 다중 재료의 독립 타입/순수 검증은 별도 고정 커밋으로 인계하며 공유 fixture 결합·새 묶음으로 확대하지 않는다. 사용자 지시에 따라 현재 작업의 검증/PR/main 정리 후 후속 작업을 시작하지 않는다.
+
+main `fbbf98e` 조합의 직접 소비 통합 명령 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --offline --no-daemon`은28초에 성공했다. core212·app96 실패/오류/생략0, APK/Lint성공(오류0·경고18), 저장소21/26/280·diff검사 통과다. #53/#55 제품 소스·09/06·기기 증거를 유지했고 새 장치 시험은 하지 않았다. 기존 독립 검토 원본과 공통3개 파일의 blob 동일성은 게시 전 다시 확인했다. 정확한 게시 head·원격 CI는 연결 PR에서 관리한다.
+## #121 재료 강화 타입·순수 검증 준비 — 2026-11-07
+
+가챠 검토 커밋 `08eb3c4` 기반 별도 브랜치에서 MaterialContract 타입/순수 검증과 MaterialContractTest 소비 예제를 추가했다. 기존 계산이 만든 두 Update를 명령에 넣고, 역할·현재 revision/활동·취득/재료 성장 보존·비용과 예정 두 snapshot을 검증한다. 처음 시험 소스의 콘텐츠 버전 경로 컴파일 오류를 교정한 뒤 stub의 성공 기대 assertion 실패1건을 확인하고 구현했다.
+
+검토 중인 GachaContract·공유 RentalContractFixtures와 원작업 폴더는 변경하지 않았다. 메모리 commitMaterial 구현·실제 원자 경쟁·과거 결과 재생·SQLite·앱 프로세스 시험은 없다. 시험의 MaterialSettlement는 후속 결과 DTO의 형태 예시이며 저장을 실행한 결과가 아니다. 로컬 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug` 성공, core225개(재료 표적13개)·app84개 실패/오류/생략0, Lint오류0·경고17이다. 독립 코드 검토 APPROVE·구조 CLEAR는 이 타입/순수 검증 범위의 AI 보조 결과이며 사람 승인·실제 거래 검증이 아니다. 저장소/링크·diff 검사와 정확한 인계 커밋은 #121에서 구분한다.
+
+
+재료 준비 원본 `fbd93c448e88aa0dc76e7a26438ba25c8d0dc898`은 별도 A 검토에서 코드 APPROVE·구조 CLEAR, 정식13+독립3=표적16개와 기존 planMaterial 소비152조합 확인 결과를 회수했다. 이 독립 결과는 AI 보조 검증이며 이 세션의 재실행이 아니다. 가챠 #126 병합 main `1089926f7815bf49d3c5a6f233b06f28d5ee5c49`에 준비4파일만 rebase하고 양쪽06 기록을 유지했다. MaterialContract 제품/정식 시험2파일은 원검토 커밋과 바이트 동일하고 GachaContract/공유 fixture/기존 UI는 변경하지 않았다.
+
+통합 후 직접 실행한 `:core:test --tests '*MaterialContractTest' :app:compileDebugKotlin :app:compileDebugUnitTestKotlin --offline --no-daemon`은8초에 성공했다. 재료13개 실패/오류/생략0과 기존 앱/시험 소비 컴파일을 확인했다. 기존 전체225/84·APK/Lint 근거는 원본 기준으로 보존하고 전체/장치 검사를 무조건 반복하지 않았다. 저장소21/26/280·diff검사 통과, 정확한 게시head/원격CI는 연결PR에서 기록한다. 초기화·공유 재료 store·SQLite 등 새 묶음은 시작하지 않고 현재 준비 범위를 인계한다.

@@ -1,0 +1,39 @@
+{
+  "head": "08eb3c4819f886381ab62b83473c86d8ebd6cc05",
+  "base": "1a0499099006d4644e12527505eaf62f80e18d7e",
+  "sourceBlobs": {
+    "core/src/main/kotlin/io/drivegrowth/core/contract/GachaContract.kt": {
+      "expected": "3994ba30e62c38e87ceb24a0e4aaf93d7a830ed4",
+      "actual": "3994ba30e62c38e87ceb24a0e4aaf93d7a830ed4",
+      "equal": true
+    },
+    "core/src/testFixtures/kotlin/io/drivegrowth/core/contract/RentalContractFixtures.kt": {
+      "expected": "61461e66ec2f2cf7005e0a324fad28c0672ad858",
+      "actual": "61461e66ec2f2cf7005e0a324fad28c0672ad858",
+      "equal": true
+    },
+    "core/src/test/kotlin/io/drivegrowth/core/contract/GachaChangeStoreTest.kt": {
+      "expected": "cc6517a747f9b71544189435c747a2f47fed5b64",
+      "actual": "cc6517a747f9b71544189435c747a2f47fed5b64",
+      "equal": true
+    }
+  },
+  "directTests": [
+    {
+      "name": "io.drivegrowth.core.contract.GachaChangeStoreTest",
+      "tests": "21",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.drivegrowth.core.contract.GachaIndependentBoundaryTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "deviceExecuted": false,
+  "productionFilesModified": false
+}
