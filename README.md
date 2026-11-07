@@ -4,10 +4,10 @@
 
 | 담당 | 지금 할 일 | 막고 있는 이슈 | 해제 조건 |
 |---|---|---|---|
-| 정원 | [#80](https://github.com/Yaho03/drive-growth/issues/80), [#37](https://github.com/Yaho03/drive-growth/issues/37) 시험용 후보·규칙 확인, [#40](https://github.com/Yaho03/drive-growth/issues/40) 음성 없는 뼈대 | #38·#39는 정원 #37 | 선택 의뢰의 필요한 결과 검토·main 반영 |
+| 정원 | [#37](https://github.com/Yaho03/drive-growth/issues/37) 실제 저장 연결, [#38](https://github.com/Yaho03/drive-growth/issues/38)·[#39](https://github.com/Yaho03/drive-growth/issues/39) 독립 계산, [#80](https://github.com/Yaho03/drive-growth/issues/80) 내비 마무리 | 실제 탁송 연결은 #37 영속 거래·#80 SDK 근거 | #112의 후보·선택 타입은 main 사용 가능. #38·#39 시험 입력 계산은 ready |
 | 환석 | [#51](https://github.com/Yaho03/drive-growth/issues/51)·[#54](https://github.com/Yaho03/drive-growth/issues/54)·[#56](https://github.com/Yaho03/drive-growth/issues/56) 정산·첫 실행 화면 연결, [#52](https://github.com/Yaho03/drive-growth/issues/52) 관리 명령 연결 | 첫 지급은 호열 #50, 차량 관리 거래는 호열 #47~#49 | #108·#109·#110의 View·typed 호스트 사용. 정산 열람 저장·Back·제한·복원 연결 후 검증 |
-| 호열 | [#47](https://github.com/Yaho03/drive-growth/issues/47), [#48](https://github.com/Yaho03/drive-growth/issues/48), [#50](https://github.com/Yaho03/drive-growth/issues/50), #46 활동·영속 도감 연결·#35 콘텐츠 | #49는 경민 #42 | #104 개체 필드·단일 개체 저장 사용 가능. 확정 사고 결과 인계와 다중 개체 거래는 별도 확인 |
-| 경민 | [#41](https://github.com/Yaho03/drive-growth/issues/41) 조회 후보·자동 배정 구현 | #42는 경민 #41, #43·#44는 경민 #42 | 각 기능이 소비할 결과의 검토·main 반영 |
+| 호열 | [#47](https://github.com/Yaho03/drive-growth/issues/47) 요청 동일성·차고 용량 수정, [#48](https://github.com/Yaho03/drive-growth/issues/48) 재료 소비, [#50](https://github.com/Yaho03/drive-growth/issues/50) 초기화 연결, #35 유형·정의 연결 | 가챠는 환석·경민의 공통 명령/저장 확장. #49는 경민 #42 | #113 레벨업 명령·#114 첫 지급·#115 20종은 main 사용 가능. 실제 저장·제품 연결은 각 이슈 완료 조건 유지 |
+| 경민 | [#41](https://github.com/Yaho03/drive-growth/issues/41)~[#44](https://github.com/Yaho03/drive-growth/issues/44) 실제 입력·콘텐츠·앱 연결, [#116](https://github.com/Yaho03/drive-growth/pull/116) 조회 경계 수정 | 가챠 저장 확장은 환석의 공통 명령 조율 | #107 기반은 main 반영. #116의 발견/완료 영업 조회 수정 요청은 별도 유지 |
 
 선행 결과가 검토·머지되거나 이슈를 완료로 닫으면 이 표도 갱신한다. 세부 정책·실제 연결 조건은 각 이슈를 따른다. 팀 구현이 끝나면 이 섹션을 삭제한다.
 
