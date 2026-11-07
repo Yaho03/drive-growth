@@ -1,0 +1,24 @@
+
+io.drivegrowth.app.host.ResultsHostActivityTest:
+Failure in testRealResultsRecreationGateRejectionAcknowledgementAndUnavailableOnboarding:
+junit.framework.AssertionFailedError: 호스트가 거절한 미제출 Pending이 남으면 안 된다
+	at io.drivegrowth.app.host.ResultsHostActivityTest.testRealResultsRecreationGateRejectionAcknowledgementAndUnavailableOnboarding$lambda$10(ResultsHostActivityTest.kt:88)
+	at io.drivegrowth.app.host.ResultsHostActivityTest.$r8$lambda$m96QEni58WDphk40nWTl2CgC_GY(Unknown Source:0)
+	at io.drivegrowth.app.host.ResultsHostActivityTest$$ExternalSyntheticLambda14.invoke(D8$$SyntheticClass:0)
+	at io.drivegrowth.app.host.ResultsHostActivityTest.ui$lambda$0(ResultsHostActivityTest.kt:28)
+	at io.drivegrowth.app.host.ResultsHostActivityTest.$r8$lambda$ds1D3qSqRUsAW2x2hIOgonR_Ask(Unknown Source:0)
+	at io.drivegrowth.app.host.ResultsHostActivityTest$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2420)
+	at android.os.Handler.handleCallback(Handler.java:958)
+	at android.os.Handler.dispatchMessage(Handler.java:99)
+	at android.os.Looper.loopOnce(Looper.java:205)
+	at android.os.Looper.loop(Looper.java:294)
+	at android.app.ActivityThread.main(ActivityThread.java:8194)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+
+Test results for InstrumentationTestRunner=.F
+Time: 10.565
+
+FAILURES!!!
+Tests run: 1,  Failures: 1,  Errors: 0

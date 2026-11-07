@@ -1,0 +1,33 @@
+
+io.drivegrowth.app.host.ResultsHostStorageTest:..
+io.drivegrowth.app.host.ResultsHostActivityTest:
+Error in testRealResultsRecreationGateRejectionAcknowledgementAndUnavailableOnboarding:
+java.lang.IllegalArgumentException: Targeted input event injection from pid 26421 was not directed at a window owned by uid 1010191.
+	at android.os.Parcel.createExceptionOrNull(Parcel.java:3061)
+	at android.os.Parcel.createException(Parcel.java:3041)
+	at android.os.Parcel.readException(Parcel.java:3024)
+	at android.os.Parcel.readException(Parcel.java:2966)
+	at android.hardware.input.IInputManager$Stub$Proxy.injectInputEventToTarget(IInputManager.java:1557)
+	at android.hardware.input.InputManagerGlobal.injectInputEvent(InputManagerGlobal.java:1217)
+	at android.app.Instrumentation.syncInputTransactionsAndInjectEventIntoSelf(Instrumentation.java:1233)
+	at android.app.Instrumentation.sendPointerSync(Instrumentation.java:1218)
+	at io.drivegrowth.app.host.ResultsHostActivityTest.tap(ResultsHostActivityTest.kt:50)
+	at io.drivegrowth.app.host.ResultsHostActivityTest.testRealResultsRecreationGateRejectionAcknowledgementAndUnavailableOnboarding(ResultsHostActivityTest.kt:126)
+	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+Caused by: android.os.RemoteException: Remote stack trace:
+	at com.android.server.input.InputManagerService.injectInputEventToTarget(InputManagerService.java:916)
+	at android.hardware.input.IInputManager$Stub.onTransact(IInputManager.java:735)
+	at android.os.Binder.execTransactInternal(Binder.java:1332)
+	at android.os.Binder.execTransact(Binder.java:1278)
+
+
+Test results for InstrumentationTestRunner=...E
+Time: 13.116
+
+FAILURES!!!
+Tests run: 3,  Failures: 0,  Errors: 1
