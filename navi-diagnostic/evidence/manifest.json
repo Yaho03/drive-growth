@@ -67,6 +67,33 @@
       "sourceSha256": "fe03ecf7ce60fe5fcf0d006b5135b50f972b1548c33abf6f1ae710b147b563c1",
       "publishedRecords": 1769,
       "publishedSha256": "e07acd8e119d71e241e3c68a9e0c94eda9771c611c097b4eecc66f15545f5b55"
+    },
+    {
+      "file": "x86-50m-arrival-events.jsonl",
+      "sourceFileName": "navi-2fd60c40-c80e-4443-833e-3e3870e1a679.jsonl",
+      "sourceRecords": 1765,
+      "sourceSha256": "4216c1fc4f8d871174a28ec70e4cbbe0cae7ead7fbb268902ef23d2231c585ba",
+      "publishedRecords": 43,
+      "publishedSha256": "c291b3d8ddb422aa9ed145d9b76c7fc2b7cd16ce34684f7c663dba2596e3441e",
+      "selection": "TOOL·SDK_INITIALIZE 행, requestRoute·cancelRoute·requestReRoute의 REQUEST·REQUEST_RETURN 행, 경로 시작·종료·상태·도착·취소·재탐색·오류·연결 콜백, onDestinationInfo의 remainDistance·remainTime·name 변화, onCurrentLocationInfo의 routeId·currentRouteIndex 변화, onRouteStateInfo의 naviMode 변화, 앞 행과 10초 넘게 떨어진 행과 그 앞 행. 선택한 행의 필드 값은 바꾸지 않았다."
+    },
+    {
+      "file": "x86-56km-route-events.jsonl",
+      "sourceFileName": "navi-ffa9e333.jsonl",
+      "sourceRecords": 17373,
+      "sourceSha256": "ffe1bdd3b80adf178807926653e8ea450d1d07362a7e5df1e1da383c4da11474",
+      "publishedRecords": 241,
+      "publishedSha256": "602c3b6b574dd1deb314d06ba4ca06c4b05a6030ca2d4deab5096027686e5eb3",
+      "selection": "TOOL·SDK_INITIALIZE 행, requestRoute·cancelRoute·requestReRoute의 REQUEST·REQUEST_RETURN 행, 경로 시작·종료·상태·도착·취소·재탐색·오류·연결 콜백, onDestinationInfo의 remainDistance·remainTime·name 변화, onCurrentLocationInfo의 routeId·currentRouteIndex 변화, onRouteStateInfo의 naviMode 변화, 앞 행과 10초 넘게 떨어진 행과 그 앞 행. 선택한 행의 필드 값은 바꾸지 않았다."
+    },
+    {
+      "file": "x86-3km-arrival-events.jsonl",
+      "sourceFileName": "navi-ced1fe0f.jsonl",
+      "sourceRecords": 9176,
+      "sourceSha256": "18aeb7df6dc85bce232e6d77dd7cda8925efcfacd7489f96bfc5d0e28f1e0892",
+      "publishedRecords": 211,
+      "publishedSha256": "2b448ca62479ff77d0887e1044712ca07e45ce4ca5a10b41fa496ea5bdd6615c",
+      "selection": "TOOL·SDK_INITIALIZE 행, requestRoute·cancelRoute·requestReRoute의 REQUEST·REQUEST_RETURN 행, 경로 시작·종료·상태·도착·취소·재탐색·오류·연결 콜백, onDestinationInfo의 remainDistance·remainTime·name 변화, onCurrentLocationInfo의 routeId·currentRouteIndex 변화, onRouteStateInfo의 naviMode 변화, 앞 행과 10초 넘게 떨어진 행과 그 앞 행. 선택한 행의 필드 값은 바꾸지 않았다."
     }
   ]
 }
