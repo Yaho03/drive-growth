@@ -16,7 +16,6 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
     private val dayMs = 24 * 60 * 60 * 1000L
     private val today = LocalDate.of(2026, 11, 7)
     private val rules = DeliverySettlementRules(RuleVersion("delivery-settle-trial-v0"), dayMs, dayMs, 5)
-    private val settlement = DeliverySettlement(rules)
     private val drivingRules = DrivingIncomeRules(RuleVersion("driving-trial-v0"), 500_000, GameMoney(10))
     private val income = DeliveryOffer.Income(DeliveryOfferId("offer-0"), VehicleId("hyundai_casper"), GameMoney(400))
     private val purchase = DeliveryOffer.Purchase(DeliveryOfferId("offer-1"), VehicleId("hyundai_sonata"), Rarity.RARE, GameMoney(3_000))
@@ -72,8 +71,40 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
     private fun arrival(at: Long = start.value + 60_000, r: RouteId = route) =
         Observation.Available(DeliveryArrivalEvidence(r, source, EpochMillis(at)))
 
-    private fun settle(evidence: Observation<DeliveryArrivalEvidence>, now: Long = start.value + 120_000) =
-        ledger.settleArrival(settlement, evidence, EpochMillis(now), refill)
+    private fun settle(
+        evidence: Observation<DeliveryArrivalEvidence>,
+        now: Long = start.value + 120_000,
+        id: String = "r1",
+        next: (DeliveryList, DeliveryOfferId) -> ContractResult<DeliveryList> = refill,
+    ) = ledger.settleArrival(rules, RequestId(id), evidence, EpochMillis(now), next)
+
+    private val keep: (DeliveryList, DeliveryOfferId) -> ContractResult<DeliveryList> = { l, _ -> ContractResult.Success(l) }
+
+    private fun sql(vararg statements: String) = ok(store.atomic { db -> statements.forEach(db::execSQL); ContractResult.Success(Unit) })
+
+    private val tables = listOf(
+        "account", "settlements", "vehicles", "delivery_lists", "delivery_requests", "delivery_active", "delivery_routes",
+        "delivery_outcomes", "delivery_held", "delivery_hold_outcomes", "driving_days", "driving_drives",
+    )
+
+    /** 표의 모든 칸을 형식까지 포함해 읽는다. 실패한 호출이 원본을 바꾸지 않았는지 본다. */
+    private fun dump(): List<String> = ok(store.atomic { db ->
+        ContractResult.Success(tables.map { table ->
+            val columns = db.rawQuery("SELECT * FROM $table LIMIT 0", null).use { it.columnNames.toList() }
+            val quoted = columns.joinToString(" || '|' || ") { "quote($it)" }
+            db.rawQuery("SELECT $quoted FROM $table ORDER BY rowid", null).use {
+                buildList { while (it.moveToNext()) add(it.getString(0)) }.joinToString("\n")
+            }
+        })
+    })
+
+    private fun assertStorageFailureKeepsRows(vararg calls: () -> ContractResult<*>) {
+        val before = dump()
+        calls.forEach { assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), it()) }
+        reopen()
+        calls.forEach { assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), it()) }
+        assertEquals(before, dump())
+    }
 
     private fun fillGarage(count: Int) = repeat(count) { i ->
         ok(store.commitGameChange(GameChange(RequestId("add$i"), TransactionKind.GARAGE, source, rule, vehicle = VehicleWrite.Add(
@@ -92,8 +123,12 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
         assertEquals(listOf(DeliveryOfferId("offer-2"), purchase.id), stored.offers.map { it.id })
         assertEquals(3, stored.nextOfferNumber)
         reopen()
-        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE), settle(arrival()))
+        val again = ok(settle(arrival()))
+        assertEquals(commit, again)
+        assertEquals(commit.settlement?.settlementId, again.settlement?.settlementId)
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), settle(arrival(), now = start.value + 120_001))
         assertEquals(10_400, balance())
+        assertEquals(stored, ok(ledger.lists(today)).single())
     }
 
     fun testPurchaseArrivalGivesVehicleWithoutMoneyChange() {
@@ -117,28 +152,34 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
         assertEquals(3, owned().size)
         assertEquals(listOf(held), ok(ledger.held()))
         assertNull(ok(ledger.active()))
-        assertTrue(ok(ledger.resolveHold(settlement, RequestId("r1"), EpochMillis(held.deadline.value - 1))).outcome is HoldOutcome.StillHeld)
+        assertTrue(ok(ledger.resolveHold(rules, RequestId("r1"), EpochMillis(held.deadline.value - 1))).outcome is HoldOutcome.StillHeld)
         ok(store.commitGameChange(GameChange(RequestId("sell0"), TransactionKind.GARAGE, source, rule,
             vehicle = VehicleWrite.Update(OwnedVehicleId("car0"), Revision(0), 1, VehicleLifecycle.SOLD, 0))))
         reopen()
-        val claim = ok(ledger.resolveHold(settlement, RequestId("r1"), EpochMillis(held.deadline.value - 1)))
+        val claim = ok(ledger.resolveHold(rules, RequestId("r1"), EpochMillis(held.deadline.value - 1)))
         assertTrue(claim.outcome is HoldOutcome.Claimed)
         assertTrue(owned().any { it.ownedVehicleId == OwnedVehicleId("delivery/r1") })
         assertTrue(ok(ledger.held()).isEmpty())
-        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
-            ledger.resolveHold(settlement, RequestId("r1"), EpochMillis(held.deadline.value - 1)))
+        reopen()
+        assertEquals(claim, ok(ledger.resolveHold(rules, RequestId("r1"), EpochMillis(held.deadline.value - 1))))
+        assertEquals(claim, ok(ledger.holdResult(RequestId("r1"))))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), ledger.resolveHold(rules, RequestId("r1"), held.deadline))
         assertEquals(7_000, balance())
+        assertEquals(3, owned().size)
     }
 
     fun testExpiredHoldRefundsAfterFee() {
         fillGarage(3)
         choose(purchase)
         val held = (ok(settle(arrival())).outcome as DeliveryOutcome.VehicleHeld).held
-        val refund = ok(ledger.resolveHold(settlement, RequestId("r1"), held.deadline))
+        val refund = ok(ledger.resolveHold(rules, RequestId("r1"), held.deadline))
         assertTrue(refund.outcome is HoldOutcome.Refunded)
         assertEquals(7_000 + 2_850, balance())
         assertEquals(3, owned().size)
         assertTrue(ok(ledger.held()).isEmpty())
+        reopen()
+        assertEquals(refund, ok(ledger.resolveHold(rules, RequestId("r1"), held.deadline)))
+        assertEquals(7_000 + 2_850, balance())
     }
 
     fun testMissingOrOldRouteEvidenceWaitsWithoutChange() {
@@ -160,7 +201,7 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
         assertNull(ok(ledger.active()))
         assertEquals(list, ok(ledger.lists(today)).single())
         choose(income, "r2")
-        val expired = ok(settle(Observation.Missing(MissingReason.NO_DATA), now = start.value + dayMs))
+        val expired = ok(settle(Observation.Missing(MissingReason.NO_DATA), now = start.value + dayMs, id = "r2"))
         assertEquals(DeliveryOutcome.IncomeExpired, expired.outcome)
         assertNull(expired.settlement)
         assertEquals(10_000, balance())
@@ -229,5 +270,125 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
             driving.settle(drivingRules, ConfirmedDrive("d1", today, ObservedDistance(1_000, source))))
         assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT),
             driving.settle(drivingRules, ConfirmedDrive("d2", today, ObservedDistance(1_000, InputSource.VEHICLE))))
+    }
+
+    fun testEveryFinishedArrivalReplaysAfterLostResponseEvenWithNewActiveRequest() {
+        fun lostResponse(offer: DeliveryOffer, id: String, evidence: Observation<DeliveryArrivalEvidence>, now: Long) {
+            choose(offer, id)
+            val first = ok(settle(evidence, now, id, keep))
+            reopen()
+            ok(ledger.select(proposed, income.id, RequestId("$id-next")))
+            val balance = balance(); val cars = owned(); val lists = ok(ledger.lists(today)); val held = ok(ledger.held())
+            assertEquals(first, ok(settle(evidence, now, id, keep)))
+            assertEquals(first, ok(ledger.arrivalResult(RequestId(id))))
+            assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), settle(evidence, now + 1, id))
+            assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), settle(Observation.Missing(MissingReason.STALE), now, id))
+            assertEquals(balance, balance()); assertEquals(cars, owned()); assertEquals(lists, ok(ledger.lists(today))); assertEquals(held, ok(ledger.held()))
+            assertEquals(RequestId("$id-next"), ok(ledger.active())?.requestId)
+            ok(store.atomic { ledger.finishActive(it, RequestId("$id-next")) })
+        }
+        lostResponse(income, "a", arrival(), start.value + 120_000)
+        lostResponse(purchase, "b", arrival(), start.value + 120_000)
+        lostResponse(purchase, "c", Observation.Missing(MissingReason.NO_DATA), start.value + dayMs)
+        lostResponse(income, "d", Observation.Missing(MissingReason.NO_DATA), start.value + dayMs)
+        fillGarage(3)
+        lostResponse(purchase, "e", arrival(), start.value + 120_000)
+        assertNull(ok(ledger.arrivalResult(RequestId("never"))))
+    }
+
+    fun testArrivalForAnotherRequestOrUsedSettleIdIsRejected() {
+        choose(purchase)
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), settle(arrival(), id = "other"))
+        ok(store.commitGameChange(GameChange(RequestId("delivery/r1/settle"), TransactionKind.GARAGE, source, rule,
+            MoneyChange(MoneyDirection.CREDIT, GameMoney(1)))))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), settle(arrival()))
+        assertEquals(7_001, balance())
+        assertEquals(purchase, ok(ledger.active())?.offer)
+        assertTrue(owned().isEmpty())
+    }
+
+    fun testStoredArrivalThatDoesNotMatchItsCommandIsStorageFailure() {
+        choose(purchase)
+        ok(settle(arrival()))
+        val call = { settle(arrival()) }
+        val read = { ledger.arrivalResult(RequestId("r1")) }
+        sql("CREATE TABLE backup AS SELECT * FROM delivery_outcomes")
+        val capacity = ok(store.atomic { db -> ContractResult.Success(db.rawQuery("SELECT capacity FROM shop", null).use { it.moveToFirst(); it.getLong(0) }) })
+        for (corruption in listOf(
+            "UPDATE delivery_outcomes SET result = replace(result, '\"slots\":$capacity', '\"slots\":0')",
+            "UPDATE delivery_outcomes SET result = replace(result, 'VEHICLE_DELIVERED', 'PURCHASE_REFUNDED')",
+            "UPDATE delivery_outcomes SET result = replace(result, '\"route\":\"route-1\"', '\"route\":\"route-x\"')",
+            "UPDATE delivery_outcomes SET command = replace(command, '\"now\":1120000', '\"now\":\"1120000\"')",
+            "UPDATE delivery_outcomes SET result = 7",
+        )) {
+            sql(corruption)
+            assertStorageFailureKeepsRows(call, read)
+            sql("DELETE FROM delivery_outcomes", "INSERT INTO delivery_outcomes SELECT * FROM backup")
+        }
+        sql("CREATE TABLE settle_backup AS SELECT * FROM settlements WHERE request_id = 'delivery/r1/settle'")
+        sql("UPDATE settlements SET result = replace(result, '\"kind\":\"DELIVERY\"', '\"kind\":\"GARAGE\"') WHERE request_id = 'delivery/r1/settle'")
+        assertStorageFailureKeepsRows(call, read)
+        sql("DELETE FROM settlements WHERE request_id = 'delivery/r1/settle'")
+        assertStorageFailureKeepsRows(call, read)
+        sql("INSERT INTO settlements SELECT * FROM settle_backup")
+        assertEquals(VehicleId("hyundai_sonata"), ((ok(call()).outcome as DeliveryOutcome.VehicleDelivered).change.vehicle as VehicleWrite.Add).vehicle.vehicleId)
+    }
+
+    fun testFinishedArrivalWithoutMoneyButWithSettlementIsStorageFailure() {
+        choose(income)
+        ok(settle(Observation.Missing(MissingReason.NO_DATA), now = start.value + dayMs))
+        ok(store.commitGameChange(GameChange(RequestId("delivery/r1/settle"), TransactionKind.DELIVERY, source, rule,
+            MoneyChange(MoneyDirection.CREDIT, GameMoney(400)))))
+        assertStorageFailureKeepsRows({ settle(Observation.Missing(MissingReason.NO_DATA), now = start.value + dayMs) })
+    }
+
+    fun testHeldRowOrHoldResultThatDoesNotMatchArrivalIsStorageFailure() {
+        fillGarage(3)
+        choose(purchase)
+        ok(settle(arrival()))
+        sql("UPDATE delivery_held SET payload = replace(payload, '\"price\":3000', '\"price\":9000')")
+        assertStorageFailureKeepsRows({ ledger.held() }, { ledger.resolveHold(rules, RequestId("r1"), start) })
+        sql("UPDATE delivery_held SET payload = replace(payload, '\"price\":9000', '\"price\":3000')")
+        val now = EpochMillis(start.value + dayMs + 60_000 + 1)
+        val refund = ok(ledger.resolveHold(rules, RequestId("r1"), now))
+        assertTrue(refund.outcome is HoldOutcome.Refunded)
+        sql("UPDATE delivery_hold_outcomes SET result = replace(result, 'REFUNDED', 'CLAIMED')")
+        assertStorageFailureKeepsRows({ ledger.resolveHold(rules, RequestId("r1"), now) }, { ledger.holdResult(RequestId("r1")) })
+    }
+
+    fun testDriveWithZeroPayReplaysWithoutSettlement() {
+        ok(driving.settle(drivingRules, ConfirmedDrive("d1", today, ObservedDistance(500_000, source))))
+        val zero = ConfirmedDrive("d2", today, ObservedDistance(3_000, source))
+        val first = ok(driving.settle(drivingRules, zero))
+        assertEquals(GameMoney(0), first.amount)
+        assertNull(first.settlement)
+        reopen()
+        assertEquals(first, ok(driving.settle(drivingRules, zero)))
+    }
+
+    fun testStoredDriveThatDoesNotMatchItsCommandOrPaymentIsStorageFailure() {
+        val drive = ConfirmedDrive("d1", today, ObservedDistance(30_000, source))
+        ok(driving.settle(drivingRules, drive))
+        val call = { driving.settle(drivingRules, drive) }
+        sql("CREATE TABLE backup AS SELECT * FROM driving_drives", "CREATE TABLE settle_backup AS SELECT * FROM settlements WHERE request_id = 'drive/d1'")
+        for (corruption in listOf(
+            "UPDATE driving_drives SET amount = 'broken'",
+            "UPDATE driving_drives SET amount = 0",
+            "UPDATE driving_drives SET rewarded = 29000",
+            "UPDATE driving_drives SET recorded = 31000",
+            "UPDATE driving_drives SET day_rewarded = 40000",
+            "UPDATE driving_drives SET day = '2026-02-30'",
+            "UPDATE settlements SET result = replace(result, '\"amount\":300', '\"amount\":0') WHERE request_id = 'drive/d1'",
+            "UPDATE settlements SET result = replace(result, '\"kind\":\"DRIVING\"', '\"kind\":\"GARAGE\"') WHERE request_id = 'drive/d1'",
+            "DELETE FROM settlements WHERE request_id = 'drive/d1'",
+        )) {
+            sql(corruption)
+            assertStorageFailureKeepsRows(call)
+            sql("DELETE FROM driving_drives", "INSERT INTO driving_drives SELECT * FROM backup",
+                "DELETE FROM settlements WHERE request_id = 'drive/d1'", "INSERT INTO settlements SELECT * FROM settle_backup")
+        }
+        assertEquals(GameMoney(300), ok(call()).amount)
+        sql("UPDATE driving_days SET rewarded = 'broken'")
+        assertStorageFailureKeepsRows({ driving.day(today) })
     }
 }

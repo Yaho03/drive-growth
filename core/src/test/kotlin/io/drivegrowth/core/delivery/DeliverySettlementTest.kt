@@ -75,6 +75,39 @@ class DeliverySettlementTest {
         assertTrue(resolve(purchase, arrival(at = start.value + day), now = start.value + day) is DeliveryOutcome.PurchaseRefunded)
     }
 
+    @Test fun `현재보다 늦게 받은 증거는 수익과 구매 모두 지급하지 않고 기다린다`() {
+        val now = start.value + 120_000
+        listOf(income, purchase).forEach { offer ->
+            assertEquals(DeliveryOutcome.AwaitingEvidence(EpochMillis(start.value + day)), resolve(offer, arrival(at = now + 1), now = now))
+            assertEquals(DeliveryOutcome.AwaitingEvidence(EpochMillis(start.value + day)), resolve(offer, arrival(at = now + 1), now = now, slots = 0))
+        }
+        assertTrue(resolve(income, arrival(at = now), now = now) is DeliveryOutcome.IncomeCompleted)
+        assertTrue(resolve(purchase, arrival(at = now), now = now) is DeliveryOutcome.VehicleDelivered)
+        assertEquals(EpochMillis(now), (resolve(purchase, arrival(at = now), now = now, slots = 0) as DeliveryOutcome.VehicleHeld).held.heldAt)
+    }
+
+    @Test fun `기한 안에 받은 증거를 기한 뒤에 처리하면 정상 도착이다`() {
+        val received = start.value + day - 1
+        val later = start.value + day + 60_000
+        assertTrue(resolve(income, arrival(at = received), now = later) is DeliveryOutcome.IncomeCompleted)
+        assertTrue(resolve(purchase, arrival(at = received), now = later) is DeliveryOutcome.VehicleDelivered)
+        assertEquals(EpochMillis(received + day), (resolve(purchase, arrival(at = received), now = later, slots = 0) as DeliveryOutcome.VehicleHeld).held.deadline)
+    }
+
+    @Test fun `기한이 지났는데 현재보다 늦은 증거가 오면 미도착으로 끝난다`() {
+        val deadline = start.value + day
+        assertTrue(resolve(purchase, arrival(at = deadline + 5), now = deadline) is DeliveryOutcome.PurchaseRefunded)
+        assertEquals(DeliveryOutcome.IncomeExpired, resolve(income, arrival(at = deadline + 5), now = deadline))
+    }
+
+    @Test fun `기기 시계가 시작 시각보다 뒤로 가면 도착도 환급도 하지 않는다`() {
+        val back = start.value - 60_000
+        listOf(income, purchase).forEach { offer ->
+            assertTrue(resolve(offer, arrival(at = start.value), now = back) is DeliveryOutcome.AwaitingEvidence)
+            assertTrue(resolve(offer, Observation.Missing(MissingReason.NO_DATA), now = back) is DeliveryOutcome.AwaitingEvidence)
+        }
+    }
+
     @Test fun `기한 전에는 기다리고 기한이 지나면 구매는 전액 환급, 수익은 벌금 없이 끝난다`() {
         val missing = Observation.Missing(MissingReason.NO_DATA)
         assertTrue(resolve(purchase, missing, now = start.value + day - 1) is DeliveryOutcome.AwaitingEvidence)
