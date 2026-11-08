@@ -1,0 +1,11 @@
+// 공개 사본: 실행 당시 임시 절대 경로만 GACHA_REVIEW_HOST 환경변수로 치환. 재실행하지 않음.
+gradle.afterProject { project, state ->
+ if(project.path == ':app') {
+  def a=project.extensions.getByName('android')
+  a.defaultConfig.applicationId='io.drivegrowth.app.gacha52finala'
+  a.defaultConfig.testApplicationId='io.drivegrowth.app.gacha52finala.test'
+  a.sourceSets.getByName('debug').java.srcDir(new File(System.getenv('GACHA_REVIEW_HOST'), 'java'))
+  a.sourceSets.getByName('debug').manifest.srcFile(new File(System.getenv('GACHA_REVIEW_HOST'), 'AndroidManifest.xml'))
+  a.sourceSets.getByName('androidTest').java.srcDir(new File(System.getenv('GACHA_REVIEW_HOST'), 'test'))
+ }
+}

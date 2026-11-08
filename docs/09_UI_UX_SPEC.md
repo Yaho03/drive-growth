@@ -270,3 +270,21 @@ progress.render(ProgressScreenState.Unsupported("진행·청구 연결을 아직
 ```
 
 MainActivity·공통 탐색·gate·공통 모델/fixture·DB·경제 계산·02/08/README는 수정하지 않았다. #45 실제 진행/청구/기간·영속 수령, #40 실제 휴식 증거/출발/수익 연결, #51 탐색/수명주기와 #81 정책 검증은 남으며 #57 전체 완료가 아니다. 고정 debug 입력과 실행/미실행 근거는 [검증 문서](06_VERIFICATION.md#57-퀘스트업적휴식-표시-ui-부분-검증)를 따른다.
+
+
+### #52 가챠 독립 표시·확인·결과 UI 연결점
+
+2026-11-07, main `fbbf98e`에서 `app/ui/gacha/GachaView`를 추가했다. `ui-v3/4p-gacha.png`·`5a-landscape-gacha.png`를 직접 확인해 카드·확률/보장 요약·큰 확인 버튼의 구성을 참고하고 기존 `GarageStyle`·`garage_vehicle_placeholder.xml`을 재사용한다. 시안의3000·카운터·확률·미확인 실차/캐릭터 아트를 제품 상수로 옮기지 않는다. debug 예제의 구입 단가500도 공급 입력이며 UI가 티켓 구입·할인·차감 경제를 구현한 것이 아니다.
+
+- 진입은 `GachaView(context, onEvent, restored)`이며 복원 상태는 **새 인스턴스의 생성자에서만** 받는다. 현재 View/Interaction의 Pending·처리 키·재조회 잠금을 과거 상태로 덮는 공개 restore API는 없다. 호스트는 같은 프로필/세션의 최신 `uiState`만 새 View로 넘긴다. 다른 프로필은 새 상태로 시작하고 이전 callback을 새 세션에 연결하지 않는다. Activity Bundle·프로세스 영속 복원 어댑터는 이번 범위가 아니다.
+- `render(GachaFrame, controlsEnabled)`의 generation은 호스트 표시 공급 순서이고 경제 RequestId·DB revision이 아니다. 낮은 세대 또는 같은 세대의 다른 내용은 거절하며, 오래된 입력의 false gate는 적용하고 오래된 true로 제한을 풀지 않는다. Loading/Failure도 같은 frame 세대 경계에 포함한다. 복원 시 frame·Pending·선택·옵션별 보존 요청·조회/차고 이동 잠금을 방어 복사한다.
+- `GachaOffers.content`는 기존 `GameContentSnapshot`·`GachaRules`다. 후보는 공급자가 현재 해금 확인한 VehicleId 목록이며 UI가 `unlockedAt`을 호출하지 않는다. 카탈로그/게임 콘텐츠 참조·중복은 표시 형식 검사로 확인한다. 후보 이름과 개체 희귀도를 구분하며 결과는 공통 `Settlement.changedVehicle`의 `OwnedVehicle`을 그대로 표시한다.
+- `appliedPercent`는 **이번에 실제 적용할** 공통 Rarity별 BigDecimal 퍼센트를 공급한다. 모든 희귀도·0..100 범위·합100의 표시 형식만 검사하며, 누락/잘못된 합을 기본 가중치로 대체하지 않는다. UI는 추첨·가중치 정규화·보장 재분배를 하지 않는다. 보장 회차 여부·남은 횟수·후보 가능 여부도 공급값이며 GachaRules는 기준 주기/보장 희귀도 표시에 사용한다. 한 frame의 옵션들은 공급자가 같은 현재 후보/확률/보장 문맥으로 준비한 선택들이다.
+- 옵션은 공급된 유료/무료 구분·실제 이번 게임머니/티켓 차감량·보유권·설명·행동 가능 상태와 **호스트가 준비한 경제 RequestId**를 받는다. UI에서 경제 키를 생성하지 않는다. 디버그 예제는 이미 보유한 유료권/무료권1장을 사용하는 요청(이번 게임머니 차감0)과 별도의 구입 단가500을 구분한다. 실제 티켓 구입 버튼/명령·할인권 경제는 미연결이다. 빈 후보·보장 불가·공간 부족·재화/티켓 부족·정보 누락·미지원·형식 오류는 구분하고 사용 불가 옵션은 확인/제출하지 않는다. 공간/잔액/권수의 최종 경제 판단은 공급자와 저장 경계 책임이다.
+- 선택→비용 확인→`GachaEvent.Draw(GachaRequest)` 순서다. 요청에는 확인한 공급 문맥/옵션 전체·경제 키와 별도 UUID attemptId를 담는다. Pending을 먼저 기록한 뒤 callback을 보내 중복·동기 응답을 처리한다. 확인 취소와 Back은 선택만 닫으며 돈/티켓/차량/보장 상태를 바꾸지 않는다. Pending Back은 부모 탐색 책임으로 넘긴다.
+- 실패 뒤 다른 옵션을 오가도 보존한 원문/경제 키로 재시도하며 attemptId만 바꾼다. 새 조회에서 같은 옵션의 키/내용이 바뀌거나, 보존된 경제 RequestId를 새 옵션 ID·다른 옵션·변경 비용/문맥에 재결합하면 이전 실패 요청을 조용히 버리지 않고 차단한다. 옵션 ID별 원문 검사와 모든 보존 요청의 동일 경제 키에 대한 전체 `GachaDrawInput` 대조를 함께 적용한다. 표시 세대만 바꾸어 우회할 수 없다. 호스트가 이전 요청의 **확정 실패를 조회한 뒤** `resolveFailedRequest(key)`로 해당 키를 해소해야 새 조건을 사용할 수 있다. 이 메서드는 경제 저장/취소가 아니고 Pending 또는 성공 대기 키를 임의 해소하지 않는다.
+- `complete(request, ContractResult)`는 같은 시도 객체 값의 응답만 받는다. 성공 callback은 획득 화면을 만들지 않고 모든 추가 뽑기를 막아 확정 조회를 기다린다. 새 세대의 `GachaScreen.Result`에 외부 확정 Settlement가 전달돼야 차량/희귀도/취득액/잔액을 표시한다. 같은 경제 키의 확정 결과는 해당 보존 요청을 종결하며, 다른 요청의 Pending을 성공으로 바꾸지 않는다. UI는 결과를 재추첨·재지급하거나 기본 확률로 성공을 만들지 않는다.
+- Loading/Missing/Unsupported/Failure·Offers의 차단 사유·Pending·외부 Result를 구분한다. 실패/누락 재조회는 `Reload(token)`과 일치하는 `completeReload(token)`으로 잠금을 푼다. 결과의 `OpenGarage(GachaGarageRequest)`는 정산 ID·개체 ID와 이동 시도별 UUID token을 담는 이동 요청이다. Pending을 먼저 저장하고 `completeGarageNavigation(request)`가 현재 요청 전체와 일치할 때만 잠금을 푼다. 같은 정산의 다음 이동 중 이전 완료가 늦게 와도 잠금을 유지하며 새 View 생성자 복원에도 현재 이동 요청을 보존한다. 이 token은 경제 RequestId와 별개다. `release()` 뒤 입력/응답은 폐기한다. false gate는 모든 게임 내용과 버튼을 제거하고 옛 버튼도 그리기 세대·현재 gate를 검사한다.
+- 폭900dp 이상은 후보/적용 확률과 보장/확인/옵션을 두 열로, 좁은 폭은 한 열로 표시하고 전체 본문을 스크롤한다. 분기값은 구현 기준이며 공식 폼팩터 인증이 아니다. 긴 문구는 줄바꿈한다. 생성자 복원은 선택/요청 상태를 보존하며 스크롤의 프로세스 영속화는 제공하지 않는다.
+
+`debug/GachaPreviewStates`는 일반/보장 회차·유료/무료 보유권·빈 후보/부족/누락/오류·외부 결과 모양의 고정 입력이다. 실제 #47 추첨·정산·티켓/카운터 저장 성공이 아니다. MainActivity·기존 Garage/Collection·공통 탐색/gate·계약/fixture·SQL·경제·Manifest/Gradle은 변경하지 않는다. 가챠 UI는 #111 실제 소비 어댑터나 PR #126의 가챠 capability에 아직 연결하지 않았다. 현재 main의 #126 가챠 타입·메모리 참조와 #127 재료 타입·순수 검증은 보존해 사용할 수 있으나, 실제 #47 소비·#122 SQLite·원자 차감/지급·저장/재실행·발견 기록·수정본 기기/공식 폼팩터는 후속 연결·검증이다. #52 전체 완료로 닫지 않는다.
