@@ -1,5 +1,6 @@
 package io.drivegrowth.core.progression
 
+import io.drivegrowth.core.contract.OwnedVehicle
 import io.drivegrowth.core.contract.Rarity
 import java.math.BigInteger
 
@@ -21,6 +22,8 @@ data class VehicleCareRules(
     val salePercent: Int = 60,
     val salePenaltyPointsPerAccident: Int = 5,
     val minSalePercent: Int = 30,
+    /** 레벨 1 초과분 레벨당 판매가 가산(%p). PRD 2026-11-05: +1%p, Lv20 사고 없음 79%. */
+    val saleLevelBonusPointsPerLevel: Int = 1,
     val scrapOnlyAccidents: Int = 3,
     val scrapPercent: Int = 20,
 )
@@ -66,18 +69,27 @@ class VehicleCare(private val rules: VehicleCareRules = VehicleCareRules()) {
         return 100 + (level - 1) * rules.rentBonusPercentPerLevel - penalty
     }
 
-    fun repairCost(price: Long): Long = percentOf(price, rules.repairCostPercent.toLong())
+    /** 차종 가격 × 5% × 희귀도 비용 배율. 마지막에 한 번 내림. */
+    fun repairCost(modelPrice: Long, rarity: Rarity): Long =
+        percentOf(modelPrice, rules.repairCostPercent.toLong() * rules.costMultiplierPercent.getValue(rarity), 10_000)
 
     fun canSell(accidents: Int): Boolean = accidents.nonNegative() < rules.scrapOnlyAccidents
 
-    // 판매 시 레벨 가산은 PRD 미정이라 넣지 않는다.
-    fun salePrice(purchasePrice: Long, accidents: Int): Long {
+    /**
+     * 판매가 = 실제 취득액 × (60% − 사고당 5%p, 최저 30%, + 레벨 1 초과분 레벨당 1%p).
+     * 기준은 개체의 실제 취득액(무료권·첫 지급 0)이며 차종 가격·희귀도는 쓰지 않는다(PRD 2026-11-07).
+     */
+    fun salePrice(vehicle: OwnedVehicle, accidents: Int): Long {
         require(canSell(accidents)) { "사고 ${rules.scrapOnlyAccidents}회 이상은 폐차만 가능하다" }
-        val percent = maxOf(rules.salePercent - accidents * rules.salePenaltyPointsPerAccident, rules.minSalePercent)
-        return percentOf(purchasePrice, percent.toLong())
+        // 규칙 값이 커도 Int로 잘리지 않도록 비율도 BigInteger로 계산한다.
+        val penalty = big(accidents).multiply(big(rules.salePenaltyPointsPerAccident))
+        val base = big(rules.salePercent).subtract(penalty).max(big(rules.minSalePercent))
+        val percent = base.add(big(vehicle.level - 1).multiply(big(rules.saleLevelBonusPointsPerLevel)))
+        return percentOf(vehicle.acquisitionCost.units, percent)
     }
 
-    fun scrapValue(purchasePrice: Long): Long = percentOf(purchasePrice, rules.scrapPercent.toLong())
+    /** 폐차 = 실제 취득액의 20%. 사고 횟수와 무관하게 가능하다(사고 3회 이상은 폐차만 가능). */
+    fun scrapValue(vehicle: OwnedVehicle): Long = percentOf(vehicle.acquisitionCost.units, rules.scrapPercent.toLong())
 
     fun isAllowed(activity: VehicleActivity, action: VehicleAction): Boolean = when (activity) {
         VehicleActivity.IDLE -> action != VehicleAction.REPAIR
@@ -91,8 +103,15 @@ class VehicleCare(private val rules: VehicleCareRules = VehicleCareRules()) {
         require(p.progressPercent in 0..99) { "진행량은 0..99" }
     }
     private fun Int.nonNegative(): Int = also { require(it >= 0) { "사고 횟수는 0 이상" } }
-    private fun percentOf(amount: Long, percent: Long): Long {
+    /** amount × numerator / denominator(내림). 중간 곱이 Long을 넘어도 최종값이 Long 안이면 계산하고, 넘으면 ArithmeticException. */
+    private fun percentOf(amount: Long, numerator: Long, denominator: Long = 100): Long =
+        percentOf(amount, BigInteger.valueOf(numerator), denominator)
+
+    private fun percentOf(amount: Long, numerator: BigInteger, denominator: Long = 100): Long {
         require(amount >= 0) { "금액은 0 이상" }
-        return Math.multiplyExact(amount, percent) / 100
+        require(numerator.signum() >= 0) { "비율은 0 이상" }
+        return BigInteger.valueOf(amount).multiply(numerator).divide(BigInteger.valueOf(denominator)).longValueExact()
     }
+
+    private fun big(value: Int): BigInteger = BigInteger.valueOf(value.toLong())
 }

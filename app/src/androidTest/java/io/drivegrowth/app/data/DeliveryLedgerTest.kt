@@ -257,7 +257,10 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
             "UPDATE settlements SET result = replace(result, '\"rule\":\"delivery-trial-v0\"', '\"rule\":\"other-rule\"') WHERE request_id = 'r1'",
             "UPDATE settlements SET command = replace(command, '3000', '2000') WHERE request_id = 'r1'",
             "UPDATE settlements SET settlement_id = 'forged' WHERE request_id = 'r1'",
-        )
+        ) + listOf("3000.5", "3000.0", "\"3000\"", "3e3", "92233720368547758070").map {
+            // 공용 금액 해석(#136)이 소수·문자열·지수·범위 초과를 정수로 보정하지 않는지 탁송 소비 경로에서 확인한다.
+            "UPDATE settlements SET result = replace(result, '\"amount\":3000', '\"amount\":$it') WHERE request_id = 'r1'"
+        }
         val original = dump("settlements")
         sql("CREATE TABLE settlement_backup AS SELECT * FROM settlements WHERE request_id = 'r1'")
         for (corruption in corruptions) {

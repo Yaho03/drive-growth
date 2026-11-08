@@ -812,6 +812,13 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w \
 
 재현은 프로젝트의 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` 후 Pleos의 활성 사용자에 앱/시험 APK를 설치하고 `adb shell am instrument --user 10 -w -e class io.drivegrowth.app.data.RentalLedgerTest io.drivegrowth.app.test/android.test.InstrumentationTestRunner`로 실행한다.
 
+### #34·#46·#49·#50 이력과 영업 조회 인계
+
+Android API 37 독립 에뮬레이터에서 `RentalLedgerTest` 11개와 `SqliteGameChangeStoreTest` 26개를 실행해 37개가 통과했다. 판매·폐차·강화 재료 소비 뒤 재개방해 개체와 취득 출처를 읽었고, 발견 중복 및 실패 배치가 추가 기록·재화 변경을 일으키지 않음을 확인했다. 두 대여를 배정과 반대 순서로 정산하고 최초 영수증을 열람한 뒤 v2 → v3로 이전해도 동일한 정산 ID·개체·사고 결과를 읽었다. 기존 v1에서의 직접 이전도 통과했다. 실행 범위는 SQLite이며 실제 가챠 화면 노출·선물 지급·실차 연동은 검증하지 않았다.
+
+#49 인계 보완 후 같은 API 37 환경에서 대여 시험 12개·기존 원장 시험 26개(총 38개)가 통과했다. 같은 차종 두 개체 중 한 대에 무사고 1건·사고 3건을 정산해 누적 0/1/2/3을 확인했고, 정산 실패·재시도·재개방·폐차 뒤에도 개체별 횟수가 보존됐다. 연속 대여 사이의 수리 완료 활동만 시험 입력으로 주입했다.
+
+#116 세 수정 요청 보완 후 API37 독립 기기에서 대여14개·원장26개 총40개 통과. 발견 입력 반복 순회 변경, 정산 오연결·ID/종류/출처 불일치와 숫자·불리언 손상11종에서 최초/지정 조회 실패·DB 바이트와 잔액 보존을 확인했다. 사고 집계도 같은 완료 정산 검증을 사용한다.
 
 
 ## #56 첫 실행·차량 선택 독립 표시 UI 검증
@@ -1213,3 +1220,9 @@ JDK17·기존 Android SDK35·Gradle8.11.1, `--offline --no-daemon`을 사용했�
 설치 앱 SHA-256은 `bad1e1314e0f3411c98cf7b9254148a1f144d2d37bb7fc3c9929115d8cebaab7`, 시험은 `1320fd3fb1372815c1ef29f5c882c400c4c5339b5ac0a91661096a198ecaf9e5`로 빌드/실제 설치가 일치했다. [metadata의 소스7개 Git blob·해시](evidence/issue52-gacha-ui/metadata.json)를 원본·현재 작업 파일과 직접 대조했다. [제품/설정 전후 발췌](evidence/issue52-gacha-ui/restoration.json)에서 제품 APK `793e1db8…`·기존 데이터 파일6개·권한·user10/boot23·1080×600/120dpi·font null/night no가 동일했고 자기 격리2패키지만 제거해 내비 전면으로 반환했다. 활성 시험 없음은 검증 A 보고이며 snapshot의 미지원 instrumentation 명령 오류를 성공 근거로 사용하지 않는다. 기어·전역 창·글꼴·CarService/VHAL·제품 데이터 변경 없이 반환했고 이후 추가 adb는 없다는 종료 보고를 회수했다.
 
 [공개 증거 안내·격리 재현 호스트](evidence/issue52-gacha-ui/README.md)에 최소 자료를 모았다. 개인 경로·APK 바이너리·전체 dump를 제외하고 발췌/경로 치환은 명시했다. 이번 최종 정리는 문서·증거만 바꾸며 제품/정식 시험/리소스7파일은 고정 소스와 동일하다. 고정 입력·새 View 생성자 복원 시험이며 실제 #47 소비/경제·#122 SQLite·발견 저장·제품 탐색/gate·Activity Bundle/프로세스 영속 복원·공식 폼팩터/실차는 미완료다. #52 전체 완료로 닫지 않는다. 최종 PR·원격 head/CI·main 반영은 메인이 처리하고 새 기능은 시작하지 않는다.
+
+### #122 가챠 SQLite 부분 구현
+
+최신 main의 core225개·앱 단위139개, APK/시험APK 조립·lint·저장소 검사 통과. 독립 Android API37에서 GachaLedgerTest7개·RentalLedgerTest14개·SqliteGameChangeStoreTest26개 총47개 통과했다. 유료/무료의 전체 결과 재생, 성장 뒤 당시 개체 재생, 마지막 칸과 무료권의 두 연결 경쟁, 실패 후 원상태·재시도, 보장 회차, 일반 Add의 공간/source 검사, 일반 거래·대여 방문과 가챠의 요청 ID 충돌 양방향을 확인했다. v3 이전은 기존 원장을 보존하고 가챠 상태 미제공으로 남았으며 손상 진행값은 원본 파일을 보존해 실패했다.
+
+신뢰한 신규 프로필 진행값은 시험에서 명시 입력했다. 기존 DB의 무료권/카운터를 기본값으로 생성하거나 제품 UI를 활성화하지 않는다. #50 프로필 초기화·복구·권위 콘텐츠 공급 연결, 추가 티켓 지급 명령과 #111의 실제 소비는 후속이다. 실제 기기 강제종료·전원/차량 SDK 연결 검증은 미수행이다.
