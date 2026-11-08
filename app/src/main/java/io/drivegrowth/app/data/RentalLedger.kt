@@ -1,5 +1,7 @@
 package io.drivegrowth.app.data
 
+import android.database.Cursor
+import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteDatabase
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.Garage
@@ -22,11 +24,10 @@ data class RentalTerms(
     }
 }
 
-data class RentalReceipt(val settlement: Settlement, val accident: Boolean, val matchReview: Boolean,
-                         val washReview: Boolean, val facilityBonus: GameMoney, val regularCustomer: Boolean?)
+typealias RentalReceipt = io.drivegrowth.core.rental.RentalReceipt
 data class ShopState(val progress: ShopProgress, val capacity: Int, val facilities: Set<Facility>)
 
-class RentalLedger internal constructor(private val store: SqliteGameChangeStore) {
+class RentalLedger internal constructor(private val store: SqliteGameChangeStore) : CompletedRentalSource {
     internal companion object {
         fun createTables(db: SQLiteDatabase) {
             db.execSQL("""CREATE TABLE rentals (
@@ -108,8 +109,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         }
         if (lastReturn != null && terms.start.value < lastReturn) return@atomic conflict()
         val hourlyFare = hourlyRates[v.vehicleId] ?: return@atomic missing()
-        val pastAccidents = db.rawQuery("SELECT count(*) FROM rentals WHERE owned_id=? AND accident=1 AND settlement_request IS NOT NULL",
-            arrayOf(v.ownedVehicleId.value)).use { it.moveToFirst(); it.getInt(0) }
+        val pastAccidents = countSettledAccidents(db, v.ownedVehicleId)
         val quote = plan.quote(hourlyFare, pastAccidents, terms.customer, terms.roll,
             rentalFacilities(installed(db), terms.fuelBonus))
         val end = terms.start.value + plan.request.hours * 3_600_000L
@@ -155,6 +155,68 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             })
         }
     }
+
+    /** 정산 쓰기 순서로 최초 영업을 찾는다. 같은 시각·이미 열람한 정산도 구분한다. */
+    override fun firstCompletedRental(): ContractResult<CompletedRental?> = completed(null)
+
+    /** #49가 지정 대여의 확정 결과만 읽는다. 미완료/없는 대여는 null이다. */
+    override fun completedRental(id: RequestId): ContractResult<CompletedRental?> = completed(id)
+
+    override fun accidentCount(ownedVehicleId: OwnedVehicleId): ContractResult<Int> =
+        store.readResult { db ->
+            if (store.findVehicle(db, ownedVehicleId) == null) missing()
+            else ContractResult.Success(countSettledAccidents(db, ownedVehicleId))
+        }
+
+    private val completedSelect = """SELECT r.id,r.owned_id,s.result,r.accident,r.match_review,r.wash_review,
+        r.bonus,r.weighted,r.regular_customer,r.settlement_request,s.request_id,s.settlement_id FROM rentals r
+        LEFT JOIN settlements s ON s.request_id=r.settlement_request
+        WHERE r.settlement_request IS NOT NULL"""
+
+    private fun countSettledAccidents(db: SQLiteDatabase, ownedVehicleId: OwnedVehicleId): Int =
+        db.rawQuery("$completedSelect AND r.owned_id=?", arrayOf(ownedVehicleId.value)).use { rows ->
+            var count = 0
+            while (rows.moveToNext()) if (decodeCompleted(rows).receipt.accident) count++
+            count
+        }
+
+    private fun completed(id: RequestId?): ContractResult<CompletedRental?> = store.read { db ->
+        val filter = if (id == null) "" else " AND r.id=?"
+        db.rawQuery("$completedSelect$filter ORDER BY s.rowid LIMIT 1", id?.let { arrayOf(it.value) }).use { row ->
+            if (!row.moveToFirst()) return@read null
+            decodeCompleted(row)
+        }
+    }
+
+    private fun decodeCompleted(row: Cursor): CompletedRental {
+        if (row.isNull(2) || row.isNull(10) || row.isNull(11)) throw SQLiteException("대여 정산 누락")
+        val rentalId = RequestId(row.getString(0))
+        val settlement = LedgerJson.settlement(JSONObject(row.getString(2)))
+        val expected = "rental/settle/" + rentalId.value
+        if (row.getString(9) != expected || row.getString(10) != expected ||
+            settlement.transaction.requestId.value != expected ||
+            settlement.settlementId.value != row.getString(11) ||
+            settlement.transaction.kind != TransactionKind.RENTAL ||
+            settlement.transaction.source != store.source)
+            throw SQLiteException("대여 정산 연결 불일치")
+        val bonusUnits = row.strictInteger(6, 0, Long.MAX_VALUE)
+        val weighted = if (row.getType(7) == Cursor.FIELD_TYPE_STRING) BigDecimal(row.getString(7))
+            else throw SQLiteException("시간 가중치 형식 오류")
+        if (weighted.signum() < 0) throw SQLiteException("시간 가중치 범위 오류")
+        val bonus = GameMoney(if (weighted.signum() == 0) 0 else bonusUnits)
+        return CompletedRental(rentalId, OwnedVehicleId(row.getString(1)),
+            RentalReceipt(settlement, row.strictBoolean(3), row.strictBoolean(4), row.strictBoolean(5),
+                bonus, if (row.isNull(8)) null else row.strictBoolean(8)))
+    }
+
+    private fun Cursor.strictInteger(column: Int, min: Long, max: Long): Long {
+        if (getType(column) != Cursor.FIELD_TYPE_INTEGER) throw SQLiteException("정수 저장 형식 오류")
+        val value = getLong(column)
+        if (value !in min..max) throw SQLiteException("정수 저장 범위 오류")
+        return value
+    }
+
+    private fun Cursor.strictBoolean(column: Int) = strictInteger(column, 0, 1) == 1L
 
     fun settle(id: RequestId, resolvedRounding: RoundingMode? = null) = store.atomic { db ->
         db.rawQuery("""SELECT version,start,end,cursor,weighted,fare,bonus,rounding,accident,match_review,wash_review,

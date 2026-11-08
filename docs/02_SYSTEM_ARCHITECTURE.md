@@ -376,9 +376,26 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 
 재료 강화는 두 개체를 한 정산에 확정해야 하므로 위 「#48 후속 거래」의 다중 개체 명령이 #33·#34에 생긴 뒤 `MaterialPlan`을 한 건으로 커밋한다. 희귀도 수익 배율(1.0~1.3)과 대여료 반영은 영업 계산(B) 범위라 이번에 바꾸지 않았다.
 
+#### #47 가챠 1회 지급
+
+`io.drivegrowth.core.garage.GachaPull.prepare(store, requestId, ticket)`는 `readGachaState()`의 권위 상태와 이 콘텐츠를 대조한 뒤(콘텐츠·규칙 버전, 천장·보장 희귀도, 양수 가중치 희귀도, 가게 레벨의 해금 차종 집합이 모두 같아야 함) 희귀도 추첨(30회 보장) → 해금 차종 균등 선택으로 추첨을 고정한 `GachaCommand`를 만든다. 가게 레벨·칸 수·카운터·가챠 revision·뽑기권 가격은 저장 측 `GachaAuthority`/`GachaProgress` 값을 쓰고 호출자 입력이나 콘텐츠 `price_unit`을 쓰지 않는다. 새 개체는 `gacha-<requestId>`, GACHA·1레벨·0%·실제 지불액(유료 `purchasePrice`, 무료 0)이다. 추첨 seed는 requestId에서 정한다.
+
+저장은 호출자가 `store.commitGacha(command)`로 한다(#126 `GachaChangeStore`). 차감·새 개체·다음 카운터·무료권 −1이 한 번에 확정되고, 결과는 저장소가 돌려준 `GachaSettlement`(최초 명령·당시 정산·진행 상태)만 사용한다. **응답을 잃으면 보관한 같은 command를 다시 commitGacha**한다. 저장소가 현재 공간·조회 상태보다 먼저 최초 결과를 재생한다.
+
+| 경우 | 처리 |
+|---|---|
+| 권위 상태 없음 / 해금 차종 없음 | `DATA_UNAVAILABLE` (계획 단계) |
+| 저장 측 규칙·해금이 이 콘텐츠와 다름 | `STATE_CONFLICT` (계획 단계) |
+| 차고 칸 부족 / 무료권 0 / 손상 개체 | `CAPACITY_EXCEEDED` / `INSUFFICIENT_FUNDS` / `INVALID_INPUT` (계획 단계, 저장소도 확정 때 다시 검사) |
+| 같은 requestId·다른 입력(카운터·티켓·버전·결과) | 저장소 `STATE_CONFLICT`, 무변경 |
+| 같은 상태로 만든 두 요청의 마지막 칸 경쟁 | 저장소가 한 건만 확정(다른 건은 가챠 revision 충돌) |
+| 잔액 부족·저장 실패 | 저장소가 전체 미반영 |
+
+메모리 참조 구현(`InMemoryGameChangeStore`)으로 검증했다. 실제 SQLite 원자 확정은 경민 PR #136(#122), 무료권 지급·제품 초기 권위 상태·앱 재실행은 후속이다.
+
 #### #49 수리·판매·폐차 금액 계산
 
-`io.drivegrowth.core.progression.VehicleCare`의 금액 계산은 PRD 「수리」·「판매」·「폐차」 시험값을 따른다. 모두 BigInteger로 곱한 뒤 마지막에 한 번 내리고, 최종값이 Long을 넘으면 ArithmeticException이다.
+`io.drivegrowth.core.progression.VehicleCare`의 금액 계산은 PRD 「수리」·「판매」·「폐차」 시험값을 따른다. 모두 BigInteger로 계산해 마지막에 한 번 내리고(레벨 가산·사고 감액 비율도 BigInteger), 최종값이 Long을 넘으면 ArithmeticException이다. 내림은 기존 `VehicleCare`의 잠정 정책을 유지한 것이며 최종 반올림 합의가 아니다.
 
 | 함수 | 산식 | 기준값 |
 |---|---|---|
@@ -386,7 +403,7 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 | `salePrice(vehicle, accidents)` | 실제 취득액 × (max(60% − 사고당 5%p, 30%) + 레벨 1 초과분 레벨당 1%p). 사고 3회 이상은 거절 | `OwnedVehicle.acquisitionCost`(무료권·첫 지급 0). 차종 가격·희귀도는 쓰지 않음 |
 | `scrapValue(vehicle)` | 실제 취득액 × 20% | 위와 같음 |
 
-예: 구입 뽑기권 500 Lv1 판매 300, 같은 차 Lv20 사고 없음 395(79%), 무료권·첫 지급 0. 사고 횟수는 호출자가 넘기는 입력이다. 차량별 확정 사고 누계 조회(#116 질문), 수리비 차감 + 수리 필요 종료의 원자 명령, 판매·폐차의 실제 정산(금액 CREDIT + SOLD/SCRAPPED Update)은 후속 연결이다.
+예: 구입 뽑기권 500 Lv1 판매 300, 같은 차 Lv20 사고 없음 395(79%), 무료권·첫 지급 0. 사고 횟수는 호출자가 넘기는 입력이며, 차량별 정산 완료 사고 횟수는 #116의 `CompletedRentalSource.accidentCount(ownedVehicleId)`로 읽어 넘긴다(연결은 후속). 수리비 차감 + 수리 필요 종료의 원자 명령, 판매·폐차의 실제 정산(금액 CREDIT + SOLD/SCRAPPED Update)은 후속 연결이다.
 
 ### 거래 원장 영속 저장
 
@@ -417,6 +434,12 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 - 대여 종료까지 반영된 뒤 `settle`로 금액, 사고, 리뷰 상승 근거와 입력받은 단골 여부를 조회한다. 미정인 단골 판정은 null이다. 정수 정책 없이 소수 지급이 필요하면 `POLICY_UNRESOLVED`로 보류하고 확정된 방법을 전달해 이어간다. 원장 입금과 반납 이동 전환은 함께 확정된다. 같은 ID의 재정산은 당시 잔액·결과를 재생한다. `finishReturn`은 반납 종료 시각이 지난 경우에 유휴 또는 수리 필요 상태로 전환한다. #49의 수리 완료·사고 이력 소비 연결은 별도다.
 - `shop`, `buy`, `expand`는 가게 상태와 시설 구입·공간 확장의 거래 입구다. 시설과 확장 제안은 규칙 버전·시험값 표시·가격을 받는다. 누적 고객은 중복을 제거한 방문 ID 수로 계산한다. 일반 고객 수익과 대여당 주유소 보너스를 영수증에서 구분하며, 보험은 사고 손실의 절반을 보전한다. 실제 콘텐츠·제품 화면·차량 신호를 연결하는 단계에서는 #35·#51·#55·#28에서 같은 규칙 버전과 입력 출처를 대조한다.
 
+### C 파트에 제공하는 영속 조회 (#34·#46·#49·#50)
+
+- `SqliteGameChangeStore`가 구현하는 `VehicleHistoryStore.listVehicleHistory()`는 모든 개체의 마지막 상태·취득 출처·revision을 반환한다. 첫 차 지급 확인은 `acquisitionSource == INITIAL_GRANT`인 개체가 있는지 검사한다. 처음 받은 차를 처분해도 찾을 수 있다. 현재 보유 목록은 기존 `listOwnedVehicles()`로 읽는다.
+- 탁송/가챠 화면에서 실제로 본 키 집합을 `recordDiscoveries(catalog, keys)`에 넘긴다. SQLite v3의 `discoveries` 표는 차종 ID와 희귀도의 조합을 한 번만 기록한다. 목록에 없는 차종은 배치 전체를 거절한다. 도감은 이력에서 얻은 `CollectionKey(vehicleId, rarity)` 집합과 `discoveredVehicles()` 결과를 `Garage.collection`에 넘긴다. 조회 실패를 빈 도감으로 대체하지 않는다. v1과 v2는 기존 행을 보존해 이전하며 과거에 보았는지 알 수 없는 키를 만들지 않는다.
+- `SqliteGameChangeStore.rental`은 코어의 `CompletedRentalSource`를 구현한다. #49는 `completedRental(rentalId)`에서 개체 ID, 확정 정산의 매출(시설 보너스 포함), 시설 보너스 및 사고 여부를 읽는다. #50은 `firstCompletedRental()`에서 처음 **정산이 커밋된** 대여의 같은 결과를 읽는다. 아직 결과가 없으면 Success(null), DB 오류는 Failure다. 열람·반납·재접속 후에도 최초 정산 ID를 재사용한다. 무료권 지급은 #33이 정할 명령에서 최초 정산 ID와 프로필당 1회 지급을 함께 검사해야 한다. 조회 자체는 보상을 지급하지 않는다.
+- #49의 판매 감액·폐차 조건은 `CompletedRentalSource.accidentCount(ownedVehicleId)`로 조회한다. 같은 차종도 보유 개체 ID별로 분리하며, 사고가 발생하고 정산까지 커밋된 대여 1건을 1회로 센다. 수리·열람·처분 후에도 누적값을 유지한다. 알려진 무사고 차량은 0, 없는 개체는 DATA_UNAVAILABLE다. 처분을 확정할 때는 조회 후 상태가 바뀔 수 있으므로 해당 명령의 revision/활동 검사도 수행한다.
 
 ## 전체 기능의 공통 계약과 저장 선행 작업
 
