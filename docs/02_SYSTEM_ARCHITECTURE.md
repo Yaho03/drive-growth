@@ -194,7 +194,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 현재 `GameChangeStore.listOwnedVehicles()`의 개체 타입은 아래 v1 필드를 포함한다. 메모리 조회·변경 예제와 SQLite의 필드 보존용 최소 codec 대응은 반영했다. 시험용 DB의 SQLite 실행 범위는 [검증 문서](06_VERIFICATION.md)의 PR #104 숫자 decoder 재검증 기록을 따르며 실제 제품 DB 이전·앱 재실행 검증과 구분한다. 처분 포함 이력·발견 기록, 실제 활동·영업 쉬기의 영속 공급은 별도다. 필드·명령은 아래 공통 계약을 사용하고 실제 조회 확장·SQLite 호환·재개방 검증은 #34 담당과 아래 연결점으로 조율한다. #46은 이 조회·계산 부분의 인계이며 저장·재실행을 포함한 전체 완료가 아니다. 기능별 본인 검증과 #28 통합 검증은 유지한다.
 
-`Garage.collection(history: VehicleHistoryStore)`는 #116의 `listVehicleHistory()`(처분 포함 전체 개체)에서 `(vehicleId, rarity)` 보유 키를, `discoveredVehicles()`에서 발견 키를 읽어 위 `collection(everOwned, discovered)`를 계산한다. 이력·발견 조회 실패는 빈 도감으로 바꾸지 않고 그대로 전달하며, 이력의 콘텐츠 밖 차종·중복 개체 ID는 `INVALID_INPUT`이다. 가챠 결과·탁송 목록에서 본 키는 호출자(화면·호스트)가 `recordDiscoveries(catalog, keys)`로 먼저 기록한다.
+`Garage.collection(history: VehicleHistoryStore)`는 #116의 `listVehicleHistory()`(처분 포함 전체 개체)에서 `(vehicleId, rarity)` 보유 키를, `discoveredVehicles()`에서 발견 키를 읽어 위 `collection(everOwned, discovered)`를 계산한다. 이력·발견 조회 실패는 빈 도감으로 바꾸지 않고 그대로 전달하며, 이력의 콘텐츠 밖 차종·중복 개체 ID는 `INVALID_INPUT`이다. 공급 목록은 불변을 약정하지 않으므로 `Garage`의 모든 조회는 받은 목록을 먼저 한 번 복사하고 그 사본으로 검사·선택·키 변환을 한다(복사 자체가 외부 동시 변경에 원자적이라는 뜻은 아님). 가챠 결과·탁송 목록에서 본 키는 호출자(화면·호스트)가 `recordDiscoveries(catalog, keys)`로 먼저 기록한다.
 
 #### #50 첫 실행 지급
 

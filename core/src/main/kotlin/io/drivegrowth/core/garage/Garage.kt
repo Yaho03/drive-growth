@@ -106,9 +106,12 @@ class Garage(catalog: VehicleCatalogSnapshot) {
         vehicles: List<OwnedVehicle>,
         select: (List<OwnedVehicle>) -> List<OwnedVehicle>,
     ): ContractResult<List<OwnedVehicle>> {
-        val corrupt = vehicles.any { it.vehicleId !in known } ||
-            vehicles.map { it.ownedVehicleId }.toSet().size != vehicles.size
+        // 공급 목록은 불변 snapshot을 약정하지 않으므로 먼저 한 번 복사하고, 검사·선택·변환을 모두 이 사본으로 한다.
+        // ponytail: 복사 자체가 외부 동시 변경에 원자적이지는 않다. 공급자가 불변 목록을 주면 충분하다.
+        val snapshot = ArrayList(vehicles)
+        val corrupt = snapshot.any { it.vehicleId !in known } ||
+            snapshot.map { it.ownedVehicleId }.toSet().size != snapshot.size
         if (corrupt) return ContractResult.Failure(ContractError.INVALID_INPUT)
-        return ContractResult.Success(Collections.unmodifiableList(ArrayList(select(vehicles))))
+        return ContractResult.Success(Collections.unmodifiableList(ArrayList(select(snapshot))))
     }
 }
