@@ -61,7 +61,7 @@ internal class GachaLedger(private val store: SqliteGameChangeStore) {
 
     fun commit(command: GachaCommand): ContractResult<GachaSettlement> = store.atomic { db ->
         val encoded = encode(command)
-        db.rawQuery("""SELECT g.command,g.settlement_id,g.revision,g.counter,g.tickets,s.result
+        db.rawQuery("""SELECT g.command,g.settlement_id,g.revision,g.counter,g.tickets,s.result,s.command,s.settlement_id
             FROM gacha_requests g LEFT JOIN settlements s ON s.request_id=g.request_id WHERE g.request_id=?""",
             arrayOf(command.requestId.value)).use { row ->
             if (row.moveToFirst()) {
@@ -72,7 +72,17 @@ internal class GachaLedger(private val store: SqliteGameChangeStore) {
                     settlement.transaction.source != store.source || settlement.transaction.kind != TransactionKind.GARAGE ||
                     settlement.transaction.ruleVersion != command.ruleVersion || settlement.changedVehicle != command.award.vehicle)
                     throw SQLiteException("가챠 정산 연결 오류")
-                return@atomic ContractResult.Success(GachaSettlement(command, settlement, progress(row, 2)))
+                val savedProgress = progress(row, 2)
+                val expectedMoney = if (command.ticket == GachaTicketUse.PURCHASED)
+                    MoneyChange(MoneyDirection.DEBIT, command.award.vehicle.acquisitionCost) else null
+                if (row.isNull(6) || row.getString(6) != encoded || row.isNull(7) ||
+                    row.getString(7) != settlement.settlementId.value ||
+                    savedProgress.revision.value.toLong() != command.expectedRevision.value.toLong() + 1 ||
+                    savedProgress.drawsSinceGuarantee != command.award.nextCounter ||
+                    settlement.transaction.money != expectedMoney ||
+                    (command.ticket == GachaTicketUse.FREE && command.award.vehicle.acquisitionCost.units != 0L))
+                    throw SQLiteException("가챠 최초 명령·결제·진행 연결 오류")
+                return@atomic ContractResult.Success(GachaSettlement(command, settlement, savedProgress))
             }
         }
         if (db.rawQuery("SELECT 1 FROM settlements WHERE request_id=?", arrayOf(command.requestId.value)).use { it.moveToFirst() })
