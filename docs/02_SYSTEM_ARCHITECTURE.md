@@ -403,7 +403,9 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 | `salePrice(vehicle, accidents)` | 실제 취득액 × (max(60% − 사고당 5%p, 30%) + 레벨 1 초과분 레벨당 1%p). 사고 3회 이상은 거절 | `OwnedVehicle.acquisitionCost`(무료권·첫 지급 0). 차종 가격·희귀도는 쓰지 않음 |
 | `scrapValue(vehicle)` | 실제 취득액 × 20% | 위와 같음 |
 
-예: 구입 뽑기권 500 Lv1 판매 300, 같은 차 Lv20 사고 없음 395(79%), 무료권·첫 지급 0. 사고 횟수는 호출자가 넘기는 입력이며, 차량별 정산 완료 사고 횟수는 #116의 `CompletedRentalSource.accidentCount(ownedVehicleId)`로 읽어 넘긴다(연결은 후속). 수리비 차감 + 수리 필요 종료의 원자 명령, 판매·폐차의 실제 정산(금액 CREDIT + SOLD/SCRAPPED Update)은 후속 연결이다.
+예: 구입 뽑기권 500 Lv1 판매 300, 같은 차 Lv20 사고 없음 395(79%), 무료권·첫 지급 0. 사고 횟수는 호출자가 넘기는 입력이며, 차량별 정산 완료 사고 횟수는 #116의 `CompletedRentalSource.accidentCount(ownedVehicleId)`로 읽어 넘긴다(아래 `VehicleDisposal`이 연결). 수리비 차감 + 수리 필요 종료의 원자 명령은 후속이다.
+
+`io.drivegrowth.core.garage.VehicleDisposal`의 `planSale(owned, requestId, source, VehicleRef, accidents, activityOf)`·`planScrap(...)`은 처분 금액 CREDIT(0이면 금액 변경 없음)과 `VehicleWrite.Update`(SOLD/SCRAPPED, 레벨·진행량·취득 정보 보존)를 담은 불변 `GameChange` 계획을 만든다. 호출자가 `commitGameChange`로 저장하고, 응답을 잃으면 같은 계획을 재제출해 처음 정산을 재생한다. 판매의 사고 횟수는 #116 `CompletedRentalSource.accidentCount(ownedVehicleId)`에서 읽으며 조회 실패·음수는 그대로/`INVALID_INPUT`, 사고 3회 이상 판매는 `INVALID_INPUT`(폐차만 가능)이다. 대여·반납 중과 revision 불일치는 `STATE_CONFLICT`, 수리 필요는 판매·폐차 가능, 처분된 개체는 `DATA_UNAVAILABLE`이다. 동시 대여와의 최종 점유 경쟁은 저장소(#107 SQLite)가 확정 때 검사한다. 수리 명령(수리비 차감 + 수리 필요 해제)은 #121 계약 후속이다.
 
 ### 거래 원장 영속 저장
 
