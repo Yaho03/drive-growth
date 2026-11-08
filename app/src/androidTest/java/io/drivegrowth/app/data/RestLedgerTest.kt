@@ -178,6 +178,9 @@ class RestLedgerTest : InstrumentationTestCase() {
             "DELETE FROM rest_log WHERE kind = 'CONSUME'" to listOf(current),
             "UPDATE rest_log SET result = 7 WHERE key = '2'" to listOf(current),
             "UPDATE rest_log SET command = X'7B7D' WHERE key = '2'" to listOf(current),
+            // 소모 결과와 다음 출발의 직전·이후 상태를 맞춰 바꿔 버프를 늘린 손상. 처음부터 다시 계산해야 드러난다.
+            "UPDATE rest_log SET result = replace(result, '\"remaining\":900000', '\"remaining\":1200000')" to listOf(current, replayConsume),
+            "UPDATE rest_log SET result = replace(result, ',\"last\":null}', '}') WHERE key = '1'" to listOf(current, replayFirst),
         )) {
             val clean = dump()
             sql(corruption)

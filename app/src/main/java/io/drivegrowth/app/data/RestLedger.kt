@@ -24,7 +24,9 @@ import org.json.JSONObject
  *
  * - 상태는 출발 처리와 운전 소모 기록을 순서대로 쌓은 기록(`rest_log`)의 마지막 결과다. 시각이 아니라 남은 시간을 저장해 주차·앱 종료 중에는 줄지 않는다.
  * - 같은 정차의 출발 처리, 같은 ID의 소모는 한 번만 기록한다. 같은 명령을 다시 보내면 당시 결과를 돌려주고, 다른 명령이면 STATE_CONFLICT다.
- * - 저장된 기록은 원래 명령과 직전 상태로 다시 계산해 대조한다. 직전 기록과 이어지지 않거나 형식이 다르면 STORAGE_FAILURE이고 원본을 바꾸지 않는다.
+ * - 읽을 때마다 기록 전체를 처음부터 순서대로 다시 계산해 각 기록의 결과와 대조한다. 한 기록이라도 계산·이어짐·형식이 다르면 STORAGE_FAILURE이고 원본을 바꾸지 않는다.
+ *   여러 기록을 맞춰 바꾼 손상도 처음 상태부터 다시 계산하므로 드러난다. 기록 수에 비례해 읽는 비용이 늘지만 하루 정차·운전 구간 수 규모를 가정한다.
+ * - 버프가 없을 때의 운전 소모도 기록한다. 같은 소모 ID의 재전송이 언제 와도 같은 결과를 돌려주게 하려는 것이다.
  * - 공용 store 연결, 테이블 생성 호출, DB 버전 이전은 #122에서 통합한다. 휴식 기준 수치는 #24 제안 단계의 시험값을 호출자가 넘긴다.
  */
 class RestLedger internal constructor(private val store: SqliteGameChangeStore) {
@@ -68,16 +70,17 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
         store.atomic { db -> consumeIn(db, rules, consumeId, afterStop, elapsedMs) }
 
     /** 기본 주행 수익 정산과 같은 트랜잭션에서 읽을 때 쓰는 연결점. */
-    internal fun stateIn(db: SQLiteDatabase): RestBonusState = latest(db)?.after ?: RestBonusState.NONE
+    internal fun stateIn(db: SQLiteDatabase): RestBonusState = chain(db).lastOrNull()?.after ?: RestBonusState.NONE
 
     internal fun departIn(db: SQLiteDatabase, rules: RestRules, stop: RestStop): ContractResult<RestDeparture> {
         if (stop.source != store.source) return failure(ContractError.INVALID_INPUT)
         val command = RestJson.departCommand(rules, stop).toString()
-        readEntry(db, KIND_DEPART, stop.number.toString())?.let { stored ->
+        val entries = chain(db)
+        entries.firstOrNull { it.kind == KIND_DEPART && it.key == stop.number.toString() }?.let { stored ->
             if (stored.command != command) return failure(ContractError.STATE_CONFLICT)
             return ContractResult.Success(requireNotNull(stored.departure))
         }
-        val before = stateIn(db)
+        val before = entries.lastOrNull()?.after ?: RestBonusState.NONE
         val departure = RestBonus(rules).depart(before, stop)
         if (departure.outcome == RestOutcome.ALREADY_HANDLED) return ContractResult.Success(departure)
         insert(db, KIND_DEPART, stop.number.toString(), command, RestJson.departResult(before, departure))
@@ -93,11 +96,12 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
     ): ContractResult<RestBonusState> {
         if (consumeId.isBlank() || elapsedMs < 0 || (afterStop != null && afterStop < 0)) return failure(ContractError.INVALID_INPUT)
         val command = RestJson.consumeCommand(rules, consumeId, afterStop, elapsedMs).toString()
-        readEntry(db, KIND_CONSUME, consumeId)?.let { stored ->
+        val entries = chain(db)
+        entries.firstOrNull { it.kind == KIND_CONSUME && it.key == consumeId }?.let { stored ->
             if (stored.command != command) return failure(ContractError.STATE_CONFLICT)
             return ContractResult.Success(stored.after)
         }
-        val before = stateIn(db)
+        val before = entries.lastOrNull()?.after ?: RestBonusState.NONE
         if (before.lastStopNumber != afterStop) return failure(ContractError.STATE_CONFLICT)
         val after = when (val result = RestBonus(rules).consume(before, elapsedMs)) {
             is ContractResult.Failure -> return result
@@ -107,7 +111,7 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
         return ContractResult.Success(after)
     }
 
-    private class Entry(val seq: Long, val command: String, val before: RestBonusState, val after: RestBonusState, val departure: RestDeparture?)
+    private class Entry(val kind: String, val key: String, val command: String, val after: RestBonusState, val departure: RestDeparture?)
 
     private fun insert(db: SQLiteDatabase, kind: String, key: String, command: String, result: JSONObject) {
         db.insertOrThrow("rest_log", null, ContentValues().apply {
@@ -118,30 +122,28 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
         })
     }
 
-    private fun latest(db: SQLiteDatabase): Entry? =
-        db.rawQuery("SELECT seq, kind, key, command, result FROM rest_log ORDER BY seq DESC LIMIT 1", null).use {
-            if (it.moveToFirst()) verified(db, it.integer(0, 1, Long.MAX_VALUE), it.text(1), it.text(2), it.text(3), it.text(4)) else null
-        }
-
-    private fun readEntry(db: SQLiteDatabase, kind: String, key: String): Entry? =
-        db.rawQuery("SELECT seq, kind, key, command, result FROM rest_log WHERE kind = ? AND key = ?", arrayOf(kind, key)).use {
-            if (it.moveToFirst()) verified(db, it.integer(0, 1, Long.MAX_VALUE), it.text(1), it.text(2), it.text(3), it.text(4)) else null
-        }
-
-    /** 직전 기록의 결과 상태. 첫 기록이면 [RestBonusState.NONE]이다. 직전 기록 자체의 명령·결과 대조는 그 기록을 읽을 때 한다. */
-    private fun previousAfter(db: SQLiteDatabase, seq: Long): RestBonusState =
-        db.rawQuery("SELECT result FROM rest_log WHERE seq < ? ORDER BY seq DESC LIMIT 1", arrayOf(seq.toString())).use {
-            if (it.moveToFirst()) RestJson.state(JSONObject(it.text(0)).getJSONObject("after")) else RestBonusState.NONE
+    /** 기록 전체를 처음 상태부터 순서대로 다시 계산해 대조한 목록. */
+    private fun chain(db: SQLiteDatabase): List<Entry> =
+        db.rawQuery("SELECT seq, kind, key, command, result FROM rest_log ORDER BY seq", null).use {
+            val entries = ArrayList<Entry>()
+            var previous = RestBonusState.NONE
+            while (it.moveToNext()) {
+                it.integer(0, 1, Long.MAX_VALUE)
+                val entry = verified(previous, it.text(1), it.text(2), it.text(3), it.text(4))
+                entries += entry
+                previous = entry.after
+            }
+            entries
         }
 
     /**
-     * 기록 한 건을 원래 명령과 직전 상태로 다시 계산해 대조한다. 기록의 직전 상태는 바로 앞 기록의 결과와 같아야 한다.
-     * 파싱에 성공해도 계산 결과·키·이어짐이 다르면 손상이다.
+     * 기록 한 건을 원래 명령과 [previous](바로 앞 기록까지 다시 계산한 상태)로 다시 계산해 대조한다.
+     * 기록에 적힌 직전 상태가 [previous]와 다르거나, 파싱에 성공해도 계산 결과·키가 다르면 손상이다.
      */
-    private fun verified(db: SQLiteDatabase, seq: Long, kind: String, key: String, command: String, raw: String): Entry {
+    private fun verified(previous: RestBonusState, kind: String, key: String, command: String, raw: String): Entry {
         val result = JSONObject(raw)
         val before = RestJson.state(result.getJSONObject("before"))
-        if (before != previousAfter(db, seq)) throw JSONException("휴식 기록이 직전 기록과 이어지지 않음")
+        if (before != previous) throw JSONException("휴식 기록이 직전 기록과 이어지지 않음")
         return when (kind) {
             KIND_DEPART -> {
                 val (rules, stop) = RestJson.departInput(JSONObject(command))
@@ -156,7 +158,7 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
                 ) {
                     throw JSONException("출발 결과가 원래 명령과 다름")
                 }
-                Entry(seq, command, before, departure.state, departure)
+                Entry(kind, key, command, departure.state, departure)
             }
             KIND_CONSUME -> {
                 val input = RestJson.consumeInput(JSONObject(command))
@@ -169,7 +171,7 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
                 val after = (RestBonus(input.rules).consume(before, input.elapsedMs) as? ContractResult.Success)?.value
                     ?: throw JSONException("저장된 소모 재계산 실패")
                 if (RestJson.consumeResult(before, after).toString() != result.toString()) throw JSONException("소모 결과가 원래 명령과 다름")
-                Entry(seq, command, before, after, null)
+                Entry(kind, key, command, after, null)
             }
             else -> throw JSONException("휴식 기록 종류 오류")
         }
@@ -191,7 +193,7 @@ internal object RestJson {
 
     fun state(j: JSONObject) = RestBonusState(
         long(j, "remaining", 0, Long.MAX_VALUE),
-        if (j.isNull("last")) null else long(j, "last", 0, Long.MAX_VALUE),
+        if (j.get("last") == JSONObject.NULL) null else long(j, "last", 0, Long.MAX_VALUE),
     )
 
     private fun <T> observation(o: Observation<T>, value: (T) -> Any): JSONObject = when (o) {
@@ -237,7 +239,7 @@ internal object RestJson {
 
     fun consumeInput(j: JSONObject) = ConsumeInput(
         rules(j.getJSONObject("rules")), j.getString("id"),
-        if (j.isNull("after")) null else long(j, "after", 0, Long.MAX_VALUE),
+        if (j.get("after") == JSONObject.NULL) null else long(j, "after", 0, Long.MAX_VALUE),
         long(j, "elapsed", 0, Long.MAX_VALUE),
     )
 
