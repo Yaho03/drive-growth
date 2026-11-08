@@ -188,7 +188,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 2026-11-07 PR #100 검토에서 확인한 카탈로그 원본 변경과 활동 조회 실패 경계를 보완한다. `Garage`는 생성 당시 차종 ID 목록을 복사해 개체 검증과 도감 계산에 같은 기준을 사용한다. `availableForRental(vehicles, activityOf)`의 공급자는 개체 ID를 받아 `ContractResult<VehicleActivity>`를 반환하며 조회 중 거래·점유 등 상태 변경을 수행하지 않는다. 활동 정보 누락은 `DATA_UNAVAILABLE`, 저장 조회 실패는 `STORAGE_FAILURE` 등 실제 실패로 전달한다. Garage는 실패 이유를 그대로 반환하고 후보 일부를 성공으로 반환하지 않으며, 누락을 `IDLE`로 채우거나 예상하지 못한 예외를 일괄 변환하지 않는다.
 
-- `availableForRental`은 현재 `OWNED`·`IDLE` 후보를 거르는 조회다. 영업 쉬기는 아직 반영하지 않는다. 최종 자동 배정 가능 여부·점유·최신 revision과 동시 상태 변경 검사는 #41의 공통 거래 연결에서 별도로 확인한다.
+- `availableForRental`은 현재 `OWNED`·`IDLE` 후보를 거르는 조회이며 영업 쉬기는 보지 않는다. 영업 쉬기는 #41의 `planRental(…, resting, …)`이 이 결과에서 `RentalLedger.restingVehicles()` 개체를 빼서 적용하고, 켜기/끄기는 `RentalLedger.setResting`이 저장한다(대여 중에 켜면 반납 후 배정에서 빠짐). 최종 자동 배정 가능 여부·점유·최신 revision과 동시 상태 변경 검사는 #41의 공통 거래 연결에서 별도로 확인한다.
 - `owned`는 사용 중·수리 필요 개체도 포함하므로 강화 가능 목록으로 그대로 사용하지 않는다. 대여 후보 목록도 수리·판매·폐차 가능 목록으로 재사용하지 않는다. 수리 필요 차량의 수리·판매·폐차는 PRD에서 허용하므로 각 명령의 활동 제한을 별도로 검사한다.
 - `collection`의 `OWNED`는 한 번이라도 소유한 기록이다. 호출자는 처분 뒤에도 유지되는 `(vehicleId, rarity)` 획득 이력을 `everOwned`로, 탁송 목록·가챠 결과에서 본 기록을 `discovered`로 제공해야 한다. 도감 키를 직접 주입한 계산 시험은 실제 저장·재실행 시험과 다르다.
 
