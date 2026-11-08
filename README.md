@@ -74,7 +74,7 @@ Debug 산출물은 `app/build/outputs/apk/debug/app-debug.apk`입니다. 설치�
 
 | 문서 | 이름의 뜻 | 담는 내용·읽는 시점 |
 |---|---|---|
-| [CONTRIBUTING.md](CONTRIBUTING.md) | 팀 기여·협업 가이드 | 문서 언어, 브랜치·커밋·PR, 검사, 사람 리뷰·머지·게시 절차. 모든 작업 전에 확인 |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 팀 기여·협업 가이드 | 문서 언어, 브랜치·커밋·PR, [댓글 요청 추적](CONTRIBUTING.md#댓글-요청과-조율), 검사, 사람 리뷰·머지·게시 절차. 모든 작업 전에 확인 |
 | [01_PRD.md](docs/01_PRD.md) | Product Requirements Document · 제품 요구사항 | 무엇을 만들지, 확정·미정 범위, 렌터카 영업·탁송·차량 수집·가게 성장 규칙. 기존 제품·차량 게임 기획 통합 |
 | [02_SYSTEM_ARCHITECTURE.md](docs/02_SYSTEM_ARCHITECTURE.md) | 시스템 구조·기술 계약 | 모듈 역할, 입력 데이터, 상태 전환, 계산·저장·UI 제한. 구현 전에 확인 |
 | [03_GAME_BENCHMARK.md](docs/03_GAME_BENCHMARK.md) | 참고 게임 비교·분석 | 유명 방치형 게임 7개의 근거와 우리 게임 적용 제안. 외부 사실과 제안을 구분하며 확정 요구사항은 PRD에 기록 |
