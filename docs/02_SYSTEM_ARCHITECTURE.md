@@ -405,6 +405,12 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 - 대여 종료까지 반영된 뒤 `settle`로 금액, 사고, 리뷰 상승 근거와 입력받은 단골 여부를 조회한다. 미정인 단골 판정은 null이다. 정수 정책 없이 소수 지급이 필요하면 `POLICY_UNRESOLVED`로 보류하고 확정된 방법을 전달해 이어간다. 원장 입금과 반납 이동 전환은 함께 확정된다. 같은 ID의 재정산은 당시 잔액·결과를 재생한다. `finishReturn`은 반납 종료 시각이 지난 경우에 유휴 또는 수리 필요 상태로 전환한다. #49의 수리 완료·사고 이력 소비 연결은 별도다.
 - `shop`, `buy`, `expand`는 가게 상태와 시설 구입·공간 확장의 거래 입구다. 시설과 확장 제안은 규칙 버전·시험값 표시·가격을 받는다. 누적 고객은 중복을 제거한 방문 ID 수로 계산한다. 일반 고객 수익과 대여당 주유소 보너스를 영수증에서 구분하며, 보험은 사고 손실의 절반을 보전한다. 실제 콘텐츠·제품 화면·차량 신호를 연결하는 단계에서는 #35·#51·#55·#28에서 같은 규칙 버전과 입력 출처를 대조한다.
 
+### C 파트에 제공하는 영속 조회 (#34·#46·#49·#50)
+
+- `SqliteGameChangeStore`가 구현하는 `VehicleHistoryStore.listVehicleHistory()`는 모든 개체의 마지막 상태·취득 출처·revision을 반환한다. 첫 차 지급 확인은 `acquisitionSource == INITIAL_GRANT`인 개체가 있는지 검사한다. 처음 받은 차를 처분해도 찾을 수 있다. 현재 보유 목록은 기존 `listOwnedVehicles()`로 읽는다.
+- 탁송/가챠 화면에서 실제로 본 키 집합을 `recordDiscoveries(catalog, keys)`에 넘긴다. SQLite v3의 `discoveries` 표는 차종 ID와 희귀도의 조합을 한 번만 기록한다. 목록에 없는 차종은 배치 전체를 거절한다. 도감은 이력에서 얻은 `CollectionKey(vehicleId, rarity)` 집합과 `discoveredVehicles()` 결과를 `Garage.collection`에 넘긴다. 조회 실패를 빈 도감으로 대체하지 않는다. v1과 v2는 기존 행을 보존해 이전하며 과거에 보았는지 알 수 없는 키를 만들지 않는다.
+- `SqliteGameChangeStore.rental`은 코어의 `CompletedRentalSource`를 구현한다. #49는 `completedRental(rentalId)`에서 개체 ID, 확정 정산의 매출(시설 보너스 포함), 시설 보너스 및 사고 여부를 읽는다. #50은 `firstCompletedRental()`에서 처음 **정산이 커밋된** 대여의 같은 결과를 읽는다. 아직 결과가 없으면 Success(null), DB 오류는 Failure다. 열람·반납·재접속 후에도 최초 정산 ID를 재사용한다. 무료권 지급은 #33이 정할 명령에서 최초 정산 ID와 프로필당 1회 지급을 함께 검사해야 한다. 조회 자체는 보상을 지급하지 않는다.
+- #49의 판매 감액·폐차 조건은 `CompletedRentalSource.accidentCount(ownedVehicleId)`로 조회한다. 같은 차종도 보유 개체 ID별로 분리하며, 사고가 발생하고 정산까지 커밋된 대여 1건을 1회로 센다. 수리·열람·처분 후에도 누적값을 유지한다. 알려진 무사고 차량은 0, 없는 개체는 DATA_UNAVAILABLE다. 처분을 확정할 때는 조회 후 상태가 바뀔 수 있으므로 해당 명령의 revision/활동 검사도 수행한다.
 
 ## 전체 기능의 공통 계약과 저장 선행 작업
 

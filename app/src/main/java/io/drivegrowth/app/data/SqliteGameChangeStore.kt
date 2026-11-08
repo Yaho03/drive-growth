@@ -8,6 +8,8 @@ import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteDatabaseCorruptException
 import android.database.sqlite.SQLiteOpenHelper
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.garage.CollectionKey
+import io.drivegrowth.core.garage.VehicleHistoryStore
 import io.drivegrowth.core.progression.VehicleActivity
 import org.json.JSONException
 import org.json.JSONObject
@@ -20,7 +22,7 @@ class SqliteGameChangeStore(
     internal val source: InputSource,
     databaseName: String = "game-ledger-${source.name.lowercase()}.db",
     private val clock: () -> Long = System::currentTimeMillis,
-) : GameChangeStore, Closeable {
+) : GameChangeStore, VehicleHistoryStore, Closeable {
     private val helper = LedgerHelper(context.applicationContext, databaseName, source)
 
     /** 디스크 쓰기 후 COMMIT 이전의 실패를 재현하기 위한 모듈 내부 시험 지점. */
@@ -121,12 +123,41 @@ class SqliteGameChangeStore(
         return ContractResult.Success(result)
     }
 
+    internal fun <T> read(query: (SQLiteDatabase) -> T): ContractResult<T> =
+        readResult { db -> ContractResult.Success(query(db)) }
+
     @Synchronized
-    override fun listOwnedVehicles(): ContractResult<List<OwnedVehicle>> = storage {
-        val vehicles = helper.readableDatabase.rawQuery("SELECT payload FROM vehicles ORDER BY owned_id", null).use { cursor ->
+    internal fun <T> readResult(query: (SQLiteDatabase) -> ContractResult<T>): ContractResult<T> =
+        storage { query(helper.readableDatabase) }
+
+    private fun readVehicles(db: SQLiteDatabase): List<OwnedVehicle> =
+        db.rawQuery("SELECT payload FROM vehicles ORDER BY owned_id", null).use { cursor ->
             buildList { while (cursor.moveToNext()) add(LedgerJson.vehicle(JSONObject(cursor.getString(0)))) }
         }
-        ContractResult.Success(vehicles.filter { it.lifecycle == VehicleLifecycle.OWNED })
+
+    override fun listOwnedVehicles() = read { db -> readVehicles(db).filter { it.lifecycle == VehicleLifecycle.OWNED } }
+
+    /** 처분된 개체도 마지막 상태와 취득 정보를 보존한다. */
+    override fun listVehicleHistory() = read(::readVehicles)
+
+    override fun discoveredVehicles(): ContractResult<Set<CollectionKey>> = read { db ->
+        db.rawQuery("SELECT vehicle_id, rarity FROM discoveries", null).use { rows ->
+            buildSet {
+                while (rows.moveToNext()) add(CollectionKey(VehicleId(rows.getString(0)), Rarity.valueOf(rows.getString(1))))
+            }
+        }
+    }
+
+    /** 목록에서 실제로 본 칸만 기록한다. 재노출·재시도에는 같은 복합 키를 사용한다. */
+    override fun recordDiscoveries(catalog: VehicleCatalogSnapshot, keys: Set<CollectionKey>): ContractResult<Unit> {
+        val snapshot = keys.toSet()
+        val known = catalog.vehicles.toList().mapTo(mutableSetOf()) { it.vehicleId }
+        if (snapshot.any { it.vehicleId !in known }) return failure(ContractError.INVALID_INPUT)
+        return atomic { db ->
+            for (key in snapshot) db.execSQL("INSERT OR IGNORE INTO discoveries(vehicle_id, rarity) VALUES (?, ?)",
+                arrayOf(key.vehicleId.value, key.rarity.name))
+            ContractResult.Success(Unit)
+        }
     }
 
     @Synchronized
@@ -181,7 +212,7 @@ internal enum class LedgerFailureReason { SQLITE, CORRUPT, UNSUPPORTED_SCHEMA, S
 private class LedgerStorageException(val reason: LedgerFailureReason) : SQLiteException(reason.name)
 
 private class LedgerHelper(context: Context, name: String, private val source: InputSource) : SQLiteOpenHelper(
-    context, name, null, 2,
+    context, name, null, 3,
     // Android 기본 핸들러의 손상 DB 삭제를 막고 원본을 보존한다.
     DatabaseErrorHandler { throw LedgerStorageException(LedgerFailureReason.CORRUPT) },
 ) {
@@ -194,12 +225,17 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         db.execSQL("CREATE TABLE vehicles (owned_id TEXT PRIMARY KEY NOT NULL, payload TEXT NOT NULL)")
         db.execSQL("CREATE TABLE settlements (request_id TEXT PRIMARY KEY NOT NULL, settlement_id TEXT UNIQUE NOT NULL, command TEXT NOT NULL, result TEXT NOT NULL, viewed INTEGER NOT NULL CHECK(viewed IN (0,1)))")
         RentalLedger.createTables(db)
+        createDiscoveries(db)
+    }
+    private fun createDiscoveries(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE discoveries (vehicle_id TEXT NOT NULL, rarity TEXT NOT NULL, PRIMARY KEY(vehicle_id, rarity))")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion != 1 || newVersion != 2) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
+        if (oldVersion !in 1..2 || newVersion != 3) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
         verifySource(db)
         // 기존 원장과 개체 JSON은 그대로 보존한다.
-        RentalLedger.createTables(db)
+        if (oldVersion == 1) RentalLedger.createTables(db)
+        createDiscoveries(db)
     }
     override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
