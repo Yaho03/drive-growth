@@ -113,7 +113,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
      * - 제시 목록이 저장되지 않았으면 DATA_UNAVAILABLE, 저장된 목록과 다르면 STATE_CONFLICT다. 다시 뽑은 목록으로 고르지 못하게 한다.
      * - 구매는 결제 정산, 선택 이력, 활성 의뢰를 한 트랜잭션으로 확정한다.
      * - 입력은 처음에 한 번만 읽어 고정한다. 명령 기록·저장 목록 대조·선택·결제·활성 기록이 모두 같은 값을 쓴다.
-     * - 재생할 때 저장된 활성 의뢰와 결제 정산이 원래 명령과 맞지 않으면 STORAGE_FAILURE이고 원본을 바꾸지 않는다.
+     * - 재생·활성 조회 때 저장된 활성 의뢰와 결제 정산이 원래 명령과 맞지 않거나 구매 정산이 없으면 STORAGE_FAILURE이고 원본을 바꾸지 않는다.
      */
     fun select(proposed: DeliveryProposed, offerId: DeliveryOfferId, requestId: RequestId): ContractResult<DeliveryCommit> =
         store.atomic { db ->
@@ -124,7 +124,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
             val command = DeliveryJson.command(requestId, offerId, request).toString()
             readRequest(db, requestId)?.let { previous ->
                 if (previous.command != command) return@atomic failure(ContractError.STATE_CONFLICT)
-                return@atomic replay(db, previous)
+                return@atomic replay(previous)
             }
             if (hasSettlement(db, requestId)) return@atomic failure(ContractError.STATE_CONFLICT)
             val stored = readList(db, request.list) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
@@ -160,16 +160,13 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         return if (removed == 1) ContractResult.Success(Unit) else failure(ContractError.STATE_CONFLICT)
     }
 
-    /** 원래 명령에서 다시 계산해 저장값과 대조를 마친 선택 이력. */
-    private class StoredRequest(val command: String, val selected: DeliverySelected) {
+    /** 원래 명령에서 다시 계산해 저장값·구매 결제 정산과 대조를 마친 선택 이력. */
+    private class StoredRequest(val command: String, val selected: DeliverySelected, val settlement: Settlement?) {
         val active: ActiveDelivery get() = selected.active
     }
 
-    /** 대조를 마친 선택 이력과 공용 결제 정산을 돌려준다. 정산이 원래 결제와 맞지 않으면 손상이다. */
-    private fun replay(db: SQLiteDatabase, previous: StoredRequest): ContractResult<DeliveryCommit> {
-        val settlement = previous.selected.payment?.let { readRecordedSettlement(db, it) ?: throw JSONException("구매 결제 정산 누락") }
-        return ContractResult.Success(DeliveryCommit(previous.selected, settlement))
-    }
+    private fun replay(previous: StoredRequest): ContractResult<DeliveryCommit> =
+        ContractResult.Success(DeliveryCommit(previous.selected, previous.settlement))
 
     private fun listValues(list: DeliveryList) = ContentValues().apply {
         put("created_on", list.createdOn.toString())
@@ -238,7 +235,9 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         }
         if (activeJson != DeliveryJson.active(selected.active).toString()) throw JSONException("활성 의뢰가 원래 명령과 다름")
         if (paid != (selected.payment != null)) throw JSONException("결제 기록 불일치")
-        StoredRequest(command, selected)
+        // 구매는 재전송뿐 아니라 활성 조회에서도 결제 정산이 있고 원래 결제와 맞아야 한다. 사라진 결제를 정상 구매로 보여 주지 않는다.
+        val settlement = selected.payment?.let { readRecordedSettlement(db, it) ?: throw JSONException("구매 결제 정산 누락") }
+        StoredRequest(command, selected, settlement)
     }
 
     private fun readActive(db: SQLiteDatabase): ActiveDelivery? {
