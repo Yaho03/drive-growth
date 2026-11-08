@@ -1226,3 +1226,17 @@ JDK17·기존 Android SDK35·Gradle8.11.1, `--offline --no-daemon`을 사용했�
 최신 main의 core225개·앱 단위139개, APK/시험APK 조립·lint·저장소 검사 통과. 독립 Android API37에서 GachaLedgerTest7개·RentalLedgerTest14개·SqliteGameChangeStoreTest26개 총47개 통과했다. 유료/무료의 전체 결과 재생, 성장 뒤 당시 개체 재생, 마지막 칸과 무료권의 두 연결 경쟁, 실패 후 원상태·재시도, 보장 회차, 일반 Add의 공간/source 검사, 일반 거래·대여 방문과 가챠의 요청 ID 충돌 양방향을 확인했다. v3 이전은 기존 원장을 보존하고 가챠 상태 미제공으로 남았으며 손상 진행값은 원본 파일을 보존해 실패했다.
 
 신뢰한 신규 프로필 진행값은 시험에서 명시 입력했다. 기존 DB의 무료권/카운터를 기본값으로 생성하거나 제품 UI를 활성화하지 않는다. #50 프로필 초기화·복구·권위 콘텐츠 공급 연결, 추가 티켓 지급 명령과 #111의 실제 소비는 후속이다. 실제 기기 강제종료·전원/차량 SDK 연결 검증은 미수행이다.
+
+### #47 GachaPull × SQLite 가챠 저장소 기기 시험 — 2026-11-08
+
+호열 로컬 Mac에서 #111 `GachaPull`이 만든 명령을 #136 `SqliteGameChangeStore.commitGacha`로 확정하는 통합 시험 `GachaPullSqliteTest`를 실행했다. 콘텐츠는 앱 assets 20종(`trial-content-2026-11-07`), 권위 상태는 같은 snapshot으로 시험 주입했다(제품 초기값·무료권 지급 아님).
+
+| 항목 | 값 |
+|---|---|
+| 환경 | macOS arm64, JDK 17, Android Emulator 37.2.13, AVD `drive_growth_api34`(`system-images;android-34;default;arm64-v8a` r4, Pleos 이미지 아님), `emulator-5554` |
+| 명령 | `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.drivegrowth.app.data.GachaPullSqliteTest,io.drivegrowth.app.data.GachaLedgerTest` |
+| 결과 | 15개 통과, 실패·오류·생략 0 (`GachaPullSqliteTest` 4 + 기존 `GachaLedgerTest` 11) |
+
+`GachaPullSqliteTest`가 확인한 것: 유료 뽑기 확정 후 DB 재개방 → 같은 명령 재제출이 처음 `GachaSettlement`·진행 상태를 재생하고 추가 차감 없음 / 같은 requestId·다른 입력 `STATE_CONFLICT`·무변경 / 보유 2·칸 3에서 같은 상태로 만든 두 명령 중 한 건만 확정 / 무료권 1장은 금액 변경 없이 취득액 0으로 한 번만 쓰이고 재개방 뒤 두 번째는 `INSUFFICIENT_FUNDS`.
+
+미검증: Pleos 이미지·실차, 제품 UI에서의 명령 보존·프로세스 강제 종료, 실제 무료권 지급(#50)·제품 권위 상태 공급.
