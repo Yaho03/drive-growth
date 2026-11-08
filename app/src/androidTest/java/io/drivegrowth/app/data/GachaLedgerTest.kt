@@ -155,6 +155,57 @@ class GachaLedgerTest : InstrumentationTestCase() {
         assertEquals(GameMoney(2000), ok(store.balance()))
     }
 
+    fun testPastResultCorruptionIsRejectedWithoutChangingFileOrCurrentState() {
+        val c = command()
+        val first = ok(store.commitGacha(c))
+        val balance = ok(store.balance())
+        val vehicles = ok(store.listOwnedVehicles())
+        val cases = listOf(
+            "UPDATE gacha_requests SET counter=28",
+            "UPDATE gacha_requests SET revision=99",
+            "UPDATE settlements SET result=json_set(result,'$.money.amount',350) WHERE request_id='draw'",
+            "UPDATE settlements SET result=json_set(result,'$.money.direction','CREDIT') WHERE request_id='draw'",
+            "UPDATE settlements SET result=json_set(result,'$.request','wrong') WHERE request_id='draw'",
+            "UPDATE settlements SET result=json_set(result,'$.source','VEHICLE') WHERE request_id='draw'",
+            "UPDATE settlements SET result=json_set(result,'$.rule','wrong') WHERE request_id='draw'",
+            "UPDATE settlements SET settlement_id='wrong' WHERE request_id='draw'",
+            "UPDATE settlements SET command='wrong' WHERE request_id='draw'",
+        )
+        store.close()
+        val file = context.getDatabasePath(name)
+        val original = file.readBytes()
+        for (sql in cases) {
+            file.writeBytes(original)
+            SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { it.execSQL(sql) }
+            val corrupted = file.readBytes()
+            store = open()
+            assertEquals(sql, ContractResult.Failure(ContractError.STORAGE_FAILURE), store.commitGacha(c))
+            assertEquals(balance, ok(store.balance()))
+            assertEquals(vehicles, ok(store.listOwnedVehicles()))
+            store.close()
+            assertTrue(sql, corrupted.contentEquals(file.readBytes()))
+        }
+        file.writeBytes(original)
+        store = open()
+        assertEquals(first, ok(store.commitGacha(c)))
+    }
+
+    fun testFreeReplayRejectsFabricatedPaymentAndSurvivesDisposal() {
+        val c = command(free = true)
+        val receipt = ok(store.commitGacha(c))
+        ok(store.commitGameChange(GameChange(RequestId("sell"), TransactionKind.GARAGE, source, version,
+            vehicle = VehicleWrite.Update(c.award.vehicle.ownedVehicleId, Revision(0), 1, VehicleLifecycle.SOLD, 0))))
+        reopen()
+        assertEquals(receipt, ok(store.commitGacha(c)))
+        store.close()
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+            it.execSQL("UPDATE settlements SET result=json_set(result,'$.money',json_object('direction','DEBIT','amount',0)) WHERE request_id='draw'")
+        }
+        store = open()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.commitGacha(c))
+        assertTrue(ok(store.listOwnedVehicles()).isEmpty())
+    }
+
     fun testMalformedProgressAndWrongAwardFailWithoutWrites() {
         val c = command()
         assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT),
