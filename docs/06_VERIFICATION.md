@@ -1221,24 +1221,33 @@ JDK17·기존 Android SDK35·Gradle8.11.1, `--offline --no-daemon`을 사용했�
 
 [공개 증거 안내·격리 재현 호스트](evidence/issue52-gacha-ui/README.md)에 최소 자료를 모았다. 개인 경로·APK 바이너리·전체 dump를 제외하고 발췌/경로 치환은 명시했다. 이번 최종 정리는 문서·증거만 바꾸며 제품/정식 시험/리소스7파일은 고정 소스와 동일하다. 고정 입력·새 View 생성자 복원 시험이며 실제 #47 소비/경제·#122 SQLite·발견 저장·제품 탐색/gate·Activity Bundle/프로세스 영속 복원·공식 폼팩터/실차는 미완료다. #52 전체 완료로 닫지 않는다. 최종 PR·원격 head/CI·main 반영은 메인이 처리하고 새 기능은 시작하지 않는다.
 
+### #122 가챠 SQLite 부분 구현
 
-## 열린 PR 수정본 재검토 상태 — 2026-11-08
+최신 main의 core225개·앱 단위139개, APK/시험APK 조립·lint·저장소 검사 통과. 독립 Android API37에서 GachaLedgerTest7개·RentalLedgerTest14개·SqliteGameChangeStoreTest26개 총47개 통과했다. 유료/무료의 전체 결과 재생, 성장 뒤 당시 개체 재생, 마지막 칸과 무료권의 두 연결 경쟁, 실패 후 원상태·재시도, 보장 회차, 일반 Add의 공간/source 검사, 일반 거래·대여 방문과 가챠의 요청 ID 충돌 양방향을 확인했다. v3 이전은 기존 원장을 보존하고 가챠 상태 미제공으로 남았으며 손상 진행값은 원본 파일을 보존해 실패했다.
 
-기준 main은 `fc4fe328`이다. #116은 `0799eb5`에, #111·#131·#135는 각각 `094ee59`·`b777d1b`·`fc4fe328`에 반영됐다. 이전 절의 시험은 당시 커밋·환경의 근거로 보존하며 아래 상태로 과거 실패를 통과로 바꾸지 않는다. 독립 검증 보고서·실행 로그·XML을 대조한 AI 보조 결과이며 사람 승인이 아니며 이번 문서 정리 작업에서 시험을 재실행한 것은 아니다.
+신뢰한 신규 프로필 진행값은 시험에서 명시 입력했다. 기존 DB의 무료권/카운터를 기본값으로 생성하거나 제품 UI를 활성화하지 않는다. #50 프로필 초기화·복구·권위 콘텐츠 공급 연결, 추가 티켓 지급 명령과 #111의 실제 소비는 후속이다. 실제 기기 강제종료·전원/차량 SDK 연결 검증은 미수행이다.
 
-| PR·검토 head | 현재 결과와 근거 | 범위·남은 조건 |
+
+## PR 수정본 재검토와 부분 인계 — 2026-11-08
+
+기준 main은 `7f8aa039`이다. #116·#111·#131·#135·#138은 각각 `0799eb5`·`094ee59`·`b777d1b`·`fc4fe328`·`7f8aa039`에 반영됐다. #136은 작성자 경민이 `a9d58d6`에 직접 머지했으며 이번 조율 채팅이 실행한 머지가 아니다. 과거 결과는 당시 head·환경의 근거로 보존한다. 아래는 독립 보고서·로그·XML/소스를 회수·대조한 AI 검토이며 사람 승인이나 이 문서 작업의 새 시험 실행이 아니다.
+
+| PR·검토 head | 실제 검증과 현재 판단 | 남은 범위 |
 |---|---|---|
-| [#116](https://github.com/Yaho03/drive-growth/pull/116#pullrequestreview-5812685180) `9583e44` | 이전 발견 입력 snapshot·완료 영업 정산 연결·원시 값 지적 해결, main 반영 | 이력·발견·완료 영업/사고 조회 부분. 이력 부재는 신규 프로필 근거가 아님 |
-| [#111](https://github.com/Yaho03/drive-growth/pull/111#pullrequestreview-5816776288) `0003504` | 이전 코드 승인 head 동일. 수정 #136·당시 main 조합에서 정식12+독립3=15개 및 앱·시험 소비 컴파일 성공, 구조 CLEAR, main 반영 | 전체 명령 보존·소비까지. 실제 제품 SQLite/화면·프로세스 연결 완료가 아님 |
-| [#131](https://github.com/Yaho03/drive-growth/pull/131#pullrequestreview-5816767830) `4570870` | 미래 수신 시각 거절 수정. 정식18+독립4=22개 통과, 구조 CLEAR, main 반영 | 도착·기본 주행 계산. 실제 내비/SDK·저장은 후속 |
-| [#135](https://github.com/Yaho03/drive-growth/pull/135#pullrequestreview-5816776648) `116b33b` | 입력/반환 snapshot 수정. 정식22+독립1=23개 통과, 구조 CLEAR, main 반영 | 변경·포기 계산. 실제 원장 확정·화면은 후속 |
-| [#128 재수정 요청](https://github.com/Yaho03/drive-growth/pull/128#pullrequestreview-5816788228) `fc3c55a` | 정식22+이전 독립3=25개 통과. 새 원시 금액3000.5를3000으로 바꾸는 재생1개 실패, 원본 보존 | 이전 날짜·상관·boolean/snapshot 수정과 별개인 공용 decoder 잔여. 현재 머지 보류 |
-| [#136 재수정 요청](https://github.com/Yaho03/drive-growth/pull/136#pullrequestreview-5816788176) `4bf21d7` | 기존 실패3+정상 재생2=5개 통과. 새500.75/문자열500을500으로 바꾸는2개 실패, 원본 보존 | Pleos API34 격리 SQLite 7개 중5통과·2실패. API37 작성자 근거와 구분 |
-| [#134](https://github.com/Yaho03/drive-growth/pull/134#pullrequestreview-5816803222) `d7d61cf` | 정식19+이전 독립3=22개 통과. 새10.75/문자열10을10으로 바꾸는2개 실패, 원본 보존 | 실제 API34 격리 시험. 재수정 요청 유지 |
-| [#137](https://github.com/Yaho03/drive-growth/pull/137#pullrequestreview-5816803279) `d39df69` | 기존 수정·정상7개 통과, 새 원시 금액2개 실패(9개, 2.586초). 시험 DB 원본·당시 잔액6500·개체0 보존 | 자체 지적은 수정됐으나 같은 공용 decoder 상속. 별개 P2로 중복 집계하지 않고 현재 머지 보류 |
-| [#139](https://github.com/Yaho03/drive-growth/pull/139) `9b90e1d` | 고유 표적26개 중22통과·4실패·오류0(4.948초). 최신 부모 수정 포함 확인 | 공용 금액·구매 조회 무결성·기존 DB 재생 보완과 부모 재검토 전까지 전체 통합 머지 보류 |
-| [#138 기존 수정 요청](https://github.com/Yaho03/drive-growth/pull/138#pullrequestreview-5812698885) `ca5635b` | 원본 미수정, 기존 overflow 반려 유지 | 통과한 수정본으로 표시하지 않음 |
+| [#111](https://github.com/Yaho03/drive-growth/pull/111) `0003504` | 전체 GachaCommand 소비의 이전 두 P1 해결, 정식12+독립3=15개·소비 컴파일 및 구조 CLEAR, main 반영 | 제품 UI·프로세스 복원·무료권 지급 |
+| [#116](https://github.com/Yaho03/drive-growth/pull/116) `9583e44` | 입력 snapshot·완료 정산 연결·원시값 세 지적 해결, main 반영 | 실제 발견 표시 이벤트·제품 소비. 이력 부재는 신규 판별 근거 아님 |
+| [#131](https://github.com/Yaho03/drive-growth/pull/131) `4570870` / [#135](https://github.com/Yaho03/drive-growth/pull/135) `116b33b` | 도착/주행22개·변경/포기23개 통과, 구조 CLEAR, main 반영 | 실제 SDK·원장/화면 연결 |
+| [#136](https://github.com/Yaho03/drive-growth/pull/136) `1322f85` | API34 격리 SQLite7개 통과. 원시 소수/문자열 거절·원본 보존 및 정상0/Long 상한/무료null 유지, 구조 CLEAR | 제품 초기 권위 상태·티켓 지급·UI/프로세스 |
+| [#138](https://github.com/Yaho03/drive-growth/pull/138) `7cf700a` | 코드 정식13+독립4=17개, 구조 정식13+독립1=14개 통과. 중간 Int overflow를 BigInteger로 해결, main 반영 | 수리 명령·실제 저장/사고/화면. 잠정 내림은 최종 밸런스 합의 아님 |
+| [#128](https://github.com/Yaho03/drive-growth/pull/128) `bb6e9da` → `a9ba814` | 기존 main 합성 SQLite7개 통과·코드/구조 수용. 새 head는 main 병합+원시 금액 소비 시험 추가로 delta 재확인 중 | 공용 통합 #139·발견 표시·SDK/제품 UI/프로세스 |
+| [#134](https://github.com/Yaho03/drive-growth/pull/134) `f43c08e` → `c60f743` | 기존 합성 SQLite26개 통과. 도착/보관/주행·active 결제 검증 유지, 새 head delta 재확인 중 | 공용 이전 #139·SDK/제품 UI/프로세스 |
+| [#137](https://github.com/Yaho03/drive-growth/pull/137) `b12f268` → `1451224` | 기존 합성 SQLite6개 통과. 포기 전체 명령·paid/정산·경로 방어 유지, 새 head delta 재확인 중 | 공용 이전 #139·SDK/제품 UI/프로세스 |
+| [#139 수정 요청](https://github.com/Yaho03/drive-growth/pull/139#pullrequestreview-5817062005) `c0566a7` | API34 격리 SQLite8개 중6통과·2실패, 코드 REQUEST_CHANGES·구조 BLOCK | active 구매 결제 증거 검증 소비와 지원 v4 동일 명령 재생 두 P2. 공용 금액 수정은 해결 인정 |
+| [#140 수정 요청](https://github.com/Yaho03/drive-growth/pull/140#pullrequestreview-5817031282) `60de79c` | 정식23+독립4=27개 중26통과·snapshot1실패, 코드 REQUEST_CHANGES·구조 BLOCK | 조회 List를 먼저 한 번 복사하고 같은 사본만 검증·변환. SQLite 경쟁 재현은 아님. FirstGrant false≠NEW/오류 전파는 정상 |
+| [#141](https://github.com/Yaho03/drive-growth/pull/141) `0fee943` | 정식5+독립3=JVM8개·앱 소비 컴파일 통과, 구조 CLEAR. 부모 #138 main 반영·base main/자체3파일 확인 | 판매/폐차 계획 부분. 수리·실제 SQLite 경쟁/DB·제품 재시작·화면은 후속 |
 
-공용 원인은 JSON 금액을 `getLong`으로 변환한 뒤 원래 거래와 비교해 손상된 실수·문자열을 정상 정수처럼 수락하는 경계다. #122 기존 저장 담당이 #136 또는 #139 한 곳에서 원시 타입·범위를 변환 전에 확인하는 최소 보완을 제공하고, 소비 PR들이 같은 수정 커밋을 받아 각 재생·원본 보존 경계를 재검증한다. 별도 이슈·지갑·원장이나 기능별 중복 decoder를 만들지 않는다. 정상 정수0·Long 상한·무료money=null을 유지하며, 500.0/지수·상한 초과 등의 추가 회귀는 실제 실행 후에만 결과로 기록한다.
+#128/#134/#137의 위 실제 장치 실행은 main `a9d58d6`과 각 이전 head의 합성본이다. 최종 main `7f8aa039` 합성에서도 공용 `SqliteGameChangeStore` blob `16c22a8b15d37a8040c83de7d9e7d102c6541b61` 동일·충돌0을 확인했다. 새 head는 이 main 공급본을 병합하고 시험을 추가했으므로 해당 delta와 동일 head CI를 확인한 뒤에만 머지한다. 오래된 head 단독에 최신 decoder가 있었다고 쓰지 않는다.
 
-기준 main `fc4fe328`의 원격 CI 성공은 메인이 확인했다. PR의 정상 시험·CI 성공과 위 독립 실패를 함께 기록하며, DB 재개방을 Activity/제품 프로세스 재시작으로 확대하지 않는다. 각 슬롯의 제품 APK·권한/설정과 자기 패키지 정리·반환 근거는 유지한다. 다만 #137의 제품6파일 전후 자료는 해시가 아닌 목록만 수집돼 직접 SHA-256 동일성 주장을 철회했다. 추가 adb 없이 기존 자료를 연결 대조한 결과 이전 arrival 종료→ledger139 시작→종료의 6개 SHA-256이 모두 같았다. 이는 앞뒤 슬롯의 연결 근거이며 #137 세션이 직접 전후6해시를 검증한 것으로 표시하지 않는다. 격리 시험 DB 원본 보존과 제품 파일의 이 증거 구분을 유지한다. 실제 제품 SDK/UI·프로세스·전원·실차, #37·#38·#39·#47·#122 전체 완료는 아니다. 기존 담당과 합의된 후속 범위를 유지한다.
+#139의 v4 fixture는 옛 writer가 허용한 정합 command/result/request를 구성해 v5로 재개방한 시험이며 옛 v4 APK의 최초 쓰기를 실행한 근거가 아니다. #140은 공개 VehicleHistoryStore의 순회가 달라지는 결정적 입력에서 검증/사용 불일치를 확인한 JVM 경계이며 실제 DB 손상·중복 지급으로 확대하지 않는다. 구체 재현·최소 수정은 각 공식 리뷰에 모았다.
+
+모든 실행 슬롯의 자기 격리 패키지 제거·제품 APK/정확6파일 SHA·권한/설정 보존·내비 복귀 보고를 회수했다. 이전 #137 슬롯의 파일 목록 수집 공백은 arrival 종료→ledger 시작/종료6SHA 연결 근거로 보완한 것이며 과거 직접 수집으로 소급하지 않는다. 이번 next 슬롯6SHA는 별도 직접 수집 결과다. 이 조율/문서 작업은 추가 adb를 사용하지 않았다. 실제 제품 SDK/UI·프로세스/전원·실차와 #37/#38/#39/#46/#47/#49/#50/#122 전체 완료는 아니다.
