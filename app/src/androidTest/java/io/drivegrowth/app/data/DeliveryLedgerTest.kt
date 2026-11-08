@@ -274,6 +274,19 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
         ok(select(purchase, "r1"))
         sql("DELETE FROM settlements WHERE request_id = 'r1'")
         assertStorageFailureKeepsRows { select(purchase, "r1") }
+        // 재전송이 아닌 활성 조회와 다른 요청의 선택도 결제가 사라진 구매를 정상으로 보지 않는다.
+        assertStorageFailureKeepsRows { ledger.active() }
+        assertStorageFailureKeepsRows { select(income, "r2") }
+    }
+
+    fun testActiveIncomeNeedsNoSettlementAndPurchaseActiveIsVerified() {
+        ok(select(income, "r1"))
+        reopen()
+        assertEquals(income, ok(ledger.active())?.offer)
+        ok(store.atomic { ledger.finishActive(it, RequestId("r1")) })
+        ok(select(purchase, "r2"))
+        sql("UPDATE settlements SET result = replace(result, '\"kind\":\"DELIVERY\"', '\"kind\":\"GARAGE\"') WHERE request_id = 'r2'")
+        assertStorageFailureKeepsRows { ledger.active() }
     }
 
     fun testAnotherValidActiveOrPaidFlagIsStorageFailure() {
