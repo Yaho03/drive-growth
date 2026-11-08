@@ -1254,3 +1254,5 @@ JDK17·기존 Android SDK35·Gradle8.11.1, `--offline --no-daemon`을 사용했�
 공급본 #137 b12f268의 선택 이력 읽기 검증을 소비해 active/inProgress/terms에서도 실제 구매 정산을 대조한다. 결제 행 누락·종류 오연결은 STORAGE_FAILURE이며 정상 수익 의뢰는 결제 정산 없이 조회된다. 공용 record는 source·실제 기능 소유 이력을 먼저 검사하고, 기존 GENERAL의 동일 명령/정산을 검증·재생한 다음 신규 요청의 prefix 예약을 적용한다. 다른 명령·신규 prefix 선점·실제 주행 소유 이력의 GENERAL 재생 거절을 유지했다.
 
 독립 API37/ARM64 SQLite119개(선택28·도착/주행21·변경/포기19·가챠11·대여14·원장26), core276·앱 단위139개 실패/오류0, APK/시험APK 조립·lint·저장소/diff 검사 통과. v4의 drive/legacy-record와 delivery/legacy/settle fixture를 v5로 이전·재개방한 뒤 과거 정산·현재 잔액·DB 바이트 보존을 확인했다. 이 fixture는 구형 writer가 허용한 표현을 재구성한 시험이며 실제 v4 APK의 최초 쓰기나 제품 DB 이전 성공 근거가 아니다. 리뷰어의 API34 표적 실행을 작성자가 반복한 것으로 표시하지 않는다. 이번 API37 시험은 별도 에뮬레이터에서 수행했으며 제품 기기·실차·SDK/UI 전체 시험은 수행하지 않았다. PR 재검토 전 Draft를 유지한다.
+
+같은 날 선행 #128/#134/#137이 main c2ad04a에 반영되어 최신 main을 merge했다. 구매 검증의 중복 주석 충돌은 공급본을 유지하고 inProgress 회귀는 보존했다. main의 가챠/처분/가격 변경을 임의 수정하지 않았다. 통합 후 core294·앱139·APK/시험APK·lint·저장소/diff 검사와 API37 SQLite120개(선택28·도착/주행22·변경19·가챠11·대여14·원장26)가 통과했다(57.616초, 실패/오류0).
