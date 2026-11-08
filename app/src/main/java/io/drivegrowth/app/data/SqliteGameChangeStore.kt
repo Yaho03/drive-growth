@@ -321,7 +321,12 @@ internal object LedgerJson {
         return value
     }
     private fun money(m: MoneyChange?) = m?.let { JSONObject().put("direction", it.direction.name).put("amount", it.amount.units) }
-    private fun money(j: JSONObject?): MoneyChange? = j?.let { MoneyChange(MoneyDirection.valueOf(it.getString("direction")), GameMoney(it.getLong("amount"))) }
+    private fun money(j: JSONObject?): MoneyChange? = j?.let { MoneyChange(MoneyDirection.valueOf(it.getString("direction")), GameMoney(integer(it, "amount", 0, Long.MAX_VALUE))) }
+    private fun moneyObject(j: JSONObject): JSONObject? = when (val raw = j.get("money")) {
+        JSONObject.NULL -> null
+        is JSONObject -> raw
+        else -> throw JSONException("재화 변경 형식 오류")
+    }
     fun command(c: GameChange): JSONObject {
         val write = when (val v = c.vehicle) {
             null -> null
@@ -339,6 +344,6 @@ internal object LedgerJson {
         .put("balance", s.balance.units).put("vehicle", s.changedVehicle?.let(::vehicle) ?: JSONObject.NULL).put("at", s.confirmedAt.value)
     fun settlement(j: JSONObject) = Settlement(SettlementId(j.getString("id")),
         Transaction(TransactionId(j.getString("transaction")), RequestId(j.getString("request")), TransactionKind.valueOf(j.getString("kind")),
-            InputSource.valueOf(j.getString("source")), RuleVersion(j.getString("rule")), money(j.optJSONObject("money"))),
+            InputSource.valueOf(j.getString("source")), RuleVersion(j.getString("rule")), money(moneyObject(j))),
         GameMoney(j.getLong("balance")), j.optJSONObject("vehicle")?.let(::vehicle), EpochMillis(j.getLong("at")))
 }
