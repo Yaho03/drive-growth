@@ -381,8 +381,13 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
             "UPDATE settlements SET result = replace(result, '\"amount\":300', '\"amount\":0') WHERE request_id = 'drive/d1'",
             "UPDATE settlements SET result = replace(result, '\"kind\":\"DRIVING\"', '\"kind\":\"GARAGE\"') WHERE request_id = 'drive/d1'",
             "DELETE FROM settlements WHERE request_id = 'drive/d1'",
-        )) {
+        ) + listOf("300.75", "300.0", "\"300\"", "3e2", "92233720368547758070").map {
+            // 공용 금액 해석(#136)이 소수·문자열·지수·범위 초과를 정수로 보정하지 않는지 주행 소비 경로에서 확인한다.
+            "UPDATE settlements SET result = replace(result, '\"amount\":300', '\"amount\":$it') WHERE request_id = 'drive/d1'"
+        }) {
+            val clean = dump()
             sql(corruption)
+            assertTrue("손상이 들어가지 않음: $corruption", dump() != clean)
             assertStorageFailureKeepsRows(call)
             sql("DELETE FROM driving_drives", "INSERT INTO driving_drives SELECT * FROM backup",
                 "DELETE FROM settlements WHERE request_id = 'drive/d1'", "INSERT INTO settlements SELECT * FROM settle_backup")
@@ -390,5 +395,21 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
         assertEquals(GameMoney(300), ok(call()).amount)
         sql("UPDATE driving_days SET rewarded = 'broken'")
         assertStorageFailureKeepsRows({ driving.day(today) })
+    }
+
+    fun testArrivalPaymentWithFractionalOrTextAmountIsStorageFailure() {
+        choose(income)
+        ok(settle(arrival()))
+        val call = { settle(arrival()) }
+        sql("CREATE TABLE settle_backup AS SELECT * FROM settlements WHERE request_id = 'delivery/r1/settle'")
+        for (raw in listOf("400.5", "400.0", "\"400\"", "4e2")) {
+            val clean = dump()
+            sql("UPDATE settlements SET result = replace(result, '\"amount\":400', '\"amount\":$raw') WHERE request_id = 'delivery/r1/settle'")
+            assertTrue("손상이 들어가지 않음: $raw", dump() != clean)
+            assertStorageFailureKeepsRows(call, { ledger.arrivalResult(RequestId("r1")) })
+            sql("DELETE FROM settlements WHERE request_id = 'delivery/r1/settle'", "INSERT INTO settlements SELECT * FROM settle_backup")
+        }
+        assertTrue(ok(call()).outcome is DeliveryOutcome.IncomeCompleted)
+        assertEquals(10_400, balance())
     }
 }
