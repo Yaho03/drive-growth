@@ -317,6 +317,19 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
         assertTrue(owned().isEmpty())
     }
 
+    fun testArrivalReplayRejectsLossyRawMoneyFromSharedDecoder() {
+        choose(income)
+        ok(settle(arrival()))
+        sql("CREATE TABLE raw_money_backup AS SELECT * FROM settlements WHERE request_id='delivery/r1/settle'")
+        for (raw in listOf("400.75", "\"400\"", "400.0", "4e2", "9223372036854775808")) {
+            sql("UPDATE settlements SET result=replace(result,'\"amount\":400','\"amount\":$raw') WHERE request_id='delivery/r1/settle'")
+            assertStorageFailureKeepsRows({ settle(arrival()) }, { ledger.arrivalResult(RequestId("r1")) })
+            sql("DELETE FROM settlements WHERE request_id='delivery/r1/settle'",
+                "INSERT INTO settlements SELECT * FROM raw_money_backup")
+        }
+        assertNotNull(ok(ledger.arrivalResult(RequestId("r1"))))
+    }
+
     fun testStoredArrivalThatDoesNotMatchItsCommandIsStorageFailure() {
         choose(purchase)
         ok(settle(arrival()))
