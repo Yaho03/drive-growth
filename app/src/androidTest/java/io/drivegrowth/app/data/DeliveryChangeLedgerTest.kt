@@ -287,7 +287,10 @@ class DeliveryChangeLedgerTest : InstrumentationTestCase() {
             "UPDATE settlements SET result = replace(result, '\"amount\":500', '\"amount\":400') WHERE request_id = 'delivery/r1/change'",
             "UPDATE settlements SET result = replace(result, '\"request\":\"delivery\\/r1\\/change\"', '\"request\":\"other\"') WHERE request_id = 'delivery/r1/change'",
             "DELETE FROM settlements WHERE request_id = 'delivery/r1/change'",
-        )) {
+        ) + listOf("500.75", "500.0", "\"500\"", "5e2", "92233720368547758070").map {
+            // 공용 금액 해석(#136)이 소수·문자열·지수·범위 초과를 정수로 보정하지 않는지 변경 차액 소비 경로에서 확인한다.
+            "UPDATE settlements SET result = replace(result, '\"amount\":500', '\"amount\":$it') WHERE request_id = 'delivery/r1/change'"
+        }) {
             val clean = dump()
             sql("PRAGMA ignore_check_constraints = ON", corruption, "PRAGMA ignore_check_constraints = OFF")
             assertTrue("손상이 들어가지 않음: $corruption", dump() != clean)
