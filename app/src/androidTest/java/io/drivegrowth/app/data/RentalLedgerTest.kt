@@ -4,6 +4,9 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import android.test.InstrumentationTestCase
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.garage.CollectionKey
+import io.drivegrowth.core.garage.CollectionState
+import io.drivegrowth.core.garage.Garage
 import io.drivegrowth.core.progression.VehicleActivity
 import io.drivegrowth.core.rental.*
 import java.math.RoundingMode
@@ -206,10 +209,187 @@ class RentalLedgerTest : InstrumentationTestCase() {
         }
     }
 
+    fun testDisposedHistoryAndDiscoverySurviveReopen() {
+        val seen = CollectionKey(car.vehicleId, Rarity.RARE)
+        val owned = CollectionKey(car.vehicleId, Rarity.COMMON)
+        val expected = mutableListOf<OwnedVehicle>()
+        for (state in listOf(VehicleLifecycle.SOLD, VehicleLifecycle.SCRAPPED, VehicleLifecycle.CONSUMED)) {
+            val vehicle = if (state == VehicleLifecycle.SOLD) car else car.copy(
+                ownedVehicleId = OwnedVehicleId(state.name), acquisitionSource = VehicleAcquisitionSource.GACHA)
+            if (vehicle != car) add(vehicle, 0)
+            val updated = ok(store.commitGameChange(GameChange(RequestId("dispose/" + state.name),
+                TransactionKind.GARAGE, source, version, vehicle = VehicleWrite.Update(vehicle.ownedVehicleId,
+                    vehicle.revision, vehicle.level, state, vehicle.levelProgressPercent))))
+            expected.add(checkNotNull(updated.changedVehicle))
+        }
+        repeat(2) { ok(store.recordDiscoveries(catalog, setOf(seen))) }
+        val lastBalance = ok(store.balance())
+        val transactions = ok(store.listUnviewedSettlements())
+        val unseen = CollectionKey(car.vehicleId, Rarity.LEGEND)
+        assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT), store.recordDiscoveries(catalog,
+            setOf(unseen, CollectionKey(VehicleId("unknown"), Rarity.COMMON))))
+        store.beforeCommit = { throw SQLiteException("발견 저장 실패") }
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.recordDiscoveries(catalog, setOf(unseen)))
+        reopen()
+        assertTrue(ok(store.listOwnedVehicles()).isEmpty())
+        val history = ok(store.listVehicleHistory())
+        assertEquals(expected.toSet(), history.toSet())
+        assertEquals(car.ownedVehicleId, history.single { it.acquisitionSource == VehicleAcquisitionSource.INITIAL_GRANT }.ownedVehicleId)
+        assertEquals(setOf(seen), ok(store.discoveredVehicles()))
+        val keys = history.map { CollectionKey(it.vehicleId, it.rarity) }.toSet()
+        val states = ok(Garage(catalog).collection(keys, ok(store.discoveredVehicles()))).associate { it.key to it.state }
+        assertEquals(CollectionState.OWNED, states[owned])
+        assertEquals(CollectionState.DISCOVERED, states[seen])
+        assertEquals(CollectionState.UNDISCOVERED, states[unseen])
+        assertEquals(lastBalance, ok(store.balance()))
+        assertEquals(transactions, ok(store.listUnviewedSettlements()))
+    }
+
+    fun testAccidentCountUsesOnlyCommittedAccidentsOfOneOwnedVehicle() {
+        val id = car.ownedVehicleId
+        val other = OwnedVehicleId("same-model")
+        add(car.copy(ownedVehicleId = other), 0)
+        ok(store.rental.setResting(other, true))
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
+            store.rental.accidentCount(OwnedVehicleId("unknown")))
+        assertEquals(0, ok(store.rental.accidentCount(id)))
+
+        for (n in 0..3) {
+            val start = n * 4500000L
+            val r = request.copy(id = RequestId("visit-$n"))
+            // 첫 대여는 정상, 이어지는 세 번은 사고다.
+            val t = terms.copy(start = EpochMillis(start), roll = if (n == 0) 99 else 0)
+            assertEquals(id, ok(assign(r = r, t = t)))
+            val before = (n - 1).coerceAtLeast(0)
+            assertEquals(before, ok(store.rental.accidentCount(id)))
+            ok(store.rental.account(r.id, t.start, EpochMillis(start + 3600000), null))
+            if (n == 1) {
+                store.beforeCommit = { throw SQLiteException("정산 실패") }
+                assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.rental.settle(r.id))
+                reopen()
+                assertEquals(before, ok(store.rental.accidentCount(id)))
+            }
+            val receipt = ok(store.rental.settle(r.id))
+            assertEquals(n != 0, receipt.accident)
+            assertEquals(receipt, ok(store.rental.settle(r.id)))
+            ok(store.rental.finishReturn(r.id, EpochMillis(start + 4500000)))
+            reopen()
+            assertEquals(n, ok(store.rental.accidentCount(id)))
+            assertEquals(0, ok(store.rental.accidentCount(other)))
+            if (n in 1..2) {
+                // #49 수리 명령 전의 fixture: 수리 완료 활동만 주입하고 대여·사고 이력은 그대로 둔다.
+                store.close()
+                SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                    it.execSQL("UPDATE rentals SET phase='IDLE' WHERE id=? AND phase='NEEDS_REPAIR'", arrayOf(r.id.value))
+                }
+                store = open()
+            }
+        }
+        val current = ok(store.listOwnedVehicles()).single { it.ownedVehicleId == id }
+        ok(store.commitGameChange(GameChange(RequestId("scrap"), TransactionKind.GARAGE, source, version,
+            vehicle = VehicleWrite.Update(id, current.revision, current.level, VehicleLifecycle.SCRAPPED, current.levelProgressPercent))))
+        reopen()
+        assertEquals(3, ok(store.rental.accidentCount(id)))
+    }
+
+    fun testFirstCompletedRentalUsesActualCommitOrderAcrossV2Upgrade() {
+        val second = request.copy(id = RequestId("second"))
+        add(car.copy(ownedVehicleId = OwnedVehicleId("two")), 0)
+        val firstCar = ok(assign())
+        val secondCar = ok(assign(r = second, t = terms.copy(roll = 0)))
+        assertNull(ok(store.rental.firstCompletedRental()))
+        for (r in listOf(request, second)) ok(store.rental.account(r.id, terms.start, EpochMillis(3600000), null))
+        store.beforeCommit = { throw SQLiteException("정산 실패") }
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.rental.settle(request.id))
+        reopen()
+        assertNull(ok(store.rental.firstCompletedRental()))
+        val earliest = ok(store.rental.settle(second.id))
+        ok(store.markViewed(earliest.settlement.settlementId))
+        val later = ok(store.rental.settle(request.id))
+        val balance = ok(store.balance())
+        val unviewed = ok(store.listUnviewedSettlements())
+        store.close()
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+            it.execSQL("DROP TABLE discoveries")
+            it.execSQL("DROP TABLE gacha_progress")
+            it.execSQL("DROP TABLE gacha_requests")
+            it.version = 2
+        }
+        store = open()
+        val first = checkNotNull(ok(store.rental.firstCompletedRental()))
+        assertEquals(second.id, first.rentalId)
+        assertEquals(secondCar, first.ownedVehicleId)
+        assertEquals(earliest, first.receipt)
+        assertTrue(first.receipt.accident)
+        assertEquals(first, ok(store.rental.completedRental(second.id)))
+        val last = checkNotNull(ok(store.rental.completedRental(request.id)))
+        assertEquals(firstCar, last.ownedVehicleId)
+        assertEquals(later, last.receipt)
+        assertNull(ok(store.rental.completedRental(RequestId("unknown"))))
+        assertTrue(ok(store.discoveredVehicles()).isEmpty())
+        assertEquals(balance, ok(store.balance()))
+        assertEquals(unviewed, ok(store.listUnviewedSettlements()))
+        assertEquals(earliest, ok(store.rental.settle(second.id)))
+    }
+
+    fun testDiscoveryUsesOneSnapshotOfChangingInput() {
+        val valid = CollectionKey(car.vehicleId, Rarity.RARE)
+        val invalid = CollectionKey(VehicleId("unknown"), Rarity.LEGEND)
+        var reads = 0
+        val changing = object : AbstractSet<CollectionKey>() {
+            override val size = 2
+            override fun iterator(): Iterator<CollectionKey> {
+                reads++
+                return if (reads == 1) setOf(valid, CollectionKey(car.vehicleId, Rarity.COMMON)).iterator()
+                else setOf(valid, invalid).iterator()
+            }
+        }
+        ok(store.recordDiscoveries(catalog, changing))
+        assertFalse(invalid in ok(store.discoveredVehicles()))
+        assertEquals(2, ok(store.discoveredVehicles()).size)
+    }
+
+    fun testCompletedRentalRejectsBrokenLinksAndRawValuesWithoutWrites() {
+        ok(assign())
+        ok(store.rental.account(request.id, terms.start, EpochMillis(3600000), null))
+        ok(store.rental.settle(request.id))
+        val balance = ok(store.balance())
+        val cases = listOf(
+            "UPDATE rentals SET settlement_request='add/one'" ,
+            "UPDATE settlements SET settlement_id='wrong' WHERE request_id='rental/settle/r1'",
+            "UPDATE settlements SET result=json_set(result,'$.request','wrong') WHERE request_id='rental/settle/r1'",
+            "UPDATE settlements SET result=json_set(result,'$.kind','GARAGE') WHERE request_id='rental/settle/r1'",
+            "UPDATE settlements SET result=json_set(result,'$.source','VEHICLE') WHERE request_id='rental/settle/r1'",
+            "UPDATE rentals SET accident=2",
+            "UPDATE rentals SET match_review=0.5",
+            "UPDATE rentals SET wash_review='invalid'",
+            "UPDATE rentals SET regular_customer=-1",
+            "UPDATE rentals SET bonus=1.5",
+            "UPDATE rentals SET bonus=-1",
+        )
+        store.close()
+        val file = context.getDatabasePath(name)
+        val original = file.readBytes()
+        for (sql in cases) {
+            file.writeBytes(original)
+            SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { it.execSQL(sql) }
+            val broken = file.readBytes()
+            store = open()
+            assertEquals(sql, ContractResult.Failure(ContractError.STORAGE_FAILURE), store.rental.firstCompletedRental())
+            assertEquals(sql, ContractResult.Failure(ContractError.STORAGE_FAILURE), store.rental.completedRental(request.id))
+            assertEquals(balance, ok(store.balance()))
+            store.close()
+            assertTrue(sql, broken.contentEquals(file.readBytes()))
+        }
+        file.writeBytes(original)
+        store = open()
+        assertNotNull(ok(store.rental.firstCompletedRental()))
+    }
+
     fun testUpgradeFromV1KeepsAccountAndOriginalVehicle() {
         store.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path,null,SQLiteDatabase.OPEN_READWRITE).use { db ->
-            listOf("visits","rentals","shop","facilities","rental_rest").forEach { db.execSQL("DROP TABLE "+it) }
+            listOf("visits","rentals","shop","facilities","rental_rest","discoveries","gacha_progress","gacha_requests").forEach { db.execSQL("DROP TABLE "+it) }
             db.version=1
         }
         store=open()

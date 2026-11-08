@@ -1,0 +1,11 @@
+10
+null
+Physical size: 1080x600
+Physical density: 120
+package:io.drivegrowth.app.review103
+package:io.drivegrowth.app.review103.test
+package:io.drivegrowth.app.test
+package:io.drivegrowth.app
+package:io.drivegrowth.navidiagnostic
+    topResumedActivity=ActivityRecord{5914855 u10 ai.umos.maps.android.navigation.app/.MainActivity t1004870}
+      topResumedActivity=ActivityRecord{ab8c392 u10 ai.umos.homescreen/.HomeActivity t1004867}

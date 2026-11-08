@@ -1,0 +1,74 @@
+> Task :core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:compileKotlin UP-TO-DATE
+> Task :core:compileJava NO-SOURCE
+> Task :core:processResources NO-SOURCE
+> Task :core:classes UP-TO-DATE
+> Task :core:jar UP-TO-DATE
+> Task :core:compileTestFixturesKotlin UP-TO-DATE
+> Task :core:compileTestFixturesJava NO-SOURCE
+> Task :core:processTestFixturesResources NO-SOURCE
+> Task :core:testFixturesClasses UP-TO-DATE
+> Task :core:testFixturesJar UP-TO-DATE
+> Task :core:processTestResources NO-SOURCE
+> Task :core:compileTestKotlin
+> Task :core:compileTestJava NO-SOURCE
+> Task :core:testClasses UP-TO-DATE
+
+> Task :core:test
+
+GachaChangeStoreTest > 예전 Add 경로와 새 가챠도 같은 현재 공간을 검사한다 PASSED
+
+GachaChangeStoreTest > 다른 종류 요청과 ID를 양방향으로 재사용할 수 없다 PASSED
+
+GachaChangeStoreTest > 해금 후보는 생성 시 복사되고 외부에서 수정되지 않는다 PASSED
+
+GachaChangeStoreTest > 유료 명령은 재화 개체 카운터와 최초 전체 결과를 함께 확정한다 PASSED
+
+GachaChangeStoreTest > 희귀도 가용 집합도 복사하며 비활성 희귀도와 빈 차종은 거절한다 PASSED
+
+GachaChangeStoreTest > 새 요청의 출처 버전과 revision 초과도 무변경이다 PASSED
+
+GachaChangeStoreTest > 서로 다른 두 무료 요청이 마지막 한 장을 같이 쓸 수 없다 PASSED
+
+GachaChangeStoreTest > 설정 없는 기존 저장소에 가챠 상태를 임의 생성하지 않는다 PASSED
+
+GachaChangeStoreTest > 확정 재생은 대기 중인 실패를 소모하지 않으며 다음 새 요청만 실패한다 PASSED
+
+GachaChangeStoreTest > 잔액 무료권 부족과 저장 실패는 개체 카운터 티켓을 전혀 바꾸지 않는다 PASSED
+
+GachaChangeStoreTest > 소비 예제는 조회한 권위 상태와 기존 추첨을 명령으로 보관하고 저장 결과만 사용한다 PASSED
+
+GachaChangeStoreTest > 성장 처분 후에도 예전 가챠는 현재 개체를 덮지 않고 당시 snapshot을 재생한다 PASSED
+
+GachaChangeStoreTest > 과거에 준비한 용량이나 카운터를 현재 권위 상태로 신뢰하지 않는다 PASSED
+
+GachaChangeStoreTest > 같은 ID의 의미 입력 하나라도 다르면 충돌하고 원본 전체 결과가 유지된다 PASSED
+
+GachaChangeStoreTest > 무료권은 실제0 취득액으로 한 장만 소비하고 0원 거래를 만들지 않는다 PASSED
+
+GachaChangeStoreTest > 예전 Add가 먼저 마지막 칸을 채워도 가챠는 현재 공간을 읽는다 PASSED
+
+GachaChangeStoreTest > 잘못된 새 개체 성장 출처 취득액과 후보는 부분 반영 없이 거절된다 PASSED
+
+GachaChangeStoreTest > 마지막 칸에 두 가챠 명령이 경쟁해도 한 개체만 지급된다 PASSED
+
+GachaChangeStoreTest > 동시에 같은 요청을 두 번 내도 무료권과 개체는 한 번만 변한다 PASSED
+
+GachaChangeStoreTest > 유료 명령을 예전 Add 명령으로 바꾸어 재생하거나 다른 종류로 우회할 수 없다 PASSED
+
+GachaChangeStoreTest > 보장 회차와 희귀 이상 결과의 카운터는 기존 계산 규칙과 일치해야 한다 PASSED
+
+GachaIndependentBoundaryTest > maximumPricePityRevisionAndTicketValuesDoNotOverflowOrBlockReplay PASSED
+
+GachaIndependentBoundaryTest > legacyAndGachaRacingTheSameIdCanCommitOnlyOneNamespace PASSED
+
+GachaIndependentBoundaryTest > soldVehicleFreesCapacityButItsInstanceIdCannotBeReused PASSED
+
+GachaIndependentBoundaryTest > everyNestedAwardChangeConflictsBeforeValidationAndPublicCollectionsStayFrozen PASSED
+
+GachaIndependentBoundaryTest > missingGachaAuthorityKeepsLegacyBehaviorAndDoesNotPretendToSupportGacha PASSED
+
+GachaIndependentBoundaryTest > legacyAndGachaRacingTheLastSlotShareCurrentOccupancyAndWallet PASSED
+
+BUILD SUCCESSFUL in 2s
+6 actionable tasks: 2 executed, 4 up-to-date
