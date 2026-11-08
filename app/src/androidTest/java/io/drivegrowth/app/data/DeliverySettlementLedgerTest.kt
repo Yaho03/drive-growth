@@ -47,6 +47,13 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
         ok(ledger.saveList(list))
     }
 
+    /** 공용 API가 새로 막는 예약 ID의 과거 오염 행을 시험 DB에 명시 주입한다. */
+    private fun injectLegacyChange(change: GameChange) {
+        ok(store.commitGameChange(change.copy(requestId = RequestId("legacy-seed"))))
+        val id = change.requestId.value
+        sql("UPDATE settlements SET request_id='$id', command=json_set(command,'$.request','$id'), result=json_set(result,'$.request','$id') WHERE request_id='legacy-seed'")
+    }
+
     override fun tearDown() { store.close(); context.deleteDatabase(name); super.tearDown() }
 
     private fun bind() { ledger = store.delivery; driving = store.driving }
@@ -302,8 +309,8 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
     fun testArrivalForAnotherRequestOrUsedSettleIdIsRejected() {
         choose(purchase)
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), settle(arrival(), id = "other"))
-        ok(store.commitGameChange(GameChange(RequestId("delivery/r1/settle"), TransactionKind.GARAGE, source, rule,
-            MoneyChange(MoneyDirection.CREDIT, GameMoney(1)))))
+        injectLegacyChange(GameChange(RequestId("delivery/r1/settle"), TransactionKind.GARAGE, source, rule,
+            MoneyChange(MoneyDirection.CREDIT, GameMoney(1))))
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), settle(arrival()))
         assertEquals(7_001, balance())
         assertEquals(purchase, ok(ledger.active())?.offer)
@@ -340,8 +347,8 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
     fun testFinishedArrivalWithoutMoneyButWithSettlementIsStorageFailure() {
         choose(income)
         ok(settle(Observation.Missing(MissingReason.NO_DATA), now = start.value + dayMs))
-        ok(store.commitGameChange(GameChange(RequestId("delivery/r1/settle"), TransactionKind.DELIVERY, source, rule,
-            MoneyChange(MoneyDirection.CREDIT, GameMoney(400)))))
+        injectLegacyChange(GameChange(RequestId("delivery/r1/settle"), TransactionKind.DELIVERY, source, rule,
+            MoneyChange(MoneyDirection.CREDIT, GameMoney(400))))
         assertStorageFailureKeepsRows({ settle(Observation.Missing(MissingReason.NO_DATA), now = start.value + dayMs) })
     }
 

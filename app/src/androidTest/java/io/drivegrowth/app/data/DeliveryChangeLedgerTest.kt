@@ -52,6 +52,13 @@ class DeliveryChangeLedgerTest : InstrumentationTestCase() {
         ok(ledger.saveList(list))
     }
 
+    /** 공용 API가 새로 막는 예약 ID의 과거 오염 행을 시험 DB에 명시 주입한다. */
+    private fun injectLegacyChange(change: GameChange) {
+        ok(store.commitGameChange(change.copy(requestId = RequestId("legacy-seed"))))
+        val id = change.requestId.value
+        sql("UPDATE settlements SET request_id='$id', command=json_set(command,'$.request','$id'), result=json_set(result,'$.request','$id') WHERE request_id='legacy-seed'")
+    }
+
     override fun tearDown() { store.close(); context.deleteDatabase(name); super.tearDown() }
 
     private fun reopen() { store.close(); store = open(); ledger = store.delivery }
@@ -311,8 +318,8 @@ class DeliveryChangeLedgerTest : InstrumentationTestCase() {
         assertNull(commit.settlement)
         reopen()
         assertEquals(commit, ok(ledger.changeDestination(changeRules, changeOffer(same), same.id, newRoute)))
-        ok(store.commitGameChange(GameChange(RequestId("delivery/r1/change"), TransactionKind.DELIVERY, source, changeRules.ruleVersion,
-            MoneyChange(MoneyDirection.DEBIT, GameMoney(1)))))
+        injectLegacyChange(GameChange(RequestId("delivery/r1/change"), TransactionKind.DELIVERY, source, changeRules.ruleVersion,
+            MoneyChange(MoneyDirection.DEBIT, GameMoney(1))))
         assertStorageFailureKeepsRows({ ledger.inProgress() })
     }
 

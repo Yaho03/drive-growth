@@ -793,7 +793,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
 internal fun readRecordedSettlement(db: SQLiteDatabase, change: GameChange): Settlement? =
     db.rawQuery("SELECT settlement_id, command, result FROM settlements WHERE request_id = ?", arrayOf(change.requestId.value)).use {
         if (!it.moveToFirst()) return@use null
-        if (it.text(1) != LedgerJson.command(change).toString(), SqliteGameChangeStore.RequestDomain.DELIVERY) throw JSONException("정산 명령이 원래 거래와 다름")
+        if (it.text(1) != LedgerJson.command(change).toString()) throw JSONException("정산 명령이 원래 거래와 다름")
         val settlement = LedgerJson.settlement(JSONObject(it.text(2)))
         val t = settlement.transaction
         if (settlement.settlementId.value != it.text(0) || t.requestId != change.requestId || t.kind != change.kind ||
