@@ -81,9 +81,11 @@ class VehicleCare(private val rules: VehicleCareRules = VehicleCareRules()) {
      */
     fun salePrice(vehicle: OwnedVehicle, accidents: Int): Long {
         require(canSell(accidents)) { "사고 ${rules.scrapOnlyAccidents}회 이상은 폐차만 가능하다" }
-        val percent = maxOf(rules.salePercent - accidents * rules.salePenaltyPointsPerAccident, rules.minSalePercent) +
-            (vehicle.level - 1) * rules.saleLevelBonusPointsPerLevel
-        return percentOf(vehicle.acquisitionCost.units, percent.toLong())
+        // 규칙 값이 커도 Int로 잘리지 않도록 비율도 BigInteger로 계산한다.
+        val penalty = big(accidents).multiply(big(rules.salePenaltyPointsPerAccident))
+        val base = big(rules.salePercent).subtract(penalty).max(big(rules.minSalePercent))
+        val percent = base.add(big(vehicle.level - 1).multiply(big(rules.saleLevelBonusPointsPerLevel)))
+        return percentOf(vehicle.acquisitionCost.units, percent)
     }
 
     /** 폐차 = 실제 취득액의 20%. 사고 횟수와 무관하게 가능하다(사고 3회 이상은 폐차만 가능). */
@@ -102,9 +104,14 @@ class VehicleCare(private val rules: VehicleCareRules = VehicleCareRules()) {
     }
     private fun Int.nonNegative(): Int = also { require(it >= 0) { "사고 횟수는 0 이상" } }
     /** amount × numerator / denominator(내림). 중간 곱이 Long을 넘어도 최종값이 Long 안이면 계산하고, 넘으면 ArithmeticException. */
-    private fun percentOf(amount: Long, numerator: Long, denominator: Long = 100): Long {
+    private fun percentOf(amount: Long, numerator: Long, denominator: Long = 100): Long =
+        percentOf(amount, BigInteger.valueOf(numerator), denominator)
+
+    private fun percentOf(amount: Long, numerator: BigInteger, denominator: Long = 100): Long {
         require(amount >= 0) { "금액은 0 이상" }
-        return BigInteger.valueOf(amount).multiply(BigInteger.valueOf(numerator))
-            .divide(BigInteger.valueOf(denominator)).longValueExact()
+        require(numerator.signum() >= 0) { "비율은 0 이상" }
+        return BigInteger.valueOf(amount).multiply(numerator).divide(BigInteger.valueOf(denominator)).longValueExact()
     }
+
+    private fun big(value: Int): BigInteger = BigInteger.valueOf(value.toLong())
 }

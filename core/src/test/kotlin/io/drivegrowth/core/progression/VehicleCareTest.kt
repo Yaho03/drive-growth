@@ -98,6 +98,20 @@ class VehicleCareTest {
         assertEquals(4_900L, lenient.salePrice(owned(10_000, level = 20), 8)) // 30% + 19%p
     }
 
+    @Test fun `판매 비율 계산은 규칙 값이 커도 Int로 잘리지 않고 최종값이 넘으면 예외다`() {
+        // 리뷰 재현: Lv20·취득액 100·사고 0·레벨 가산 Int.MAX → 60 + 19 × Int.MAX = 40,802,189,353 (음수 아님)
+        val bigBonus = VehicleCare(VehicleCareRules(saleLevelBonusPointsPerLevel = Int.MAX_VALUE))
+        assertEquals(40_802_189_353L, bigBonus.salePrice(owned(100, level = 20), 0))
+        assertEquals(2_147_483_707L, bigBonus.salePrice(owned(100, level = 2), 0)) // 인접 경계: 60 + Int.MAX
+        assertEquals(60L, bigBonus.salePrice(owned(100, level = 1), 0))             // Lv1은 가산 없음
+        assertThrows(ArithmeticException::class.java) { bigBonus.salePrice(owned(Long.MAX_VALUE, level = 20), 0) }
+        // 사고 감액 곱도 잘리지 않는다: 2 × Int.MAX 감액이 음수로 뒤집히지 않고 최저 30%에서 멈춤
+        val bigPenalty = VehicleCare(VehicleCareRules(salePenaltyPointsPerAccident = Int.MAX_VALUE, scrapOnlyAccidents = 100))
+        assertEquals(30L, bigPenalty.salePrice(owned(100), 2))
+        // 기본 규칙 기대값은 그대로
+        assertEquals(listOf(300L, 0L, 395L), listOf(care.salePrice(owned(500), 0), care.salePrice(owned(0), 0), care.salePrice(owned(500, level = 20), 0)))
+    }
+
     @Test fun `폐차 금액은 실제 취득액의 20퍼센트이고 무료 취득은 0이다`() {
         assertEquals(100L, care.scrapValue(owned(500)))
         assertEquals(100L, care.scrapValue(owned(500, level = 20)))
