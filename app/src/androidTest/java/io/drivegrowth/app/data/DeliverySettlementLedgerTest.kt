@@ -273,6 +273,15 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
         assertEquals(10_000 + 4_990 + 10 + 10, balance())
     }
 
+    fun testFeatureOwnedRequestCannotReplayThroughGeneralWriter() {
+        val drive = ok(driving.settle(drivingRules, ConfirmedDrive("owned", today, ObservedDistance(1_000, source))))
+        val t = checkNotNull(drive.settlement).transaction
+        val sameChange = GameChange(t.requestId, t.kind, t.source, t.ruleVersion, t.money)
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), store.commitGameChange(sameChange))
+        assertEquals(drive, ok(driving.settle(drivingRules, ConfirmedDrive("owned", today, ObservedDistance(1_000, source)))))
+        assertEquals(10_010, balance())
+    }
+
     fun testDriveIdUsedByAnotherLedgerEntryOrSourceIsRejected() {
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
             store.commitGameChange(GameChange(RequestId("drive/d1"), TransactionKind.GARAGE, source, rule,

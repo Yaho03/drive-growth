@@ -83,6 +83,46 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
         assertEquals(saved, ok(select(purchase, "post-migration")))
     }
 
+    fun testV4LegacyGeneralRequestsReplayBeforeNewReservation() {
+        val commands = listOf("drive/legacy-record", "delivery/legacy/settle").map { id ->
+            GameChange(RequestId(id), TransactionKind.DRIVING, source, rule,
+                MoneyChange(MoneyDirection.CREDIT, GameMoney(10)))
+        }
+        val saved = commands.mapIndexed { index, c ->
+            Settlement(SettlementId("legacy-$index"),
+                Transaction(TransactionId("tx-$index"), c.requestId, c.kind, c.source, c.ruleVersion, c.money),
+                GameMoney(10010L + index * 10), null, EpochMillis(100))
+        }
+        store.close()
+        val file = context.getDatabasePath(name)
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            deliveryTables.forEach { db.execSQL("DROP TABLE $it") }
+            commands.zip(saved).forEach { (c, result) ->
+                db.execSQL("INSERT INTO settlements VALUES (?,?,?,?,0)", arrayOf(c.requestId.value,
+                    result.settlementId.value, LedgerJson.command(c).toString(), LedgerJson.settlement(result).toString()))
+            }
+            db.execSQL("UPDATE account SET balance=10020 WHERE id=1")
+            db.version = 4
+        }
+        store = open()
+        assertEquals(10020, balance())
+        store.close()
+        val migrated = file.readBytes()
+        store = open()
+        commands.zip(saved).forEach { (c, result) ->
+            assertEquals(result, ok(store.commitGameChange(c)))
+            assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
+                store.commitGameChange(c.copy(money = MoneyChange(MoneyDirection.CREDIT, GameMoney(11)))))
+            assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
+                store.commitGameChange(c.copy(requestId = RequestId(c.requestId.value + "-new"))))
+        }
+        assertEquals(10020, balance())
+        store.close()
+        assertTrue(migrated.contentEquals(file.readBytes()))
+        store = open()
+        ledger = store.delivery
+    }
+
     fun testMigrationFailurePreservesOriginalFile() {
         store.close()
         val file = context.getDatabasePath(name)
@@ -349,6 +389,20 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
         ok(select(purchase, "r1"))
         sql("DELETE FROM settlements WHERE request_id = 'r1'")
         assertStorageFailureKeepsRows { select(purchase, "r1") }
+        // 재전송이 아닌 활성 조회와 다른 요청의 선택도 결제가 사라진 구매를 정상으로 보지 않는다.
+        assertStorageFailureKeepsRows { ledger.active() }
+        assertStorageFailureKeepsRows { ledger.inProgress() }
+        assertStorageFailureKeepsRows { select(income, "r2") }
+    }
+
+    fun testActiveIncomeNeedsNoSettlementAndPurchaseActiveIsVerified() {
+        ok(select(income, "r1"))
+        reopen()
+        assertEquals(income, ok(ledger.active())?.offer)
+        ok(store.atomic { ledger.finishActive(it, RequestId("r1")) })
+        ok(select(purchase, "r2"))
+        sql("UPDATE settlements SET result = replace(result, '\"kind\":\"DELIVERY\"', '\"kind\":\"GARAGE\"') WHERE request_id = 'r2'")
+        assertStorageFailureKeepsRows { ledger.active() }
     }
 
     fun testAnotherValidActiveOrPaidFlagIsStorageFailure() {

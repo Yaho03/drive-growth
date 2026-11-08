@@ -77,9 +77,6 @@ class SqliteGameChangeStore(
                         domain: RequestDomain = RequestDomain.GENERAL): ContractResult<Settlement> {
         if (change.source != source) return failure(ContractError.INVALID_INPUT)
         val id = change.requestId.value
-        if ((id.startsWith("delivery/") && domain != RequestDomain.DELIVERY) ||
-            (id.startsWith("drive/") && domain != RequestDomain.DRIVING))
-            return failure(ContractError.STATE_CONFLICT)
         if (domain == RequestDomain.DELIVERY && change.kind != TransactionKind.DELIVERY ||
             domain == RequestDomain.DRIVING && change.kind != TransactionKind.DRIVING)
             return failure(ContractError.INVALID_INPUT)
@@ -88,14 +85,27 @@ class SqliteGameChangeStore(
             if (db.rawQuery("SELECT 1 FROM $table WHERE $key=?", arrayOf(id)).use { it.moveToFirst() })
                 return failure(ContractError.STATE_CONFLICT)
         }
+        // 기능 소유 이력이 있는 ID는 같은 명령처럼 보여도 GENERAL 재생 대상이 아니다.
+        for ((table, expression) in listOf(
+            "driving_drives" to "'drive/' || drive_id",
+            "delivery_outcomes" to "'delivery/' || request_id || '/settle'",
+            "delivery_hold_outcomes" to "'delivery/' || request_id || '/hold'",
+            "delivery_changes" to "'delivery/' || request_id || '/change'")) {
+            if (db.rawQuery("SELECT 1 FROM $table WHERE $expression=?", arrayOf(id)).use { it.moveToFirst() })
+                return failure(ContractError.STATE_CONFLICT)
+        }
         val existing = db.rawQuery("SELECT command, result FROM settlements WHERE request_id = ?", arrayOf(id)).use {
             if (it.moveToFirst()) it.getString(0) to it.getString(1) else null
         }
         if (existing != null) {
+            // v4에서 허용한 GENERAL 동일 명령은 새 prefix 예약보다 먼저 검증·재생한다.
             return if (domain == RequestDomain.GENERAL && existing.first == command)
-                ContractResult.Success(LedgerJson.settlement(JSONObject(existing.second)))
+                ContractResult.Success(readRecordedSettlement(db, change) ?: throw SQLiteException("기존 정산 누락"))
             else failure(ContractError.STATE_CONFLICT)
         }
+        if ((id.startsWith("delivery/") && domain != RequestDomain.DELIVERY) ||
+            (id.startsWith("drive/") && domain != RequestDomain.DRIVING))
+            return failure(ContractError.STATE_CONFLICT)
         val previousBalance = readBalance(db)
         val balance = when (val money = change.money) {
             null -> previousBalance
