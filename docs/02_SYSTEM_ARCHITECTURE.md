@@ -509,3 +509,11 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 - `commitMaterial(command)`는 동일 요청/전체 내용의 최초 결과 재생을 현재 검증보다 먼저 하고, 다른 내용/legacy/가챠 ID 재사용은 STATE_CONFLICT여야 한다. 새 명령은 같은 잠금/DB에서 최신 상태를 다시 읽고 두 개체·비용·요청/정산을 전부 확정하거나 전부 거절한다. **이 순서·원자성·저장 실패·재생 실행 검증은 아직 미제공**이며 두 번의 GameChange 커밋으로 우회하지 않는다.
 
 현재 순수 검증 오류는 잘못된 역할/동일 개체/차종/성장·보존/증가 범위·출처가 INVALID_INPUT, 버전/revision/활동 충돌은 STATE_CONFLICT, 대상 누락·처분은 DATA_UNAVAILABLE, 비용 부족은 INSUFFICIENT_FUNDS다. 실제 STORAGE_FAILURE와 현재 상태 변화 후 과거 두 snapshot 재생은 후속 공유 원장/SQLite 구현에서 검증한다. 이 부분 인계로 #121/#122/#48을 완료 처리하지 않는다.
+
+### #122 가챠 SQLite 확정 경계
+
+`SqliteGameChangeStore`는 `GachaChangeStore`를 구현한다. `readGachaState/commitGacha`는 공통 계약의 전체 명령·전체 결과를 사용한다. 스키마4에 `gacha_progress`와 `gacha_requests`를 추가한다. v1/v2/v3의 기존 표·행은 보존한다. #37의 탁송 저장은 실제 머지 순서에 따라 이 버전 이후 번호로 조율해야 한다.
+
+권위 콘텐츠는 저장소 구성 시 `gachaAuthority` 공급자로 전달하며 현재 DB의 가게 레벨·용량과 일치해야 한다. 후보·가격·보장·버전은 공급자의 불변 GachaAuthority를 따른다. `initialGachaProgress`는 신뢰한 프로필 초기화 입력을 새 DB 생성 시 명시한 경우에만 저장한다. 기존 DB 이전에는 값을 주입하지 않는다. 값이나 공급자가 없으면 DATA_UNAVAILABLE이며, 과거 이력 부재로 무료권·카운터를 0으로 초기화하지 않는다. #50의 NEW/EXISTING/UNKNOWN 및 복구 정책·실제 앱 공급 연결은 후속이다.
+
+확정은 기존 요청 재생/다른 종류 ID 충돌 → 권위 상태·revision·공간·추첨 결과·티켓·재화 검사 → 공용 원장·차량·카운터·티켓·최초 결과 저장 순서다. 무료권은 실제 취득액0과 money=null을 사용한다. 현재 상태가 바뀌어도 같은 전체 명령 재시도는 당시 결과를 반환한다. 같은 DB의 일반 Add도 설정된 공간을 검사하고, 기존 원장·대여 방문·가챠의 요청 ID 재사용을 거절한다. 두 연결의 쓰기와 실패 롤백은 같은 SQLite 거래로 직렬화한다. 읽은 가챠 정수와 과거 결과 연결 오류는 STORAGE_FAILURE다.

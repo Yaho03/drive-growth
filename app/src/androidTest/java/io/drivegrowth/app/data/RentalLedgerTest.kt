@@ -311,6 +311,8 @@ class RentalLedgerTest : InstrumentationTestCase() {
         store.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
             it.execSQL("DROP TABLE discoveries")
+            it.execSQL("DROP TABLE gacha_progress")
+            it.execSQL("DROP TABLE gacha_requests")
             it.version = 2
         }
         store = open()
@@ -387,7 +389,7 @@ class RentalLedgerTest : InstrumentationTestCase() {
     fun testUpgradeFromV1KeepsAccountAndOriginalVehicle() {
         store.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path,null,SQLiteDatabase.OPEN_READWRITE).use { db ->
-            listOf("visits","rentals","shop","facilities","rental_rest","discoveries").forEach { db.execSQL("DROP TABLE "+it) }
+            listOf("visits","rentals","shop","facilities","rental_rest","discoveries","gacha_progress","gacha_requests").forEach { db.execSQL("DROP TABLE "+it) }
             db.version=1
         }
         store=open()
