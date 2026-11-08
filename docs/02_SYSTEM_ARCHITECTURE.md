@@ -194,11 +194,15 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 현재 `GameChangeStore.listOwnedVehicles()`의 개체 타입은 아래 v1 필드를 포함한다. 메모리 조회·변경 예제와 SQLite의 필드 보존용 최소 codec 대응은 반영했다. 시험용 DB의 SQLite 실행 범위는 [검증 문서](06_VERIFICATION.md)의 PR #104 숫자 decoder 재검증 기록을 따르며 실제 제품 DB 이전·앱 재실행 검증과 구분한다. 처분 포함 이력·발견 기록, 실제 활동·영업 쉬기의 영속 공급은 별도다. 필드·명령은 아래 공통 계약을 사용하고 실제 조회 확장·SQLite 호환·재개방 검증은 #34 담당과 아래 연결점으로 조율한다. #46은 이 조회·계산 부분의 인계이며 저장·재실행을 포함한 전체 완료가 아니다. 기능별 본인 검증과 #28 통합 검증은 유지한다.
 
+`Garage.collection(history: VehicleHistoryStore)`는 #116의 `listVehicleHistory()`(처분 포함 전체 개체)에서 `(vehicleId, rarity)` 보유 키를, `discoveredVehicles()`에서 발견 키를 읽어 위 `collection(everOwned, discovered)`를 계산한다. 이력·발견 조회 실패는 빈 도감으로 바꾸지 않고 그대로 전달하며, 이력의 콘텐츠 밖 차종·중복 개체 ID는 `INVALID_INPUT`이다. 가챠 결과·탁송 목록에서 본 키는 호출자(화면·호스트)가 `recordDiscoveries(catalog, keys)`로 먼저 기록한다.
+
 #### #50 첫 실행 지급
 
 `io.drivegrowth.core.garage.FirstGrant.grant(store, chosen, source)`는 PRD 「최초 차량」·「초기 상태」 시험값대로 초기 재화 1,000 CREDIT과 고른 첫 차(캐스퍼·아반떼, COMMON·1레벨·0%·취득액0·`INITIAL_GRANT`, 개체 ID `initial-grant`)를 `GameChange` 한 건으로 커밋한다. SQLite 계정 잔액은 0에서 시작하므로 이 거래가 초기 재화의 유일한 지급 경로다. 초기 차고 칸 수는 `FirstGrant.INITIAL_GARAGE_CAPACITY`(3)로 제공한다.
 
 프로필당 고정 `requestId`(`initial-grant`)를 쓰므로 같은 차로 반복하면 처음 정산을 재생하고, 다른 차는 `STATE_CONFLICT`(선택 취소 불가), 후보 밖은 `INVALID_INPUT`, 콘텐츠에 없는 후보는 `DATA_UNAVAILABLE`이다. 첫 차를 처분해 보유가 0대여도 재지급하지 않는다. 단, 이 방지는 `initial-grant` 요청이 기록된 저장소에만 해당한다. 이 요청 기록이 없는 기존 데이터(다른 경로로 재화·첫 차를 받은 DB)에 호출하면 다시 지급되므로, 호스트는 **신규 프로필로 확인된 경우에만** 호출하고 확인할 수 없으면 Unavailable/복구 필요를 유지한다. 빈 보유 목록이나 미확인 정산 없음은 신규 프로필 근거가 아니다. 후보 목록 `CANDIDATES`는 읽기 전용이다. 규칙 버전이 바뀐 뒤 재시도도 명령이 달라 `STATE_CONFLICT`이며 재지급하지 않는다. 화면이 지급 전에 "이미 받은 프로필"인지 알려면 처분 포함 이력 조회(아래 「#34 저장 확장의 연결점」)가 필요하다. 개업 선물 뽑기권은 뽑기권 보유 수 저장과 첫 영업 완료 신호(#42)가 정해진 뒤 연결한다.
+
+`FirstGrant.alreadyGranted(history)`는 처분 포함 이력에 `INITIAL_GRANT` 개체가 있으면 true(이미 받은 프로필)다. 첫 차를 판매·소비해도 true다. false는 "이력에 첫 지급 기록 없음"이며 신규 프로필 근거가 아니다. 마커 없는 기존 DB 판별(NEW/EXISTING/UNKNOWN)은 #121 후속이다. 조회 실패는 그대로 전달한다.
 
 ### 원자성·오류·재시도
 

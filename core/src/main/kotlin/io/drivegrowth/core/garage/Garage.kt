@@ -81,6 +81,27 @@ class Garage(catalog: VehicleCatalogSnapshot) {
         return ContractResult.Success(Collections.unmodifiableList(entries))
     }
 
+    /**
+     * 저장된 기록으로 도감을 만든다. 보유 칸은 처분 포함 이력(`listVehicleHistory`)의 (차종, 희귀도), 발견 칸은 `discoveredVehicles`.
+     * 조회 실패는 빈 도감으로 바꾸지 않고 그대로 전달하며, 이력의 손상(콘텐츠에 없는 차종·중복 개체 ID)은 INVALID_INPUT이다.
+     * 가챠·탁송에서 본 키는 호출자가 `recordDiscoveries`로 먼저 기록한다.
+     */
+    fun collection(history: VehicleHistoryStore): ContractResult<List<CollectionEntry>> {
+        val records = when (val result = history.listVehicleHistory()) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
+        }
+        val checked = when (val result = validated(records) { it }) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
+        }
+        val discovered = when (val result = history.discoveredVehicles()) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
+        }
+        return collection(checked.map { CollectionKey(it.vehicleId, it.rarity) }.toSet(), discovered)
+    }
+
     private fun validated(
         vehicles: List<OwnedVehicle>,
         select: (List<OwnedVehicle>) -> List<OwnedVehicle>,
