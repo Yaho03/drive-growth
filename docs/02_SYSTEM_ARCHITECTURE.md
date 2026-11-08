@@ -438,9 +438,9 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 | 구간 | 현재 제공 | 남은 공급과 책임 |
 |---|---|---|
 | 공통 타입·단일 거래 | `core.contract`의 Rarity·OwnedVehicle 필수 필드, GameChange/Settlement·공통 오류, 메모리 fixture와 SQLite 단일 개체 명령 | [계약 후속 121](https://github.com/Yaho03/drive-growth/issues/121): 환석이 기능 입력/결과·다중 개체·프로필·진행 상태의 공통 타입과 소비 fixture를 확장. 기존 생성자 누락을 기본값으로 숨기지 않음 |
-| 공용 저장 | schema2의 SqliteGameChangeStore + RentalLedger, 단일 개체 revision·활동 검사·원자 확정·열람 저장 | [저장 후속 122](https://github.com/Yaho03/drive-growth/issues/122): 경민이 합의된 명령과 기능 Ledger를 같은 DB에 연결하고 최종 조건 검사·요청 이력·이전·조회 어댑터를 담당. A/C의 계산 구현과 중복하지 않음 |
-| PR #111 | prepare/submit으로 보관한 같은 계획 재제출의 현재 상태 의존은 해결. main 미반영 | 같은 ID·다른 카운터와 마지막 칸 경쟁의 P1 두 건은 미해결. 전체 요청/결과와 최종 용량 조건을 위 후속에서 제공한 뒤 호열이 소비·회귀 |
-| PR #116 | `VehicleHistoryStore.listVehicleHistory`·`recordDiscoveries(catalog, keys)`·`discoveredVehicles`, `CompletedRentalSource.firstCompletedRental`·`completedRental`·`accidentCount`가 작성됨. main 미반영 | 경민이 발견 입력 snapshot, 완료 영업의 정산 연결, 원시 숫자/불리언 검증의 세 수정 요청을 보완. 새 초기화 판별·무료권·다중 강화까지 이 PR에 묶지 않음 |
+| 공용 저장 | schema3의 SqliteGameChangeStore + RentalLedger, 단일 개체 원자 확정·열람과 #116 이력/발견·완료 영업/사고 조회 | [저장 후속 122](https://github.com/Yaho03/drive-growth/issues/122): 경민이 합의된 명령과 기능 Ledger를 같은 DB에 연결하고 최종 조건 검사·요청 이력·이전·조회 어댑터를 담당. A/C의 계산 구현과 중복하지 않음 |
+| PR #111 | main `094ee59` 반영. #126의 전체 GachaCommand를 보존·재제출하고 저장소의 최초 전체 결과를 소비. 동일 ID·다른 입력과 마지막 칸 경쟁의 이전 두 P1 해결 | 실제 SQLite #136은 원시 결제 금액 검증을 재보완 중. 제품 UI·프로세스 복원·무료권 지급은 후속이며 #47 전체 완료가 아님 |
+| PR #116 | main `0799eb5` 반영. VehicleHistoryStore와 CompletedRentalSource의 이력/발견·완료 영업/사고 조회 제공. 입력 snapshot·정산 연결·원시 값의 세 지적 해결 | 이력 부재만으로 신규 프로필을 판정하지 않음. 실제 표시 이벤트 연결·무료권·다중 강화·초기화는 별도 후속 |
 
 ### 공통 명령·결과·실패의 확장 조건
 

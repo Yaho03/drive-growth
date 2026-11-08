@@ -1220,3 +1220,25 @@ JDK17·기존 Android SDK35·Gradle8.11.1, `--offline --no-daemon`을 사용했�
 설치 앱 SHA-256은 `bad1e1314e0f3411c98cf7b9254148a1f144d2d37bb7fc3c9929115d8cebaab7`, 시험은 `1320fd3fb1372815c1ef29f5c882c400c4c5339b5ac0a91661096a198ecaf9e5`로 빌드/실제 설치가 일치했다. [metadata의 소스7개 Git blob·해시](evidence/issue52-gacha-ui/metadata.json)를 원본·현재 작업 파일과 직접 대조했다. [제품/설정 전후 발췌](evidence/issue52-gacha-ui/restoration.json)에서 제품 APK `793e1db8…`·기존 데이터 파일6개·권한·user10/boot23·1080×600/120dpi·font null/night no가 동일했고 자기 격리2패키지만 제거해 내비 전면으로 반환했다. 활성 시험 없음은 검증 A 보고이며 snapshot의 미지원 instrumentation 명령 오류를 성공 근거로 사용하지 않는다. 기어·전역 창·글꼴·CarService/VHAL·제품 데이터 변경 없이 반환했고 이후 추가 adb는 없다는 종료 보고를 회수했다.
 
 [공개 증거 안내·격리 재현 호스트](evidence/issue52-gacha-ui/README.md)에 최소 자료를 모았다. 개인 경로·APK 바이너리·전체 dump를 제외하고 발췌/경로 치환은 명시했다. 이번 최종 정리는 문서·증거만 바꾸며 제품/정식 시험/리소스7파일은 고정 소스와 동일하다. 고정 입력·새 View 생성자 복원 시험이며 실제 #47 소비/경제·#122 SQLite·발견 저장·제품 탐색/gate·Activity Bundle/프로세스 영속 복원·공식 폼팩터/실차는 미완료다. #52 전체 완료로 닫지 않는다. 최종 PR·원격 head/CI·main 반영은 메인이 처리하고 새 기능은 시작하지 않는다.
+
+
+## 열린 PR 수정본 재검토 상태 — 2026-11-08
+
+기준 main은 `fc4fe328`이다. #116은 `0799eb5`에, #111·#131·#135는 각각 `094ee59`·`b777d1b`·`fc4fe328`에 반영됐다. 이전 절의 시험은 당시 커밋·환경의 근거로 보존하며 아래 상태로 과거 실패를 통과로 바꾸지 않는다. 독립 검증 보고서·실행 로그·XML을 대조한 AI 보조 결과이며 사람 승인이 아니며 이번 문서 정리 작업에서 시험을 재실행한 것은 아니다.
+
+| PR·검토 head | 현재 결과와 근거 | 범위·남은 조건 |
+|---|---|---|
+| [#116](https://github.com/Yaho03/drive-growth/pull/116#pullrequestreview-5812685180) `9583e44` | 이전 발견 입력 snapshot·완료 영업 정산 연결·원시 값 지적 해결, main 반영 | 이력·발견·완료 영업/사고 조회 부분. 이력 부재는 신규 프로필 근거가 아님 |
+| [#111](https://github.com/Yaho03/drive-growth/pull/111#pullrequestreview-5816776288) `0003504` | 이전 코드 승인 head 동일. 수정 #136·당시 main 조합에서 정식12+독립3=15개 및 앱·시험 소비 컴파일 성공, 구조 CLEAR, main 반영 | 전체 명령 보존·소비까지. 실제 제품 SQLite/화면·프로세스 연결 완료가 아님 |
+| [#131](https://github.com/Yaho03/drive-growth/pull/131#pullrequestreview-5816767830) `4570870` | 미래 수신 시각 거절 수정. 정식18+독립4=22개 통과, 구조 CLEAR, main 반영 | 도착·기본 주행 계산. 실제 내비/SDK·저장은 후속 |
+| [#135](https://github.com/Yaho03/drive-growth/pull/135#pullrequestreview-5816776648) `116b33b` | 입력/반환 snapshot 수정. 정식22+독립1=23개 통과, 구조 CLEAR, main 반영 | 변경·포기 계산. 실제 원장 확정·화면은 후속 |
+| [#128 재수정 요청](https://github.com/Yaho03/drive-growth/pull/128#pullrequestreview-5816788228) `fc3c55a` | 정식22+이전 독립3=25개 통과. 새 원시 금액3000.5를3000으로 바꾸는 재생1개 실패, 원본 보존 | 이전 날짜·상관·boolean/snapshot 수정과 별개인 공용 decoder 잔여. 현재 머지 보류 |
+| [#136 재수정 요청](https://github.com/Yaho03/drive-growth/pull/136#pullrequestreview-5816788176) `4bf21d7` | 기존 실패3+정상 재생2=5개 통과. 새500.75/문자열500을500으로 바꾸는2개 실패, 원본 보존 | Pleos API34 격리 SQLite 7개 중5통과·2실패. API37 작성자 근거와 구분 |
+| [#134](https://github.com/Yaho03/drive-growth/pull/134#pullrequestreview-5816803222) `d7d61cf` | 정식19+이전 독립3=22개 통과. 새10.75/문자열10을10으로 바꾸는2개 실패, 원본 보존 | 실제 API34 격리 시험. 재수정 요청 유지 |
+| [#137](https://github.com/Yaho03/drive-growth/pull/137#pullrequestreview-5816803279) `d39df69` | 기존 수정·정상7개 통과, 새 원시 금액2개 실패(9개, 2.586초). 시험 DB 원본·당시 잔액6500·개체0 보존 | 자체 지적은 수정됐으나 같은 공용 decoder 상속. 별개 P2로 중복 집계하지 않고 현재 머지 보류 |
+| [#139](https://github.com/Yaho03/drive-growth/pull/139) `9b90e1d` | 고유 표적26개 중22통과·4실패·오류0(4.948초). 최신 부모 수정 포함 확인 | 공용 금액·구매 조회 무결성·기존 DB 재생 보완과 부모 재검토 전까지 전체 통합 머지 보류 |
+| [#138 기존 수정 요청](https://github.com/Yaho03/drive-growth/pull/138#pullrequestreview-5812698885) `ca5635b` | 원본 미수정, 기존 overflow 반려 유지 | 통과한 수정본으로 표시하지 않음 |
+
+공용 원인은 JSON 금액을 `getLong`으로 변환한 뒤 원래 거래와 비교해 손상된 실수·문자열을 정상 정수처럼 수락하는 경계다. #122 기존 저장 담당이 #136 또는 #139 한 곳에서 원시 타입·범위를 변환 전에 확인하는 최소 보완을 제공하고, 소비 PR들이 같은 수정 커밋을 받아 각 재생·원본 보존 경계를 재검증한다. 별도 이슈·지갑·원장이나 기능별 중복 decoder를 만들지 않는다. 정상 정수0·Long 상한·무료money=null을 유지하며, 500.0/지수·상한 초과 등의 추가 회귀는 실제 실행 후에만 결과로 기록한다.
+
+기준 main `fc4fe328`의 원격 CI 성공은 메인이 확인했다. PR의 정상 시험·CI 성공과 위 독립 실패를 함께 기록하며, DB 재개방을 Activity/제품 프로세스 재시작으로 확대하지 않는다. 각 슬롯의 제품 APK·권한/설정과 자기 패키지 정리·반환 근거는 유지한다. 다만 #137의 제품6파일 전후 자료는 해시가 아닌 목록만 수집돼 직접 SHA-256 동일성 주장을 철회했다. 추가 adb 없이 기존 자료를 연결 대조한 결과 이전 arrival 종료→ledger139 시작→종료의 6개 SHA-256이 모두 같았다. 이는 앞뒤 슬롯의 연결 근거이며 #137 세션이 직접 전후6해시를 검증한 것으로 표시하지 않는다. 격리 시험 DB 원본 보존과 제품 파일의 이 증거 구분을 유지한다. 실제 제품 SDK/UI·프로세스·전원·실차, #37·#38·#39·#47·#122 전체 완료는 아니다. 기존 담당과 합의된 후속 범위를 유지한다.
