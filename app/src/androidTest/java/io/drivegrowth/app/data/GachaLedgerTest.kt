@@ -203,6 +203,54 @@ class GachaLedgerTest : InstrumentationTestCase() {
         assertTrue(ok(store.listOwnedVehicles()).isEmpty())
     }
 
+    fun testRawPaymentTypesAreRejectedBeforeConversionAndPreserveDatabase() {
+        val c = command()
+        val receipt = ok(store.commitGacha(c))
+        val balance = ok(store.balance())
+        val vehicles = ok(store.listOwnedVehicles())
+        store.close()
+        val file = context.getDatabasePath(name)
+        val original = file.readBytes()
+        val resultJson = SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            db.rawQuery("SELECT result FROM settlements WHERE request_id='draw'", null).use {
+                assertTrue(it.moveToFirst())
+                it.getString(0)
+            }
+        }
+        val literals = listOf("500.75", "\"500\"", "500.0", "5e2", "9223372036854775808",
+            "-9223372036854775809", "-1", "true", "null", "[]", "{}")
+        for (literal in literals) {
+            file.writeBytes(original)
+            val malformed = Regex("\"amount\":500").replace(resultJson, "\"amount\":$literal")
+            assertTrue(literal, malformed != resultJson)
+            SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+                db.execSQL("UPDATE settlements SET result=? WHERE request_id='draw'", arrayOf(malformed))
+            }
+            val corrupted = file.readBytes()
+            store = open()
+            assertEquals(literal, ContractResult.Failure(ContractError.STORAGE_FAILURE), store.commitGacha(c))
+            assertEquals(balance, ok(store.balance()))
+            assertEquals(vehicles, ok(store.listOwnedVehicles()))
+            store.close()
+            assertTrue(literal, corrupted.contentEquals(file.readBytes()))
+        }
+        file.writeBytes(original)
+        store = open()
+        assertEquals(receipt, ok(store.commitGacha(c)))
+    }
+
+    fun testPaymentDecoderKeepsIntegerBoundariesAndFreeNull() {
+        val receipt = ok(store.commitGacha(command()))
+        val json = LedgerJson.settlement(receipt.settlement)
+        for (amount in listOf(0L, Long.MAX_VALUE)) {
+            json.getJSONObject("money").put("amount", amount)
+            val decoded = LedgerJson.settlement(org.json.JSONObject(json.toString()))
+            assertEquals(GameMoney(amount), decoded.transaction.money?.amount)
+        }
+        json.put("money", org.json.JSONObject.NULL)
+        assertNull(LedgerJson.settlement(org.json.JSONObject(json.toString())).transaction.money)
+    }
+
     fun testMalformedProgressAndWrongAwardFailWithoutWrites() {
         val c = command()
         assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT),
