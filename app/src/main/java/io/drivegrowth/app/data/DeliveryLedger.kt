@@ -1,6 +1,7 @@
 package io.drivegrowth.app.data
 
 import android.content.ContentValues
+import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import io.drivegrowth.core.contract.ContentVersion
 import io.drivegrowth.core.contract.ContractError
@@ -8,8 +9,10 @@ import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.DeliveryArrivalEvidence
 import io.drivegrowth.core.contract.EpochMillis
 import io.drivegrowth.core.contract.EstimatedRouteDistance
+import io.drivegrowth.core.contract.GameChange
 import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.InputSource
+import io.drivegrowth.core.contract.MissingReason
 import io.drivegrowth.core.contract.Observation
 import io.drivegrowth.core.contract.Rarity
 import io.drivegrowth.core.contract.RequestId
@@ -18,6 +21,7 @@ import io.drivegrowth.core.contract.RuleVersion
 import io.drivegrowth.core.contract.Settlement
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.contract.VehicleLifecycle
+import io.drivegrowth.core.contract.VehicleWrite
 import io.drivegrowth.core.delivery.ActiveDelivery
 import io.drivegrowth.core.delivery.DeliveryChange
 import io.drivegrowth.core.delivery.DeliveryChangeOffer
@@ -32,6 +36,7 @@ import io.drivegrowth.core.delivery.DeliveryProposed
 import io.drivegrowth.core.delivery.DeliverySelected
 import io.drivegrowth.core.delivery.DeliverySelection
 import io.drivegrowth.core.delivery.DeliverySettlement
+import io.drivegrowth.core.delivery.DeliverySettlementRules
 import io.drivegrowth.core.delivery.DestinationKey
 import io.drivegrowth.core.delivery.HeldVehicle
 import io.drivegrowth.core.delivery.HoldOutcome
@@ -39,6 +44,7 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.time.LocalDate
+import java.time.format.DateTimeParseException
 
 /**
  * 탁송 선택의 확정 결과.
@@ -92,9 +98,6 @@ data class HoldCommit(
  */
 class DeliveryLedger internal constructor(private val store: SqliteGameChangeStore) {
     internal companion object {
-        /** delivery_outcomes.kind의 포기 값. 도착 정산 결과는 결과 클래스 이름을 쓴다. */
-        const val ABANDONED = "Abandoned"
-
         fun createTables(db: SQLiteDatabase) {
             db.execSQL(
                 """CREATE TABLE delivery_lists (
@@ -114,13 +117,19 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
                 "CREATE TABLE delivery_routes (request_id TEXT PRIMARY KEY NOT NULL, route TEXT NOT NULL, started_at INTEGER NOT NULL)",
             )
             db.execSQL(
-                "CREATE TABLE delivery_outcomes (request_id TEXT PRIMARY KEY NOT NULL, kind TEXT NOT NULL, settle_request TEXT)",
+                "CREATE TABLE delivery_outcomes (request_id TEXT PRIMARY KEY NOT NULL, command TEXT NOT NULL, result TEXT NOT NULL)",
             )
             db.execSQL("CREATE TABLE delivery_held (request_id TEXT PRIMARY KEY NOT NULL, payload TEXT NOT NULL)")
+            db.execSQL(
+                "CREATE TABLE delivery_hold_outcomes (request_id TEXT PRIMARY KEY NOT NULL, command TEXT NOT NULL, result TEXT NOT NULL)",
+            )
             db.execSQL(
                 """CREATE TABLE delivery_changes (
                 request_id TEXT PRIMARY KEY NOT NULL, command TEXT NOT NULL, active TEXT NOT NULL,
                 paid INTEGER NOT NULL CHECK (paid >= 0), charged INTEGER NOT NULL CHECK (charged IN (0, 1)))""",
+            )
+            db.execSQL(
+                "CREATE TABLE delivery_route_history (route TEXT PRIMARY KEY NOT NULL, request_id TEXT NOT NULL)",
             )
         }
     }
@@ -170,23 +179,26 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
      * - 같은 요청 ID·다른 내용, 또는 공용 정산에 이미 있는 요청 ID는 STATE_CONFLICT이고 바꾸지 않는다.
      * - 제시 목록이 저장되지 않았으면 DATA_UNAVAILABLE, 저장된 목록과 다르면 STATE_CONFLICT다. 다시 뽑은 목록으로 고르지 못하게 한다.
      * - 구매는 결제 정산, 선택 이력, 활성 의뢰를 한 트랜잭션으로 확정한다.
+     * - 입력은 처음에 한 번만 읽어 고정한다. 명령 기록·저장 목록 대조·선택·결제·활성 기록이 모두 같은 값을 쓴다.
+     * - 재생할 때 저장된 활성 의뢰와 결제 정산이 원래 명령과 맞지 않으면 STORAGE_FAILURE이고 원본을 바꾸지 않는다.
      */
     fun select(proposed: DeliveryProposed, offerId: DeliveryOfferId, requestId: RequestId): ContractResult<DeliveryCommit> =
         store.atomic { db ->
-            if (proposed.estimated.source != store.source || proposed.list.source != store.source) {
+            val request = DeliveryJson.proposed(DeliveryJson.proposed(proposed))
+            if (request.estimated.source != store.source || request.list.source != store.source) {
                 return@atomic failure(ContractError.INVALID_INPUT)
             }
-            val command = DeliveryJson.command(requestId, offerId, proposed).toString()
+            val command = DeliveryJson.command(requestId, offerId, request).toString()
             readRequest(db, requestId)?.let { previous ->
                 if (previous.command != command) return@atomic failure(ContractError.STATE_CONFLICT)
-                return@atomic replay(db, previous, offerId)
+                return@atomic replay(db, previous)
             }
             if (store.requestUnavailable(db, requestId)) return@atomic failure(ContractError.STATE_CONFLICT)
-            val stored = readList(db, proposed.list) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
-            if (!sameList(stored, proposed.list)) return@atomic failure(ContractError.STATE_CONFLICT)
+            val stored = readList(db, request.list) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
+            if (!sameList(stored, request.list)) return@atomic failure(ContractError.STATE_CONFLICT)
 
             val current = readActive(db)
-            val selected = when (val result = DeliverySelection.select(proposed, offerId, requestId, store.readBalance(db), current)) {
+            val selected = when (val result = DeliverySelection.select(request, offerId, requestId, store.readBalance(db), current)) {
                 is ContractResult.Failure -> return@atomic result
                 is ContractResult.Success -> result.value
             }
@@ -211,18 +223,41 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
 
     /**
      * 활성 의뢰의 경로를 시작하거나 새 경로 세대로 바꾼다. 미도착 기한의 시작 시각은 처음 값을 유지한다.
-     * 활성 의뢰가 없으면 DATA_UNAVAILABLE, 다른 요청이면 STATE_CONFLICT다.
+     *
+     * - [replacing]은 호출자가 바꾸려는 현재 경로다. 처음 시작하면 null이다. 저장된 현재 경로와 다르면 STATE_CONFLICT라서,
+     *   목적지 변경 전에 보낸 늦은 요청이 새 목적지 경로를 덮지 못한다.
+     * - 한 번 쓴 경로 ID는 어느 의뢰에서도 다시 쓰지 못한다(STATE_CONFLICT). 현재 경로와 같은 요청을 다시 보내면 그대로 돌려준다.
+     * - 활성 의뢰가 없으면 DATA_UNAVAILABLE, 다른 요청이면 STATE_CONFLICT다.
      */
-    fun beginRoute(requestId: RequestId, route: RouteId, at: EpochMillis): ContractResult<DeliveryInProgress> = store.atomic { db ->
+    fun beginRoute(
+        requestId: RequestId,
+        route: RouteId,
+        at: EpochMillis,
+        replacing: RouteId? = null,
+    ): ContractResult<DeliveryInProgress> = store.atomic { db ->
         val active = readActive(db) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
         if (active.requestId != requestId) return@atomic failure(ContractError.STATE_CONFLICT)
-        val started = readRoute(db, requestId)?.second ?: at
+        val current = readRoute(db, requestId)
+        if (current != null && current.first == route) return@atomic ContractResult.Success(DeliveryInProgress(active, route, current.second))
+        if (current?.first != replacing || routeUsed(db, route)) return@atomic failure(ContractError.STATE_CONFLICT)
+        val started = current?.second ?: at
+        useRoute(db, requestId, route)
         db.insertWithOnConflict("delivery_routes", null, ContentValues().apply {
             put("request_id", requestId.value)
             put("route", route.value)
             put("started_at", started.value)
         }, SQLiteDatabase.CONFLICT_REPLACE)
         ContractResult.Success(DeliveryInProgress(active, route, started))
+    }
+
+    private fun routeUsed(db: SQLiteDatabase, route: RouteId): Boolean =
+        db.rawQuery("SELECT 1 FROM delivery_route_history WHERE route = ?", arrayOf(route.value)).use { it.moveToFirst() }
+
+    private fun useRoute(db: SQLiteDatabase, requestId: RequestId, route: RouteId) {
+        db.insertOrThrow("delivery_route_history", null, ContentValues().apply {
+            put("route", route.value)
+            put("request_id", requestId.value)
+        })
     }
 
     /** 경로까지 시작한 활성 의뢰. 활성 의뢰가 없거나 경로를 아직 시작하지 않았으면 null이다. */
@@ -233,24 +268,34 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
     }
 
     /**
-     * 활성 의뢰의 도착을 정산한다. [DeliverySettlement]의 결과와 지급·환급, 활성 의뢰 종료, 완료한 자리 교체, 임시 보관 기록을 한 트랜잭션으로 확정한다.
-     * 빈 칸 수는 같은 트랜잭션 안에서 가게 용량과 보유 차량으로 계산한다.
+     * [requestId] 의뢰의 도착을 정산한다. [DeliverySettlement]의 결과와 지급·환급, 활성 의뢰 종료, 완료한 자리 교체, 임시 보관 기록,
+     * 이 명령과 당시 전체 결과를 한 트랜잭션으로 확정한다. 빈 칸 수는 같은 트랜잭션 안에서 가게 용량과 보유 차량으로 계산한다.
+     *
+     * - 이미 확정한 요청은 현재 활성 의뢰보다 먼저 확인한다. 같은 명령(규칙·증거·현재 시각)이면 당시 결과와 정산을 그대로 돌려주고,
+     *   다른 명령이면 STATE_CONFLICT다. 당시 결과만 다시 읽으려면 [arrivalResult]를 쓴다.
+     * - 저장된 결과는 원래 명령과 당시 경로·빈 칸 수로 다시 계산해 대조한다. 다르면 STORAGE_FAILURE이고 원본을 바꾸지 않는다.
      *
      * @param nextList 완료한 자리를 채운 목록을 만드는 함수. 보통 `DeliveryProposal.replaceCompleted`에 콘텐츠·가게 레벨·난수를 묶어 넘긴다.
-     * @return 확인 대기면 아무것도 바꾸지 않는다. 활성 의뢰나 경로가 없으면 DATA_UNAVAILABLE이다.
+     * @return 확인 대기면 아무것도 바꾸지 않는다. 활성 의뢰나 경로가 없으면 DATA_UNAVAILABLE, 다른 의뢰가 활성이면 STATE_CONFLICT다.
      */
     fun settleArrival(
-        settlement: DeliverySettlement,
+        rules: DeliverySettlementRules,
+        requestId: RequestId,
         evidence: Observation<DeliveryArrivalEvidence>,
         now: EpochMillis,
         nextList: (DeliveryList, DeliveryOfferId) -> ContractResult<DeliveryList>,
     ): ContractResult<ArrivalCommit> = store.atomic { db ->
+        val command = DeliveryJson.arrivalCommand(requestId, rules, evidence, now).toString()
+        readOutcome(db, requestId)?.let { stored ->
+            if (stored !is StoredArrival || stored.command != command) return@atomic failure(ContractError.STATE_CONFLICT)
+            return@atomic ContractResult.Success(stored.commit)
+        }
         val active = readActive(db) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
+        if (active.requestId != requestId) return@atomic failure(ContractError.STATE_CONFLICT)
         val route = readRoute(db, active.requestId) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
-        if (hasSettlement(db, RequestId("delivery/${active.requestId.value}/settle")))
-            return@atomic failure(ContractError.STATE_CONFLICT)
         val progress = DeliveryInProgress(active, route.first, route.second)
-        val outcome = when (val result = settlement.resolve(progress, evidence, now, freeSlots(db))) {
+        val slots = freeSlots(db)
+        val outcome = when (val result = DeliverySettlement(rules).resolve(progress, evidence, now, slots)) {
             is ContractResult.Failure -> return@atomic result
             is ContractResult.Success -> result.value
         }
@@ -261,6 +306,8 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
             is DeliveryOutcome.PurchaseRefunded -> outcome.change
             is DeliveryOutcome.VehicleHeld, DeliveryOutcome.IncomeExpired -> null
         }
+        // 이 의뢰의 정산 ID를 다른 기록이 먼저 썼으면 그 정산을 이 도착의 결과로 재사용하지 않는다.
+        if (hasSettlement(db, settleIdOf(requestId))) return@atomic failure(ContractError.STATE_CONFLICT)
         val recorded = change?.let {
             when (val result = store.record(db, it, LedgerJson.command(it).toString(), SqliteGameChangeStore.RequestDomain.DELIVERY)) {
                 is ContractResult.Failure -> return@atomic result
@@ -280,8 +327,8 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         db.delete("delivery_routes", "request_id = ?", arrayOf(active.requestId.value))
         db.insertOrThrow("delivery_outcomes", null, ContentValues().apply {
             put("request_id", active.requestId.value)
-            put("kind", outcome::class.simpleName)
-            put("settle_request", recorded?.transaction?.requestId?.value)
+            put("command", command)
+            put("result", DeliveryJson.arrivalResult(progress.route, progress.startedAt, slots, outcome).toString())
         })
         ContractResult.Success(ArrivalCommit(outcome, recorded))
     }
@@ -290,7 +337,10 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
      * 진행 중 의뢰의 목적지를 바꾼다. 기존 변경 확인 → 활성 의뢰·잔액·후보 검사 → 확정 순서로 처리한다.
      * 차액 결제·환급, 바뀐 의뢰와 보류 대금, 새 경로 세대를 한 트랜잭션으로 확정한다. 미도착 기한의 시작 시각은 처음 값을 유지한다.
      *
+     * - 입력은 처음에 한 번만 읽어 고정한다. 명령 기록·검증·결제·저장이 모두 같은 값을 쓴다.
      * - 같은 의뢰·같은 변경 명령은 당시 결과를 돌려준다. 다른 변경 명령은 STATE_CONFLICT다(변경은 1회).
+     * - 새 경로 ID가 이미 쓴 경로면 STATE_CONFLICT다. 목적지를 다시 고를 때마다 새 경로 ID를 발급해야 한다.
+     * - 저장된 변경은 원래 명령과 처음 선택으로 다시 계산해 대조한다. 다르면 STORAGE_FAILURE이고 원본을 바꾸지 않는다.
      * - 활성 의뢰나 경로가 없으면 DATA_UNAVAILABLE이다. 실패하면 아무것도 바꾸지 않는다.
      */
     fun changeDestination(
@@ -299,18 +349,20 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         offerId: DeliveryOfferId,
         route: RouteId,
     ): ContractResult<ChangeCommit> = store.atomic { db ->
-        val command = DeliveryJson.changeCommand(rules, offer, offerId, route).toString()
-        val changeId = RequestId("delivery/${offer.requestId.value}/change")
-        readChange(db, offer.requestId)?.let { stored ->
+        val input = DeliveryJson.changeInput(DeliveryJson.changeCommand(rules, offer, offerId, route))
+        val command = DeliveryJson.changeCommand(input.rules, input.offer, input.offerId, input.route).toString()
+        val requestId = input.offer.requestId
+        readChange(db, requestId)?.let { stored ->
             if (stored.command != command) return@atomic failure(ContractError.STATE_CONFLICT)
-            return@atomic ContractResult.Success(ChangeCommit(stored.terms, if (stored.charged) readSettlement(db, changeId) else null))
+            return@atomic ContractResult.Success(stored.commit)
         }
         val terms = readTerms(db) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
-        if (terms.active.requestId != offer.requestId) return@atomic failure(ContractError.STATE_CONFLICT)
-        if (offer.proposed.list.source != store.source) return@atomic failure(ContractError.INVALID_INPUT)
-        val started = readRoute(db, offer.requestId)?.second ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
-        if (hasSettlement(db, changeId)) return@atomic failure(ContractError.STATE_CONFLICT)
-        val changed = when (val result = DeliveryChange(rules).change(terms, offer, offerId, store.readBalance(db))) {
+        if (terms.active.requestId != requestId) return@atomic failure(ContractError.STATE_CONFLICT)
+        if (input.offer.proposed.list.source != store.source) return@atomic failure(ContractError.INVALID_INPUT)
+        val started = readRoute(db, requestId)?.second ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
+        if (routeUsed(db, input.route)) return@atomic failure(ContractError.STATE_CONFLICT)
+        if (hasSettlement(db, changeIdOf(requestId))) return@atomic failure(ContractError.STATE_CONFLICT)
+        val changed = when (val result = DeliveryChange(input.rules).change(terms, input.offer, input.offerId, store.readBalance(db))) {
             is ContractResult.Failure -> return@atomic result
             is ContractResult.Success -> result.value
         }
@@ -321,35 +373,36 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
             }
         }
         db.insertOrThrow("delivery_changes", null, ContentValues().apply {
-            put("request_id", offer.requestId.value)
+            put("request_id", requestId.value)
             put("command", command)
             put("active", DeliveryJson.active(changed.terms.active).toString())
             put("paid", changed.terms.paid.units)
             put("charged", if (recorded != null) 1 else 0)
         })
+        useRoute(db, requestId, input.route)
         db.update("delivery_routes", ContentValues().apply {
-            put("route", route.value)
+            put("route", input.route.value)
             put("started_at", started.value)
-        }, "request_id = ?", arrayOf(offer.requestId.value))
+        }, "request_id = ?", arrayOf(requestId.value))
         ContractResult.Success(ChangeCommit(changed.terms, recorded))
     }
 
     /**
-     * 진행 중 의뢰를 포기한다. 환급, 활성 의뢰 종료, 결과 기록을 한 트랜잭션으로 확정하고 하루 목록은 바꾸지 않는다.
-     * 같은 의뢰의 포기 재전송은 당시 결과를 돌려준다. 이미 도착 정산 등으로 끝난 의뢰는 STATE_CONFLICT다.
+     * 진행 중 의뢰를 포기한다. 환급, 활성 의뢰 종료, 이 명령과 결과를 한 트랜잭션으로 확정하고 하루 목록은 바꾸지 않는다.
+     *
+     * - 이미 끝난 요청은 현재 활성 의뢰보다 먼저 확인한다. 같은 포기 명령(규칙 버전·수수료율)이면 당시 결과를 돌려주고,
+     *   다른 규칙의 포기나 도착 정산으로 끝난 의뢰는 STATE_CONFLICT다. 수익 포기도 같은 기준으로 비교한다.
+     * - 저장된 포기 결과는 원래 명령과 당시 결제 상태로 다시 계산해 대조한다. 다르면 STORAGE_FAILURE다.
      */
     fun abandon(rules: DeliveryChangeRules, requestId: RequestId): ContractResult<AbandonCommit> = store.atomic { db ->
-        val settleId = RequestId("delivery/${requestId.value}/settle")
-        db.rawQuery("SELECT kind FROM delivery_outcomes WHERE request_id = ?", arrayOf(requestId.value)).use {
-            if (it.moveToFirst()) {
-                if (it.getString(0) != ABANDONED) return@atomic failure(ContractError.STATE_CONFLICT)
-                val settlement = if (hasSettlement(db, settleId)) readSettlement(db, settleId) else null
-                return@atomic ContractResult.Success(AbandonCommit(requestId, settlement))
-            }
+        val command = DeliveryJson.abandonCommand(requestId, rules).toString()
+        readOutcome(db, requestId)?.let { stored ->
+            if (stored !is StoredAbandon || stored.command != command) return@atomic failure(ContractError.STATE_CONFLICT)
+            return@atomic ContractResult.Success(stored.commit)
         }
-        if (hasSettlement(db, settleId)) return@atomic failure(ContractError.STATE_CONFLICT)
         val terms = readTerms(db) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
         if (terms.active.requestId != requestId) return@atomic failure(ContractError.STATE_CONFLICT)
+        if (hasSettlement(db, settleIdOf(requestId))) return@atomic failure(ContractError.STATE_CONFLICT)
         val abandoned = when (val result = DeliveryChange(rules).abandon(terms)) {
             is ContractResult.Failure -> return@atomic result
             is ContractResult.Success -> result.value
@@ -364,36 +417,45 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         db.delete("delivery_routes", "request_id = ?", arrayOf(requestId.value))
         db.insertOrThrow("delivery_outcomes", null, ContentValues().apply {
             put("request_id", requestId.value)
-            put("kind", ABANDONED)
-            put("settle_request", recorded?.transaction?.requestId?.value)
+            put("command", command)
+            put("result", DeliveryJson.abandonResult(abandoned.change).toString())
         })
         ContractResult.Success(AbandonCommit(requestId, recorded))
     }
 
+    /** 확정한 도착 결과. 확정 전이거나 확인 대기만 있었으면 null이다. 저장값이 원래 명령과 맞지 않으면 STORAGE_FAILURE다. */
+    fun arrivalResult(requestId: RequestId): ContractResult<ArrivalCommit?> = store.atomic { db ->
+        ContractResult.Success((readOutcome(db, requestId) as? StoredArrival)?.commit)
+    }
+
+    /** 확정한 보관 처리 결과. 수령·환급 전이면 null이다. 저장값이 원래 명령과 맞지 않으면 STORAGE_FAILURE다. */
+    fun holdResult(requestId: RequestId): ContractResult<HoldCommit?> = store.atomic { db ->
+        ContractResult.Success(readHoldOutcome(db, requestId)?.commit)
+    }
+
     /** 임시 보관 중인 차량. */
     fun held(): ContractResult<List<HeldVehicle>> = store.atomic { db ->
-        db.rawQuery("SELECT request_id, payload FROM delivery_held ORDER BY request_id", null).use {
-            val list = ArrayList<HeldVehicle>()
-            while (it.moveToNext()) {
-                val held = DeliveryJson.held(JSONObject(it.getString(1)))
-                if (held.requestId.value != it.getString(0)) throw JSONException("보관 요청 ID 불일치")
-                list += held
-            }
-            ContractResult.Success(list)
+        val ids = db.rawQuery("SELECT request_id FROM delivery_held ORDER BY request_id", null).use {
+            buildList { while (it.moveToNext()) add(RequestId(it.text(0))) }
         }
+        ContractResult.Success(ids.map { readHeld(db, it) ?: throw JSONException("보관 기록 누락") })
     }
 
     /**
-     * 임시 보관 차량을 처리한다. 수령·환급은 지급 또는 환급과 보관 기록 정리를 한 트랜잭션으로 확정한다.
-     * 보관 기록이 없으면 DATA_UNAVAILABLE이다.
+     * 임시 보관 차량을 처리한다. 수령·환급은 지급 또는 환급, 보관 기록 정리, 이 명령과 당시 결과를 한 트랜잭션으로 확정한다.
+     *
+     * - 이미 수령·환급한 요청은 보관 기록보다 먼저 확인한다. 같은 명령(규칙·현재 시각)이면 당시 결과를 돌려주고 다른 명령이면 STATE_CONFLICT다.
+     * - 보관 기록이 없으면 DATA_UNAVAILABLE이다.
      */
-    fun resolveHold(settlement: DeliverySettlement, requestId: RequestId, now: EpochMillis): ContractResult<HoldCommit> =
+    fun resolveHold(rules: DeliverySettlementRules, requestId: RequestId, now: EpochMillis): ContractResult<HoldCommit> =
         store.atomic { db ->
-            val held = db.rawQuery("SELECT payload FROM delivery_held WHERE request_id = ?", arrayOf(requestId.value)).use {
-                if (it.moveToFirst()) DeliveryJson.held(JSONObject(it.getString(0))) else null
-            } ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
-            if (held.requestId != requestId || held.source != store.source) throw JSONException("보관 기록 불일치")
-            val outcome = when (val result = settlement.resolveHold(held, now, freeSlots(db))) {
+            val command = DeliveryJson.holdCommand(requestId, rules, now).toString()
+            readHoldOutcome(db, requestId)?.let { stored ->
+                if (stored.command != command) return@atomic failure(ContractError.STATE_CONFLICT)
+                return@atomic ContractResult.Success(stored.commit)
+            }
+            val held = readHeld(db, requestId) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
+            val outcome = when (val result = DeliverySettlement(rules).resolveHold(held, now, freeSlots(db))) {
                 is ContractResult.Failure -> return@atomic result
                 is ContractResult.Success -> result.value
             }
@@ -402,13 +464,145 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
                 is HoldOutcome.Claimed -> outcome.change
                 is HoldOutcome.Refunded -> outcome.change
             }
+            if (hasSettlement(db, change.requestId)) return@atomic failure(ContractError.STATE_CONFLICT)
             val recorded = when (val result = store.record(db, change, LedgerJson.command(change).toString(), SqliteGameChangeStore.RequestDomain.DELIVERY)) {
                 is ContractResult.Failure -> return@atomic result
                 is ContractResult.Success -> result.value
             }
             db.delete("delivery_held", "request_id = ?", arrayOf(requestId.value))
+            db.insertOrThrow("delivery_hold_outcomes", null, ContentValues().apply {
+                put("request_id", requestId.value)
+                put("command", command)
+                put("result", DeliveryJson.holdResult(held, outcome).toString())
+            })
             ContractResult.Success(HoldCommit(outcome, recorded))
         }
+
+    /** 끝난 의뢰의 명령과 당시 결과. 도착 정산과 포기가 같은 표를 써서 한 의뢰는 한 번만 끝난다. */
+    private sealed interface StoredOutcome { val command: String }
+
+    private class StoredArrival(override val command: String, val commit: ArrivalCommit) : StoredOutcome
+
+    private class StoredAbandon(override val command: String, val commit: AbandonCommit) : StoredOutcome
+
+    private class StoredHold(val command: String, val commit: HoldCommit)
+
+    private fun settleIdOf(requestId: RequestId) = RequestId("delivery/${requestId.value}/settle")
+
+    private fun changeIdOf(requestId: RequestId) = RequestId("delivery/${requestId.value}/change")
+
+    /** 정산 계산에 쓸 그 의뢰의 당시 활성 상태. 목적지를 바꿨으면 바뀐 의뢰다. 이력이 없으면 손상이다. */
+    private fun activeOf(db: SQLiteDatabase, requestId: RequestId): ActiveDelivery = termsOf(db, requestId).active
+
+    /**
+     * 확정한 도착 결과를 읽는다. 원래 명령과 당시 경로·시작 시각·빈 칸 수로 다시 계산한 결과가 저장값과 같아야 하고,
+     * 지급·환급 정산은 그 결과의 거래와 맞아야 한다. 돈·차량이 바뀌지 않은 결과에 정산이 있으면 손상이다.
+     */
+    private fun readOutcome(db: SQLiteDatabase, requestId: RequestId): StoredOutcome? = db.rawQuery(
+        "SELECT command, result FROM delivery_outcomes WHERE request_id = ?", arrayOf(requestId.value),
+    ).use {
+        if (!it.moveToFirst()) return@use null
+        val command = it.text(0)
+        val stored = JSONObject(it.text(1))
+        when (stored.getString("type")) {
+            "ARRIVAL" -> readArrival(db, requestId, command, stored)
+            "ABANDON" -> readAbandon(db, requestId, command, stored)
+            else -> throw JSONException("끝난 의뢰 결과 형식 오류")
+        }
+    }
+
+    /** 포기 결과를 원래 명령과 당시 결제 상태(바뀐 대금 포함)로 다시 계산해 대조한다. */
+    private fun readAbandon(db: SQLiteDatabase, requestId: RequestId, command: String, stored: JSONObject): StoredAbandon {
+        val (id, rules) = DeliveryJson.abandonInput(JSONObject(command))
+        if (id != requestId || DeliveryJson.abandonCommand(requestId, rules).toString() != command) throw JSONException("포기 명령 형식 오류")
+        val expected = when (val result = DeliveryChange(rules).abandon(termsOf(db, requestId))) {
+            is ContractResult.Failure -> throw JSONException("저장된 포기 재계산 실패: ${result.error}")
+            is ContractResult.Success -> result.value
+        }
+        if (DeliveryJson.abandonResult(expected.change).toString() != stored.toString()) throw JSONException("포기 결과가 원래 명령과 다름")
+        return StoredAbandon(command, AbandonCommit(requestId, settlementOf(db, settleIdOf(requestId), expected.change)))
+    }
+
+    private fun readArrival(db: SQLiteDatabase, requestId: RequestId, command: String, stored: JSONObject): StoredArrival {
+        val input = DeliveryJson.arrivalInput(JSONObject(command))
+        if (input.requestId != requestId ||
+            DeliveryJson.arrivalCommand(requestId, input.rules, input.evidence, input.now).toString() != command
+        ) {
+            throw JSONException("도착 명령 형식 오류")
+        }
+        val route = RouteId(stored.getString("route"))
+        val startedAt = EpochMillis(DeliveryJson.long(stored, "startedAt", Long.MIN_VALUE, Long.MAX_VALUE))
+        val slots = DeliveryJson.long(stored, "slots", 0, Int.MAX_VALUE.toLong()).toInt()
+        val progress = DeliveryInProgress(activeOf(db, requestId), route, startedAt)
+        val outcome = when (val result = DeliverySettlement(input.rules).resolve(progress, input.evidence, input.now, slots)) {
+            is ContractResult.Failure -> throw JSONException("저장된 도착 재계산 실패: ${result.error}")
+            is ContractResult.Success -> result.value
+        }
+        if (outcome is DeliveryOutcome.AwaitingEvidence ||
+            DeliveryJson.arrivalResult(route, startedAt, slots, outcome).toString() != stored.toString()
+        ) {
+            throw JSONException("도착 결과가 원래 명령과 다름")
+        }
+        return StoredArrival(command, ArrivalCommit(outcome, settlementOf(db, settleIdOf(requestId), outcome.changeOrNull())))
+    }
+
+    /** 확정한 보관 처리 결과를 읽는다. 보관 차량은 도착 결과의 보관 차량과 같고, 결과는 원래 명령으로 다시 계산한 값과 같아야 한다. */
+    private fun readHoldOutcome(db: SQLiteDatabase, requestId: RequestId): StoredHold? = db.rawQuery(
+        "SELECT command, result FROM delivery_hold_outcomes WHERE request_id = ?", arrayOf(requestId.value),
+    ).use {
+        if (!it.moveToFirst()) return@use null
+        val command = it.text(0)
+        val stored = JSONObject(it.text(1))
+        val input = DeliveryJson.holdInput(JSONObject(command))
+        if (input.requestId != requestId || DeliveryJson.holdCommand(requestId, input.rules, input.now).toString() != command) {
+            throw JSONException("보관 명령 형식 오류")
+        }
+        val held = heldOf(db, requestId)
+        // 기한 전이면 칸이 있어야 수령으로 확정되므로 빈 칸 1로 다시 계산한다. 기한이 지났으면 칸 수와 무관하게 환급이다.
+        val outcome = when (val result = DeliverySettlement(input.rules).resolveHold(held, input.now, 1)) {
+            is ContractResult.Failure -> throw JSONException("저장된 보관 재계산 실패: ${result.error}")
+            is ContractResult.Success -> result.value
+        }
+        val change = when (outcome) {
+            is HoldOutcome.StillHeld -> throw JSONException("보관 결과 형식 오류")
+            is HoldOutcome.Claimed -> outcome.change
+            is HoldOutcome.Refunded -> outcome.change
+        }
+        if (DeliveryJson.holdResult(held, outcome).toString() != stored.toString()) throw JSONException("보관 결과가 원래 명령과 다름")
+        StoredHold(command, HoldCommit(outcome, readRecordedSettlement(db, change) ?: throw JSONException("보관 정산 누락")))
+    }
+
+    /** 도착 결과에 기록된 보관 차량. 보관으로 끝난 도착이 없으면 손상이다. */
+    private fun heldOf(db: SQLiteDatabase, requestId: RequestId): HeldVehicle =
+        ((readOutcome(db, requestId) as? StoredArrival ?: throw JSONException("보관 도착 결과 누락")).commit.outcome as? DeliveryOutcome.VehicleHeld)
+            ?.held ?: throw JSONException("보관으로 끝난 도착이 아님")
+
+    /** 보관 중인 차량. 보관 행은 그 의뢰의 도착 결과에 기록된 보관 차량과 같아야 한다. */
+    private fun readHeld(db: SQLiteDatabase, requestId: RequestId): HeldVehicle? =
+        db.rawQuery("SELECT payload FROM delivery_held WHERE request_id = ?", arrayOf(requestId.value)).use {
+            if (!it.moveToFirst()) return@use null
+            val payload = it.text(0)
+            val held = heldOf(db, requestId)
+            if (held.source != store.source || DeliveryJson.held(held).toString() != payload) throw JSONException("보관 기록 불일치")
+            held
+        }
+
+    /** 결과의 거래로 확정된 정산. 거래가 없는 결과에 같은 정산 ID의 기록이 있으면 손상이다. */
+    private fun settlementOf(db: SQLiteDatabase, settleId: RequestId, change: GameChange?): Settlement? {
+        if (change == null) {
+            if (hasSettlement(db, settleId)) throw JSONException("돈·차량이 바뀌지 않은 결과에 정산이 있음")
+            return null
+        }
+        if (change.requestId != settleId) throw JSONException("정산 ID 불일치")
+        return readRecordedSettlement(db, change) ?: throw JSONException("도착 정산 누락")
+    }
+
+    private fun DeliveryOutcome.changeOrNull(): GameChange? = when (this) {
+        is DeliveryOutcome.IncomeCompleted -> change
+        is DeliveryOutcome.VehicleDelivered -> change
+        is DeliveryOutcome.PurchaseRefunded -> change
+        is DeliveryOutcome.AwaitingEvidence, is DeliveryOutcome.VehicleHeld, DeliveryOutcome.IncomeExpired -> null
+    }
 
     /** 완료한 의뢰가 아직 저장된 목록에 있으면 그 자리만 바꾼다. 날짜가 지나 목록이 없거나 이미 바뀌었으면 건너뛴다. */
     private fun replaceCompletedSlot(
@@ -430,11 +624,11 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
     private fun freeSlots(db: SQLiteDatabase): Int {
         val capacity = db.rawQuery("SELECT capacity FROM shop WHERE id = 1", null).use {
             if (!it.moveToFirst()) throw JSONException("가게 용량 누락")
-            it.getInt(0)
+            it.integer(0, 0, Int.MAX_VALUE.toLong()).toInt()
         }
         val owned = db.rawQuery("SELECT payload FROM vehicles", null).use {
             var count = 0
-            while (it.moveToNext()) if (LedgerJson.vehicle(JSONObject(it.getString(0))).lifecycle == VehicleLifecycle.OWNED) count++
+            while (it.moveToNext()) if (LedgerJson.vehicle(JSONObject(it.text(0))).lifecycle == VehicleLifecycle.OWNED) count++
             count
         }
         return (capacity - owned).coerceAtLeast(0)
@@ -442,7 +636,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
 
     private fun readRoute(db: SQLiteDatabase, requestId: RequestId): Pair<RouteId, EpochMillis>? = db.rawQuery(
         "SELECT route, started_at FROM delivery_routes WHERE request_id = ?", arrayOf(requestId.value),
-    ).use { if (it.moveToFirst()) RouteId(it.getString(0)) to EpochMillis(it.getLong(1)) else null }
+    ).use { if (it.moveToFirst()) RouteId(it.text(0)) to EpochMillis(it.integer(1)) else null }
 
     /** 활성 의뢰를 끝낸다. #38 포기·#39 완료와 같은 트랜잭션에서 호출하는 연결점이며 선택 이력은 남긴다. */
     internal fun finishActive(db: SQLiteDatabase, requestId: RequestId): ContractResult<Unit> {
@@ -450,17 +644,15 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         return if (removed == 1) ContractResult.Success(Unit) else failure(ContractError.STATE_CONFLICT)
     }
 
-    private class StoredRequest(val command: String, val active: ActiveDelivery, val paid: Boolean)
+    /** 원래 명령에서 다시 계산해 저장값과 대조를 마친 선택 이력. */
+    private class StoredRequest(val command: String, val selected: DeliverySelected) {
+        val active: ActiveDelivery get() = selected.active
+    }
 
-    private fun replay(db: SQLiteDatabase, previous: StoredRequest, offerId: DeliveryOfferId): ContractResult<DeliveryCommit> {
-        val active = previous.active
-        val selected = when (val result = DeliverySelection.select(active.proposed, offerId, active.requestId, GameMoney(0), active)) {
-            is ContractResult.Failure -> throw JSONException("저장된 선택 재생 실패: ${result.error}")
-            is ContractResult.Success -> result.value
-        }
-        val settlement = if (previous.paid) readSettlement(db, active.requestId) else null
-        if (previous.paid != (selected.payment != null)) throw JSONException("결제 기록 불일치")
-        return ContractResult.Success(DeliveryCommit(selected, settlement))
+    /** 대조를 마친 선택 이력과 공용 결제 정산을 돌려준다. 정산이 원래 결제와 맞지 않으면 손상이다. */
+    private fun replay(db: SQLiteDatabase, previous: StoredRequest): ContractResult<DeliveryCommit> {
+        val settlement = previous.selected.payment?.let { readRecordedSettlement(db, it) ?: throw JSONException("구매 결제 정산 누락") }
+        return ContractResult.Success(DeliveryCommit(previous.selected, settlement))
     }
 
     private fun listValues(list: DeliveryList) = ContentValues().apply {
@@ -484,7 +676,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
     private fun readList(db: SQLiteDatabase, keyOf: DeliveryList): DeliveryList? =
         db.rawQuery("SELECT payload FROM delivery_lists WHERE $KEY", key(keyOf)).use {
             if (!it.moveToFirst()) return@use null
-            DeliveryJson.list(JSONObject(it.getString(0))).also { stored ->
+            DeliveryJson.list(JSONObject(it.text(0))).also { stored ->
                 if (stored.createdOn != keyOf.createdOn || stored.band != keyOf.band || stored.source != keyOf.source ||
                     stored.contentVersion != keyOf.contentVersion || stored.ruleVersion != keyOf.ruleVersion
                 ) {
@@ -500,9 +692,9 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
     ).use {
         val lists = ArrayList<DeliveryList>()
         while (it.moveToNext()) {
-            val list = DeliveryJson.list(JSONObject(it.getString(3)))
-            if (list.createdOn != day || list.source != store.source || list.band != it.getInt(0) ||
-                list.contentVersion.value != it.getString(1) || list.ruleVersion.value != it.getString(2)
+            val list = DeliveryJson.list(JSONObject(it.text(3)))
+            if (list.createdOn != day || list.source != store.source || list.band.toLong() != it.integer(0) ||
+                list.contentVersion.value != it.text(1) || list.ruleVersion.value != it.text(2)
             ) {
                 throw JSONException("목록 키 불일치")
             }
@@ -515,9 +707,22 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         "SELECT command, active, paid FROM delivery_requests WHERE request_id = ?", arrayOf(requestId.value),
     ).use {
         if (!it.moveToFirst()) return@use null
-        val active = DeliveryJson.active(JSONObject(it.getString(1)))
-        if (active.requestId != requestId) throw JSONException("선택 이력 요청 ID 불일치")
-        StoredRequest(it.getString(0), active, it.getInt(2) == 1)
+        val command = it.text(0)
+        val activeJson = it.text(1)
+        val paid = it.flag(2)
+        val stored = JSONObject(command)
+        if (stored.getString("request") != requestId.value) throw JSONException("선택 이력 요청 ID 불일치")
+        val proposed = DeliveryJson.proposed(stored.getJSONObject("proposed"))
+        val offerId = DeliveryOfferId(stored.getString("offer"))
+        if (DeliveryJson.command(requestId, offerId, proposed).toString() != command) throw JSONException("선택 명령 형식 오류")
+        // 저장된 활성 의뢰·결제 여부는 파싱만 믿지 않고 원래 명령에서 다시 계산한 값과 같아야 한다.
+        val selected = when (val result = DeliverySelection.select(proposed, offerId, requestId, GameMoney(Long.MAX_VALUE), null)) {
+            is ContractResult.Failure -> throw JSONException("저장된 선택 재생 실패: ${result.error}")
+            is ContractResult.Success -> result.value
+        }
+        if (activeJson != DeliveryJson.active(selected.active).toString()) throw JSONException("활성 의뢰가 원래 명령과 다름")
+        if (paid != (selected.payment != null)) throw JSONException("결제 기록 불일치")
+        StoredRequest(command, selected)
     }
 
     /** 현재 활성 의뢰. 목적지를 바꿨으면 바뀐 의뢰다. */
@@ -526,33 +731,100 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
     /** 현재 활성 의뢰의 보류 대금과 변경 사용 여부. 바꾼 적이 없으면 처음 선택한 의뢰와 결제액이다. */
     private fun readTerms(db: SQLiteDatabase): DeliveryTerms? {
         val requestId = db.rawQuery("SELECT request_id FROM delivery_active WHERE id = 1", null).use {
-            if (it.moveToFirst()) RequestId(it.getString(0)) else null
+            if (it.moveToFirst()) RequestId(it.text(0)) else null
         } ?: return null
-        readChange(db, requestId)?.let { return it.terms }
-        val selected = (readRequest(db, requestId) ?: throw JSONException("활성 의뢰의 선택 이력 누락")).active
-        return DeliveryTerms(selected, (selected.offer as? DeliveryOffer.Purchase)?.price ?: GameMoney(0), changeUsed = false)
+        return termsOf(db, requestId)
     }
 
-    private class StoredChange(val command: String, val terms: DeliveryTerms, val charged: Boolean)
+    /** 그 의뢰의 결제·변경 상태. 활성 여부와 무관하게 끝난 의뢰도 읽는다. */
+    private fun termsOf(db: SQLiteDatabase, requestId: RequestId): DeliveryTerms =
+        readChange(db, requestId)?.commit?.terms ?: originalTerms(db, requestId)
 
+    private fun originalTerms(db: SQLiteDatabase, requestId: RequestId): DeliveryTerms {
+        val selected = (readRequest(db, requestId) ?: throw JSONException("선택 이력 누락")).selected
+        return DeliveryTerms.of(selected)
+    }
+
+    private class StoredChange(val command: String, val commit: ChangeCommit)
+
+    /**
+     * 저장된 목적지 변경을 읽는다. 변경은 1회라 변경 전 상태는 항상 처음 선택이다. 원래 명령과 처음 선택으로 다시 계산한 의뢰·보류 대금·차액이
+     * 저장된 칸과 같아야 하고, 차액이 있으면 원래 차액 거래와 맞는 정산이, 없으면 정산이 없어야 한다. 칸 형식이 다르면 손상이다.
+     */
     private fun readChange(db: SQLiteDatabase, requestId: RequestId): StoredChange? = db.rawQuery(
         "SELECT command, active, paid, charged FROM delivery_changes WHERE request_id = ?", arrayOf(requestId.value),
     ).use {
         if (!it.moveToFirst()) return@use null
-        val active = DeliveryJson.active(JSONObject(it.getString(1)))
-        if (active.requestId != requestId) throw JSONException("변경 기록 요청 ID 불일치")
-        StoredChange(it.getString(0), DeliveryTerms(active, GameMoney(it.getLong(2)), changeUsed = true), it.getInt(3) == 1)
+        val command = it.text(0)
+        val activeJson = it.text(1)
+        val paid = GameMoney(it.integer(2, 0, Long.MAX_VALUE))
+        val charged = it.flag(3)
+        val input = DeliveryJson.changeInput(JSONObject(command))
+        if (input.offer.requestId != requestId ||
+            DeliveryJson.changeCommand(input.rules, input.offer, input.offerId, input.route).toString() != command
+        ) {
+            throw JSONException("변경 명령 형식 오류")
+        }
+        val changed = when (val result = DeliveryChange(input.rules).change(originalTerms(db, requestId), input.offer, input.offerId, GameMoney(Long.MAX_VALUE))) {
+            is ContractResult.Failure -> throw JSONException("저장된 변경 재계산 실패: ${result.error}")
+            is ContractResult.Success -> result.value
+        }
+        if (activeJson != DeliveryJson.active(changed.terms.active).toString() || paid != changed.terms.paid ||
+            charged != (changed.change != null)
+        ) {
+            throw JSONException("변경 기록이 원래 명령과 다름")
+        }
+        val settlement = when (val change = changed.change) {
+            null -> if (hasSettlement(db, changeIdOf(requestId))) throw JSONException("차액 없는 변경에 정산이 있음") else null
+            else -> readRecordedSettlement(db, change) ?: throw JSONException("차액 정산 누락")
+        }
+        StoredChange(command, ChangeCommit(changed.terms, settlement))
     }
 
     private fun hasSettlement(db: SQLiteDatabase, requestId: RequestId): Boolean =
         db.rawQuery("SELECT 1 FROM settlements WHERE request_id = ?", arrayOf(requestId.value)).use { it.moveToFirst() }
-
-    private fun readSettlement(db: SQLiteDatabase, requestId: RequestId): Settlement =
-        db.rawQuery("SELECT result FROM settlements WHERE request_id = ?", arrayOf(requestId.value)).use {
-            if (!it.moveToFirst()) throw JSONException("구매 결제 정산 누락")
-            LedgerJson.settlement(JSONObject(it.getString(0)))
-        }
 }
+
+/**
+ * [change]로 확정된 공용 정산을 읽는다. 없으면 null이다.
+ * 정산 행의 명령이 [change]와 같고, 결과의 정산 ID·요청 ID·종류·출처·규칙 버전·금액·방향·차량이 [change]와 맞아야 한다.
+ * 하나라도 다르면 파싱에 성공해도 손상으로 본다.
+ */
+internal fun readRecordedSettlement(db: SQLiteDatabase, change: GameChange): Settlement? =
+    db.rawQuery("SELECT settlement_id, command, result FROM settlements WHERE request_id = ?", arrayOf(change.requestId.value)).use {
+        if (!it.moveToFirst()) return@use null
+        if (it.text(1) != LedgerJson.command(change).toString(), SqliteGameChangeStore.RequestDomain.DELIVERY) throw JSONException("정산 명령이 원래 거래와 다름")
+        val settlement = LedgerJson.settlement(JSONObject(it.text(2)))
+        val t = settlement.transaction
+        if (settlement.settlementId.value != it.text(0) || t.requestId != change.requestId || t.kind != change.kind ||
+            t.source != change.source || t.ruleVersion != change.ruleVersion || t.money != change.money
+        ) {
+            throw JSONException("정산 결과가 원래 거래와 다름")
+        }
+        val sameVehicle = when (val write = change.vehicle) {
+            null -> settlement.changedVehicle == null
+            // 새로 지급한 차량은 희귀도·취득액·출처까지 원래 거래와 같아야 한다.
+            is VehicleWrite.Add -> settlement.changedVehicle == write.vehicle
+            is VehicleWrite.Update -> settlement.changedVehicle?.ownedVehicleId == write.ownedVehicleId
+        }
+        if (!sameVehicle) throw JSONException("정산 차량이 원래 거래와 다름")
+        settlement
+    }
+
+/** TEXT 칸만 받는다. NULL·정수·실수·BLOB은 손상으로 본다. */
+internal fun Cursor.text(index: Int): String {
+    if (getType(index) != Cursor.FIELD_TYPE_STRING) throw JSONException("문자열 칸 형식 오류")
+    return getString(index)
+}
+
+/** INTEGER 칸만 받는다. TEXT·실수·NULL을 0이나 절삭 정수로 바꾸지 않는다. */
+internal fun Cursor.integer(index: Int, min: Long = Long.MIN_VALUE, max: Long = Long.MAX_VALUE): Long {
+    if (getType(index) != Cursor.FIELD_TYPE_INTEGER) throw JSONException("정수 칸 형식 오류")
+    return getLong(index).also { if (it !in min..max) throw JSONException("정수 칸 범위 오류") }
+}
+
+/** INTEGER 0 또는 1만 받는다. */
+internal fun Cursor.flag(index: Int): Boolean = integer(index, 0, 1) == 1L
 
 /** 필드 순서가 고정된 탁송 표현. 정수는 형식과 범위를 검사하고 자동 변환하지 않는다. */
 internal object DeliveryJson {
@@ -582,7 +854,7 @@ internal object DeliveryJson {
     fun list(j: JSONObject) = DeliveryList(
         long(j, "band", 0, Int.MAX_VALUE.toLong()).toInt(),
         InputSource.valueOf(j.getString("source")),
-        LocalDate.parse(j.getString("createdOn")),
+        date(j.getString("createdOn")),
         ContentVersion(j.getString("content")),
         RuleVersion(j.getString("rule")),
         offers(j.getJSONArray("offers")),
@@ -617,6 +889,28 @@ internal object DeliveryJson {
             .put("traveled", offer.traveledMeters).put("combined", offer.combinedMeters).put("route", route.value)
             .put("rule", rules.ruleVersion.value).put("fee", rules.cancelFeePercent).put("proposed", proposed(offer.proposed))
 
+    class ChangeInput(val rules: DeliveryChangeRules, val offer: DeliveryChangeOffer, val offerId: DeliveryOfferId, val route: RouteId)
+
+    fun changeInput(j: JSONObject) = ChangeInput(
+        DeliveryChangeRules(RuleVersion(j.getString("rule")), long(j, "fee", 0, 100).toInt()),
+        DeliveryChangeOffer(
+            RequestId(j.getString("request")), long(j, "traveled", 0, Long.MAX_VALUE), long(j, "combined", 0, Long.MAX_VALUE),
+            proposed(j.getJSONObject("proposed")),
+        ),
+        DeliveryOfferId(j.getString("offer")),
+        RouteId(j.getString("route")),
+    )
+
+    /** 포기 명령. 같은 요청의 재전송은 규칙 버전과 수수료율이 모두 같아야 같은 명령이다. */
+    fun abandonCommand(requestId: RequestId, rules: DeliveryChangeRules): JSONObject =
+        JSONObject().put("request", requestId.value).put("rule", rules.ruleVersion.value).put("fee", rules.cancelFeePercent)
+
+    fun abandonInput(j: JSONObject): Pair<RequestId, DeliveryChangeRules> =
+        RequestId(j.getString("request")) to DeliveryChangeRules(RuleVersion(j.getString("rule")), long(j, "fee", 0, 100).toInt())
+
+    fun abandonResult(change: GameChange?): JSONObject =
+        JSONObject().put("type", "ABANDON").put("change", change?.let(LedgerJson::command) ?: JSONObject.NULL)
+
     fun held(h: HeldVehicle): JSONObject = JSONObject().put("request", h.requestId.value).put("source", h.source.name)
         .put("vehicle", LedgerJson.vehicle(h.vehicle)).put("price", h.price.units)
         .put("heldAt", h.heldAt.value).put("deadline", h.deadline.value)
@@ -630,11 +924,93 @@ internal object DeliveryJson {
         EpochMillis(long(j, "deadline", Long.MIN_VALUE, Long.MAX_VALUE)),
     )
 
+    fun settlementRules(r: DeliverySettlementRules): JSONObject = JSONObject().put("rule", r.ruleVersion.value)
+        .put("arrivalWindow", r.arrivalWindowMs).put("holdWindow", r.holdWindowMs).put("holdFee", r.holdRefundFeePercent)
+
+    fun settlementRules(j: JSONObject) = DeliverySettlementRules(
+        RuleVersion(j.getString("rule")), long(j, "arrivalWindow", 1, Long.MAX_VALUE), long(j, "holdWindow", 1, Long.MAX_VALUE),
+        long(j, "holdFee", 0, 100).toInt(),
+    )
+
+    fun evidence(e: Observation<DeliveryArrivalEvidence>): JSONObject = when (e) {
+        is Observation.Available -> JSONObject().put("type", "AVAILABLE").put("route", e.value.routeId.value)
+            .put("source", e.value.source.name).put("at", e.value.receivedAt.value)
+        is Observation.Missing -> JSONObject().put("type", "MISSING").put("reason", e.reason.name)
+    }
+
+    fun evidence(j: JSONObject): Observation<DeliveryArrivalEvidence> = when (j.getString("type")) {
+        "AVAILABLE" -> Observation.Available(
+            DeliveryArrivalEvidence(
+                RouteId(j.getString("route")), InputSource.valueOf(j.getString("source")),
+                EpochMillis(long(j, "at", Long.MIN_VALUE, Long.MAX_VALUE)),
+            ),
+        )
+        "MISSING" -> Observation.Missing(MissingReason.valueOf(j.getString("reason")))
+        else -> throw JSONException("증거 형식 오류")
+    }
+
+    class ArrivalInput(
+        val requestId: RequestId,
+        val rules: DeliverySettlementRules,
+        val evidence: Observation<DeliveryArrivalEvidence>,
+        val now: EpochMillis,
+    )
+
+    /** 도착 정산 명령. 같은 요청의 재시도는 규칙·증거·현재 시각이 모두 같아야 같은 명령이다. */
+    fun arrivalCommand(requestId: RequestId, rules: DeliverySettlementRules, evidence: Observation<DeliveryArrivalEvidence>, now: EpochMillis) =
+        JSONObject().put("request", requestId.value).put("rules", settlementRules(rules)).put("evidence", evidence(evidence))
+            .put("now", now.value)
+
+    fun arrivalInput(j: JSONObject) = ArrivalInput(
+        RequestId(j.getString("request")), settlementRules(j.getJSONObject("rules")), evidence(j.getJSONObject("evidence")),
+        EpochMillis(long(j, "now", Long.MIN_VALUE, Long.MAX_VALUE)),
+    )
+
+    class HoldInput(val requestId: RequestId, val rules: DeliverySettlementRules, val now: EpochMillis)
+
+    /** 보관 처리 명령. 같은 요청의 재시도는 규칙·현재 시각이 모두 같아야 같은 명령이다. */
+    fun holdCommand(requestId: RequestId, rules: DeliverySettlementRules, now: EpochMillis) =
+        JSONObject().put("request", requestId.value).put("rules", settlementRules(rules)).put("now", now.value)
+
+    fun holdInput(j: JSONObject) = HoldInput(
+        RequestId(j.getString("request")), settlementRules(j.getJSONObject("rules")), EpochMillis(long(j, "now", Long.MIN_VALUE, Long.MAX_VALUE)),
+    )
+
+    fun outcome(o: DeliveryOutcome): JSONObject = when (o) {
+        is DeliveryOutcome.AwaitingEvidence -> throw JSONException("확인 대기는 저장하지 않는다")
+        is DeliveryOutcome.IncomeCompleted -> JSONObject().put("type", "INCOME_COMPLETED").put("change", LedgerJson.command(o.change))
+        is DeliveryOutcome.VehicleDelivered -> JSONObject().put("type", "VEHICLE_DELIVERED").put("change", LedgerJson.command(o.change))
+        is DeliveryOutcome.VehicleHeld -> JSONObject().put("type", "VEHICLE_HELD").put("held", held(o.held))
+        DeliveryOutcome.IncomeExpired -> JSONObject().put("type", "INCOME_EXPIRED")
+        is DeliveryOutcome.PurchaseRefunded -> JSONObject().put("type", "PURCHASE_REFUNDED").put("change", LedgerJson.command(o.change))
+    }
+
+    /** 도착 결과. 다시 계산해 대조할 수 있게 당시 경로·시작 시각·빈 칸 수를 함께 둔다. */
+    fun arrivalResult(route: RouteId, startedAt: EpochMillis, slots: Int, outcome: DeliveryOutcome): JSONObject =
+        JSONObject().put("type", "ARRIVAL").put("route", route.value).put("startedAt", startedAt.value).put("slots", slots)
+            .put("outcome", outcome(outcome))
+
+    fun holdResult(held: HeldVehicle, outcome: HoldOutcome): JSONObject = JSONObject().put("held", held(held)).put(
+        "outcome",
+        when (outcome) {
+            is HoldOutcome.StillHeld -> throw JSONException("계속 보관은 저장하지 않는다")
+            is HoldOutcome.Claimed -> JSONObject().put("type", "CLAIMED").put("change", LedgerJson.command(outcome.change))
+            is HoldOutcome.Refunded -> JSONObject().put("type", "REFUNDED").put("change", LedgerJson.command(outcome.change))
+        },
+    )
+
+    /** 잘못된 날짜는 기본값으로 바꾸지 않고 저장 손상으로 돌려준다. */
+    fun date(raw: String): LocalDate = try {
+        LocalDate.parse(raw)
+    } catch (error: DateTimeParseException) {
+        throw JSONException("날짜 형식 오류: $raw")
+    }
+
     private fun offers(list: List<DeliveryOffer>) = JSONArray().apply { list.forEach { put(offer(it)) } }
 
     private fun offers(array: JSONArray): List<DeliveryOffer> = List(array.length()) { offer(array.getJSONObject(it)) }
 
-    private fun long(j: JSONObject, key: String, min: Long, max: Long): Long {
+    fun long(j: JSONObject, key: String, min: Long, max: Long): Long {
         val value = when (val raw = j.get(key)) {
             is Int -> raw.toLong()
             is Long -> raw

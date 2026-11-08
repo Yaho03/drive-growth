@@ -54,7 +54,7 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
     }
 
     private val deliveryTables = listOf("delivery_lists", "delivery_requests", "delivery_active", "delivery_routes",
-        "delivery_outcomes", "delivery_held", "delivery_changes", "driving_days", "driving_drives")
+        "delivery_outcomes", "delivery_held", "delivery_changes", "driving_days", "driving_drives", "delivery_route_history", "delivery_hold_outcomes")
 
     fun testV4MigrationPreservesExistingMoneyVehiclesDiscoveryAndProgress() {
         val before = ok(store.listUnviewedSettlements())
@@ -278,5 +278,121 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
             assertEquals(7_000, balance())
             assertNotNull(ok(ledger.active()))
         } finally { pool.shutdownNow(); other.close() }
+    }
+
+    /** 처음 순회와 그 뒤 순회 결과가 다른 목록. 입력을 한 번만 읽는지 확인한다. */
+    private class Flipping(private val first: List<DeliveryOffer>, private val later: List<DeliveryOffer>) : AbstractList<DeliveryOffer>() {
+        var reads = 0
+        override val size get() = if (reads == 0) first.size else later.size
+        override fun get(index: Int) = (if (reads == 0) first else later)[index]
+        override fun iterator(): Iterator<DeliveryOffer> = (if (reads++ == 0) first else later).iterator()
+    }
+
+    private fun sql(vararg statements: String) = ok(store.atomic { db -> statements.forEach(db::execSQL); ContractResult.Success(Unit) })
+
+    /** 표의 모든 칸을 형식까지 포함해 읽는다. 실패한 호출이 원본을 바꾸지 않았는지 본다. */
+    private fun dump(table: String): String = ok(store.atomic { db ->
+        val columns = db.rawQuery("SELECT * FROM $table LIMIT 0", null).use { it.columnNames.toList() }
+        val quoted = columns.joinToString(" || '|' || ") { "quote($it)" }
+        ContractResult.Success(db.rawQuery("SELECT $quoted FROM $table ORDER BY rowid", null).use {
+            buildList { while (it.moveToNext()) add(it.getString(0)) }.joinToString("\n")
+        })
+    })
+
+    private fun assertStorageFailureKeepsRows(call: () -> ContractResult<*>) {
+        val before = listOf(dump("delivery_requests"), dump("delivery_active"), dump("settlements"), dump("account"), dump("delivery_lists"))
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), call())
+        reopen()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), call())
+        assertEquals(before, listOf(dump("delivery_requests"), dump("delivery_active"), dump("settlements"), dump("account"), dump("delivery_lists")))
+    }
+
+    fun testInputIsReadOnceForCommandListCheckAndPayment() {
+        val flipping = Flipping(listOf(income), listOf(income, purchase))
+        val changing = proposed.copy(offers = flipping)
+        flipping.reads = 0
+        assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT), ledger.select(changing, purchase.id, RequestId("r1")))
+        assertEquals(10_000, balance())
+        assertNull(ok(ledger.active()))
+        val growing = Flipping(listOf(income, purchase), listOf(income))
+        val commit = ok(ledger.select(proposed.copy(offers = growing), purchase.id, RequestId("r1")))
+        assertEquals(listOf(income, purchase), commit.selected.active.proposed.offers)
+        assertEquals(7_000, balance())
+        reopen()
+        assertEquals(listOf(income, purchase), requireNotNull(ok(ledger.active())).proposed.offers)
+        assertEquals(commit, ok(ledger.select(proposed.copy(offers = listOf(income, purchase)), purchase.id, RequestId("r1"))))
+    }
+
+    fun testReplayWithMislinkedPaymentSettlementIsStorageFailure() {
+        ok(select(purchase, "r1"))
+        val corruptions = listOf(
+            "UPDATE settlements SET result = replace(result, '\"request\":\"r1\"', '\"request\":\"other-request\"') WHERE request_id = 'r1'",
+            "UPDATE settlements SET result = replace(result, '\"kind\":\"DELIVERY\"', '\"kind\":\"GARAGE\"') WHERE request_id = 'r1'",
+            "UPDATE settlements SET result = replace(result, '\"amount\":3000', '\"amount\":2000') WHERE request_id = 'r1'",
+            "UPDATE settlements SET result = replace(result, '\"rule\":\"delivery-trial-v0\"', '\"rule\":\"other-rule\"') WHERE request_id = 'r1'",
+            "UPDATE settlements SET command = replace(command, '3000', '2000') WHERE request_id = 'r1'",
+            "UPDATE settlements SET settlement_id = 'forged' WHERE request_id = 'r1'",
+        )
+        val original = dump("settlements")
+        sql("CREATE TABLE settlement_backup AS SELECT * FROM settlements WHERE request_id = 'r1'")
+        for (corruption in corruptions) {
+            sql(corruption)
+            assertTrue(corruption, dump("settlements") != original)
+            assertStorageFailureKeepsRows { select(purchase, "r1") }
+            assertEquals(7_000, balance())
+            sql("DELETE FROM settlements WHERE request_id = 'r1'", "INSERT INTO settlements SELECT * FROM settlement_backup")
+        }
+        assertEquals(purchase, ok(select(purchase, "r1")).selected.active.offer)
+    }
+
+    fun testMissingPaymentSettlementIsStorageFailure() {
+        ok(select(purchase, "r1"))
+        sql("DELETE FROM settlements WHERE request_id = 'r1'")
+        assertStorageFailureKeepsRows { select(purchase, "r1") }
+    }
+
+    fun testAnotherValidActiveOrPaidFlagIsStorageFailure() {
+        ok(select(purchase, "r1"))
+        val forged = DeliveryJson.active(ActiveDelivery(RequestId("r1"), proposed, samePrice)).toString().replace("'", "''")
+        sql("UPDATE delivery_requests SET active = '$forged' WHERE request_id = 'r1'")
+        assertStorageFailureKeepsRows { select(purchase, "r1") }
+        assertStorageFailureKeepsRows { ledger.active() }
+        assertEquals(7_000, balance())
+    }
+
+    fun testIncomeHistoryMarkedPaidIsStorageFailure() {
+        ok(select(income, "r1"))
+        sql("UPDATE delivery_requests SET paid = 1 WHERE request_id = 'r1'")
+        assertStorageFailureKeepsRows { select(income, "r1") }
+        assertStorageFailureKeepsRows { ledger.active() }
+    }
+
+    fun testPaidOutsideZeroOrOneOrNotIntegerIsStorageFailure() {
+        ok(select(purchase, "r1"))
+        // CHECK 제약 때문에 정상 API로는 만들 수 없는 손상값을 일부러 만든다.
+        // 이런 값은 다시 열 때 저장소 전체 검사(quick_check)에도 걸리므로, 같은 연결에서 이 원장의 대조를 먼저 확인한다.
+        val tables = listOf("delivery_requests", "delivery_active", "settlements", "account", "delivery_lists")
+        for (raw in listOf("2", "-1", "'broken'", "X'01'")) {
+            sql("PRAGMA ignore_check_constraints = ON", "UPDATE delivery_requests SET paid = $raw WHERE request_id = 'r1'",
+                "PRAGMA ignore_check_constraints = OFF")
+            val before = tables.map(::dump)
+            assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), select(purchase, "r1"))
+            assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), ledger.active())
+            assertEquals(before, tables.map(::dump))
+            sql("UPDATE delivery_requests SET paid = 1 WHERE request_id = 'r1'")
+            assertNotNull(ok(select(purchase, "r1")).settlement)
+        }
+        sql("PRAGMA ignore_check_constraints = ON", "UPDATE delivery_requests SET paid = 2 WHERE request_id = 'r1'",
+            "PRAGMA ignore_check_constraints = OFF")
+        reopen()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), select(purchase, "r1"))
+        assertEquals(LedgerFailureReason.CORRUPT, store.lastStorageFailure)
+    }
+
+    fun testBrokenStoredDateIsStorageFailureNotACrash() {
+        sql("UPDATE delivery_lists SET payload = replace(payload, '\"createdOn\":\"2026-11-07\"', '\"createdOn\":\"2026-02-30\"')")
+        assertStorageFailureKeepsRows { ledger.lists(day) }
+        assertStorageFailureKeepsRows { select(purchase, "r1") }
+        assertEquals(10_000, balance())
     }
 }
