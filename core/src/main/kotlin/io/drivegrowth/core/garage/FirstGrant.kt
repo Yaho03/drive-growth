@@ -44,6 +44,17 @@ class FirstGrant(private val content: GameContentSnapshot) {
         ))
     }
 
+    /**
+     * 처분 포함 이력에 첫 지급 개체(`INITIAL_GRANT`)가 있으면 true: 이미 받은 프로필이라 온보딩 지급을 열지 않는다.
+     * false는 "이력에 첫 지급 기록 없음"일 뿐 신규 프로필의 근거가 아니다(마커 없는 기존 DB는 구분 못 함, #121 NEW/EXISTING/UNKNOWN 후속).
+     * 조회 실패는 그대로 전달한다.
+     */
+    fun alreadyGranted(history: VehicleHistoryStore): ContractResult<Boolean> =
+        when (val result = history.listVehicleHistory()) {
+            is ContractResult.Failure -> result
+            is ContractResult.Success -> ContractResult.Success(result.value.any { it.acquisitionSource == VehicleAcquisitionSource.INITIAL_GRANT })
+        }
+
     companion object {
         val REQUEST_ID = RequestId("initial-grant")
         /** PRD 「초기 상태」 시험값. */
