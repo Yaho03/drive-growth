@@ -200,9 +200,19 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 `io.drivegrowth.core.garage.FirstGrant.grant(store, chosen, source)`는 PRD 「최초 차량」·「초기 상태」 시험값대로 초기 재화 1,000 CREDIT과 고른 첫 차(캐스퍼·아반떼, COMMON·1레벨·0%·취득액0·`INITIAL_GRANT`, 개체 ID `initial-grant`)를 `GameChange` 한 건으로 커밋한다. SQLite 계정 잔액은 0에서 시작하므로 이 거래가 초기 재화의 유일한 지급 경로다. 초기 차고 칸 수는 `FirstGrant.INITIAL_GARAGE_CAPACITY`(3)로 제공한다.
 
-프로필당 고정 `requestId`(`initial-grant`)를 쓰므로 같은 차로 반복하면 처음 정산을 재생하고, 다른 차는 `STATE_CONFLICT`(선택 취소 불가), 후보 밖은 `INVALID_INPUT`, 콘텐츠에 없는 후보는 `DATA_UNAVAILABLE`이다. 첫 차를 처분해 보유가 0대여도 재지급하지 않는다. 단, 이 방지는 `initial-grant` 요청이 기록된 저장소에만 해당한다. 이 요청 기록이 없는 기존 데이터(다른 경로로 재화·첫 차를 받은 DB)에 호출하면 다시 지급되므로, 호스트는 **신규 프로필로 확인된 경우에만** 호출하고 확인할 수 없으면 Unavailable/복구 필요를 유지한다. 빈 보유 목록이나 미확인 정산 없음은 신규 프로필 근거가 아니다. 후보 목록 `CANDIDATES`는 읽기 전용이다. 규칙 버전이 바뀐 뒤 재시도도 명령이 달라 `STATE_CONFLICT`이며 재지급하지 않는다. 화면이 지급 전에 "이미 받은 프로필"인지 알려면 처분 포함 이력 조회(아래 「#34 저장 확장의 연결점」)가 필요하다. 개업 선물 뽑기권은 뽑기권 보유 수 저장과 첫 영업 완료 신호(#42)가 정해진 뒤 연결한다.
+프로필당 고정 `requestId`(`initial-grant`)를 쓰므로 같은 차로 반복하면 처음 정산을 재생하고, 다른 차는 `STATE_CONFLICT`(선택 취소 불가), 후보 밖은 `INVALID_INPUT`, 콘텐츠에 없는 후보는 `DATA_UNAVAILABLE`이다. 첫 차를 처분해 보유가 0대여도 재지급하지 않는다. 단, 이 방지는 `initial-grant` 요청이 기록된 저장소에만 해당한다. 이 요청 기록이 없는 기존 데이터(다른 경로로 재화·첫 차를 받은 DB)에 호출하면 다시 지급되므로, 호스트는 **신규 프로필로 확인된 경우에만** 호출하고 확인할 수 없으면 Unavailable/복구 필요를 유지한다. 빈 보유 목록이나 미확인 정산 없음은 신규 프로필 근거가 아니다. 후보 목록 `CANDIDATES`는 읽기 전용이다. 규칙 버전이 바뀐 뒤 재시도도 명령이 달라 `STATE_CONFLICT`이며 재지급하지 않는다. 화면이 지급 전에 "이미 받은 프로필"인지 알려면 처분 포함 이력 조회(아래 「#34 저장 확장의 연결점」)가 필요하다. 개업 선물 뽑기권은 아래 `prepareOpeningGift`가 명령을 만든다.
 
 `FirstGrant.alreadyGranted(history)`는 처분 포함 이력에 `INITIAL_GRANT` 개체가 있으면 true(이미 받은 프로필)다. 첫 차를 판매·소비해도 true다. false는 "이력에 첫 지급 기록 없음"이며 신규 프로필 근거가 아니다. 마커 없는 기존 DB 판별(NEW/EXISTING/UNKNOWN)은 #121 후속이다. 조회 실패는 그대로 전달한다.
+
+#121 계약(PR #147)을 소비하는 제품 경로는 아래 세 함수다. 모두 저장하지 않는 준비이거나 계약 어댑터로 한 번에 확정하며, 조회 실패는 받은 오류 그대로다.
+
+| 함수 | 동작 | 거절 |
+|---|---|---|
+| `choices(store: InitializationChangeStore, profileId)` | 저장 측이 NEW 근거를 준 프로필만 `CANDIDATES` 중 현재 콘텐츠·저장 측 후보에 있는 차를 돌려준다. 이미 받은 프로필(EXISTING)은 빈 목록이다(다시 고르지 않음) | UNKNOWN·후보 없음 `DATA_UNAVAILABLE`(무지급) |
+| `choose(store, profileId, chosen)` | NEW만 근거와 `INITIAL_GARAGE_CAPACITY`로 `commitFirstGrantInitialization`을 호출해 초기 재화·첫 차·초기 공간·마커를 한 번에 확정한다. 이미 확정된 프로필(EXISTING)은 현재 콘텐츠로 다시 만들지 않고 **보관된 원래 전체 명령을 그대로** `commitInitialization`에 제출한다. 그래서 콘텐츠·규칙 버전이 바뀌거나 원래 차종이 빠져도 같은 선택은 처음 결과를 재생한다. 응답을 잃으면 같은 선택으로 다시 부른다 | 다른 차 `STATE_CONFLICT`, 다른 프로필 `INVALID_INPUT`, 원래 명령에 첫 차 없음 `STORAGE_FAILURE`, 원래 결과 없는 기존 프로필·UNKNOWN `DATA_UNAVAILABLE`(commit 호출 안 함) |
+| `prepareOpeningGift(store: FirstRentalGiftStore, profileId, source)` | 같은 프로필 원장의 최초 완료 영업(rentalId·정산 ID)과 현재 가챠 revision으로 고정 요청 ID `opening-gift`의 `FirstRentalGiftCommand`(무료 뽑기권 +1, 돈·차량 불변)를 만든다. 이미 지급된 프로필은 원래 명령을 돌려주므로 다시 제출하면 처음 결과가 재생된다(프로필당 1회). 호출자가 `commitFirstRentalGift`로 확정한다 | 다른 프로필·출처 `INVALID_INPUT`, 완료 영업 없음 `DATA_UNAVAILABLE`, 버전·revision 불일치 `STATE_CONFLICT` |
+
+`commitInitialization`·`commitFirstRentalGift`는 메모리·SQLite 모두 아직 구현이 없다(#121·#122 후속). 이번에는 계약의 `prepareInitialization`/`prepareFirstRentalGift`로 확정을 흉내 내는 시험 저장소로 후보·선택·재요청·선물 명령만 검증했다. NEW 근거 발급과 legacy 복구 정책은 저장 측 책임이다.
 
 ### 원자성·오류·재시도
 
