@@ -587,3 +587,11 @@ GachaHostController는 확인 입력을 입구에서 한 번 고정하고 같은
 GachaOffers는 기존 appliedPercent와 선택적 GachaRatio를 받는다. GachaRatio는 모든 Rarity의 원시 Long 가중치·양수 Long 분모를 불변 Map으로 보존하고 음수/키/합을 검사한다(BigInteger 합으로 overflow 방지). 둘 중 하나는 필요하며 함께 주면 percent×분모=가중치×100을 정확히 비교한다. 일반 회차는 기존74.7/20/5/0.3%를 유지하고 보장 회차는0/53·0/53·50/53·3/53을 직접 표시한다. 임의 반올림·합100 잔여 배분·core 확률 변경 없이 정상 prepare/commit/retry로 이어진다. 순환소수는 정책 미정 오류가 아니다. 실제 권위/보장 후보 누락은 기존 오류를 유지한다.
 
 보존 입출력은 GachaHostState의 generation·pending GachaRequest(전체 확인 입력/attemptId)·GachaCommand 전체다. 같은 프로필의 최신 GachaUiState도 함께 복원하고 이전 owner는 release한다. durable checkpoint/codec와 MainActivity 조립은 미제공이며 새 DB/SharedPreferences를 만들지 않았다. 누락 command를 명시적 미준비 null로 보정하지 않는다. freeTickets가 기존 UI Int 범위를 넘으면 0으로 채우지 않고 DATA_UNAVAILABLE다.
+
+### #122 재료 강화 SQLite 확정 경계
+
+SqliteGameChangeStore는 MaterialChangeStore.readMaterialState/commitMaterial을 제공한다. 구성 시 materialVersions 공급자가 콘텐츠/규칙 버전을 명시하며, 없거나 실패하면 DATA_UNAVAILABLE 또는 원래 오류를 반환한다. 명령이 주장하는 버전에서 저장 권위를 만들지 않는다. 조회/새 확정은 같은 SQLite 거래 안에서 현재 잔액·역할별 두 개체와 RentalLedger의 live 활동을 읽고 기존 prepareMaterialChange를 사용한다. 영업 쉬기와 IDLE 활동은 구분하며 대여/반납/수리 상태는 두 역할 모두 거절한다. 성장 산식은 기존 #148 VehicleUpgrade.planMaterial/prepareMaterial 책임이고 제품 비용은0을 유지한다.
+
+확정 순서는 기존 재료 요청/최초 결과의 무결성 검증·동일 명령 재생 → 공용 요청 ID 충돌 검사 → 최신 버전/revision/활동/잔액 검증 → 두 차량·비용·공용 정산·최초 전체 결과 저장이다. 서로 다른 요청이 같은 재료를 소비하거나 배정/처분과 경쟁하면 같은 DB 거래의 현재 조건으로 판정한다. 단일 GameChange 두 건으로 나누지 않는다. 공용 settlements에는 동일 거래의 메타데이터를 연결하고, material_requests에는 전체 명령·검증 당시 상태·역할별 두 snapshot을 포함한 최초 MaterialSettlement를 저장한다. 두 역할을 현재 차량이나 nullable 단일 changedVehicle에서 재구성하지 않는다. 비용0은 money=null이며 가짜0원 결제를 만들지 않는다. 기존 가챠/대여 방문/무금액 탁송 선택과 요청 ID 공간을 공유한다.
+
+스키마6은 material_requests만 추가하며 지원 v1~v5의 기존 표/행/정산·렌털·발견·가챠·탁송/주행 이력을 보존한다. 이전 중 실패는 SQLiteOpenHelper 거래로 롤백하고 원본을 보존한다. 스키마5 공급이 main에 반영된 뒤 준비한 버전이며 향후 PR 머지 순서가 달라지면 재확인한다. 최초 결과 재생은 현재 버전 공급/활동/성장/처분과 독립적이며 원래 상태+명령의 순수 검증 결과, 공용 정산의 ID/출처/종류/규칙/금액/잔액/시각 및 두 역할을 대조한다. JSON 정수·금액/차량은 공용 LedgerJson decoder를 재사용해 소수/문자열/지수/범위 초과를 보정하지 않고 STORAGE_FAILURE로 반환한다. 수리/초기화/선물 실제 commit·제품 UI/권위 공급·프로세스/실차 연결과 #122 전체 완료는 별도 후속이다.
