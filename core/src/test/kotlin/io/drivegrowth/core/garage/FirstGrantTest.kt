@@ -19,6 +19,7 @@ import io.drivegrowth.core.contract.VehicleAcquisitionSource
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.contract.VehicleLifecycle
 import io.drivegrowth.core.contract.VehicleWrite
+import io.drivegrowth.core.contract.OwnedVehicleId
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -97,5 +98,20 @@ class FirstGrantTest {
         assertEquals(fail(ContractError.INVALID_INPUT), firstGrant.grant(store, VehicleId("hyundai_sonata"), src))
         val first = ok(firstGrant.grant(store, casper, src))
         assertEquals(first, ok(firstGrant.grant(store, casper, src)))
+    }
+
+    @Test fun `처분 포함 이력에 첫 지급 개체가 있으면 이미 받은 프로필이다`() {
+        val store = newStore()
+        val granted = ok(firstGrant.grant(store, casper, src)).changedVehicle!!
+        val sold = granted.copy(lifecycle = VehicleLifecycle.SOLD, revision = Revision(1))
+        val gacha = granted.copy(ownedVehicleId = OwnedVehicleId("g"), acquisitionSource = VehicleAcquisitionSource.GACHA)
+
+        assertEquals(true, ok(firstGrant.alreadyGranted(FakeHistory(ContractResult.Success(listOf(granted))))))
+        assertEquals(true, ok(firstGrant.alreadyGranted(FakeHistory(ContractResult.Success(listOf(sold))))))   // 판매 후에도
+        // 첫 지급 기록 없음은 false지만 신규 프로필 근거는 아니다(문서 참조)
+        assertEquals(false, ok(firstGrant.alreadyGranted(FakeHistory(ContractResult.Success(listOf(gacha))))))
+        assertEquals(false, ok(firstGrant.alreadyGranted(FakeHistory(ContractResult.Success(emptyList())))))
+        assertEquals(fail(ContractError.STORAGE_FAILURE),
+            firstGrant.alreadyGranted(FakeHistory(ContractResult.Failure(ContractError.STORAGE_FAILURE))))
     }
 }

@@ -84,7 +84,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             if (it.moveToFirst()) return@atomic if (it.getString(0) == command)
                 ContractResult.Success(it.getString(1)?.let(::OwnedVehicleId)) else conflict()
         }
-        if (db.rawQuery("SELECT 1 FROM settlements WHERE request_id=?", arrayOf(id)).use { it.moveToFirst() })
+        if (store.requestUnavailable(db, request.id))
             return@atomic conflict()
         if (catalog.vehicles.none { it.vehicleId == request.desired }) return@atomic missing()
         val owned = when (val result = store.listOwnedVehicles()) {
