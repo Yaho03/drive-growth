@@ -54,7 +54,8 @@ data class RepairSettlement(
 )
 
 /**
- * 실제 메모리 commit/SQLite 구현은 미제공이다. 기존 GameChange와 같은 원장/프로필/출처/전역 요청 ID 공간을 쓴다.
+ * 시험용 InMemoryGameChangeStore가 메모리 참조를 제공한다. 실제 SQLite/live 상태 공급은 후속이다.
+ * 기존 GameChange와 같은 원장/프로필/출처/전역 요청 ID 공간을 쓴다.
  * 같은 ID/전체 입력은 현재 상태 검사보다 먼저 최초 전체 결과를 반환하고 다른 입력/명령 종류는 STATE_CONFLICT다.
  * 새 명령은 같은 잠금/DB 거래에서 readRepairState/prepare를 다시 수행하고 잔액·개체 revision·NEEDS_REPAIR→IDLE·
  * 요청/정산을 전부 확정하거나 전부 거절한다. 사고 영업 이력과 영업 쉬기 스위치는 변경하지 않는다.

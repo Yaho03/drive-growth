@@ -6,55 +6,35 @@ import android.util.Log
 import io.drivegrowth.app.data.AssetGameContent
 import io.drivegrowth.app.data.SqliteGameChangeStore
 import io.drivegrowth.core.content.ContentLoad
-import io.drivegrowth.core.contract.ContractError
-import io.drivegrowth.core.contract.ContractResult
-import io.drivegrowth.core.contract.InputSource
-import io.drivegrowth.core.contract.SettlementId
+import io.drivegrowth.core.content.GameContentSnapshot
+import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.garage.CollectionState
+import io.drivegrowth.core.garage.Garage
+import io.drivegrowth.core.garage.VehicleHistoryStore
+import io.drivegrowth.core.progression.VehicleActivity
+import java.util.Collections
 
-/** worker에서 호출하는 읽기 전용 진입점. 기존 개별 조회를 원자적인 일괄 조회로 취급하지 않는다. */
-internal class StoredHostSource(
-    context: Context,
-    private val collectionHistory: () -> ContractResult<CollectionHistory> = {
-        ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
-    },
-) {
+/** worker의 읽기 진입점. 개별 조회를 원자적인 일괄 조회로 취급하지 않는다. databaseName은 격리 시험용이다. */
+internal class StoredHostSource(context: Context, private val databaseName: String? = null) {
     private val context = context.applicationContext
+
+    private fun openStore() = if (databaseName == null) SqliteGameChangeStore(context, InputSource.SIMULATION)
+        else SqliteGameChangeStore(context, InputSource.SIMULATION, databaseName)
 
     fun read(): ContractResult<HostSnapshot> {
         var operation = "content"
         return try {
             val content = (AssetGameContent(context.assets).load() as? ContentLoad.Loaded)?.snapshot
-            if (content == null) ContractResult.Failure(ContractError.DATA_UNAVAILABLE) else {
-                operation = "ledger-open"
-                SqliteGameChangeStore(context, InputSource.SIMULATION).use { store ->
-                    operation = "balance"
-                    val balance = when (val result = store.balance()) {
-                        is ContractResult.Failure -> return result
-                        is ContractResult.Success -> result.value
-                    }
-                    operation = "owned-vehicles"
-                    val owned = when (val result = store.listOwnedVehicles()) {
-                        is ContractResult.Failure -> return result
-                        is ContractResult.Success -> result.value
-                    }
-                    operation = "settlements"
-                    val settlements = when (val result = store.listUnviewedSettlements()) {
-                        is ContractResult.Failure -> return result
-                        is ContractResult.Success -> result.value
-                    }
-                    operation = "collection-history"
-                    val history = collectionHistory()
-                    operation = "ledger-close"
-                    ContractResult.Success(HostSnapshot(content, InputSource.SIMULATION, balance, owned, settlements, history))
-                }
-            }
+                ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+            operation = "ledger-read"
+            openStore().use { store -> readStoredHostSnapshot(content, InputSource.SIMULATION, LedgerHostReads(store)) }
         } catch (error: RuntimeException) {
             failure(operation, error)
         }
     }
 
     fun markViewed(id: SettlementId): ContractResult<Unit> = try {
-        SqliteGameChangeStore(context, InputSource.SIMULATION).use { it.markViewed(id) }
+        openStore().use { it.markViewed(id) }
     } catch (error: RuntimeException) {
         failure("mark-viewed", error)
     }
@@ -69,3 +49,74 @@ internal class StoredHostSource(
         })
     }
 }
+
+/** 실제 store와 동일한 읽기 경로를 시험한다. 이 경계에서 쓰기 API는 호출하지 않는다. */
+internal interface StoredHostReads : VehicleHistoryStore {
+    val source: InputSource
+    fun balance(): ContractResult<GameMoney>
+    fun owned(): ContractResult<List<OwnedVehicle>>
+    fun settlements(): ContractResult<List<Settlement>>
+    fun activity(id: OwnedVehicleId): ContractResult<VehicleActivity>
+    fun accidents(id: OwnedVehicleId): ContractResult<Int>
+    fun capacity(): ContractResult<Int>
+}
+
+private class LedgerHostReads(private val store: SqliteGameChangeStore) : StoredHostReads, VehicleHistoryStore by store {
+    override val source get() = store.source
+    override fun balance() = store.balance()
+    override fun owned() = store.listOwnedVehicles()
+    override fun settlements() = store.listUnviewedSettlements()
+    override fun activity(id: OwnedVehicleId) = store.rental.activity(id)
+    override fun accidents(id: OwnedVehicleId) = store.rental.accidentCount(id)
+    override fun capacity(): ContractResult<Int> = when (val result = store.rental.shop()) {
+        is ContractResult.Failure -> result
+        is ContractResult.Success -> ContractResult.Success(result.value.capacity)
+    }
+}
+
+internal fun readStoredHostSnapshot(
+    content: GameContentSnapshot,
+    expectedSource: InputSource,
+    reads: StoredHostReads,
+): ContractResult<HostSnapshot> {
+    if (reads.source != expectedSource) return ContractResult.Failure(ContractError.INVALID_INPUT)
+    val balance = when (val result = reads.balance()) {
+        is ContractResult.Failure -> return result
+        is ContractResult.Success -> result.value
+    }
+    val owned = when (val result = reads.owned()) {
+        is ContractResult.Failure -> return result
+        is ContractResult.Success -> Collections.unmodifiableList(ArrayList(result.value))
+    }
+    val settlements = when (val result = reads.settlements()) {
+        is ContractResult.Failure -> return result
+        is ContractResult.Success -> Collections.unmodifiableList(ArrayList(result.value))
+    }
+    if (settlements.any { it.transaction.source != expectedSource }) return ContractResult.Failure(ContractError.INVALID_INPUT)
+    val garage = Garage(content.catalog)
+    when (val result = garage.owned(owned)) {
+        is ContractResult.Failure -> return result
+        is ContractResult.Success -> Unit
+    }
+    val history = when (val result = garage.collection(reads)) {
+        is ContractResult.Failure -> result
+        is ContractResult.Success -> ContractResult.Success(CollectionHistory(
+            result.value.filter { it.state == CollectionState.OWNED }.mapTo(linkedSetOf()) { it.key },
+            result.value.filter { it.state == CollectionState.DISCOVERED }.mapTo(linkedSetOf()) { it.key },
+            expectedSource, content.catalog.contentVersion, content.ruleVersion))
+    }
+    val vehicles = owned.map { vehicle ->
+        StoredVehicleState(vehicle, reads.activity(vehicle.ownedVehicleId), nonNegative(reads.accidents(vehicle.ownedVehicleId)))
+    }
+    val capacity = nonNegative(reads.capacity())
+    // 개체 ID/revision의 조회 중 변경만 감지한다. 활동·잔액·이력 전체의 원자성/전역 revision 보장은 아니다.
+    when (val result = reads.owned()) {
+        is ContractResult.Failure -> return result
+        is ContractResult.Success -> if (owned != result.value) return ContractResult.Failure(ContractError.STATE_CONFLICT)
+    }
+    return ContractResult.Success(HostSnapshot(content, expectedSource, balance, owned, settlements, history,
+        ContractResult.Success(StoredGarageState(expectedSource, content.catalog.contentVersion, content.ruleVersion, vehicles, capacity))))
+}
+
+private fun nonNegative(result: ContractResult<Int>): ContractResult<Int> =
+    if (result is ContractResult.Success && result.value < 0) ContractResult.Failure(ContractError.STORAGE_FAILURE) else result

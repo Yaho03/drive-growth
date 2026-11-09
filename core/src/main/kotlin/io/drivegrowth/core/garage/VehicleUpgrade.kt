@@ -6,6 +6,8 @@ import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.GameChange
 import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.InputSource
+import io.drivegrowth.core.contract.MaterialChangeStore
+import io.drivegrowth.core.contract.MaterialCommand
 import io.drivegrowth.core.contract.MAX_VEHICLE_LEVEL
 import io.drivegrowth.core.contract.MoneyChange
 import io.drivegrowth.core.contract.MoneyDirection
@@ -66,9 +68,39 @@ class VehicleUpgrade(private val content: GameContentSnapshot, private val care:
     }
 
     /**
-     * 재료 강화 계산·검사. 같은 차종이면 희귀도가 달라도 재료가 된다.
-     * ponytail: 현재 GameChange는 차량 한 대만 바꿔 저장하지 않는다. 다중 개체 거래가 생기면(#33·#34) 이 계획을 한 건으로 커밋.
+     * 재료 강화 명령. 저장 측 `readMaterialState`의 두 개체·활동·버전으로 [planMaterial]을 실행해 비용0 `MaterialCommand`를 만든다.
+     * 저장하지 않는다. 호출자가 `store.commitMaterial(command)`로 대상 성장과 재료 CONSUMED를 한 정산에 확정한다(#121).
+     * 응답을 잃으면 **보관한 같은 command를 다시 commitMaterial**한다. 저장소가 처음 정산을 재생한다.
+     * 거절: 조회 실패는 그대로 / 저장 측 콘텐츠·규칙 버전이 이 앱과 다르면 STATE_CONFLICT / 나머지는 [planMaterial]과 같다.
      */
+    fun prepareMaterial(
+        store: MaterialChangeStore,
+        requestId: RequestId,
+        source: InputSource,
+        target: VehicleRef,
+        material: VehicleRef,
+    ): ContractResult<MaterialCommand> {
+        if (target.ownedVehicleId == material.ownedVehicleId) return ContractResult.Failure(ContractError.INVALID_INPUT)
+        val state = when (val result = store.readMaterialState(target.ownedVehicleId, material.ownedVehicleId)) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
+        }
+        if (state.contentVersion != content.catalog.contentVersion || state.ruleVersion != content.ruleVersion)
+            return ContractResult.Failure(ContractError.STATE_CONFLICT)
+        val activities = listOf(state.target, state.material).associate { it.vehicle.ownedVehicleId to it.activity }
+        val plan = when (val result = planMaterial(listOf(state.target.vehicle, state.material.vehicle), target, material) { id ->
+            activities[id]?.let { ContractResult.Success(it) } ?: ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+        }) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
+        }
+        // PRD: 재료 강화는 재화를 쓰지 않는다. 비용0은 명시적 무과금이다.
+        return ContractResult.Success(MaterialCommand(
+            requestId, source, state.contentVersion, state.ruleVersion, plan.target, plan.material, GameMoney(0),
+        ))
+    }
+
+    /** 재료 강화 계산·검사. 같은 차종이면 희귀도가 달라도 재료가 된다. 저장은 [prepareMaterial]의 명령으로 한다. */
     fun planMaterial(
         owned: List<OwnedVehicle>,
         target: VehicleRef,

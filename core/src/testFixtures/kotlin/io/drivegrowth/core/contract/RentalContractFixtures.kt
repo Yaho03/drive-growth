@@ -82,27 +82,99 @@ class InMemoryGameChangeStore(
     private val confirmedAt: EpochMillis = RentalContractFixtures.time,
     private var gachaState: GachaState? = null,
     private val materialConfiguration: MaterialFixtureConfiguration? = null,
-) : GachaChangeStore, MaterialChangeStore {
+    private val repairConfiguration: RepairFixtureConfiguration? = null,
+) : GachaChangeStore, MaterialChangeStore, RepairChangeStore {
     init {
         val gachaSource = gachaState?.authority?.source
         require(gachaSource == null || materialConfiguration == null || gachaSource == materialConfiguration.source) {
             "같은 메모리 원장의 가챠와 재료 출처는 같아야 한다"
         }
+        val sources = listOfNotNull(gachaSource, materialConfiguration?.source, repairConfiguration?.source)
+        require(sources.distinct().size <= 1) { "같은 메모리 원장의 출처는 같아야 한다" }
+        materialConfiguration?.activities?.forEach { (id, activity) ->
+            val repairActivity = repairConfiguration?.activities?.get(id)
+            require(repairActivity == null || repairActivity == activity) { "같은 개체의 활동 입력은 같아야 한다" }
+        }
     }
 
+    // 모든 capability가 같은 현재 활동을 읽는다. 수리 완료는 이 Map에서만 IDLE로 전환한다.
+    private val activities = (materialConfiguration?.activities.orEmpty() + repairConfiguration?.activities.orEmpty()).toMutableMap()
     private val vehiclesById = vehicles.associateBy { it.ownedVehicleId }.toMutableMap()
     private val committed = mutableMapOf<RequestId, Pair<GameChange, Settlement>>()
     private val gachaCommitted = mutableMapOf<RequestId, GachaSettlement>()
     private val materialCommitted = mutableMapOf<RequestId, MaterialSettlement>()
+    private val repairCommitted = mutableMapOf<RequestId, RepairSettlement>()
     private var balance = initialBalance
     var nextCommitFailure: ContractError? = null
+
+    @Synchronized
+    override fun readRepairState(target: OwnedVehicleId): ContractResult<RepairState> {
+        val configuration = repairConfiguration ?: return failure(ContractError.DATA_UNAVAILABLE)
+        val vehicle = vehiclesById[target] ?: return failure(ContractError.DATA_UNAVAILABLE)
+        val activity = when (val read = activities[target] ?: failure(ContractError.DATA_UNAVAILABLE)) {
+            is ContractResult.Failure -> return read
+            is ContractResult.Success -> read.value
+        }
+        val accidents = when (val read = configuration.accidentCounts[target] ?: failure(ContractError.DATA_UNAVAILABLE)) {
+            is ContractResult.Failure -> return read
+            is ContractResult.Success -> read.value
+        }
+        if (accidents < 0) return failure(ContractError.STORAGE_FAILURE)
+        val cost = when (val read = configuration.repairCosts[target] ?: failure(ContractError.DATA_UNAVAILABLE)) {
+            is ContractResult.Failure -> return read
+            is ContractResult.Success -> read.value
+        }
+        return ContractResult.Success(RepairState(configuration.source, configuration.contentVersion, configuration.ruleVersion,
+            balance, vehicle, activity, accidents, cost))
+    }
+
+    @Synchronized
+    override fun repairSettlement(requestId: RequestId): ContractResult<RepairSettlement?> {
+        if (requestId in committed || requestId in gachaCommitted || requestId in materialCommitted)
+            return failure(ContractError.STATE_CONFLICT)
+        return ContractResult.Success(repairCommitted[requestId])
+    }
+
+    @Synchronized
+    override fun commitRepair(command: RepairCommand): ContractResult<RepairSettlement> {
+        repairCommitted[command.requestId]?.let { original ->
+            return when (val replay = replayRepairChange(command, original)) {
+                is ContractResult.Failure -> replay
+                is ContractResult.Success -> ContractResult.Success(original)
+            }
+        }
+        if (command.requestId in committed || command.requestId in gachaCommitted || command.requestId in materialCommitted)
+            return failure(ContractError.STATE_CONFLICT)
+        val current = when (val read = readRepairState(command.target.ownedVehicleId)) {
+            is ContractResult.Failure -> return read
+            is ContractResult.Success -> read.value
+        }
+        val prepared = when (val result = prepareRepairChange(command, current)) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
+        }
+        nextCommitFailure?.let {
+            nextCommitFailure = null
+            return failure(it)
+        }
+        val receipt = RepairSettlement(command, SettlementId("fixture-settlement-${command.requestId.value}"),
+            Transaction(TransactionId("fixture-transaction-${command.requestId.value}"), command.requestId,
+                TransactionKind.GARAGE, command.source, command.ruleVersion, prepared.money),
+            prepared.balance, prepared.vehicle, prepared.activity, prepared.accidentCount, confirmedAt)
+        // 같은 모니터에서 지갑·개체·활동·최초 결과를 함께 확정한다. 사고/취득 정보는 변경하지 않는다.
+        balance = prepared.balance
+        vehiclesById[prepared.vehicle.ownedVehicleId] = prepared.vehicle
+        activities[prepared.vehicle.ownedVehicleId] = ContractResult.Success(prepared.activity)
+        repairCommitted[command.requestId] = receipt
+        return ContractResult.Success(receipt)
+    }
 
     @Synchronized
     override fun readMaterialState(target: OwnedVehicleId, material: OwnedVehicleId): ContractResult<MaterialState> {
         val configuration = materialConfiguration ?: return failure(ContractError.DATA_UNAVAILABLE)
         val targetVehicle = vehiclesById[target] ?: return failure(ContractError.DATA_UNAVAILABLE)
         val materialVehicle = vehiclesById[material] ?: return failure(ContractError.DATA_UNAVAILABLE)
-        fun activity(id: OwnedVehicleId) = configuration.activities[id] ?: failure(ContractError.DATA_UNAVAILABLE)
+        fun activity(id: OwnedVehicleId) = activities[id] ?: failure(ContractError.DATA_UNAVAILABLE)
         val targetActivity = when (val result = activity(target)) {
             is ContractResult.Failure -> return result
             is ContractResult.Success -> result.value
@@ -122,7 +194,7 @@ class InMemoryGameChangeStore(
         materialCommitted[request.requestId]?.let { original ->
             return if (original.command == request) ContractResult.Success(original) else failure(ContractError.STATE_CONFLICT)
         }
-        if (request.requestId in committed || request.requestId in gachaCommitted) return failure(ContractError.STATE_CONFLICT)
+        if (request.requestId in committed || request.requestId in gachaCommitted || request.requestId in repairCommitted) return failure(ContractError.STATE_CONFLICT)
         val current = when (val result = readMaterialState(request.target.ownedVehicleId, request.material.ownedVehicleId)) {
             is ContractResult.Failure -> return result
             is ContractResult.Success -> result.value
@@ -153,12 +225,12 @@ class InMemoryGameChangeStore(
 
     @Synchronized
     override fun commitGameChange(change: GameChange): ContractResult<Settlement> {
-        if (change.requestId in gachaCommitted || change.requestId in materialCommitted) return failure(ContractError.STATE_CONFLICT)
+        if (change.requestId in gachaCommitted || change.requestId in materialCommitted || change.requestId in repairCommitted) return failure(ContractError.STATE_CONFLICT)
         committed[change.requestId]?.let { (original, result) ->
             return if (original == change) ContractResult.Success(result) else failure(ContractError.STATE_CONFLICT)
         }
         val authority = gachaState?.authority
-        val configuredSource = authority?.source ?: materialConfiguration?.source
+        val configuredSource = authority?.source ?: materialConfiguration?.source ?: repairConfiguration?.source
         if (configuredSource != null && change.source != configuredSource) return failure(ContractError.INVALID_INPUT)
         nextCommitFailure?.let {
             nextCommitFailure = null
@@ -182,6 +254,15 @@ class InMemoryGameChangeStore(
                 val previous = vehiclesById[write.ownedVehicleId] ?: return failure(ContractError.DATA_UNAVAILABLE)
                 if (previous.revision != write.expectedRevision || previous.lifecycle != VehicleLifecycle.OWNED) {
                     return failure(ContractError.STATE_CONFLICT)
+                }
+                if (repairConfiguration != null) {
+                    val activity = when (val read = activities[write.ownedVehicleId] ?: failure(ContractError.DATA_UNAVAILABLE)) {
+                        is ContractResult.Failure -> return read
+                        is ContractResult.Success -> read.value
+                    }
+                    if (activity == VehicleActivity.RENTED || activity == VehicleActivity.RETURNING ||
+                        (activity == VehicleActivity.NEEDS_REPAIR && write.lifecycle !in setOf(VehicleLifecycle.SOLD, VehicleLifecycle.SCRAPPED)))
+                        return failure(ContractError.STATE_CONFLICT)
                 }
                 if (previous.revision.value == Int.MAX_VALUE) return failure(ContractError.INVALID_INPUT)
                 if (write.lifecycle != VehicleLifecycle.OWNED &&
@@ -234,7 +315,7 @@ class InMemoryGameChangeStore(
         gachaCommitted[command.requestId]?.let { original ->
             return if (original.command == command) ContractResult.Success(original) else failure(ContractError.STATE_CONFLICT)
         }
-        if (command.requestId in committed || command.requestId in materialCommitted) return failure(ContractError.STATE_CONFLICT)
+        if (command.requestId in committed || command.requestId in materialCommitted || command.requestId in repairCommitted) return failure(ContractError.STATE_CONFLICT)
         val state = gachaState ?: return failure(ContractError.DATA_UNAVAILABLE)
         val authority = state.authority
         val progress = state.progress
