@@ -50,6 +50,11 @@ internal class MaterialLedger(private val store: SqliteGameChangeStore) {
                 return@atomic ContractResult.Success(originalResult)
             }
         }
+        // 자기 공용 정산만 남았다면 최초 두 snapshot 이력이 손실된 상태다. 현재 개체로 복구하지 않는다.
+        db.rawQuery("SELECT command FROM settlements WHERE request_id=?", arrayOf(command.requestId.value)).use { row ->
+            if (row.moveToFirst() && JSONObject(row.text(0)).optString("type") == "material-v1")
+                throw JSONException("재료 최초 이력 누락")
+        }
         if (store.requestUnavailable(db, command.requestId)) return@atomic ContractResult.Failure(ContractError.STATE_CONFLICT)
         val current = when (val read = state(db, command.target.ownedVehicleId, command.material.ownedVehicleId)) {
             is ContractResult.Failure -> return@atomic read
