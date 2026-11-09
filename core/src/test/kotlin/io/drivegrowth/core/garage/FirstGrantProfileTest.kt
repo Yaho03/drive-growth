@@ -1,6 +1,8 @@
 package io.drivegrowth.core.garage
 
+import io.drivegrowth.core.content.ContentLoad
 import io.drivegrowth.core.content.GameContentFixtures
+import io.drivegrowth.core.content.GameContentLoader
 import io.drivegrowth.core.contract.ContentVersion
 import io.drivegrowth.core.contract.ContractError
 import io.drivegrowth.core.contract.ContractResult
@@ -26,6 +28,7 @@ import io.drivegrowth.core.contract.ProfileId
 import io.drivegrowth.core.contract.ProfileInitializationStatus
 import io.drivegrowth.core.contract.RequestId
 import io.drivegrowth.core.contract.Revision
+import io.drivegrowth.core.contract.RuleVersion
 import io.drivegrowth.core.contract.Settlement
 import io.drivegrowth.core.contract.SettlementId
 import io.drivegrowth.core.contract.Transaction
@@ -103,6 +106,31 @@ class FirstGrantProfileTest {
         store.state = ContractResult.Success(newState.copy(status = ProfileInitializationStatus.Existing(first), balance = GameMoney(1000), ownedVehicleCount = 1))
         assertEquals(first, ok(firstGrant.choose(store, profile, casper)))
         assertEquals(fail(ContractError.STATE_CONFLICT), firstGrant.choose(store, profile, avante))
+    }
+
+    @Test fun `이미 받은 프로필은 콘텐츠·규칙 버전이 바뀌거나 원래 차종이 빠져도 원래 명령을 그대로 재제출한다`() {
+        val store = ProfileStore(ContractResult.Success(newState))
+        val first = ok(firstGrant.choose(store, profile, casper))
+        // 앱 업데이트로 콘텐츠·규칙 버전이 바뀌고 캐스퍼가 콘텐츠에서 빠진 상황
+        val v1 = GameContentFixtures.content.replace("hyundai_casper,100,1\n", "")
+            .replace("fixture-content-v0", "fixture-content-v1").replace("fixture-rule-v0", "fixture-rule-v1")
+        val updated = FirstGrant((GameContentLoader.load(GameContentFixtures.facts, v1) as ContentLoad.Loaded).snapshot)
+        store.state = ContractResult.Success(newState.copy(status = ProfileInitializationStatus.Existing(first),
+            contentVersion = ContentVersion("fixture-content-v1"), ruleVersion = RuleVersion("fixture-rule-v1"),
+            balance = GameMoney(1000), ownedVehicleCount = 1))
+
+        assertEquals(first, ok(firstGrant.choose(store, profile, casper)))
+        assertEquals(first, ok(updated.choose(store, profile, casper)))
+        assertEquals(fail(ContractError.STATE_CONFLICT), updated.choose(store, profile, avante))
+        assertEquals(fail(ContractError.INVALID_INPUT), updated.choose(store, ProfileId("other-profile"), casper))
+        assertEquals(List(3) { first.command }, store.commands) // 처음 1회 + 재생 2회 모두 원래 명령, 거절은 제출 안 함
+    }
+
+    @Test fun `NEW는 후보 밖 차와 저장 측 후보에 없는 차를 지급하지 않는다`() {
+        val store = ProfileStore(ContractResult.Success(newState))
+        assertEquals(fail(ContractError.INVALID_INPUT), firstGrant.choose(store, profile, VehicleId("hyundai_sonata")))
+        val casperOnly = ProfileStore(ContractResult.Success(newState.copy(availableCandidates = setOf(casper))))
+        assertEquals(fail(ContractError.DATA_UNAVAILABLE), firstGrant.choose(casperOnly, profile, avante))
     }
 
     @Test fun `원래 결과 없는 기존 프로필과 UNKNOWN과 조회 실패는 지급을 시도하지 않는다`() {

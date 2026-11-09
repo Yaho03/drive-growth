@@ -209,7 +209,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 | 함수 | 동작 | 거절 |
 |---|---|---|
 | `choices(store: InitializationChangeStore, profileId)` | 저장 측이 NEW 근거를 준 프로필만 `CANDIDATES` 중 현재 콘텐츠·저장 측 후보에 있는 차를 돌려준다. 이미 받은 프로필(EXISTING)은 빈 목록이다(다시 고르지 않음) | UNKNOWN·후보 없음 `DATA_UNAVAILABLE`(무지급) |
-| `choose(store, profileId, chosen)` | NEW 근거와 `INITIAL_GARAGE_CAPACITY`로 `commitFirstGrantInitialization`을 호출해 초기 재화·첫 차·초기 공간·마커를 한 번에 확정한다. 이미 확정된 프로필은 원래 근거로 같은 명령을 다시 제출하므로, 같은 차는 처음 결과를 재생하고 다른 차는 `STATE_CONFLICT`다. 응답을 잃으면 같은 선택으로 다시 부른다 | 원래 결과 없는 기존 프로필·UNKNOWN `DATA_UNAVAILABLE`(commit 호출 안 함) |
+| `choose(store, profileId, chosen)` | NEW만 근거와 `INITIAL_GARAGE_CAPACITY`로 `commitFirstGrantInitialization`을 호출해 초기 재화·첫 차·초기 공간·마커를 한 번에 확정한다. 이미 확정된 프로필(EXISTING)은 현재 콘텐츠로 다시 만들지 않고 **보관된 원래 전체 명령을 그대로** `commitInitialization`에 제출한다. 그래서 콘텐츠·규칙 버전이 바뀌거나 원래 차종이 빠져도 같은 선택은 처음 결과를 재생한다. 응답을 잃으면 같은 선택으로 다시 부른다 | 다른 차 `STATE_CONFLICT`, 다른 프로필 `INVALID_INPUT`, 원래 명령에 첫 차 없음 `STORAGE_FAILURE`, 원래 결과 없는 기존 프로필·UNKNOWN `DATA_UNAVAILABLE`(commit 호출 안 함) |
 | `prepareOpeningGift(store: FirstRentalGiftStore, profileId, source)` | 같은 프로필 원장의 최초 완료 영업(rentalId·정산 ID)과 현재 가챠 revision으로 고정 요청 ID `opening-gift`의 `FirstRentalGiftCommand`(무료 뽑기권 +1, 돈·차량 불변)를 만든다. 이미 지급된 프로필은 원래 명령을 돌려주므로 다시 제출하면 처음 결과가 재생된다(프로필당 1회). 호출자가 `commitFirstRentalGift`로 확정한다 | 완료 영업 없음 `DATA_UNAVAILABLE`, 버전·revision 불일치 `STATE_CONFLICT` |
 
 `commitInitialization`·`commitFirstRentalGift`는 메모리·SQLite 모두 아직 구현이 없다(#121·#122 후속). 이번에는 계약의 `prepareInitialization`/`prepareFirstRentalGift`로 확정을 흉내 내는 시험 저장소로 후보·선택·재요청·선물 명령만 검증했다. NEW 근거 발급과 legacy 복구 정책은 저장 측 책임이다.

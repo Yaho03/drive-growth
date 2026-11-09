@@ -85,22 +85,32 @@ class FirstGrant(private val content: GameContentSnapshot) {
     }
 
     /**
-     * 첫 차 선택 확정. NEW 근거로 초기 재화·첫 차·초기 공간·마커를 `commitInitialization` 한 번에 확정한다.
-     * 이미 확정된 프로필은 원래 근거로 같은 명령을 다시 제출한다: 같은 차면 저장소가 처음 결과를 재생하고 다른 차면 STATE_CONFLICT.
-     * 그래서 응답을 잃어도 같은 선택으로 다시 부르면 된다. 원래 결과가 없는 기존 프로필·UNKNOWN은 DATA_UNAVAILABLE(무지급).
+     * 첫 차 선택 확정. NEW만 현재 콘텐츠로 초기 재화·첫 차·초기 공간·마커 명령을 만들어 `commitInitialization` 한 번에 확정한다.
+     * 이미 확정된 프로필(EXISTING)은 현재 콘텐츠로 다시 만들지 않고 **보관된 원래 전체 명령을 그대로** 제출한다. 그래서 콘텐츠·규칙 버전이
+     * 바뀌거나 원래 차종이 빠져도 같은 선택은 처음 결과를 재생한다. 응답을 잃어도 같은 선택으로 다시 부르면 된다.
+     * 거절: 다른 차 STATE_CONFLICT / 다른 프로필 INVALID_INPUT / 원래 명령에 첫 차가 없으면 STORAGE_FAILURE /
+     * 원래 결과가 없는 기존 프로필·UNKNOWN DATA_UNAVAILABLE(무지급, commit 호출 안 함).
      */
     fun choose(store: InitializationChangeStore, profileId: ProfileId, chosen: VehicleId): ContractResult<InitializationSettlement> {
         val state = when (val result = store.readInitialization(profileId)) {
             is ContractResult.Failure -> return result
             is ContractResult.Success -> result.value
         }
-        val evidence = when (val status = state.status) {
-            is ProfileInitializationStatus.New -> status.evidence
-            is ProfileInitializationStatus.Existing -> status.original?.command?.evidence
-                ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
-            is ProfileInitializationStatus.Unknown -> return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+        return when (val status = state.status) {
+            is ProfileInitializationStatus.New ->
+                commitFirstGrantInitialization(store, status.evidence, content, chosen, INITIAL_GARAGE_CAPACITY)
+            is ProfileInitializationStatus.Existing -> {
+                val original = status.original?.command ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+                val originalChoice = (original.grant.vehicle as? VehicleWrite.Add)?.vehicle?.vehicleId
+                    ?: return ContractResult.Failure(ContractError.STORAGE_FAILURE)
+                when {
+                    original.profileId != profileId -> ContractResult.Failure(ContractError.INVALID_INPUT)
+                    originalChoice != chosen -> ContractResult.Failure(ContractError.STATE_CONFLICT)
+                    else -> store.commitInitialization(original)
+                }
+            }
+            is ProfileInitializationStatus.Unknown -> ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         }
-        return commitFirstGrantInitialization(store, evidence, content, chosen, INITIAL_GARAGE_CAPACITY)
     }
 
     /**
