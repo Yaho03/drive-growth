@@ -145,11 +145,25 @@ class RepairStoreTest {
     @Test fun `수리 두 요청과 판매 경쟁은 같은 revision에서 한 건만 확정한다`() {
         for(sell in listOf(false,true)) {
             val s=store();val results=race({s.commitRepair(command())},{if(sell)s.commitGameChange(generic("other",true))else s.commitRepair(command("other"))})
-            assertEquals(1,results.count{it is ContractResult.Success});assertEquals(1,results.count{it==failure(ContractError.STATE_CONFLICT)})
-            val current=state(s);assertEquals(Revision(4),current.vehicle.revision)
+            assertEquals(1,results.count{it is ContractResult.Success})
+            val current=state(s)
+            val rejected = if (current.vehicle.lifecycle == VehicleLifecycle.SOLD) ContractError.DATA_UNAVAILABLE else ContractError.STATE_CONFLICT
+            assertEquals(1,results.count{it==failure(rejected)})
+            assertEquals(Revision(4),current.vehicle.revision)
             if(current.vehicle.lifecycle==VehicleLifecycle.SOLD) {assertEquals(GameMoney(1010),current.balance);assertEquals(VehicleActivity.NEEDS_REPAIR,current.activity)}
             else {assertEquals(GameMoney(560),current.balance);assertEquals(VehicleActivity.IDLE,current.activity)}
         }
+    }
+    @Test fun `판매 선확정은 처분 오류이고 수리 선확정은 판매 revision 충돌이다`() {
+        val soldFirst=store()
+        ok(soldFirst.commitGameChange(generic("sale-first",true)))
+        assertEquals(failure(ContractError.DATA_UNAVAILABLE),soldFirst.commitRepair(command()))
+        assertEquals(GameMoney(1010),state(soldFirst).balance)
+        assertNull(ok(soldFirst.repairSettlement(command().requestId)))
+        val repairFirst=store();val repaired=ok(repairFirst.commitRepair(command()))
+        assertEquals(failure(ContractError.STATE_CONFLICT),repairFirst.commitGameChange(generic("sale-after",true)))
+        assertEquals(repaired,ok(repairFirst.repairSettlement(command().requestId)))
+        assertEquals(GameMoney(560),state(repairFirst).balance)
     }
     @Test fun `수리와 재료 경쟁은 수리 필요 제한과 같은 revision을 공유한다`() {
         val s=store();val results=race({s.commitRepair(command())},{s.commitMaterial(materialCommand())})
