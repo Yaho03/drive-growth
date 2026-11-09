@@ -3,6 +3,7 @@ package io.drivegrowth.app.ui.gacha
 import io.drivegrowth.core.content.GameContentSnapshot
 import io.drivegrowth.core.contract.*
 import java.math.BigDecimal
+import java.math.BigInteger
 import java.util.Collections
 import java.util.UUID
 
@@ -28,6 +29,16 @@ data class GachaSpace(val owned: Int, val capacity: Int, val availability: Gacha
     init { require(owned >= 0 && capacity >= 0) }
 }
 
+/** 이번 pool의 원시 가중치와 분모를 보존하는 정확한 비율이다. */
+class GachaRatio(numerators: Map<Rarity, Long>, val denominator: Long) {
+    val numerators: Map<Rarity, Long> = Collections.unmodifiableMap(LinkedHashMap(numerators))
+    fun valid(): Boolean = denominator > 0 && numerators.keys == Rarity.entries.toSet() &&
+        numerators.values.all { it >= 0 } &&
+        numerators.values.fold(BigInteger.ZERO) { sum, value -> sum + BigInteger.valueOf(value) } == BigInteger.valueOf(denominator)
+    override fun equals(other: Any?): Boolean = other is GachaRatio && denominator == other.denominator && numerators == other.numerators
+    override fun hashCode(): Int = 31 * numerators.hashCode() + denominator.hashCode()
+}
+
 data class GachaOffers(
     val content: GameContentSnapshot?,
     val candidates: List<VehicleId>?,
@@ -36,12 +47,23 @@ data class GachaOffers(
     val guarantee: GachaGuarantee?, val space: GachaSpace?,
     val balance: GameMoney?, val ticketPurchasePrice: GameMoney?,
     val options: List<GachaOption>, val availability: GachaAvailability, val origin: GachaOrigin,
+    val appliedRatio: GachaRatio? = null,
 ) {
     init { require(options.map { it.id }.distinct().size == options.size) }
-    fun ratesValid(): Boolean = appliedPercent?.let { rates ->
-        rates.keys == Rarity.entries.toSet() && rates.values.all { it >= BigDecimal.ZERO && it <= BigDecimal(100) } &&
-            rates.values.fold(BigDecimal.ZERO, BigDecimal::add).compareTo(BigDecimal(100)) == 0
-    } == true
+    fun ratesValid(): Boolean {
+        val percent = appliedPercent
+        val ratio = appliedRatio
+        if (percent == null && ratio == null) return false
+        if (percent != null && (percent.keys != Rarity.entries.toSet() ||
+            percent.values.any { it < BigDecimal.ZERO || it > BigDecimal(100) } ||
+            percent.values.fold(BigDecimal.ZERO, BigDecimal::add).compareTo(BigDecimal(100)) != 0)) return false
+        if (ratio != null && !ratio.valid()) return false
+        // 둘 다 공급했으면 반올림 없이 교차 곱해 같은 확률인지 검사한다.
+        return percent == null || ratio == null || Rarity.entries.all { rarity ->
+            percent.getValue(rarity).multiply(BigDecimal.valueOf(ratio.denominator))
+                .compareTo(BigDecimal.valueOf(ratio.numerators.getValue(rarity)).multiply(BigDecimal(100))) == 0
+        }
+    }
     fun displayProblem(): GachaAvailability? {
         if (availability != GachaAvailability.READY) return availability
         val keys = options.mapNotNull { it.requestId }
@@ -50,7 +72,7 @@ data class GachaOffers(
         val ids = candidates ?: return GachaAvailability.MISSING
         if (ids.isEmpty()) return GachaAvailability.EMPTY_CANDIDATES
         if (ids.distinct().size != ids.size || ids.any { id -> c.catalog.vehicles.count { it.vehicleId == id } != 1 || c.vehicles.count { it.vehicleId == id } != 1 }) return GachaAvailability.INVALID_DISPLAY
-        if (appliedPercent == null) return GachaAvailability.MISSING
+        if (appliedPercent == null && appliedRatio == null) return GachaAvailability.MISSING
         if (!ratesValid()) return GachaAvailability.INVALID_DISPLAY
         val g = guarantee ?: return GachaAvailability.MISSING
         if (g.available == false) return GachaAvailability.GUARANTEE_UNAVAILABLE
