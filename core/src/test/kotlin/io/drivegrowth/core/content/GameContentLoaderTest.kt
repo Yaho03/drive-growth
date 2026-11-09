@@ -58,9 +58,9 @@ class GameContentLoaderTest {
         assertTrue(snapshot.trial)
         assertEquals(listOf(8, 14, 18, 20), (1..4).map { snapshot.unlockedAt(it).size })
         val prices = snapshot.vehicles.associate { it.vehicleId.value to it.price.units }
-        assertEquals(8_000L, prices["hyundai_casper"])      // 1.0
-        assertEquals(13_600L, prices["hyundai_staria_tourer"]) // 1.7
-        assertEquals(24_000L, prices["genesis_g90"])        // 3.0, 최고가 = 최저가의 3배
+        assertEquals(1_000L, prices["hyundai_casper"])      // 1.0
+        assertEquals(1_700L, prices["hyundai_staria_tourer"]) // 1.7
+        assertEquals(3_000L, prices["genesis_g90"])        // 3.0, 최고가 = 최저가의 3배
         assertEquals(prices.values.max(), prices.values.min() * 3)
         // 첫 지급 후보(캐스퍼·아반떼)는 Lv1에 있다
         assertTrue(snapshot.unlockedAt(1).map { it.vehicleId.value }.containsAll(listOf("hyundai_casper", "hyundai_avante")))

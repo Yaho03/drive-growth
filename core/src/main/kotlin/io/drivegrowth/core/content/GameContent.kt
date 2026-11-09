@@ -60,7 +60,7 @@ sealed interface ContentLoad {
  * # content_version=...
  * # rule_version=...
  * # trial=true
- * # price_unit=8000        (가격 비율 100%의 금액. 수익 단위(#44)가 정해지면 이 값만 바꾼다)
+ * # price_unit=1000        (가격 비율 100%의 금액. #44 합의 시험값)
  * # gacha_weights=COMMON:747,ADVANCED:200,RARE:50,LEGEND:3   (천분율, 합 1000)
  * # gacha_pity=30
  * # gacha_guaranteed_from=RARE
