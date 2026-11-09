@@ -64,4 +64,33 @@ class GachaHostSqliteTest : InstrumentationTestCase() {
         assertEquals(result,ok(source.commit(command)))
         assertEquals(result,ok(unavailable.commit(command)))
     }
+    fun testGuaranteedRatioKeepsCoreDrawAndStoredReplay() {
+        val guaranteedName="$name-guarantee"
+        val factory={ SqliteGameChangeStore(context,InputSource.SIMULATION,guaranteedName,
+            gachaAuthority={ ContractResult.Success(authority) },initialGachaProgress=GachaProgress(Revision(0),29,1)) }
+        try {
+            factory().use { ok(it.commitGameChange(GameChange(RequestId("guaranteed-fund"),TransactionKind.GARAGE,
+                InputSource.SIMULATION,content.ruleVersion,MoneyChange(MoneyDirection.CREDIT,GameMoney(2000))))) }
+            val source=StoredGachaHostSource(context,InputSource.SIMULATION,factory)
+            val frames=mutableListOf<GachaFrame>()
+            val host=GachaHostController(source,{ it() },{ it() },{ ContractResult.Success(Unit) },
+                { frame,_->frames+=frame },{ _,_-> },{})
+            host.setControlsEnabled(true);assertTrue(host.load())
+            val offers=(frames.last().screen as GachaScreen.Offers).value
+            assertNull(offers.appliedPercent);assertEquals(53L,offers.appliedRatio!!.denominator)
+            val expected=factory().use { ok(io.drivegrowth.core.garage.GachaPull(content).prepare(it,
+                offers.options[0].requestId!!,GachaTicketUse.PURCHASED)) }
+            assertTrue(host.draw(GachaRequest(frames.last().generation,GachaDrawInput(offers,offers.options[0]),"guaranteed")))
+            val command=host.snapshot().pending!!.command!!
+            assertEquals(expected,command);assertTrue(command.award.guaranteed)
+            assertTrue(command.award.vehicle.rarity>=Rarity.RARE)
+            val original=(frames.last().screen as GachaScreen.Result).value.settlement
+            val restored=GachaHostController(source,{ it() },{ it() },{ ContractResult.Success(Unit) },
+                { frame,_->frames+=frame },{ _,_-> },{},host.snapshot())
+            restored.setControlsEnabled(true);assertTrue(restored.retry("same-guaranteed"))
+            assertEquals(original,(frames.last().screen as GachaScreen.Result).value.settlement)
+            factory().use { assertEquals(GameMoney(1500),ok(it.balance()));assertEquals(1,ok(it.listOwnedVehicles()).size) }
+        } finally { context.deleteDatabase(guaranteedName) }
+    }
+
 }

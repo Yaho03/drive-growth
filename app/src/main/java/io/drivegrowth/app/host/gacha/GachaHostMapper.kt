@@ -22,20 +22,20 @@ fun mapGachaOffers(content: GameContentSnapshot, state: GachaState, balance: Gam
     val weights = Rarity.entries.associateWith { if (!guaranteed || it >= a.guaranteedFrom) content.gacha.weights[it] ?: 0 else 0 }
     val total = weights.values.sumOf { it.toLong() }
     if (total <= 0) return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
-    // 표시 정밀도 정책 없이 순환소수를 반올림하거나 합100을 맞추려고 확률을 바꾸지 않는다.
+    // 유한소수는 기존 표시를 유지하고 순환소수는 원시 가중치/분모를 직접 표시한다.
     val rates = try { weights.mapValues { BigDecimal.valueOf(it.value.toLong()).multiply(BigDecimal(100)).divide(BigDecimal(total)) } }
-        catch (_: ArithmeticException) { return ContractResult.Failure(ContractError.POLICY_UNRESOLVED) }
+        catch (_: ArithmeticException) { null }
     val availability = when { candidates.isEmpty() -> GachaAvailability.EMPTY_CANDIDATES
         owned >= a.garageCapacity -> GachaAvailability.NO_SPACE; else -> GachaAvailability.READY }
     return ContractResult.Success(GachaOffers(content, candidates, rates,
-        GachaGuarantee(a.pity - p.drawsSinceGuarantee, guaranteed, true, "확정된 가챠 진행 상태"),
+        GachaGuarantee(a.pity - p.drawsSinceGuarantee, guaranteed, candidates.isNotEmpty(), "확정된 가챠 진행 상태"),
         GachaSpace(owned, a.garageCapacity, availability), balance, a.purchasePrice, listOf(
             GachaOption("paid", "게임머니로 뽑기", GachaOptionKind.PAID, a.purchasePrice, 0, 0, paid,
                 if (balance.units < a.purchasePrice.units) GachaAvailability.INSUFFICIENT_MONEY else GachaAvailability.READY,
                 "뽑기권 구입과 사용을 함께 확정합니다."),
             GachaOption("free", "무료권으로 뽑기", GachaOptionKind.FREE, GameMoney(0), 1, p.freeTickets.toInt(), free,
                 if (p.freeTickets == 0L) GachaAvailability.INSUFFICIENT_TICKETS else GachaAvailability.READY,
-                "저장된 무료권 1장을 사용합니다.")), availability, origin))
+                "저장된 무료권 1장을 사용합니다.")), availability, origin, GachaRatio(weights.mapValues { it.value.toLong() }, total)))
 }
 
 /** callback 자체가 아닌 저장소의 전체 결과만 표시한다. 현재 잔액/개체로 원래 결과를 덮지 않는다. */

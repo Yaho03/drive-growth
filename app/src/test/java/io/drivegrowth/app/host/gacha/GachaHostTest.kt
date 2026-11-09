@@ -36,9 +36,15 @@ class GachaHostTest {
         assertEquals(GachaAvailability.INSUFFICIENT_TICKETS, ok(offers(noTickets)).options[1].availability)
     }
 
-    @Test fun `순환소수 보장 확률을 임의 표시값으로 만들지 않는다`() {
+    @Test fun `보장 회차의 순환소수는 원시 비율로 정확히 표시하고 제출할 수 있다`() {
         val guaranteed = state.copy(progress = state.progress.copy(drawsSinceGuarantee = 29))
-        assertEquals(ContractResult.Failure(ContractError.POLICY_UNRESOLVED), offers(guaranteed))
+        val value = ok(offers(guaranteed))
+        assertNull(value.appliedPercent)
+        assertEquals(53L,value.appliedRatio!!.denominator)
+        assertEquals(50L,value.appliedRatio.numerators.getValue(Rarity.RARE))
+        assertEquals(3L,value.appliedRatio.numerators.getValue(Rarity.LEGEND))
+        assertEquals(0L,value.appliedRatio.numerators.getValue(Rarity.COMMON))
+        assertNull(value.displayProblem())
     }
 
     @Test fun `버전 불일치와 표현 범위 초과 무료권은 명시 거절한다`() {

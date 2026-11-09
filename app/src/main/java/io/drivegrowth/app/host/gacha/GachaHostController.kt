@@ -162,7 +162,7 @@ class GachaHostController(
             ContractError.CAPACITY_EXCEEDED -> "차고 공간이 부족합니다."
             ContractError.INSUFFICIENT_FUNDS -> if (saved.pending?.request?.input?.option?.kind == GachaOptionKind.FREE) "무료권이 부족합니다." else "게임머니가 부족합니다."
             ContractError.STATE_CONFLICT -> "확인한 조건이 달라졌습니다. 보관한 요청의 결과를 확인해 주세요."
-            ContractError.POLICY_UNRESOLVED -> "이번 확률의 표시 기준이 확인되지 않았습니다."
+            ContractError.POLICY_UNRESOLVED -> "가챠 조건을 확인할 수 없습니다."
             ContractError.UX_RESTRICTED -> "현재 가챠 조작이 제한됩니다."
             else -> "결과를 확인하지 못했습니다. 같은 요청으로 다시 확인해 주세요."
         }
