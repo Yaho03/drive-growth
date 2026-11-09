@@ -2,6 +2,7 @@ package io.drivegrowth.core.contract
 
 import io.drivegrowth.core.content.GameContentSnapshot
 import io.drivegrowth.core.garage.FirstGrant
+import java.util.Collections
 
 @JvmInline
 value class ProfileId(val value: String) {
@@ -41,7 +42,7 @@ data class InitializationSettlement(
 )
 
 /** NEW 여부는 status의 양성 근거로만 판단한다. 초기 수치는 임시 기본값 없이 공급한다. */
-data class InitializationState(
+class InitializationState(
     val profileId: ProfileId,
     val source: InputSource,
     val contentVersion: ContentVersion,
@@ -52,9 +53,25 @@ data class InitializationState(
     val initialMoney: GameMoney,
     val initialGarageCapacity: Int,
     /** 저장 측 현재 콘텐츠에서 확인한 후보. 빈 집합을 제품 후보 기본값으로 채우지 않는다. */
-    val availableCandidates: Set<VehicleId>,
+    availableCandidates: Set<VehicleId>,
 ) {
+    val availableCandidates: Set<VehicleId> = Collections.unmodifiableSet(LinkedHashSet(availableCandidates))
     init { require(ownedVehicleCount >= 0 && initialGarageCapacity > 0) }
+
+    /** 명시 변경도 새 snapshot으로 만든다. copy의 기본 인수는 기존 값이며 초기값 보정이 아니다. */
+    fun copy(
+        profileId: ProfileId = this.profileId,
+        source: InputSource = this.source,
+        contentVersion: ContentVersion = this.contentVersion,
+        ruleVersion: RuleVersion = this.ruleVersion,
+        status: ProfileInitializationStatus = this.status,
+        balance: GameMoney = this.balance,
+        ownedVehicleCount: Int = this.ownedVehicleCount,
+        initialMoney: GameMoney = this.initialMoney,
+        initialGarageCapacity: Int = this.initialGarageCapacity,
+        availableCandidates: Set<VehicleId> = this.availableCandidates,
+    ): InitializationState = InitializationState(profileId, source, contentVersion, ruleVersion, status,
+        balance, ownedVehicleCount, initialMoney, initialGarageCapacity, availableCandidates)
 }
 
 /** Ready는 순수 예정 결과이며 지급 성공이 아니다. Replay는 저장 측이 검증한 원래 전체 결과다. */
@@ -106,8 +123,7 @@ fun prepareInitialization(command: InitializationCommand, current: Initializatio
         vehicle.levelProgressPercent != 0 || vehicle.rarity != Rarity.COMMON || vehicle.acquisitionCost.units != 0L ||
         vehicle.acquisitionSource != VehicleAcquisitionSource.INITIAL_GRANT)
         return ContractResult.Failure(ContractError.INVALID_INPUT)
-    val availableCandidates = current.availableCandidates.toSet()
-    if (vehicle.vehicleId !in availableCandidates) return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+    if (vehicle.vehicleId !in current.availableCandidates) return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
     return ContractResult.Success(InitializationPreparation.Ready(command, vehicle, current.initialMoney,
         current.initialGarageCapacity, InitializationMarker(current.profileId, grant.requestId, command.evidence)))
 }

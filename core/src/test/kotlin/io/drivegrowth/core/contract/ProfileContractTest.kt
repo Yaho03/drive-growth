@@ -166,6 +166,41 @@ class ProfileContractTest {
             f.newState.copy(availableCandidates=emptySet())))
     }
 
+    @Test fun `초기화 권위는 생성과 복사 뒤 원시 후보 집합 add remove clear에 영향받지 않는다`() {
+        val external=linkedSetOf(VehicleId("hyundai_avante"))
+        val base=f.newState
+        val constructed=InitializationState(base.profileId,base.source,base.contentVersion,base.ruleVersion,base.status,
+            base.balance,base.ownedVehicleCount,base.initialMoney,base.initialGarageCapacity,external)
+        val copied=base.copy(availableCandidates=external)
+        val unavailable=ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+        for (state in listOf(constructed,copied)) assertEquals(unavailable,prepareInitialization(f.initialization,state))
+        external.add(f.vehicle.vehicleId)
+        for (state in listOf(constructed,copied)) assertEquals(unavailable,prepareInitialization(f.initialization,state))
+        val allowedExternal=linkedSetOf(f.vehicle.vehicleId)
+        val allowed=base.copy(availableCandidates=allowedExternal)
+        allowedExternal.remove(f.vehicle.vehicleId)
+        assertTrue(prepareInitialization(f.initialization,allowed) is ContractResult.Success)
+        external.clear()
+        for (state in listOf(constructed,copied)) assertEquals(setOf(VehicleId("hyundai_avante")),state.availableCandidates)
+    }
+    @Test fun `초기화 상태가 노출한 후보 집합의 Java 변경은 허용하지 않는다`() {
+        val state=f.newState.copy(availableCandidates=linkedSetOf(f.vehicle.vehicleId))
+        val exposed=state.availableCandidates as MutableSet<VehicleId>
+        assertThrows(UnsupportedOperationException::class.java) { exposed.add(VehicleId("hyundai_avante")) }
+        assertThrows(UnsupportedOperationException::class.java) { exposed.remove(f.vehicle.vehicleId) }
+        assertThrows(UnsupportedOperationException::class.java) { exposed.clear() }
+        assertEquals(setOf(f.vehicle.vehicleId),state.availableCandidates)
+        assertTrue(prepareInitialization(f.initialization,state) is ContractResult.Success)
+    }
+    @Test fun `후보를 바꾼 명시적인 새 상태만 새로운 초기화 허용을 반영한다`() {
+        val external=linkedSetOf(VehicleId("hyundai_avante"))
+        val old=f.newState.copy(availableCandidates=external)
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),prepareInitialization(f.initialization,old))
+        val updated=old.copy(availableCandidates=external + f.vehicle.vehicleId)
+        assertTrue(prepareInitialization(f.initialization,updated) is ContractResult.Success)
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),prepareInitialization(f.initialization,old))
+    }
+
 }
 
 /** 조회 실패 전파만 확인하는 probe. 성공/확정/재생을 구현한 저장소가 아니다. */
