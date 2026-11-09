@@ -162,4 +162,35 @@ class InitializationStoreTest {
             assertEquals(GameMoney(1000),read(s).balance);assertEquals(1,ok(s.listOwnedVehicles()).size)
         } finally {pool.shutdownNow()}
     }
+    @Test fun `처분된 같은 개체 ID의 초기화는 기존 원장과 공간 마커를 보존한다`() {
+        for(lifecycle in listOf(VehicleLifecycle.SOLD,VehicleLifecycle.SCRAPPED,VehicleLifecycle.CONSUMED)) {
+            val previous=car.copy(lifecycle=lifecycle,revision=Revision(9),level=7)
+            val activities=mapOf(previous.ownedVehicleId to ContractResult.Success(VehicleActivity.IDLE))
+            val s=InMemoryGameChangeStore(listOf(previous),gachaState=gachaState(),
+                materialConfiguration=MaterialFixtureConfiguration(source,content.catalog.contentVersion,content.ruleVersion,activities),
+                initializationConfiguration=InitializationFixtureConfiguration(ContractResult.Success(fresh),null))
+            val beforeVehicle=ok(s.readMaterialState(previous.ownedVehicleId,previous.ownedVehicleId))
+            val beforeGacha=ok(s.readGachaState())
+            assertEquals(failure(ContractError.STATE_CONFLICT),s.commitInitialization(command()))
+            assertEquals(beforeVehicle,ok(s.readMaterialState(previous.ownedVehicleId,previous.ownedVehicleId)))
+            assertEquals(beforeGacha,ok(s.readGachaState()))
+            assertEquals(GameMoney(0),read(s).balance);assertEquals(0,read(s).ownedVehicleCount)
+            assertEquals(fresh.status,read(s).status);assertTrue(ok(s.listOwnedVehicles()).isEmpty())
+            // 결과/마커를 남기지 않아 같은 새 요청도 계속 충돌하며 원래 기록을 덮지 않는다.
+            assertEquals(failure(ContractError.STATE_CONFLICT),s.commitInitialization(command()))
+        }
+    }
+    @Test fun `공개 Add 처분 이후에도 초기화가 같은 ID를 재사용하지 않는다`() {
+        val s=store()
+        val add=GameChange(RequestId("prior-add"),TransactionKind.GARAGE,source,content.ruleVersion,vehicle=VehicleWrite.Add(car))
+        ok(s.commitGameChange(add))
+        val dispose=GameChange(RequestId("prior-dispose"),TransactionKind.GARAGE,source,content.ruleVersion,
+            vehicle=VehicleWrite.Update(car.ownedVehicleId,Revision(0),1,VehicleLifecycle.SOLD,0))
+        val sold=ok(s.commitGameChange(dispose))
+        assertEquals(failure(ContractError.STATE_CONFLICT),s.commitGameChange(add.copy(requestId=RequestId("another-add"))))
+        assertEquals(failure(ContractError.STATE_CONFLICT),s.commitInitialization(command()))
+        assertEquals(GameMoney(0),read(s).balance);assertEquals(fresh.status,read(s).status)
+        assertTrue(ok(s.listOwnedVehicles()).isEmpty());assertEquals(sold,ok(s.commitGameChange(dispose)))
+    }
+
 }

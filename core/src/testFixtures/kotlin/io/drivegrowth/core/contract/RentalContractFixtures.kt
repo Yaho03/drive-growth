@@ -260,6 +260,8 @@ class InMemoryGameChangeStore(
         }
         if (prepared is InitializationPreparation.Replay) return ContractResult.Success(prepared.result)
         prepared as InitializationPreparation.Ready
+        // 새 지급도 일반 Add처럼 처분 이력을 포함한 기존 개체 ID를 재사용하지 않는다.
+        if (prepared.vehicle.ownedVehicleId in vehiclesById) return failure(ContractError.STATE_CONFLICT)
         nextCommitFailure?.let {
             nextCommitFailure = null
             return failure(it)
