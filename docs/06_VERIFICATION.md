@@ -1393,3 +1393,10 @@ TDD: capability assertion1실패 → 수리 동작14개 중13실패 → 같은14
 게시 조율: 위 자료는 원작성/독립 검토 당시 실행 기록이다. #150은 이후 main2d4658e로 반영돼 실제 현재 제품 소스를 소비할 수 있다. 최신 main과의 최종 조합 검토·CI 및 원격 공급 상태는 연결 PR을 따른다. 앞 절의 수리 commit 미제공은 당시 상태이며 이번 수리 메모리 참조 공급 범위로만 갱신한다. SQLite/live 공급·초기화/선물 commit과 전체 기능은 여전히 미제공이다.
 
 게시 담당이 최신 maine1dc5c8(#154 문서 동기화 포함)을 일반 merge한 조합에서 수리 계약 소비/원장 표적18개(RepairStore15·VehicleRepair3)를 직접 실행해 실패/오류/생략0을 확인했다. 앱 단위시험 소비 컴파일·Debug APK·Lint도42초에 성공했으며 Lint 오류0·경고20이다. 기존 독립67개 전체를 재실행하지 않았다. 원본 소유3파일 바이트 동일성을 유지했고 RepairContract 변경은 미제공 설명을 실제 참조 제공으로 바로잡는 KDoc뿐이다. 새 기기·SQLite/live·제품 프로세스 시험은 수행하지 않았다.
+
+
+### #157 수리 wrapper의 실제 메모리 소비 — 2026-11-09
+
+[PR #157](https://github.com/Yaho03/drive-growth/pull/157)은 head0409454의 시험2개와02 정정을 main3a0181f에 반영했다. 독립 검토자가 수리5(새2 포함)·RepairStore15·RepairContract13 총33개를36초에 실행해 실패/오류/생략0과 APPROVE·필수수정0을 확인했다. 작성자의 전체374개와 합산하지 않는다. 최초 SDK 위치 미지정은 Gradle 구성 실패였고 기존 SDK 환경변수 지정 후 위 실행에 성공했다. 정확 head의 repository/android CI4개도 성공했다.
+
+실제 InMemoryGameChangeStore에서 prepare→수리비 차감/IDLE/revision·최초 결과 재생·실패 무변경을 확인한 소비다. 440은8000 기준 시험 콘텐츠의 희귀 캐스퍼 견적이며 현재 실제assets1000의 새 가격 결정이 아니다. SQLite/live 공급·DB 재개방·제품 UI/프로세스·실차나 #49/#121/#122 전체 완료는 아니다. 별도 사람 PR 승인은 미확보이며 사용자 위임에 따른 일반 merge 예외와 근거는 PR에 기록했다. 관련 이슈에는 부분만 체크하고 담당·라벨·전체 미완료를 유지했다.
