@@ -576,3 +576,14 @@ PR #127은 가챠 검토용 커밋 `08eb3c4`를 기반으로 `core.contract.Mate
 ### 휴식 저장의 현재 검토 경계 — 2026-11-09
 
 [#143](https://github.com/Yaho03/drive-growth/pull/143)의 `RestLedger`는 출발/기간 소모·전체 명령 재생을 위한 부분 제안이며 main 공급 전이다. [이력 완전성 수정 요청](https://github.com/Yaho03/drive-growth/pull/143#pullrequestreview-5820998093)이 남아 있다. 누락 이력을 정상 상태로 복원하지 않는 수정과 기존 재생/rollback 회귀를 확인한 뒤 #122가 공용 연결·테이블/이전과 기본 주행 수익의 원자 소모를 연결한다. 실제 구간/장소·정차 번호 발급·음성·제품 화면은 기존 담당 경계를 유지한다. 새 제품 규칙을 확정하거나 팀원 코드를 대신 구현한 변경이 아니다.
+
+
+### #52 가챠 호스트 명령 보존과 정확한 비율 표시
+
+`app.host.gacha.StoredGachaHostSource`는 실제 assets와 기존 SqliteGameChangeStore를 GachaStoreHostSource/GachaPull로 연결한다. 권위/진행이 없으면 DATA_UNAVAILABLE이며 초기 재화·무료권·권위값을 주입하지 않는다. 명시 factory는 같은 프로필·출처의 기존 구성 저장소를 연다. 여러 조회를 원자 일괄 조회라고 약정하지 않으며 최종 경쟁은 commitGacha 책임이다.
+
+GachaHostController는 확인 입력을 입구에서 한 번 고정하고 같은 사본을 검사·saved·worker prepare·응답 상관에 사용한다. 전체 GachaCommand의 checkpoint 성공 뒤에만 commit하며 반환한 원래 GachaSettlement로 새 Result를 공급한다. 반복/복원 재시도는 같은 command만 제출하고 현재 콘텐츠/권위 조회를 과거 재생보다 먼저 강제하지 않는다. command 없는 준비 실패를 retry에서 새 prepare로 바꾸지 않는다. clearUnprepared의 반환 키가 있을 때만 미제출 UI 예약을 해소한다. command가 있거나 결과가 불명이면 유지하며 제한/해제/옛 표시 세대·늦은 응답을 검사한다.
+
+GachaOffers는 기존 appliedPercent와 선택적 GachaRatio를 받는다. GachaRatio는 모든 Rarity의 원시 Long 가중치·양수 Long 분모를 불변 Map으로 보존하고 음수/키/합을 검사한다(BigInteger 합으로 overflow 방지). 둘 중 하나는 필요하며 함께 주면 percent×분모=가중치×100을 정확히 비교한다. 일반 회차는 기존74.7/20/5/0.3%를 유지하고 보장 회차는0/53·0/53·50/53·3/53을 직접 표시한다. 임의 반올림·합100 잔여 배분·core 확률 변경 없이 정상 prepare/commit/retry로 이어진다. 순환소수는 정책 미정 오류가 아니다. 실제 권위/보장 후보 누락은 기존 오류를 유지한다.
+
+보존 입출력은 GachaHostState의 generation·pending GachaRequest(전체 확인 입력/attemptId)·GachaCommand 전체다. 같은 프로필의 최신 GachaUiState도 함께 복원하고 이전 owner는 release한다. durable checkpoint/codec와 MainActivity 조립은 미제공이며 새 DB/SharedPreferences를 만들지 않았다. 누락 command를 명시적 미준비 null로 보정하지 않는다. freeTickets가 기존 UI Int 범위를 넘으면 0으로 채우지 않고 DATA_UNAVAILABLE다.
