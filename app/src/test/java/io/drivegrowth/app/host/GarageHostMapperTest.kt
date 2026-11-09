@@ -59,13 +59,13 @@ class GarageHostMapperTest {
     @Test fun collectionUsesOnlyExplicitHistoricalKeysAndKeepsOwnedAfterDisposal() {
         val key = CollectionKey(model, Rarity.RARE)
         val discovered = CollectionKey(model, Rarity.ADVANCED)
-        val history = CollectionHistory(setOf(key), setOf(discovered))
+        val history = CollectionHistory(setOf(key), setOf(discovered), InputSource.SIMULATION, content.catalog.contentVersion, content.ruleVersion)
         val state = mapper.collection(data(), ContractResult.Success(history)) as CollectionScreenState.Content
         assertEquals(CollectionState.OWNED, state.entries.single { it.entry.key == key }.entry.state)
         assertEquals(CollectionState.DISCOVERED, state.entries.single { it.entry.key == discovered }.entry.state)
         assertNull(state.entries.first().unlockLabel)
         val noHistory = mapper.collection(data(vehicle("current")),
-            ContractResult.Success(CollectionHistory(emptySet(), emptySet()))) as CollectionScreenState.Content
+            ContractResult.Success(CollectionHistory(emptySet(), emptySet(), InputSource.SIMULATION, content.catalog.contentVersion, content.ruleVersion))) as CollectionScreenState.Content
         assertTrue(noHistory.entries.all { it.entry.state == CollectionState.UNDISCOVERED })
     }
 }
