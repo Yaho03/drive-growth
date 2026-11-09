@@ -5,7 +5,9 @@ import io.drivegrowth.core.contract.ContractError
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.InMemoryGameChangeStore
+import io.drivegrowth.core.contract.ContentVersion
 import io.drivegrowth.core.contract.InputSource
+import io.drivegrowth.core.contract.MaterialFixtureConfiguration
 import io.drivegrowth.core.contract.OwnedVehicle
 import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.contract.Rarity
@@ -168,5 +170,57 @@ class VehicleUpgradeTest {
         }
         assertEquals(fail(ContractError.STATE_CONFLICT), plan(target, material, rentedMaterial)) // 대여 중 재료
         assertEquals(fail(ContractError.STATE_CONFLICT), plan(target, material, always(VehicleActivity.NEEDS_REPAIR)))
+    }
+
+    // ── 재료 강화 저장(#121 MaterialChangeStore) ──
+    private val content = GameContentFixtures.loaded()
+    private val material = car("material", Rarity.COMMON, level = 20)
+    private fun materialStore(
+        activities: Map<OwnedVehicleId, ContractResult<VehicleActivity>> =
+            mapOf(target.ownedVehicleId to ContractResult.Success(VehicleActivity.IDLE), material.ownedVehicleId to ContractResult.Success(VehicleActivity.IDLE)),
+        contentVersion: ContentVersion = content.catalog.contentVersion,
+    ) = InMemoryGameChangeStore(listOf(target, material), GameMoney(300), materialConfiguration =
+        MaterialFixtureConfiguration(InputSource.SIMULATION, contentVersion, content.ruleVersion, activities))
+    private fun prepare(store: InMemoryGameChangeStore, id: String = "mat", t: VehicleRef = ref(target), m: VehicleRef = ref(material)) =
+        upgrade.prepareMaterial(store, RequestId(id), InputSource.SIMULATION, t, m)
+
+    @Test fun `재료 강화는 대상 성장과 재료 소비를 한 정산으로 확정하고 재제출은 처음 정산이다`() {
+        val store = materialStore()
+        val command = ok(prepare(store))
+        val first = ok(store.commitMaterial(command))
+        // 일반 재료 100% → 5레벨 40%에서 6레벨 40%. 재화는 쓰지 않는다.
+        assertEquals(listOf(6, 40, 1), listOf(first.target.level, first.target.levelProgressPercent, first.target.revision.value))
+        assertEquals(VehicleLifecycle.CONSUMED, first.material.lifecycle)
+        assertEquals(20, first.material.level) // 처분된 재료의 성장값 보존
+        assertNull(first.transaction.money)
+        assertEquals(GameMoney(300), first.balance)
+        assertEquals(listOf(first.target), ok(store.listOwnedVehicles()))
+
+        assertEquals(first, ok(store.commitMaterial(command))) // 응답 유실 후 같은 명령 재제출
+        // 성공 뒤 옛 화면 값으로 다시 만들면 재료가 이미 없어 거절된다(두 번 소비 안 됨)
+        assertEquals(fail(ContractError.STATE_CONFLICT), prepare(store, "again"))
+        assertEquals(fail(ContractError.DATA_UNAVAILABLE), prepare(store, "again", t = ref(first.target)))
+    }
+
+    @Test fun `저장 실패는 대상·재료·잔액을 모두 보존하고 같은 명령으로 다시 확정한다`() {
+        val store = materialStore()
+        val command = ok(prepare(store))
+        store.nextCommitFailure = ContractError.STORAGE_FAILURE
+        assertEquals(fail(ContractError.STORAGE_FAILURE), store.commitMaterial(command))
+        assertEquals(listOf(target, material), ok(store.listOwnedVehicles()))
+        assertTrue(store.commitMaterial(command) is ContractResult.Success)
+    }
+
+    @Test fun `같은 개체·사용 중·활동 누락·버전 불일치·재료 미공급 저장소는 명령을 만들지 않는다`() {
+        assertEquals(fail(ContractError.INVALID_INPUT), prepare(materialStore(), m = ref(target)))
+        for (busy in listOf(VehicleActivity.RENTED, VehicleActivity.RETURNING, VehicleActivity.NEEDS_REPAIR)) {
+            val s = materialStore(mapOf(target.ownedVehicleId to ContractResult.Success(VehicleActivity.IDLE), material.ownedVehicleId to ContractResult.Success(busy)))
+            assertEquals(fail(ContractError.STATE_CONFLICT), prepare(s))
+        }
+        val missing = materialStore(mapOf(target.ownedVehicleId to ContractResult.Success(VehicleActivity.IDLE)))
+        assertEquals(fail(ContractError.DATA_UNAVAILABLE), prepare(missing)) // IDLE로 보정하지 않음
+        assertEquals(fail(ContractError.STATE_CONFLICT), prepare(materialStore(contentVersion = ContentVersion("other"))))
+        assertEquals(fail(ContractError.STATE_CONFLICT), prepare(materialStore(), t = VehicleRef(target.ownedVehicleId, Revision(9))))
+        assertEquals(fail(ContractError.DATA_UNAVAILABLE), prepare(InMemoryGameChangeStore(listOf(target, material))))
     }
 }
