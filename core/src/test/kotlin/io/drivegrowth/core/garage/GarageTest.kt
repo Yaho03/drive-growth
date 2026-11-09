@@ -203,4 +203,71 @@ class GarageTest {
         assertEquals(before, entries)
         assertEquals(CollectionState.OWNED, entries.first { it.key == key }.state)
     }
+
+    @Test fun `저장된 처분 포함 이력과 발견 기록으로 도감을 만든다`() {
+        val soldLegend = vehicle("sold", g90, VehicleLifecycle.SOLD).copy(rarity = Rarity.LEGEND)
+        val consumedRare = vehicle("used", lifecycle = VehicleLifecycle.CONSUMED).copy(rarity = Rarity.RARE)
+        val ownedCommon = vehicle("own")
+        val seen = CollectionKey(casper, Rarity.ADVANCED)
+        val history = FakeHistory(ContractResult.Success(listOf(soldLegend, consumedRare, ownedCommon)), ContractResult.Success(setOf(seen)))
+
+        val state = ok(garage.collection(history)).associate { it.key to it.state }
+        assertEquals(CollectionState.OWNED, state[CollectionKey(g90, Rarity.LEGEND)])   // 판매 후에도 보유
+        assertEquals(CollectionState.OWNED, state[CollectionKey(casper, Rarity.RARE)])  // 재료 소비 후에도 보유
+        assertEquals(CollectionState.OWNED, state[CollectionKey(casper, Rarity.COMMON)])
+        assertEquals(CollectionState.DISCOVERED, state[seen])
+        assertEquals(20 - 4, state.values.count { it == CollectionState.UNDISCOVERED })
+        // 직접 키를 넘긴 계산과 같은 결과
+        assertEquals(ok(garage.collection(setOf(CollectionKey(g90, Rarity.LEGEND), CollectionKey(casper, Rarity.RARE), CollectionKey(casper, Rarity.COMMON)), setOf(seen))),
+            ok(garage.collection(history)))
+    }
+
+    /** 순회할 때마다 다른 내용을 내는 목록(리뷰 재현용). 마지막 단계 내용을 계속 낸다. */
+    private class ShiftingList(private val phases: List<List<OwnedVehicle>>) : java.util.AbstractList<OwnedVehicle>() {
+        var traversals = 0
+        private fun current() = phases[minOf(traversals, phases.size - 1)]
+        override val size: Int get() = current().size
+        override fun get(index: Int): OwnedVehicle = current()[index]
+        override fun iterator(): MutableIterator<OwnedVehicle> = current().toMutableList().iterator().also { traversals++ }
+    }
+
+    @Test fun `공급 이력이 순회마다 바뀌어도 처음 복사한 같은 사본으로 검사하고 계산한다`() {
+        val common = vehicle("dup")
+        val legendSameId = vehicle("dup", g90).copy(rarity = Rarity.LEGEND)
+        // 리뷰 재현: 앞 순회는 정상 1대, 이후 순회는 같은 ID의 손상 2대 → 손상 내용이 섞이면 안 된다
+        val laterCorrupt = ShiftingList(listOf(listOf(common), listOf(common), listOf(common, legendSameId)))
+        val state = ok(garage.collection(FakeHistory(ContractResult.Success(laterCorrupt)))).associate { it.key to it.state }
+        assertEquals(CollectionState.OWNED, state[CollectionKey(casper, Rarity.COMMON)])
+        assertEquals(CollectionState.UNDISCOVERED, state[CollectionKey(g90, Rarity.LEGEND)])
+        assertEquals(1, laterCorrupt.traversals) // 공급 목록은 한 번만 읽는다
+        // 반대로 처음 읽은 사본이 손상이면 이후 정상이어도 거절
+        val firstCorrupt = ShiftingList(listOf(listOf(common, legendSameId), listOf(common)))
+        assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT), garage.collection(FakeHistory(ContractResult.Success(firstCorrupt))))
+        assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT), garage.owned(ShiftingList(listOf(listOf(common, legendSameId), listOf(common)))))
+    }
+
+    @Test fun `이력·발견 조회 실패와 손상 이력은 빈 도감으로 바꾸지 않는다`() {
+        val ok = ContractResult.Success(listOf(vehicle("v1")))
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),
+            garage.collection(FakeHistory(ContractResult.Failure(ContractError.STORAGE_FAILURE))))
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
+            garage.collection(FakeHistory(ok, ContractResult.Failure(ContractError.DATA_UNAVAILABLE))))
+        assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT),
+            garage.collection(FakeHistory(ContractResult.Success(listOf(vehicle("v1"), vehicle("v1", g90))))))   // 중복 개체 ID
+        assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT),
+            garage.collection(FakeHistory(ContractResult.Success(listOf(vehicle("x", VehicleId("hyundai_unknown")))))))
+        assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT),
+            garage.collection(FakeHistory(ok, ContractResult.Success(setOf(CollectionKey(VehicleId("hyundai_unknown"), Rarity.COMMON))))))
+    }
+}
+
+/** 테스트용 이력 저장소. 실제 SQLite는 app의 SqliteGameChangeStore(#116). */
+internal class FakeHistory(
+    private val history: ContractResult<List<OwnedVehicle>>,
+    private val discovered: ContractResult<Set<CollectionKey>> = ContractResult.Success(emptySet()),
+) : VehicleHistoryStore {
+    override fun listVehicleHistory() = history
+    override fun discoveredVehicles() = discovered
+    override fun recordDiscoveries(catalog: VehicleCatalogSnapshot, keys: Set<CollectionKey>): ContractResult<Unit> =
+        throw UnsupportedOperationException("조회 시험에서는 쓰지 않음")
 }

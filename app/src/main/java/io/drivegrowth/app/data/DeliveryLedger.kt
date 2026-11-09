@@ -193,7 +193,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
                 if (previous.command != command) return@atomic failure(ContractError.STATE_CONFLICT)
                 return@atomic replay(previous)
             }
-            if (hasSettlement(db, requestId)) return@atomic failure(ContractError.STATE_CONFLICT)
+            if (store.requestUnavailable(db, requestId)) return@atomic failure(ContractError.STATE_CONFLICT)
             val stored = readList(db, request.list) ?: return@atomic failure(ContractError.DATA_UNAVAILABLE)
             if (!sameList(stored, request.list)) return@atomic failure(ContractError.STATE_CONFLICT)
 
@@ -203,7 +203,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
                 is ContractResult.Success -> result.value
             }
             val settlement = selected.payment?.let { payment ->
-                when (val recorded = store.record(db, payment, LedgerJson.command(payment).toString())) {
+                when (val recorded = store.record(db, payment, LedgerJson.command(payment).toString(), SqliteGameChangeStore.RequestDomain.DELIVERY)) {
                     is ContractResult.Failure -> return@atomic recorded
                     is ContractResult.Success -> recorded.value
                 }
@@ -309,7 +309,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         // 이 의뢰의 정산 ID를 다른 기록이 먼저 썼으면 그 정산을 이 도착의 결과로 재사용하지 않는다.
         if (hasSettlement(db, settleIdOf(requestId))) return@atomic failure(ContractError.STATE_CONFLICT)
         val recorded = change?.let {
-            when (val result = store.record(db, it, LedgerJson.command(it).toString())) {
+            when (val result = store.record(db, it, LedgerJson.command(it).toString(), SqliteGameChangeStore.RequestDomain.DELIVERY)) {
                 is ContractResult.Failure -> return@atomic result
                 is ContractResult.Success -> result.value
             }
@@ -367,7 +367,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
             is ContractResult.Success -> result.value
         }
         val recorded = changed.change?.let {
-            when (val result = store.record(db, it, LedgerJson.command(it).toString())) {
+            when (val result = store.record(db, it, LedgerJson.command(it).toString(), SqliteGameChangeStore.RequestDomain.DELIVERY)) {
                 is ContractResult.Failure -> return@atomic result
                 is ContractResult.Success -> result.value
             }
@@ -408,7 +408,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
             is ContractResult.Success -> result.value
         }
         val recorded = abandoned.change?.let {
-            when (val result = store.record(db, it, LedgerJson.command(it).toString())) {
+            when (val result = store.record(db, it, LedgerJson.command(it).toString(), SqliteGameChangeStore.RequestDomain.DELIVERY)) {
                 is ContractResult.Failure -> return@atomic result
                 is ContractResult.Success -> result.value
             }
@@ -465,7 +465,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
                 is HoldOutcome.Refunded -> outcome.change
             }
             if (hasSettlement(db, change.requestId)) return@atomic failure(ContractError.STATE_CONFLICT)
-            val recorded = when (val result = store.record(db, change, LedgerJson.command(change).toString())) {
+            val recorded = when (val result = store.record(db, change, LedgerJson.command(change).toString(), SqliteGameChangeStore.RequestDomain.DELIVERY)) {
                 is ContractResult.Failure -> return@atomic result
                 is ContractResult.Success -> result.value
             }
