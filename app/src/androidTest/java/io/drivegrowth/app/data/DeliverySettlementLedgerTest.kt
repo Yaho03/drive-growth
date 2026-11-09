@@ -41,16 +41,22 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
         super.setUp()
         name = "settle-test-" + System.nanoTime() + ".db"
         store = open()
-        ok(store.atomic { DeliveryLedger.createTables(it); DrivingLedger.createTables(it); ContractResult.Success(Unit) })
         ok(store.commitGameChange(GameChange(RequestId("seed"), TransactionKind.GARAGE, source, rule,
             MoneyChange(MoneyDirection.CREDIT, GameMoney(10_000)))))
         bind()
         ok(ledger.saveList(list))
     }
 
+    /** 공용 API가 새로 막는 예약 ID의 과거 오염 행을 시험 DB에 명시 주입한다. */
+    private fun injectLegacyChange(change: GameChange) {
+        ok(store.commitGameChange(change.copy(requestId = RequestId("legacy-seed"))))
+        val id = change.requestId.value
+        sql("UPDATE settlements SET request_id='$id', command=json_set(command,'$.request','$id'), result=json_set(result,'$.request','$id') WHERE request_id='legacy-seed'")
+    }
+
     override fun tearDown() { store.close(); context.deleteDatabase(name); super.tearDown() }
 
-    private fun bind() { ledger = DeliveryLedger(store); driving = DrivingLedger(store) }
+    private fun bind() { ledger = store.delivery; driving = store.driving }
 
     private fun reopen() { store.close(); store = open(); bind() }
 
@@ -267,11 +273,20 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
         assertEquals(10_000 + 4_990 + 10 + 10, balance())
     }
 
+    fun testFeatureOwnedRequestCannotReplayThroughGeneralWriter() {
+        val drive = ok(driving.settle(drivingRules, ConfirmedDrive("owned", today, ObservedDistance(1_000, source))))
+        val t = checkNotNull(drive.settlement).transaction
+        val sameChange = GameChange(t.requestId, t.kind, t.source, t.ruleVersion, t.money)
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), store.commitGameChange(sameChange))
+        assertEquals(drive, ok(driving.settle(drivingRules, ConfirmedDrive("owned", today, ObservedDistance(1_000, source)))))
+        assertEquals(10_010, balance())
+    }
+
     fun testDriveIdUsedByAnotherLedgerEntryOrSourceIsRejected() {
-        ok(store.commitGameChange(GameChange(RequestId("drive/d1"), TransactionKind.GARAGE, source, rule,
-            MoneyChange(MoneyDirection.CREDIT, GameMoney(1)))))
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
-            driving.settle(drivingRules, ConfirmedDrive("d1", today, ObservedDistance(1_000, source))))
+            store.commitGameChange(GameChange(RequestId("drive/d1"), TransactionKind.GARAGE, source, rule,
+                MoneyChange(MoneyDirection.CREDIT, GameMoney(1)))))
+        ok(driving.settle(drivingRules, ConfirmedDrive("d1", today, ObservedDistance(1_000, source))))
         assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT),
             driving.settle(drivingRules, ConfirmedDrive("d2", today, ObservedDistance(1_000, InputSource.VEHICLE))))
     }
@@ -303,12 +318,25 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
     fun testArrivalForAnotherRequestOrUsedSettleIdIsRejected() {
         choose(purchase)
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), settle(arrival(), id = "other"))
-        ok(store.commitGameChange(GameChange(RequestId("delivery/r1/settle"), TransactionKind.GARAGE, source, rule,
-            MoneyChange(MoneyDirection.CREDIT, GameMoney(1)))))
+        injectLegacyChange(GameChange(RequestId("delivery/r1/settle"), TransactionKind.GARAGE, source, rule,
+            MoneyChange(MoneyDirection.CREDIT, GameMoney(1))))
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), settle(arrival()))
         assertEquals(7_001, balance())
         assertEquals(purchase, ok(ledger.active())?.offer)
         assertTrue(owned().isEmpty())
+    }
+
+    fun testArrivalReplayRejectsLossyRawMoneyFromSharedDecoder() {
+        choose(income)
+        ok(settle(arrival()))
+        sql("CREATE TABLE raw_money_backup AS SELECT * FROM settlements WHERE request_id='delivery/r1/settle'")
+        for (raw in listOf("400.75", "\"400\"", "400.0", "4e2", "9223372036854775808")) {
+            sql("UPDATE settlements SET result=replace(result,'\"amount\":400','\"amount\":$raw') WHERE request_id='delivery/r1/settle'")
+            assertStorageFailureKeepsRows({ settle(arrival()) }, { ledger.arrivalResult(RequestId("r1")) })
+            sql("DELETE FROM settlements WHERE request_id='delivery/r1/settle'",
+                "INSERT INTO settlements SELECT * FROM raw_money_backup")
+        }
+        assertNotNull(ok(ledger.arrivalResult(RequestId("r1"))))
     }
 
     fun testStoredArrivalThatDoesNotMatchItsCommandIsStorageFailure() {
@@ -341,8 +369,8 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
     fun testFinishedArrivalWithoutMoneyButWithSettlementIsStorageFailure() {
         choose(income)
         ok(settle(Observation.Missing(MissingReason.NO_DATA), now = start.value + dayMs))
-        ok(store.commitGameChange(GameChange(RequestId("delivery/r1/settle"), TransactionKind.DELIVERY, source, rule,
-            MoneyChange(MoneyDirection.CREDIT, GameMoney(400)))))
+        injectLegacyChange(GameChange(RequestId("delivery/r1/settle"), TransactionKind.DELIVERY, source, rule,
+            MoneyChange(MoneyDirection.CREDIT, GameMoney(400))))
         assertStorageFailureKeepsRows({ settle(Observation.Missing(MissingReason.NO_DATA), now = start.value + dayMs) })
     }
 
