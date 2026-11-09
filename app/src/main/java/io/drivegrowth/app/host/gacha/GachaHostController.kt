@@ -62,23 +62,24 @@ class GachaHostController(
 
     fun draw(request: GachaRequest): Boolean {
         if (released || !allowed || busy || confirmed) return false
+        val fixed = request.frozen()
         val currentOffers = (frame.screen as? GachaScreen.Offers)?.value
-        if (currentOffers != null && (request.generation != frame.generation || request.input.offers != currentOffers || request.input.option !in currentOffers.options)) {
-            complete(request, ContractResult.Failure(ContractError.STATE_CONFLICT)); return false
+        if (currentOffers != null && (fixed.generation != frame.generation || fixed.input.offers != currentOffers || fixed.input.option !in currentOffers.options)) {
+            complete(fixed, ContractResult.Failure(ContractError.STATE_CONFLICT)); return false
         }
         val prior = saved.pending
         if (prior != null && prior.command == null) {
-            complete(request, ContractResult.Failure(ContractError.DATA_UNAVAILABLE)); return false
+            complete(fixed, ContractResult.Failure(ContractError.DATA_UNAVAILABLE)); return false
         }
-        if (prior != null && prior.request.input != request.input) {
-            complete(request, ContractResult.Failure(ContractError.STATE_CONFLICT)); return false
+        if (prior != null && prior.request.input != fixed.input) {
+            complete(fixed, ContractResult.Failure(ContractError.STATE_CONFLICT)); return false
         }
-        if (request.input.offers.displayProblem() != null || request.input.option.displayProblem() != null) {
-            complete(request, ContractResult.Failure(ContractError.INVALID_INPUT)); return false
+        if (fixed.input.offers.displayProblem() != null || fixed.input.option.displayProblem() != null) {
+            complete(fixed, ContractResult.Failure(ContractError.INVALID_INPUT)); return false
         }
-        saved = saved.copy(pending = GachaHostPending(request.frozen(), prior?.command))
-        if (checkpoint(saved) is ContractResult.Failure) { fail(request, ContractError.STORAGE_FAILURE, null); return false }
-        run(request, null)
+        saved = saved.copy(pending = GachaHostPending(fixed, prior?.command))
+        if (checkpoint(saved) is ContractResult.Failure) { fail(fixed, ContractError.STORAGE_FAILURE, null); return false }
+        run(fixed, null)
         return true
     }
 
@@ -117,7 +118,7 @@ class GachaHostController(
                 if (!released && sequence == serial) when (result) {
                     is ContractResult.Failure -> fail(request, result.error, reload)
                     is ContractResult.Success -> {
-                        saved = saved.copy(pending = GachaHostPending(request.frozen(), result.value))
+                        saved = saved.copy(pending = GachaHostPending(request, result.value))
                         if (checkpoint(saved) is ContractResult.Failure) fail(request, ContractError.STORAGE_FAILURE, reload)
                         else if (!allowed) fail(request, ContractError.UX_RESTRICTED, reload)
                         else commit(serial, request, result.value, reload)
