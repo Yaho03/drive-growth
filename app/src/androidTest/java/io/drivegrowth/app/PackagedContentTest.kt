@@ -11,7 +11,7 @@ class PackagedContentTest : InstrumentationTestCase() {
         val first = (AssetGameContent(assets).load() as ContentLoad.Loaded).snapshot
         val next = (AssetGameContent(assets).load() as ContentLoad.Loaded).snapshot
         assertTrue(first.trial)
-        assertEquals("trial-content-2026-11-07", first.catalog.contentVersion.value)
+        assertEquals("trial-content-2026-11-09", first.catalog.contentVersion.value)
         assertEquals(20, first.vehicles.size)
         assertEquals(first, next)
     }

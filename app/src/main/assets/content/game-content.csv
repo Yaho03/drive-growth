@@ -1,7 +1,7 @@
-# content_version=trial-content-2026-11-07
+# content_version=trial-content-2026-11-09
 # rule_version=trial-rule-2026-11-07
 # trial=true
-# price_unit=8000
+# price_unit=1000
 # gacha_weights=COMMON:747,ADVANCED:200,RARE:50,LEGEND:3
 # gacha_pity=30
 # gacha_guaranteed_from=RARE

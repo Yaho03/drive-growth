@@ -1359,6 +1359,21 @@ JDK17·기존 Android SDK35·Gradle8.11.1, `--offline --no-daemon`을 사용했�
 
 #148은 head2928315의 정식354개 통과·구조32개 통과와 최종 코드 APPROVE 후 main0448398에 반영됐다. 코드 독립7개 중6통과·1실패는 prepare에서 출처를 반드시 거절하라는 더 강한 기대였으며, 실제 commit의 INVALID_INPUT/무변경을 확인해 초기 P2를 철회했다. 실패 원문을 보존하고7개 통과로 바꾸지 않았다. #150은 코드13개·구조7개 및CI 성공을 확인했으나 사용자가 검토 결과만 기록하고 머지를 보류해 OPEN이며 실제 수리 commit은 미제공이다.
 
+
+### 최근 PR 조율·이슈 부분 완료 대조 — 2026-11-09
+
+[PR #153](https://github.com/Yaho03/drive-growth/pull/153)은 검토 head8aaac7a에서 일반 merge38b3b517로 반영됐고 PR CI4개와 해당 main CI가 성공했다. 위45개 JVM·원검토2d95의 장치4개 근거를 재사용하며 새 제품 실행으로 소급하지 않는다. [PR #148](https://github.com/Yaho03/drive-growth/pull/148)의 main0448398 CI도 성공했다.
+
+[PR #150](https://github.com/Yaho03/drive-growth/pull/150)은 과거 사용자 보류·검토 COMMENT 이후 메인 조율에서 전달된 새 승인 판단 위임에 따라 검토 head847d415를 일반 merge2d4658e로 반영했다. 독립 코드13PASS/구조7PASS의 겹치는 시험은 합산하지 않는다. 실제 commitRepair·SQLite·제품 전체 공급은 미제공이다. 별도 사람 PR 승인 미확보와 사용자 위임 근거는 PR에 기록했다. 과거 보류 당시 기록은 현재 머지 상태와 구분한다.
+
+[PR #151](https://github.com/Yaho03/drive-growth/pull/151)은 head64afe55에서 EXISTING의 원래 초기화 결과 재생을 현재 콘텐츠로 다시 준비해 버전/후보 변경 때 복원이 실패하는 P2 수정 요청이다. 코드 정식356PASS와 독립7개 중5PASS/2FAIL(오류0)을 구분한다. 호열의 코드 수정·같은 두 회귀 기대값·원리뷰 회신은 #50에 연결했으며 #121 실제 메모리 commit 요청과 별개다. [PR #143](https://github.com/Yaho03/drive-growth/pull/143)의 소비 원장 누락 탐지 P2도 미해결이며 이를 실제 중복 지급 실행으로 확대하지 않는다.
+
+[PR #152](https://github.com/Yaho03/drive-growth/pull/152)는 head6339af0의 합의된 차종 기준 가격1000·콘텐츠 버전 trial-content-2026-11-09를 main07a5703에 반영했다. 독립 코드 콘텐츠12+경계3=15PASS, 구조 가격/버전·과거 정산26PASS, 최신 #153 조합 가챠25PASS와 AndroidTest 소스 컴파일 근거를 대조했다. 겹치는 시험을 합산하지 않는다. 기존 취득액0/500/8000·원래 정산 재생, 신규 content/옛 authority 충돌·별도 가챠 단가500을 확인한 메모리/순수 검증이며 새 SQLite 전환·새 APK 기기·제품 재시작 검증은 아니다. 과거 trial-content-2026-11-07 기기 기록과8000 fixture는 당시/시험 입력 근거로 유지한다. 실제 권위 버전 전환과 제품 표시·재개방은 #35/#47/#51/#122의 기존 후속이다. 대여료/시설 전체1/8 조정이나 최종 경제 밸런스 확정으로 보지 않는다.
+
+열린 이슈33개·감사 snapshot335체크·41이슈댓글과 관련 PR 본문/리뷰/줄 댓글을 대조한 초안은 독립 검토 후14이슈31치환을 최신 본문 해시와 대조해 반영했다. 이미 제공된 core/SQLite/mapper·View fixture의 부분만 체크하고 제품 프로세스·실차/폼 팩터·미제공 저장 확정 조건을 유지했다. 전체 종료 후보0이므로 이슈를 닫지 않았다. #121 메모리 수리→초기화→선물 요청과 #122 SQLite 후속은 원 댓글·담당·남은 조건에 연결했다. 담당/라벨·차단 관계를 일괄 변경하지 않았다. 이는 기존 근거 감사이며 새 제품 시험 실행 결과가 아니다.
+
+최근 검증 감사는 2026-11-06~09의 조회 가능한 PR46개에 대해 과거 실행·수정/철회·소스 변경 후 후속 근거를 대조했다. 기존 main38b3 snapshot의 #150 보류·#152 독립 근거 미회수 표기는 이후 각각 새 판단 위임 일반 merge와 코드/구조 근거 회수·직접 승인 merge로 갱신됐다. #150 main2d4658e CI와 #152 main07a5703 CI도 성공했다. 실제 필수 결함은 #143/#151 두 건의 원래 회귀에 연결하고, #149 실제 View·#153 MainActivity/권위/durable 연결이 추가될 때 필요한 최소 표시/Back·gate·재생성/재시작 시험은 #28/#51/#52의 기존 후속에 유지한다. 원래 범위 밖 기능을 부분 PR의 새 반려 조건으로 만들거나 과거 시험을 전부 다시 실행하지 않았다. 외부 답변/공식 정책·폼 팩터/실차는 #80/#81/#82의 미완료 범위다.
+
 ### #122 재료 강화 SQLite 로컬 구현·본인 검증 — 2026-11-09
 
 main38b3b51의 #147 계약/메모리 참조·#148 VehicleUpgrade.prepareMaterial 소비를 기준으로 별도 app/122-material-sqlite 브랜치에서 구현했다. SqliteGameChangeStore의 MaterialChangeStore capability와 명시 버전 공급, 같은 DB 거래의 RentalLedger live 활동 조회, 두 개체/비용/공용 정산/최초 전체 결과를 연결했다. 스키마6 준비는 material_requests만 추가하며 지원 v1~v5 이전에서 기존 payload를 고치거나 프로필/무료권을 생성하지 않는다. 현재 구현/검증은 로컬이고 원격 PR·CI·main 공급 완료가 아니다.
@@ -1377,3 +1392,9 @@ main38b3b51의 #147 계약/메모리 참조·#148 VehicleUpgrade.prepareMaterial
 초기 시험 차량이 INITIAL_GRANT의 희귀도/취득액 제약 및 새 Add의 revision0 계약과 맞지 않아 각22개가 준비 단계에서 실패한 이력을 보존했다. fixture를 고친 뒤21/22가 통과했고, 남은1개는 대여 배정으로 올라간 revision을 제거된 대여 행과 함께 되돌렸다고 가정한 시험의 잘못이었다. 현재 revision을 반영하고 live 활동 검사를 강화한 뒤146개/최종 재료24개가 통과했다. 중간 시험 import 누락 컴파일 오류도 수정했으며 제품 회귀 red→green 근거로 세지 않는다.
 
 기존 제품 기기가 아닌 Medium_Phone_API_37.0의 읽기 전용·무스냅샷 전용 emulator-5580을 사용했다. JDK17/SDK35이며 Pleos API34·실차 결과로 표시하지 않는다. 실제 제품 권위 공급/UI 명령 영속 복원·프로세스/전원 시험은 미수행이고 수리/초기화/선물 commit·#122 전체 종료는 후속이다. 원문 로그는 /private/tmp/122-material-final-build.log, /private/tmp/122-material-device-full.log, /private/tmp/122-material-device-final-target.log에 보존했다.
+
+### #122 재료 SQLite 게시 전 최신 main 통합 — 2026-11-09
+
+사용자의 커밋·푸시·Draft PR 게시 지시에 따라 main e1dc5c8을 통합했다. 충돌은 06의 추가 기록뿐이며 main 원문과 위 재료 기록을 모두 보존했다. 기존 재료 제품/정식시험·공용 저장 소스는 로컬 구현0c5dc2f와 동일하다. main의 #150 수리 명령·#152 가격1000/콘텐츠 버전 변경은 공급 그대로 유지했으며 실제 수리 commit은 이 재료 PR 범위가 아니다.
+
+통합 후 core357·앱175개 실패/오류/생략0, APK/시험APK·lint·저장소/diff 검사 통과(BUILD SUCCESSFUL10초). 새 콘텐츠에서 MaterialLedgerTest24 + GachaPullSqliteTest4 = API37 SQLite28개 실패/오류0, 34.994초를 직접 실행했다. 원문은 /private/tmp/122-material-main-build.log와 /private/tmp/122-material-publish-device.log에 보존했다. 기존124개 전체를 이 main 조합에서 다시 실행한 것으로 표시하지 않으며 앞선146개/최종24개 근거와 구분한다. 원격 head/CI는 PR 게시 후 확인하고 Draft·미머지로 공유한다.
