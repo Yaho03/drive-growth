@@ -117,13 +117,15 @@ class FirstGrant(private val content: GameContentSnapshot) {
      * 개업 선물 명령: 같은 프로필 원장의 최초 완료 영업을 근거로 무료 뽑기권 +1(#121 `FirstRentalGiftCommand`).
      * 저장하지 않는다. 호출자가 `store.commitFirstRentalGift(command)`로 확정한다.
      * 이미 지급된 프로필은 원래 명령을 돌려주므로 다시 제출하면 저장소가 처음 결과를 재생한다(프로필당 1회).
-     * 거절: 완료 영업 없음 DATA_UNAVAILABLE / 버전·가챠 revision 불일치 STATE_CONFLICT / 조회 실패는 그대로.
+     * 거절: 다른 프로필·출처 INVALID_INPUT / 완료 영업 없음 DATA_UNAVAILABLE / 버전·가챠 revision 불일치 STATE_CONFLICT / 조회 실패는 그대로.
      */
     fun prepareOpeningGift(store: FirstRentalGiftStore, profileId: ProfileId, source: InputSource): ContractResult<FirstRentalGiftCommand> {
         val state = when (val result = store.readFirstRentalGift(profileId)) {
             is ContractResult.Failure -> return result
             is ContractResult.Success -> result.value
         }
+        if (state.profileId != profileId || state.source != source)
+            return ContractResult.Failure(ContractError.INVALID_INPUT)
         val command = state.granted?.command ?: run {
             val rental = state.firstCompletedRental ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
             FirstRentalGiftCommand(GIFT_REQUEST_ID, profileId, source, content.catalog.contentVersion, content.ruleVersion,

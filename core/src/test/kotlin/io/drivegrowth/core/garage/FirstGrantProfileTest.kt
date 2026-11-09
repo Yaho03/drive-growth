@@ -169,4 +169,18 @@ class FirstGrantProfileTest {
         for (error in listOf(ContractError.DATA_UNAVAILABLE, ContractError.STORAGE_FAILURE))
             assertEquals(fail(error), firstGrant.prepareOpeningGift(GiftStore(fail(error)), profile, f.source))
     }
+    @Test fun `개업 선물 준비는 이미 받은 경우에도 호출자의 다른 출처를 거절한다`() {
+        for (state in listOf(giftState, giftState.copy(granted = f.gifted, progress = f.gifted.progress))) {
+            assertEquals(fail(ContractError.INVALID_INPUT), firstGrant.prepareOpeningGift(
+                GiftStore(ContractResult.Success(state)), profile, io.drivegrowth.core.contract.InputSource.VEHICLE))
+        }
+    }
+
+    @Test fun `개업 선물 준비는 이미 받은 경우에도 호출자의 다른 프로필을 거절한다`() {
+        for (state in listOf(giftState, giftState.copy(granted = f.gifted, progress = f.gifted.progress))) {
+            assertEquals(fail(ContractError.INVALID_INPUT), firstGrant.prepareOpeningGift(
+                GiftStore(ContractResult.Success(state)), ProfileId("other-profile"), f.source))
+        }
+    }
+
 }
