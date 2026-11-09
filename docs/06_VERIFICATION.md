@@ -1345,3 +1345,16 @@ JDK17·기존 Android SDK35·Gradle8.11.1, `--offline --no-daemon`을 사용했�
 원본320309d의 장치3개 결과를 최신 main merge/head의 새 기기 실행으로 소급하지 않는다. 전체 조회는 순차 읽기이며 전후 개체 비교가 활동/공간/잔액·이력의 원자성을 보장하지 않는다. 실제 제품 View·D/P·관리 명령·발견 표시 이벤트 쓰기·제품 재실행/프로세스·실차는 미검증/후속이다. #52 전체 종료·ready/Blocked by 변경 근거로 확대하지 않는다. AI 코드/구조 검토와 실제 사람 승인을 구분하며 최종 원격 게시/CI/head는 연결 PR에서 확인한다.
 
 근거는 `/private/tmp/drive-next-implementation-20261109/garage-read/`의 원본 로그/XML, code-review/arch-review/summary.json, device/instrumentation.txt·installed.json·baseline/final.json, merge-source-identity.json·merge-minimal-checks.log에 보존했다. 이 절은 앞선 #147 통합·NFC 경로 진단/05 환경 근거를 변경하거나 대체하지 않는다.
+
+
+### #52 가챠 호스트·정확한 비율의 로컬 수정 검증 — 2026-11-09
+
+검토 head `2d95f62`(main `dda226d` 기준)은 호스트 입력 고정 `0c9c879`과 정확한 비율 표시/보장 연결을 제공한다. 검토 A의 같은 독립3개에서 mutable 후보 clear 회귀1개 실패를 재현한 뒤3개 모두 통과했다. 비율 확장 전21개 중5실패를 확인하고 호스트17+비율4+독립3+보장 호스트1=25개를 통과했다.
+
+최종 앱 전체164개 실패/오류/생략0, core는 변경 없어 기존298개 전체 실행 근거가 UP-TO-DATE로 유지됐다. Debug 조립·Lint·기기시험 Kotlin 컴파일·저장소/링크/diff 검사 통과. Lint 오류0·경고20. JDK17·SDK35·offline Gradle, 최종1분41초다. 기존 퍼센트·불변성·복원 회귀를 함께 확인했다. 이 수정은 보장 순환소수 표시를 새 경제 정책 결정으로 넘기지 않는다.
+
+작성자는 adb 금지로 기기시험을 작성·컴파일만 했다. 이후 독립 검증C가 정확2d95f627에서 실제 assets→GachaPull→SQLite 호스트3개와 분리된 GachaView 비율1개를 실행해 총4개 통과(1.022초, 실패/오류0)를 확인했다. View는 Activity에 부착되지 않은 시험이며 실제 화면/터치·D/P 시험이 아니다. 코드 검증A와 구조 검증C의 JVM45개씩은 중복 합산하지 않는다. 이전 alias P2는 같은 원소스/기대값으로 통과 전환을 확인했다. 검증C가 자기2패키지 제거·제품APK/정확6해시·권한/설정 보존·슬롯 반환을 확인했다. 정상 권위·진행·재화 주입은 고유 SIMULATION 시험 DB용이며 제품 기본값이 아니다. MainActivity/탐색 조립·실제 권위 공급·전체 command의 durable 보존/복원·제품 재시작/실차는 미검증이다. #52/#47/#122 전체 완료로 처리하지 않는다.
+
+게시 담당은 최신 main `0448398868eef90ee22f482b78ad86834e515eb3`를 별도 worktree에 일반 merge한 코드 head `af052f598d449ad124b976ab8e03617122100d84`에서 원검토2d95의13파일 바이트 동일성을 확인했다. 이 조합에서 `:app:testDebugUnitTest --tests '*Gacha*' :app:compileDebugAndroidTestKotlin`를 직접 실행해45개 실패/오류/생략0·시험소스 컴파일 성공(33초)을 확인했다. 최초 실행은 샌드박스의 Gradle 로컬 소켓 bind 제한으로 시험 시작 전에 실패했고, 소스 수정 없이 같은 오프라인 명령을 허용된 실행 환경에서 재시도했다. 새 장치 시험은 추가하지 않았다.
+
+#148은 head2928315의 정식354개 통과·구조32개 통과와 최종 코드 APPROVE 후 main0448398에 반영됐다. 코드 독립7개 중6통과·1실패는 prepare에서 출처를 반드시 거절하라는 더 강한 기대였으며, 실제 commit의 INVALID_INPUT/무변경을 확인해 초기 P2를 철회했다. 실패 원문을 보존하고7개 통과로 바꾸지 않았다. #150은 코드13개·구조7개 및CI 성공을 확인했으나 사용자가 검토 결과만 기록하고 머지를 보류해 OPEN이며 실제 수리 commit은 미제공이다.

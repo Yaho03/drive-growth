@@ -81,7 +81,11 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
         add(facts,card().apply {
             addView(text(s(R.string.gacha_rates),28,bold=true))
             if (!value.ratesValid()) addView(text(s(R.string.gacha_rates_missing)))
-            else Rarity.entries.forEach { r -> addView(text(s(R.string.gacha_rate,rarity(r),value.appliedPercent!!.getValue(r).stripTrailingZeros().toPlainString()),24,color=rarityColor(r))) }
+            else Rarity.entries.forEach { r ->
+                val rate = value.appliedPercent?.let { s(R.string.gacha_rate,rarity(r),it.getValue(r).stripTrailingZeros().toPlainString()) }
+                    ?: value.appliedRatio!!.let { "${rarity(r)} · ${it.numerators.getValue(r)}/${it.denominator}" }
+                addView(text(rate,24,color=rarityColor(r)))
+            }
             addView(text(s(R.string.gacha_versions,value.content?.catalog?.contentVersion?.value ?: s(R.string.gacha_missing),value.content?.ruleVersion?.value ?: s(R.string.gacha_missing)),color=muted))
         })
         add(actions,card().apply {
