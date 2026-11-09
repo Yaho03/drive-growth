@@ -250,3 +250,8 @@ adb -s emulator-5556 shell getprop sys.boot_completed
 - 실차 API 지원과 권한 승인 여부는 에뮬레이터 부팅 성공으로 증명되지 않는다.
 
 이 기록은 **SDK 설치, Pleos AVD 부팅, 차량 서비스 존재 확인**까지의 근거이며, 앱 기능 또는 실차 동작 검증 완료를 주장하지 않는다.
+
+
+### 이 컴퓨터의 NFC 작업 경로 컴파일 한계 — 2026-11-09
+
+#121 통합 시험에서 native worktree의 물리적 NFC 디렉터리 아래 core JAR을 Kotlin fixture가 읽지 못했다. 동일 SHA JAR의 ASCII/NFD 물리 경로 import 시험은 통과했으나 NFD 철자만 바꾸거나 ASCII symlink를 거치는 것으로는 해결되지 않았다. 한글 경로 전체나 다른 OS의 결함으로 일반화하지 않는다. 제품/Gradle 설정을 바꾸지 않고 정확 커밋의 ASCII 실행 사본과 원본 app/core·빌드 설정의 바이트 동일성을 확인해 검증했다. 상세 실행·한계는 [검증 기록](06_VERIFICATION.md#121-재료-참조수리초기화-계약-통합-검증--2026-11-09)을 따른다. 원본 폴더·AVD·DB 삭제나 이름 변경을 해결책으로 적용하지 않는다.
