@@ -188,17 +188,21 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 2026-11-07 PR #100 검토에서 확인한 카탈로그 원본 변경과 활동 조회 실패 경계를 보완한다. `Garage`는 생성 당시 차종 ID 목록을 복사해 개체 검증과 도감 계산에 같은 기준을 사용한다. `availableForRental(vehicles, activityOf)`의 공급자는 개체 ID를 받아 `ContractResult<VehicleActivity>`를 반환하며 조회 중 거래·점유 등 상태 변경을 수행하지 않는다. 활동 정보 누락은 `DATA_UNAVAILABLE`, 저장 조회 실패는 `STORAGE_FAILURE` 등 실제 실패로 전달한다. Garage는 실패 이유를 그대로 반환하고 후보 일부를 성공으로 반환하지 않으며, 누락을 `IDLE`로 채우거나 예상하지 못한 예외를 일괄 변환하지 않는다.
 
-- `availableForRental`은 현재 `OWNED`·`IDLE` 후보를 거르는 조회다. 영업 쉬기는 아직 반영하지 않는다. 최종 자동 배정 가능 여부·점유·최신 revision과 동시 상태 변경 검사는 #41의 공통 거래 연결에서 별도로 확인한다.
+- `availableForRental`은 현재 `OWNED`·`IDLE` 후보를 거르는 조회이며 영업 쉬기는 보지 않는다. 영업 쉬기는 #41의 `planRental(…, resting, …)`이 이 결과에서 `RentalLedger.restingVehicles()` 개체를 빼서 적용하고, 켜기/끄기는 `RentalLedger.setResting`이 저장한다(대여 중에 켜면 반납 후 배정에서 빠짐). 최종 자동 배정 가능 여부·점유·최신 revision과 동시 상태 변경 검사는 #41의 공통 거래 연결에서 별도로 확인한다.
 - `owned`는 사용 중·수리 필요 개체도 포함하므로 강화 가능 목록으로 그대로 사용하지 않는다. 대여 후보 목록도 수리·판매·폐차 가능 목록으로 재사용하지 않는다. 수리 필요 차량의 수리·판매·폐차는 PRD에서 허용하므로 각 명령의 활동 제한을 별도로 검사한다.
 - `collection`의 `OWNED`는 한 번이라도 소유한 기록이다. 호출자는 처분 뒤에도 유지되는 `(vehicleId, rarity)` 획득 이력을 `everOwned`로, 탁송 목록·가챠 결과에서 본 기록을 `discovered`로 제공해야 한다. 도감 키를 직접 주입한 계산 시험은 실제 저장·재실행 시험과 다르다.
 
 현재 `GameChangeStore.listOwnedVehicles()`의 개체 타입은 아래 v1 필드를 포함한다. 메모리 조회·변경 예제와 SQLite의 필드 보존용 최소 codec 대응은 반영했다. 시험용 DB의 SQLite 실행 범위는 [검증 문서](06_VERIFICATION.md)의 PR #104 숫자 decoder 재검증 기록을 따르며 실제 제품 DB 이전·앱 재실행 검증과 구분한다. 처분 포함 이력·발견 기록, 실제 활동·영업 쉬기의 영속 공급은 별도다. 필드·명령은 아래 공통 계약을 사용하고 실제 조회 확장·SQLite 호환·재개방 검증은 #34 담당과 아래 연결점으로 조율한다. #46은 이 조회·계산 부분의 인계이며 저장·재실행을 포함한 전체 완료가 아니다. 기능별 본인 검증과 #28 통합 검증은 유지한다.
+
+`Garage.collection(history: VehicleHistoryStore)`는 #116의 `listVehicleHistory()`(처분 포함 전체 개체)에서 `(vehicleId, rarity)` 보유 키를, `discoveredVehicles()`에서 발견 키를 읽어 위 `collection(everOwned, discovered)`를 계산한다. 이력·발견 조회 실패는 빈 도감으로 바꾸지 않고 그대로 전달하며, 이력의 콘텐츠 밖 차종·중복 개체 ID는 `INVALID_INPUT`이다. 공급 목록은 불변을 약정하지 않으므로 `Garage`의 모든 조회는 받은 목록을 먼저 한 번 복사하고 그 사본으로 검사·선택·키 변환을 한다(복사 자체가 외부 동시 변경에 원자적이라는 뜻은 아님). 가챠 결과·탁송 목록에서 본 키는 호출자(화면·호스트)가 `recordDiscoveries(catalog, keys)`로 먼저 기록한다.
 
 #### #50 첫 실행 지급
 
 `io.drivegrowth.core.garage.FirstGrant.grant(store, chosen, source)`는 PRD 「최초 차량」·「초기 상태」 시험값대로 초기 재화 1,000 CREDIT과 고른 첫 차(캐스퍼·아반떼, COMMON·1레벨·0%·취득액0·`INITIAL_GRANT`, 개체 ID `initial-grant`)를 `GameChange` 한 건으로 커밋한다. SQLite 계정 잔액은 0에서 시작하므로 이 거래가 초기 재화의 유일한 지급 경로다. 초기 차고 칸 수는 `FirstGrant.INITIAL_GARAGE_CAPACITY`(3)로 제공한다.
 
 프로필당 고정 `requestId`(`initial-grant`)를 쓰므로 같은 차로 반복하면 처음 정산을 재생하고, 다른 차는 `STATE_CONFLICT`(선택 취소 불가), 후보 밖은 `INVALID_INPUT`, 콘텐츠에 없는 후보는 `DATA_UNAVAILABLE`이다. 첫 차를 처분해 보유가 0대여도 재지급하지 않는다. 단, 이 방지는 `initial-grant` 요청이 기록된 저장소에만 해당한다. 이 요청 기록이 없는 기존 데이터(다른 경로로 재화·첫 차를 받은 DB)에 호출하면 다시 지급되므로, 호스트는 **신규 프로필로 확인된 경우에만** 호출하고 확인할 수 없으면 Unavailable/복구 필요를 유지한다. 빈 보유 목록이나 미확인 정산 없음은 신규 프로필 근거가 아니다. 후보 목록 `CANDIDATES`는 읽기 전용이다. 규칙 버전이 바뀐 뒤 재시도도 명령이 달라 `STATE_CONFLICT`이며 재지급하지 않는다. 화면이 지급 전에 "이미 받은 프로필"인지 알려면 처분 포함 이력 조회(아래 「#34 저장 확장의 연결점」)가 필요하다. 개업 선물 뽑기권은 뽑기권 보유 수 저장과 첫 영업 완료 신호(#42)가 정해진 뒤 연결한다.
+
+`FirstGrant.alreadyGranted(history)`는 처분 포함 이력에 `INITIAL_GRANT` 개체가 있으면 true(이미 받은 프로필)다. 첫 차를 판매·소비해도 true다. false는 "이력에 첫 지급 기록 없음"이며 신규 프로필 근거가 아니다. 마커 없는 기존 DB 판별(NEW/EXISTING/UNKNOWN)은 #121 후속이다. 조회 실패는 그대로 전달한다.
 
 ### 원자성·오류·재시도
 
@@ -535,3 +539,14 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 권위 콘텐츠는 저장소 구성 시 `gachaAuthority` 공급자로 전달하며 현재 DB의 가게 레벨·용량과 일치해야 한다. 후보·가격·보장·버전은 공급자의 불변 GachaAuthority를 따른다. `initialGachaProgress`는 신뢰한 프로필 초기화 입력을 새 DB 생성 시 명시한 경우에만 저장한다. 기존 DB 이전에는 값을 주입하지 않는다. 값이나 공급자가 없으면 DATA_UNAVAILABLE이며, 과거 이력 부재로 무료권·카운터를 0으로 초기화하지 않는다. #50의 NEW/EXISTING/UNKNOWN 및 복구 정책·실제 앱 공급 연결은 후속이다.
 
 확정은 기존 요청 재생/다른 종류 ID 충돌 → 권위 상태·revision·공간·추첨 결과·티켓·재화 검사 → 공용 원장·차량·카운터·티켓·최초 결과 저장 순서다. 무료권은 실제 취득액0과 money=null을 사용한다. 현재 상태가 바뀌어도 같은 전체 명령 재시도는 당시 결과를 반환한다. 같은 DB의 일반 Add도 설정된 공간을 검사하고, 기존 원장·대여 방문·가챠의 요청 ID 재사용을 거절한다. 두 연결의 쓰기와 실패 롤백은 같은 SQLite 거래로 직렬화한다. 읽은 가챠 정수와 과거 결과 연결 오류는 STORAGE_FAILURE다.
+
+### #122 탁송·기본 주행 저장 통합
+
+정원의 #128/#131/#134/#135/#137 Ledger·계산 코드를 기존 DB에 연결한다. `store.delivery`, `store.driving`가 제품 호출 입구이며 새 DB와 지원 v1~v4 이전에서 탁송/주행 표를 생성한다. 통합 스키마는5다. 기존 렌털·발견·가챠 표는 해당 버전에 이미 있으면 재생성하지 않는다.
+
+공용 `record`는 직접 호출에도 출처를 검사하고, 탁송·주행 내부 확정은 각각 DELIVERY/DRIVING 종류를 요구한다. `delivery/`와 `drive/` 요청 ID는 해당 내부 Ledger용으로 예약해 일반 거래·렌털·가챠·탁송 선택이 선점하지 못하게 한다. 수익 선택의 원래 요청 ID는 `delivery_requests`로 점유하므로 금액이 없어도 다른 기능에서 재사용할 수 없다. 내부 거래가 기존 정산을 만나면 기능 이력 없이 성공으로 재생하지 않고 충돌로 반환한다. 과거 요청 재생은 각 Ledger가 보존한 명령/결과 이력을 먼저 검사한다.
+
+도착 시 빈 칸은 같은 거래의 shop.capacity와 OWNED 개체 수를 사용한다. 기존 가챠 공간과 단일 Add 경계도 공유한다. 실제 표시된 구매 후보의 발견 기록 호출은 #53 표시 이벤트 연결에서 수행한다. 이 통합만으로 목록 생성 시 발견 기록을 추가하지 않는다. 실제 내비·차량 SDK·제품 화면 연결은 각 담당의 후속이다.
+
+
+#139의 예약 prefix 규칙은 새 요청에 적용한다. v4가 허용한 정합적인 GENERAL 정산은 source와 실제 기능 소유 이력을 검사한 뒤, 동일 전체 명령·원래 정산 연결을 검증해 먼저 재생한다. 기능 소유 행이 있는 ID·다른 명령은 재생 예외가 아니며 충돌이다. 활성 구매는 공급본 b12f268의 readRequest 단계에서 실제 결제 Settlement를 검증해 active/inProgress/terms 경로에서도 누락·오연결을 저장 오류로 반환한다.
