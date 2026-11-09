@@ -1400,3 +1400,12 @@ TDD: capability assertion1실패 → 수리 동작14개 중13실패 → 같은14
 [PR #157](https://github.com/Yaho03/drive-growth/pull/157)은 head0409454의 시험2개와02 정정을 main3a0181f에 반영했다. 독립 검토자가 수리5(새2 포함)·RepairStore15·RepairContract13 총33개를36초에 실행해 실패/오류/생략0과 APPROVE·필수수정0을 확인했다. 작성자의 전체374개와 합산하지 않는다. 최초 SDK 위치 미지정은 Gradle 구성 실패였고 기존 SDK 환경변수 지정 후 위 실행에 성공했다. 정확 head의 repository/android CI4개도 성공했다.
 
 실제 InMemoryGameChangeStore에서 prepare→수리비 차감/IDLE/revision·최초 결과 재생·실패 무변경을 확인한 소비다. 440은8000 기준 시험 콘텐츠의 희귀 캐스퍼 견적이며 현재 실제assets1000의 새 가격 결정이 아니다. SQLite/live 공급·DB 재개방·제품 UI/프로세스·실차나 #49/#121/#122 전체 완료는 아니다. 별도 사람 PR 승인은 미확보이며 사용자 위임에 따른 일반 merge 예외와 근거는 PR에 기록했다. 관련 이슈에는 부분만 체크하고 담당·라벨·전체 미완료를 유지했다.
+
+
+### #151 원래 결과 재생·선물 호출 경계 수정 검증
+
+초기 head64afe55의 EXISTING 재생 P2는01d9e050의 원래 command 재제출로 해결됐다. 원래 콘텐츠/규칙 변경·차종 제거의 같은 두 반례가 기대값 변경 없이 통과했고, 독립 구조 검토는 정식35·외부7=42개를 실행해 확인했다(외부7 중5는 기존 정식 복사이므로 별도 독립 사례로 합산하지 않는다).
+
+추가 검토에서 prepareOpeningGift의 granted 분기가 호출자 source/profile을 무시하는 경계를 확인했다. 로컬4dd3be6은 반환 명령을 선택하기 전에 두 입력을 검증하며 원래 반환 명령은 보존한다. 작성 검토 lane은 기존21개 중1실패와 새 고정 회귀2개 실패를 먼저 확인한 뒤 표적23개·코어381개 통과/앱 소비 컴파일을 기록했다. 독립 delta 검토는 정확4dd3be6의 정식profile9·외부8=17개를27초에 실행해 실패/오류/생략0·CLEAR를 확인했다. 각 실행의 수치를 합산하지 않고 최초 실패를 보존한다.
+
+게시 담당은 소유2파일의 바이트 동일성을 유지해 최신 main2003752와02/06의 기존 기록·현재 위임 기준을 정상 병합했다. 이 검증은 wrapper와 probe/명시 SIMULATION 입력의 동작이며 실제 메모리 초기화/선물 commit·SQLite 롤백·NEW issuer/legacy 복구·UI/프로세스/실차 성공이 아니다. 최종 정확 head/CI·기존 리뷰의 해결 회신과 원격 반영은 [PR #151](https://github.com/Yaho03/drive-growth/pull/151)을 따른다.
