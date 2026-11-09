@@ -408,9 +408,11 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 | `salePrice(vehicle, accidents)` | 실제 취득액 × (max(60% − 사고당 5%p, 30%) + 레벨 1 초과분 레벨당 1%p). 사고 3회 이상은 거절 | `OwnedVehicle.acquisitionCost`(무료권·첫 지급 0). 차종 가격·희귀도는 쓰지 않음 |
 | `scrapValue(vehicle)` | 실제 취득액 × 20% | 위와 같음 |
 
-예: 구입 뽑기권 500 Lv1 판매 300, 같은 차 Lv20 사고 없음 395(79%), 무료권·첫 지급 0. 사고 횟수는 호출자가 넘기는 입력이며, 차량별 정산 완료 사고 횟수는 #116의 `CompletedRentalSource.accidentCount(ownedVehicleId)`로 읽어 넘긴다(아래 `VehicleDisposal`이 연결). 수리비 차감 + 수리 필요 종료의 원자 명령은 후속이다.
+예: 구입 뽑기권 500 Lv1 판매 300, 같은 차 Lv20 사고 없음 395(79%), 무료권·첫 지급 0. 사고 횟수는 호출자가 넘기는 입력이며, 차량별 정산 완료 사고 횟수는 #116의 `CompletedRentalSource.accidentCount(ownedVehicleId)`로 읽어 넘긴다(아래 `VehicleDisposal`이 연결). 수리 명령은 아래 `VehicleRepair`가 만든다.
 
-`io.drivegrowth.core.garage.VehicleDisposal`의 `planSale(owned, requestId, source, VehicleRef, accidents, activityOf)`·`planScrap(...)`은 처분 금액 CREDIT(0이면 금액 변경 없음)과 `VehicleWrite.Update`(SOLD/SCRAPPED, 레벨·진행량·취득 정보 보존)를 담은 불변 `GameChange` 계획을 만든다. 호출자가 `commitGameChange`로 저장하고, 응답을 잃으면 같은 계획을 재제출해 처음 정산을 재생한다. 판매의 사고 횟수는 #116 `CompletedRentalSource.accidentCount(ownedVehicleId)`에서 읽으며 조회 실패·음수는 그대로/`INVALID_INPUT`, 사고 3회 이상 판매는 `INVALID_INPUT`(폐차만 가능)이다. 대여·반납 중과 revision 불일치는 `STATE_CONFLICT`, 수리 필요는 판매·폐차 가능, 처분된 개체는 `DATA_UNAVAILABLE`이다. 동시 대여와의 최종 점유 경쟁은 저장소(#107 SQLite)가 확정 때 검사한다. 수리 명령(수리비 차감 + 수리 필요 해제)은 #121 계약 후속이다.
+`io.drivegrowth.core.garage.VehicleDisposal`의 `planSale(owned, requestId, source, VehicleRef, accidents, activityOf)`·`planScrap(...)`은 처분 금액 CREDIT(0이면 금액 변경 없음)과 `VehicleWrite.Update`(SOLD/SCRAPPED, 레벨·진행량·취득 정보 보존)를 담은 불변 `GameChange` 계획을 만든다. 호출자가 `commitGameChange`로 저장하고, 응답을 잃으면 같은 계획을 재제출해 처음 정산을 재생한다. 판매의 사고 횟수는 #116 `CompletedRentalSource.accidentCount(ownedVehicleId)`에서 읽으며 조회 실패·음수는 그대로/`INVALID_INPUT`, 사고 3회 이상 판매는 `INVALID_INPUT`(폐차만 가능)이다. 대여·반납 중과 revision 불일치는 `STATE_CONFLICT`, 수리 필요는 판매·폐차 가능, 처분된 개체는 `DATA_UNAVAILABLE`이다. 동시 대여와의 최종 점유 경쟁은 저장소(#107 SQLite)가 확정 때 검사한다.
+
+`io.drivegrowth.core.garage.VehicleRepair.prepare(store, requestId, source, VehicleRef)`는 #121 `RepairChangeStore.readRepairState`(PR #147)의 개체·활동·확정 사고 누계·잔액·견적을 읽는다. 저장 측 콘텐츠·규칙 버전과 견적이 이 앱의 `VehicleCare.repairCost(차종 가격, 개체 희귀도)`와 같을 때만 `RepairCommand`를 만든다. 다르면 `STATE_CONFLICT`, 콘텐츠에 없는 차종은 `DATA_UNAVAILABLE`, 조회 실패는 받은 오류 그대로다. 화면에서 본 revision·수리 필요 상태·잔액은 공통 `prepareRepairChange`로 미리 검사한다(수리 필요가 아니거나 옛 revision이면 `STATE_CONFLICT`, 잔액 부족은 `INSUFFICIENT_FUNDS`). 저장하지 않는다. 호출자가 `store.commitRepair(command)`로 비용 차감·NEEDS_REPAIR→IDLE·revision+1을 한 정산에 확정한다. 응답을 잃으면 보관한 같은 command를 다시 제출한다. 사고 누계·성장·취득 정보·영업 쉬기는 바뀌지 않는다. **`commitRepair`는 메모리·SQLite 모두 아직 구현이 없다**(#121·#122 후속). 이번에는 읽기 전용 시험 저장소로 명령 생성과 거절만 검증했다.
 
 ### 거래 원장 영속 저장
 
