@@ -1315,3 +1315,33 @@ JDK17·기존 Android SDK35·Gradle8.11.1, `--offline --no-daemon`을 사용했�
 #145의 새 head는 기존 시험2파일에 기검토 main #139/#140을 정상 병합한 결과이며 팀원 제품 코드를 대신 수정하지 않았다. 기존4개 실행과 새 조합 검토를 구분한다. 작성자의 일반 API34/비Pleos15개를 검증 A의 Pleos4개와 합산하지 않는다. 검증 A145/B143 모두 제품 APK·기존 데이터6파일 SHA·권한/설정 보존, 자기2패키지 제거·활성 시험 종료·내비 복귀·슬롯 반환 자료를 회수했다. 반환 후 추가 adb는 사용하지 않았다.
 
 사용자 2026-11-09 명시적 머지 지시와 별도 사람 승인 미확보·잔여 위험을 PR에 공개했다. #140/#145의 직접 머지 승인은 이 조율 채팅에서 추가 확인했다. 보호 우회·강제 push·브랜치 삭제 없이 일반 merge했다. #37/#38/#39/#40/#46/#47/#50/#122는 부분 조건만 반영하고 열어두며 #121 본문은 기존 메인 담당 범위로 수정하지 않는다. Blocking/Blocked by는 재조회했으나 이번 대상8개 모두 비어 있어 새 해제/ready 전환은 없고 기존 상태를 유지한다.
+
+
+## #121 재료 참조·수리·초기화 계약 통합 검증 — 2026-11-09
+
+기준 main `dda226d`에서 독립 작업 세 묶음을 일반 merge한 코드 head는 `4ddbf391c893b15df03da46e292542f8c8d05e24`다. 재료 `6c9fa882`, 수리 `89448ff6`, 초기화/첫 선물 `ec133802`의 소유 10파일이 통합본과 바이트 동일함을 독립 검토했다. 실제 제공 API·호출/저장 책임은 [기술 계약](02_SYSTEM_ARCHITECTURE.md#121-재료-강화-메모리-참조와-추가-계약)에서 관리한다. 제품 게임 규칙·SQLite·차량 SDK·UI는 이 변경에서 추가하지 않았다.
+
+초기화 후보 Set이 외부 변경에 영향받는 P2는 생성·copy의 방어 복사/변경 불가 노출로 수정했다. 작성자는 기존19+새3 시험에서 수정 전2실패→동일22통과를 확인했고, 독립 재검토는 같은22개와 이전 독립5개를 실행해27개 모두 통과했다. 재료의 독립 코드 검토는 기존 관련70+요청 종류 간 경쟁2=72개, 수리는 기존13+금액/revision 경계2=15개 통과다. 별도 구조 검토도 각 정확 head에서 재료52·수리13·초기화/FirstGrant28개 통과 및 CLEAR를 기록했다. 시험 집계는 서로 중복되므로 합산한 제품 시험 수로 쓰지 않는다. AI 검토이며 별도 사람 승인과 구분한다.
+
+통합 전체 검사는 JDK17·Kotlin2.2.21·AGP8.10.1·Gradle8.11.1·기존 SDK35에서 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest --offline --no-daemon --max-workers=2`로 실행했다. **코어351개·앱139개, 실패/오류/생략0**, 앱/시험 APK 빌드 성공, Lint 오류0·기존 경고20이다. 1분11초에 종료했다. 시험 APK 빌드는 기기 실행 성공이 아니다.
+
+처음 native 관리 worktree의 물리적 NFC 경로에서는 core JAR 생성 후 fixture의 기존 타입 조회가 실패했고 daemon/비증분 변경으로도 해결되지 않았다. 같은 SHA의 JAR을 물리적 ASCII/NFD 경로에 복사하면 최소 Kotlin import 시험이 통과해 경로 영향을 분리했다. 컴파일러 내부 원인은 미확정이다. 제품/Gradle 수정 없이 정확 코드 head를 `git archive`한 ASCII 사본 `/private/tmp/drive121-integration-ascii-diagnostic-20261109`에서 위 전체 검사를 실행했다. 추적 app/core·빌드 설정181파일을 Git blob/원본 live/실행 사본으로 비교해 불일치0을 확인했다. 관리 worktree를 이름 변경하거나 기존 개발환경을 초기화하지 않았다. 재현 시 이 컴퓨터의 NFC 경로 한계와 ASCII 실행 경로를 구분한다.
+
+근거는 `/private/tmp/drive121-resume-20261109/integration/`의 source 비교·최소 재현·실행 로그/XML/Lint·결과 JSON에 보존했다. Debug APK SHA-256은 `0fbea17a999e4e4477350d7b6fc76f5fa9b85c808523500f0a831c8ea7364e71`, 시험 APK는 `97e7e398f2195157a596424768ebd8ebcfc43118cc7ef8376f51f62ea146f28a`다. 설치하거나 adb/장치·제품 데이터를 사용하지 않았다. 실제 SQLite 다중 개체/수리/초기화/선물 commit·신규 근거 발급·legacy 복구·가챠 무료권 경쟁·제품/프로세스 복원은 남아 있다. #121/#122/#48/#49/#50 전체 완료 근거로 확대하지 않는다. 최종 게시 head/원격 CI/main 반영은 연결 PR에서 확인한다.
+
+## #52 저장 차고 읽기·mapper 독립 검토와 게시 준비 — 2026-11-09
+
+원본 구현 head `320309d43b65a69782536b7b558976728b9ef6c2`는 기준 main `dda226d`에서 StoredHostSource/HostSnapshot/GarageHostMapper 및 전용 시험6파일만 변경했다. 기존 HostSession의 실제 read 경로에서 VehicleHistoryStore/#140 Garage.collection(history), RentalLedger.activity/accidentCount/shop과 게임 콘텐츠 가격을 소비한다. 실제 제공/미제공 화면 범위는 [09 연결점](09_UI_UX_SPEC.md#52-저장-읽기mapper-연결)을 따른다. 관리 명령·SQL·core·SDK/gate·Views/디자인은 이 기능에서 수정하지 않았다.
+
+| 근거·실행 주체 | 정확한 범위와 결과 |
+|---|---|
+| 작성자 본인 검증 · 원본320309d | 초기6개 assertion 실패→같은10개 통과, 추가 손상 수치 경계를 보완해 core298·앱150(신규11 포함) 실패/오류/skip0. APK/시험 APK·Lint오류0/경고20·저장소/diff 통과. 중간 import 컴파일 오류와 시험 null 표현 오류는 교정했으며 assertion 실패로 합산하지 않음 |
+| 독립 코드 검토 · 원본320309d | 신규읽기11+기존mapper4+기존query5+독립3=23개 실패/오류/skip0, 시험소스 컴파일·저장소/diff 통과. 코드 APPROVE, 필수 수정0. 위 작성자 수와 중복되어 합산하지 않음 |
+| 독립 구조/장치 검증 C · 원본320309d | 구조 CLEAR. Pleos/API34/ARM64·user10의 격리 GarageStoredHostStorageTest3개, 0.904초·실패/오류0. 실제 SQLite→read→mapper에서 처분 도감/개체별 값/공간/가격·사고 정산 누락 오류를 확인 |
+| 최신 main 통합 뒤 작성자 최소 확인 · 코드 merge0c58abb | main `c00e52e1f7c8419eb7a5102c20710f2a43cf5233` 일반 merge. 원본 소유6파일 blob 동일·앱 표적15개/소비/시험소스 컴파일 성공(2초). 전체 suite·기기 시험을 다시 실행하지 않음 |
+
+장치 앱 SHA-256 `18470d6503275fe33a6b35fea9c3a100882f2022f341c045efe2360026bed44a`, 시험 APK `c2cd5ca0e1142f33b2c6b9034bac249c8796cd69c4822f71506f9125bc18cdbe`가 실제 설치본과 일치한다는 검증 C의 원문/JSON을 회수했다. 검증 C는 자기2패키지를 제거하고 제품 데이터6파일 SHA·제품 APK·권한 보존을 확인했다. 당시 공유 슬롯의 B 가챠 대기는 별도이므로 A 패키지 정리를 전체 슬롯 반환으로 기록하지 않는다. 이 작성자 게시 준비는 추가 adb/설치·설정 변경을 하지 않았다.
+
+원본320309d의 장치3개 결과를 최신 main merge/head의 새 기기 실행으로 소급하지 않는다. 전체 조회는 순차 읽기이며 전후 개체 비교가 활동/공간/잔액·이력의 원자성을 보장하지 않는다. 실제 제품 View·D/P·관리 명령·발견 표시 이벤트 쓰기·제품 재실행/프로세스·실차는 미검증/후속이다. #52 전체 종료·ready/Blocked by 변경 근거로 확대하지 않는다. AI 코드/구조 검토와 실제 사람 승인을 구분하며 최종 원격 게시/CI/head는 연결 PR에서 확인한다.
+
+근거는 `/private/tmp/drive-next-implementation-20261109/garage-read/`의 원본 로그/XML, code-review/arch-review/summary.json, device/instrumentation.txt·installed.json·baseline/final.json, merge-source-identity.json·merge-minimal-checks.log에 보존했다. 이 절은 앞선 #147 통합·NFC 경로 진단/05 환경 근거를 변경하거나 대체하지 않는다.

@@ -377,8 +377,9 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 |---|---|---|
 | `planLevelUp(owned, requestId, source, VehicleRef, activityOf)` | 비용 DEBIT + `VehicleWrite.Update`(레벨+1, 진행량 유지, 20이면 0)를 담은 불변 `GameChange` 계획을 반환하고, 호출자가 `commitGameChange`로 저장. **응답을 잃으면 보관한 같은 계획을 다시 제출**해 처음 정산을 재생한다(같은 requestId·다른 내용은 `STATE_CONFLICT`). 성공 뒤 계획을 새로 만들면 revision이 달라 새 요청으로 거절 | 없음·처분 `DATA_UNAVAILABLE`, revision 불일치·대여/반납/수리 필요 `STATE_CONFLICT`, 20레벨·최종 비용 Long 초과 `INVALID_INPUT`, 활동 조회 실패는 받은 오류 그대로, 잔액 부족·저장 실패는 저장소가 전체 거절 |
 | `planMaterial(owned, target, material, activityOf)` | **계산·검사만.** 대상 성장 Update와 재료 CONSUMED Update(성장값 보존) 두 개를 `MaterialPlan`으로 반환하고 저장하지 않음 | 같은 개체·다른 차종·20레벨 대상 `INVALID_INPUT`, 처분된 재료 `DATA_UNAVAILABLE`, revision 불일치·사용 중 `STATE_CONFLICT`, 대상·재료 활동 조회 실패는 받은 오류 그대로. 재료는 20레벨이어도 사용 가능 |
+| `prepareMaterial(store, requestId, source, target, material)` | 저장 측 `readMaterialState`의 두 개체·활동·버전으로 `planMaterial`을 실행해 비용0(PRD에 재료 강화 비용 없음) `MaterialCommand`를 만든다. 저장하지 않는다. 호출자가 `store.commitMaterial(command)`로 대상 성장·재료 CONSUMED를 한 정산에 확정하고, **응답을 잃으면 보관한 같은 command를 다시 commitMaterial**해 처음 정산을 재생한다 | 같은 개체 `INVALID_INPUT`, 저장 측 콘텐츠·규칙 버전이 앱과 다르면 `STATE_CONFLICT`, 상태·활동 조회 실패·활동 누락은 받은 오류 그대로(IDLE로 보정 안 함), 나머지는 `planMaterial`과 같다. 저장 실패는 저장소가 두 개체·잔액 모두 미반영 |
 
-재료 강화는 두 개체를 한 정산에 확정해야 하므로 위 「#48 후속 거래」의 다중 개체 명령이 #33·#34에 생긴 뒤 `MaterialPlan`을 한 건으로 커밋한다. 희귀도 수익 배율(1.0~1.3)과 대여료 반영은 영업 계산(B) 범위라 이번에 바꾸지 않았다.
+재료 강화는 #121 `MaterialChangeStore`(PR #147)로 두 개체를 한 정산에 확정한다. 메모리 참조 저장소에서 확정·재제출 재생·저장 실패 무변경을 시험했다. 실제 SQLite 저장·live 활동·DB 재개방·제품 화면 연결은 #122·#52의 후속이다. 희귀도 수익 배율(1.0~1.3)과 대여료 반영은 영업 계산(B) 범위라 이번에 바꾸지 않았다.
 
 #### #47 가챠 1회 지급
 
@@ -521,16 +522,36 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 
 ### #121 재료 강화의 독립 타입·순수 검증 준비
 
-가챠 검토용 커밋 `08eb3c4`를 기반으로 별도 브랜치의 `core.contract.MaterialContract` 파일에 다음 타입과 순수 검증을 추가했다. **MaterialChangeStore의 실제 구현은 없다.** 검토 중인 GachaContract·공유 RentalContractFixtures는 변경하지 않았으며, 같은 원장의 참조 구현/원자 경쟁은 미제공이다. 이번 준비 범위 이후 새 공유 구현은 착수하지 않는다. 기능 계산·SQLite·UI를 바꾸지 않았다.
+PR #127은 가챠 검토용 커밋 `08eb3c4`를 기반으로 `core.contract.MaterialContract`의 타입과 순수 검증을 먼저 제공했다. 당시에는 저장 참조 구현을 추가하지 않고 중단했다. 2026-11-09 사용자 재개 지시로 아래 「재료 강화 메모리 참조와 추가 계약」까지 확장했으며, 기존 성장 산식·SQLite·UI는 변경하지 않았다.
 
 - `MaterialCommand`는 requestId/source/contentVersion/ruleVersion과 이름 있는 `target`·`material`의 기존 `VehicleWrite.Update`, 기본값 없는 `cost: GameMoney`를 보존한다. 역할·ID·revision·성장/lifecycle·비용·버전 모두 전체 입력 동일성에 포함된다. 비용0은 명시적 무과금이며 MoneyChange는 만들지 않는다. 현재 MaterialPlan 소비는 비용0을 명시하고, 양수 금액 시험값을 새 제품 강화 비용으로 채택하지 않는다.
-- `MaterialState`는 저장 측 출처/두 버전·실제 잔액과 역할별 현재 OwnedVehicle/VehicleActivity다. 활동 조회 실패는 state 생성 전에 ContractResult.Failure로 전달하며 IDLE·잔액0으로 보정하지 않는다. `readMaterialState(targetId, materialId)`는 이 상태의 조회 계약이며 아직 실행 구현이 없다.
+- `MaterialState`는 저장 측 출처/두 버전·실제 잔액과 역할별 현재 OwnedVehicle/VehicleActivity다. 활동 조회 실패는 state 생성 전에 ContractResult.Failure로 전달하며 IDLE·잔액0으로 보정하지 않는다. `readMaterialState(targetId, materialId)`는 이 상태의 조회 계약이며 아래 메모리 참조에서 실행한다. 제품 SQLite 조회는 후속이다.
 - `prepareMaterialChange(command, current)`는 같은 개체 중복·역할 lifecycle·출처/버전·ID/현재 OWNED·양쪽 revision/증가 범위·같은 차종·IDLE·최대 레벨 대상·대상 성장의 단조 증가·재료 성장값 보존·잔액을 검사한다. 예정 두 개체는 권위 개체의 copy로 만들어 희귀도·차종·취득 출처/기준액을 각각 보존하고 revision을 각각1 올린다. 20레벨 재료는 허용한다. 결과 `MaterialPreparedChange`는 예정 snapshot·잔액·양수 비용일 때만 DEBIT를 담으며, 성공은 **저장·예약·경쟁 해결을 뜻하지 않는다.**
 - 이 함수는 100/150/250/400% 성장 산식이나 비용 정책을 재계산/확정하지 않는다. 기존 `VehicleUpgrade.planMaterial → MaterialCommand → prepareMaterialChange` 소비 예제로 연결하며 정확한 성장량은 VehicleCare의 기존 계산 책임이다. 저장 시에는 검증된 규칙/계산 결과와 현재 상태를 같은 확정 경계에서 대조해야 한다.
 - `MaterialSettlement`는 원래 command와 공통 SettlementId·Transaction·잔액·확정 시각, nullable이 아닌 **target/material 두 snapshot**을 보존한다. 후속 decoder는 거래의 requestId/종류/출처/규칙/금액 및 두 역할 ID/revision·결과 연결을 검증한다. 기존 nullable changedVehicle 하나에 두 역할을 숨기지 않는다.
-- `commitMaterial(command)`는 동일 요청/전체 내용의 최초 결과 재생을 현재 검증보다 먼저 하고, 다른 내용/legacy/가챠 ID 재사용은 STATE_CONFLICT여야 한다. 새 명령은 같은 잠금/DB에서 최신 상태를 다시 읽고 두 개체·비용·요청/정산을 전부 확정하거나 전부 거절한다. **이 순서·원자성·저장 실패·재생 실행 검증은 아직 미제공**이며 두 번의 GameChange 커밋으로 우회하지 않는다.
+- `commitMaterial(command)`는 동일 요청/전체 내용의 최초 결과 재생을 현재 검증보다 먼저 하고, 다른 내용/legacy/가챠 ID 재사용은 STATE_CONFLICT여야 한다. 새 명령은 같은 잠금/DB에서 최신 상태를 다시 읽고 두 개체·비용·요청/정산을 전부 확정하거나 전부 거절한다. 아래 메모리 참조는 이 순서·원자 확정·실패 주입·재생을 실행하며, 실제 SQLite/프로세스 경계 검증은 후속이다. 두 번의 GameChange 커밋으로 우회하지 않는다.
 
-현재 순수 검증 오류는 잘못된 역할/동일 개체/차종/성장·보존/증가 범위·출처가 INVALID_INPUT, 버전/revision/활동 충돌은 STATE_CONFLICT, 대상 누락·처분은 DATA_UNAVAILABLE, 비용 부족은 INSUFFICIENT_FUNDS다. 실제 STORAGE_FAILURE와 현재 상태 변화 후 과거 두 snapshot 재생은 후속 공유 원장/SQLite 구현에서 검증한다. 이 부분 인계로 #121/#122/#48을 완료 처리하지 않는다.
+현재 순수 검증 오류는 잘못된 역할/동일 개체/차종/성장·보존/증가 범위·출처가 INVALID_INPUT, 버전/revision/활동 충돌은 STATE_CONFLICT, 대상 누락·처분은 DATA_UNAVAILABLE, 비용 부족은 INSUFFICIENT_FUNDS다. 실패 주입과 현재 상태 변화 후 과거 두 snapshot 재생은 메모리 참조에서 검증하며, 실제 STORAGE_FAILURE·SQLite 재개방은 저장 구현 후속이다. 이 부분 인계로 #121/#122/#48을 완료 처리하지 않는다.
+
+### #121 재료 강화 메모리 참조와 추가 계약
+
+2026-11-09 사용자 재개 지시에 따른 부분 공급이다. 아래 계약은 기존 `rental-contract-v1`과 `GameChangeStore`를 유지한다. 새 SQLite 원장·기본 경제 수치·프로필 복구 정책을 만들지 않는다.
+
+| 묶음 | 이번에 실행·제공하는 범위 | 실제 저장·제품 연결에서 남은 범위 |
+|---|---|---|
+| 재료 강화 | `InMemoryGameChangeStore : MaterialChangeStore`, `MaterialFixtureConfiguration`의 명시 출처/버전/활동과 기존 지갑·차량·모니터를 공유. 같은 전체 명령은 당시 두 개체/잔액/거래를 먼저 재생하고 legacy/gacha/material의 요청 ID 충돌을 양방향 거절 | #122의 SQLite 다중 개체·요청·최초 결과 원자 저장, #48의 실제 저장 소비 |
+| 수리 | `RepairChangeStore`, 전체 `RepairCommand/RepairSettlement`, `prepareRepairChange/replayRepairChange`, 전용 시험 fixture | 메모리/SQLite commit, 실제 활동·사고·견적 공급과 #49 명령 연결 |
+| 초기화·첫 영업 선물 | `InitializationChangeStore/FirstRentalGiftStore`, 전체 명령/원래 결과, NEW/EXISTING/UNKNOWN, 순수 prepare와 기존 FirstGrant의 전용 초기화 commit 어댑터 | NEW 근거 발급·legacy 복구, 메모리/SQLite 원자 commit·가챠 무료권 소비와 경쟁, #50/#56 제품 연결 |
+
+재료 참조는 같은 잠금에서 최신 두 개체·잔액·활동을 읽고 기존 prepare를 실행한 뒤 비용·두 revision·재료 소비·최초 결과를 함께 확정한다. 비용0은 `money=null`이며 새 요금 규칙이 아니다. 설정/활동 누락은 DATA_UNAVAILABLE, 명시 실패는 그대로 전달하고 IDLE/0으로 보정하지 않는다. 활동 Map은 구성 시 복사·변경 불가 처리한다. 실패 주입과 동일 재료·다른 명령 종류의 경쟁도 같은 원장에서 검증한다. fixture 활동은 고정 시험 입력이며 제품 RentalLedger의 live 활동이 아니다.
+
+수리는 저장 측이 공급한 현재 NEEDS_REPAIR·개체 revision·확정 사고 누계·VehicleCare 비용 견적을 대조한다. 순수 결과는 비용 DEBIT(0이면 없음), NEEDS_REPAIR→IDLE, revision+1이며 차종·희귀도·성장·취득 정보·사고 누계와 영업 쉬기는 보존한다. 이전 전체 명령은 현재 조회보다 먼저 원래 수리 결과를 재생해야 한다. 실제 commit은 활동과 개체·금액·정산을 같은 잠금/DB에서 확정해야 하며 일반 Update와 활동 변경을 별도 commit으로 나누지 않는다.
+
+초기화의 `NewProfileEvidence`는 신뢰한 저장/프로필 생성 경계가 검증해 공급하는 양성 근거의 DTO다. DTO 생성 자체가 신규 판별 구현은 아니다. 빈 차고·INITIAL_GRANT 이력 부재를 NEW로 만들지 않고, UNKNOWN/마커 없는 legacy의 미복구 결과는 DATA_UNAVAILABLE·무지급이다. 마커가 있는데 결과가 손상·누락됐다면 STORAGE_FAILURE다. `InitializationState`의 가용 후보는 생성·copy 경계에서 복사하고 변경 불가 Set으로 노출한다. 새 선택은 기존 `FirstGrant`의 전체 GameChange를 `commitFirstGrantInitialization`으로 전달하며, 응답 유실은 보관한 전체 InitializationCommand로 재시도한다. 초기 재화/차량/공간/마커는 실제 저장 후속에서 원자 확정한다.
+
+첫 선물은 같은 프로필 원장의 최초 완료 영업 rentalId/SettlementId를 근거로 무료권+1·GachaProgress revision+1·프로필당 마커를 함께 계획한다. 잔액은 완료 증거가 아니며 정상 수익0도 허용한다. 가챠의 무료권 소비와 같은 progress revision을 사용하고 보장 카운터·재화는 유지한다. `Ready`는 예정일 뿐 실제 지급이 아니다. 동일 전체 명령은 최초 전체 결과 재생, 다른 명령/기능의 같은 요청 ID는 충돌이어야 한다.
+
+`MaterialStoreTest`, `RepairContractTest/RepairContractFixtures`, `ProfileContractTest/ProfileContractFixtures`가 실행 가능한 소비·실패 예제다. 수리/초기화/선물 fixture의 응답 예제를 실제 저장 성공으로 표시하지 않는다. 어느 부분도 #121/#122/#48/#49/#50 전체 완료나 에뮬레이터·실차 검증을 의미하지 않는다.
 
 ### #122 가챠 SQLite 확정 경계
 

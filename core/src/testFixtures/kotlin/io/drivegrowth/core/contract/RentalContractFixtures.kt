@@ -1,6 +1,7 @@
 package io.drivegrowth.core.contract
 
 import io.drivegrowth.core.Gear
+import io.drivegrowth.core.progression.VehicleActivity
 import java.util.Collections
 import kotlin.random.Random
 
@@ -63,18 +64,88 @@ object RentalContractFixtures {
     )
 }
 
+/** 재료 참조 시험의 명시적 권위/활동 입력. 제품 초기 상태나 IDLE 기본값이 아니다. */
+class MaterialFixtureConfiguration(
+    val source: InputSource,
+    val contentVersion: ContentVersion,
+    val ruleVersion: RuleVersion,
+    activities: Map<OwnedVehicleId, ContractResult<VehicleActivity>>,
+) {
+    val activities: Map<OwnedVehicleId, ContractResult<VehicleActivity>> =
+        Collections.unmodifiableMap(HashMap(activities))
+}
+
 /** 계약 소비 테스트에만 사용한다. 디스크 저장이나 제품 정책을 대신하지 않는다. */
 class InMemoryGameChangeStore(
     vehicles: List<OwnedVehicle>,
     initialBalance: GameMoney = GameMoney(0),
     private val confirmedAt: EpochMillis = RentalContractFixtures.time,
     private var gachaState: GachaState? = null,
-) : GachaChangeStore {
+    private val materialConfiguration: MaterialFixtureConfiguration? = null,
+) : GachaChangeStore, MaterialChangeStore {
+    init {
+        val gachaSource = gachaState?.authority?.source
+        require(gachaSource == null || materialConfiguration == null || gachaSource == materialConfiguration.source) {
+            "같은 메모리 원장의 가챠와 재료 출처는 같아야 한다"
+        }
+    }
+
     private val vehiclesById = vehicles.associateBy { it.ownedVehicleId }.toMutableMap()
     private val committed = mutableMapOf<RequestId, Pair<GameChange, Settlement>>()
     private val gachaCommitted = mutableMapOf<RequestId, GachaSettlement>()
+    private val materialCommitted = mutableMapOf<RequestId, MaterialSettlement>()
     private var balance = initialBalance
     var nextCommitFailure: ContractError? = null
+
+    @Synchronized
+    override fun readMaterialState(target: OwnedVehicleId, material: OwnedVehicleId): ContractResult<MaterialState> {
+        val configuration = materialConfiguration ?: return failure(ContractError.DATA_UNAVAILABLE)
+        val targetVehicle = vehiclesById[target] ?: return failure(ContractError.DATA_UNAVAILABLE)
+        val materialVehicle = vehiclesById[material] ?: return failure(ContractError.DATA_UNAVAILABLE)
+        fun activity(id: OwnedVehicleId) = configuration.activities[id] ?: failure(ContractError.DATA_UNAVAILABLE)
+        val targetActivity = when (val result = activity(target)) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
+        }
+        val materialActivity = when (val result = activity(material)) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
+        }
+        return ContractResult.Success(MaterialState(configuration.source, configuration.contentVersion, configuration.ruleVersion,
+            balance, MaterialVehicleState(targetVehicle, targetActivity), MaterialVehicleState(materialVehicle, materialActivity)))
+    }
+
+    @Synchronized
+    override fun commitMaterial(command: MaterialCommand): ContractResult<MaterialSettlement> {
+        // 모든 필드는 불변 값이다. 역할별 명령도 입구에서 고정해 검증과 확정/재생에 같은 값을 쓴다.
+        val request = command.copy(target = command.target.copy(), material = command.material.copy())
+        materialCommitted[request.requestId]?.let { original ->
+            return if (original.command == request) ContractResult.Success(original) else failure(ContractError.STATE_CONFLICT)
+        }
+        if (request.requestId in committed || request.requestId in gachaCommitted) return failure(ContractError.STATE_CONFLICT)
+        val current = when (val result = readMaterialState(request.target.ownedVehicleId, request.material.ownedVehicleId)) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
+        }
+        val prepared = when (val result = prepareMaterialChange(request, current)) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
+        }
+        nextCommitFailure?.let {
+            nextCommitFailure = null
+            return failure(it)
+        }
+        val receipt = MaterialSettlement(request, SettlementId("fixture-settlement-${request.requestId.value}"),
+            Transaction(TransactionId("fixture-transaction-${request.requestId.value}"), request.requestId,
+                TransactionKind.GARAGE, request.source, request.ruleVersion, prepared.money),
+            prepared.balance, prepared.target, prepared.material, confirmedAt)
+        // 단일 GameChange 두 번이 아니라 같은 모니터에서 두 개체·잔액·최초 결과를 함께 확정한다.
+        balance = prepared.balance
+        vehiclesById[prepared.target.ownedVehicleId] = prepared.target
+        vehiclesById[prepared.material.ownedVehicleId] = prepared.material
+        materialCommitted[request.requestId] = receipt
+        return ContractResult.Success(receipt)
+    }
 
     @Synchronized
     override fun listOwnedVehicles(): ContractResult<List<OwnedVehicle>> =
@@ -82,12 +153,13 @@ class InMemoryGameChangeStore(
 
     @Synchronized
     override fun commitGameChange(change: GameChange): ContractResult<Settlement> {
-        if (change.requestId in gachaCommitted) return failure(ContractError.STATE_CONFLICT)
+        if (change.requestId in gachaCommitted || change.requestId in materialCommitted) return failure(ContractError.STATE_CONFLICT)
         committed[change.requestId]?.let { (original, result) ->
             return if (original == change) ContractResult.Success(result) else failure(ContractError.STATE_CONFLICT)
         }
         val authority = gachaState?.authority
-        if (authority != null && change.source != authority.source) return failure(ContractError.INVALID_INPUT)
+        val configuredSource = authority?.source ?: materialConfiguration?.source
+        if (configuredSource != null && change.source != configuredSource) return failure(ContractError.INVALID_INPUT)
         nextCommitFailure?.let {
             nextCommitFailure = null
             return failure(it)
@@ -162,7 +234,7 @@ class InMemoryGameChangeStore(
         gachaCommitted[command.requestId]?.let { original ->
             return if (original.command == command) ContractResult.Success(original) else failure(ContractError.STATE_CONFLICT)
         }
-        if (command.requestId in committed) return failure(ContractError.STATE_CONFLICT)
+        if (command.requestId in committed || command.requestId in materialCommitted) return failure(ContractError.STATE_CONFLICT)
         val state = gachaState ?: return failure(ContractError.DATA_UNAVAILABLE)
         val authority = state.authority
         val progress = state.progress
