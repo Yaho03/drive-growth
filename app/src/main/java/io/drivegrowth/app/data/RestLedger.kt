@@ -26,6 +26,9 @@ import org.json.JSONObject
  * - 같은 정차의 출발 처리, 같은 ID의 소모는 한 번만 기록한다. 같은 명령을 다시 보내면 당시 결과를 돌려주고, 다른 명령이면 STATE_CONFLICT다.
  * - 읽을 때마다 기록 전체를 처음부터 순서대로 다시 계산해 각 기록의 결과와 대조한다. 한 기록이라도 계산·이어짐·형식이 다르면 STORAGE_FAILURE이고 원본을 바꾸지 않는다.
  *   여러 기록을 맞춰 바꾼 손상도 처음 상태부터 다시 계산하므로 드러난다. 기록 수에 비례해 읽는 비용이 늘지만 하루 정차·운전 구간 수 규모를 가정한다.
+ * - 기록이 통째로 빠진 손상도 막는다. 각 기록은 바로 앞 기록의 번호(`prev`)를 갖고, 마지막 기록 번호와 기록 수는 같은 거래에서 `rest_head`에 저장한다.
+ *   중간 기록이 빠지면 연결이, 끝 기록이 빠지면 머리 정보가 맞지 않아 STORAGE_FAILURE다. 번호는 이어지지 않아도 되며(AUTOINCREMENT 빈 번호 허용) 연결 관계만 본다.
+ *   기록과 머리 정보를 모두 지운 경우는 처음 상태와 구분할 수 없다.
  * - 버프가 없을 때의 운전 소모도 기록한다. 같은 소모 ID의 재전송이 언제 와도 같은 결과를 돌려주게 하려는 것이다.
  * - 공용 store 연결, 테이블 생성 호출, DB 버전 이전은 #122에서 통합한다. 휴식 기준 수치는 #24 제안 단계의 시험값을 호출자가 넘긴다.
  */
@@ -38,9 +41,14 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
             db.execSQL(
                 """CREATE TABLE rest_log (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                prev INTEGER NOT NULL CHECK (prev >= 0),
                 kind TEXT NOT NULL CHECK (kind IN ('DEPART', 'CONSUME')),
                 key TEXT NOT NULL, command TEXT NOT NULL, result TEXT NOT NULL,
                 UNIQUE (kind, key))""",
+            )
+            db.execSQL(
+                "CREATE TABLE rest_head (id INTEGER PRIMARY KEY CHECK (id = 1), last INTEGER NOT NULL CHECK (last >= 1), " +
+                    "count INTEGER NOT NULL CHECK (count >= 1))",
             )
         }
     }
@@ -83,7 +91,7 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
         val before = entries.lastOrNull()?.after ?: RestBonusState.NONE
         val departure = RestBonus(rules).depart(before, stop)
         if (departure.outcome == RestOutcome.ALREADY_HANDLED) return ContractResult.Success(departure)
-        insert(db, KIND_DEPART, stop.number.toString(), command, RestJson.departResult(before, departure))
+        insert(db, entries, KIND_DEPART, stop.number.toString(), command, RestJson.departResult(before, departure))
         return ContractResult.Success(departure)
     }
 
@@ -107,40 +115,64 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
             is ContractResult.Failure -> return result
             is ContractResult.Success -> result.value
         }
-        insert(db, KIND_CONSUME, consumeId, command, RestJson.consumeResult(before, after))
+        insert(db, entries, KIND_CONSUME, consumeId, command, RestJson.consumeResult(before, after))
         return ContractResult.Success(after)
     }
 
-    private class Entry(val kind: String, val key: String, val command: String, val after: RestBonusState, val departure: RestDeparture?)
+    private class Entry(val seq: Long, val kind: String, val key: String, val command: String, val after: RestBonusState, val departure: RestDeparture?)
 
-    private fun insert(db: SQLiteDatabase, kind: String, key: String, command: String, result: JSONObject) {
-        db.insertOrThrow("rest_log", null, ContentValues().apply {
+    /** 대조를 마친 기록 뒤에 한 건을 잇고, 마지막 번호·기록 수를 같은 거래에서 갱신한다. */
+    private fun insert(db: SQLiteDatabase, entries: List<Entry>, kind: String, key: String, command: String, result: JSONObject) {
+        val seq = db.insertOrThrow("rest_log", null, ContentValues().apply {
+            put("prev", entries.lastOrNull()?.seq ?: 0L)
             put("kind", kind)
             put("key", key)
             put("command", command)
             put("result", result.toString())
         })
+        db.insertWithOnConflict("rest_head", null, ContentValues().apply {
+            put("id", 1)
+            put("last", seq)
+            put("count", entries.size + 1L)
+        }, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
-    /** 기록 전체를 처음 상태부터 순서대로 다시 계산해 대조한 목록. */
-    private fun chain(db: SQLiteDatabase): List<Entry> =
-        db.rawQuery("SELECT seq, kind, key, command, result FROM rest_log ORDER BY seq", null).use {
+    /**
+     * 기록 전체를 처음 상태부터 순서대로 다시 계산해 대조한 목록.
+     * 각 기록의 `prev`가 바로 앞 기록 번호(첫 기록은 0)와 같아야 하고, 마지막 번호와 기록 수가 `rest_head`와 같아야 한다.
+     * 기록이 없으면 머리 정보도 없어야 한다.
+     */
+    private fun chain(db: SQLiteDatabase): List<Entry> {
+        val head = db.rawQuery("SELECT id, last, count FROM rest_head", null).use {
+            if (!it.moveToFirst()) return@use null
+            if (it.integer(0, 1, 1) != 1L || it.moveToNext()) throw JSONException("휴식 머리 정보 형식 오류")
+            it.moveToFirst()
+            it.integer(1, 1, Long.MAX_VALUE) to it.integer(2, 1, Long.MAX_VALUE)
+        }
+        val entries = db.rawQuery("SELECT seq, prev, kind, key, command, result FROM rest_log ORDER BY seq", null).use {
             val entries = ArrayList<Entry>()
             var previous = RestBonusState.NONE
+            var previousSeq = 0L
             while (it.moveToNext()) {
-                it.integer(0, 1, Long.MAX_VALUE)
-                val entry = verified(previous, it.text(1), it.text(2), it.text(3), it.text(4))
+                val seq = it.integer(0, 1, Long.MAX_VALUE)
+                if (it.integer(1, 0, Long.MAX_VALUE) != previousSeq) throw JSONException("휴식 기록이 빠졌거나 순서가 맞지 않음")
+                val entry = verified(seq, previous, it.text(2), it.text(3), it.text(4), it.text(5))
                 entries += entry
                 previous = entry.after
+                previousSeq = seq
             }
             entries
         }
+        val expected = entries.lastOrNull()?.let { it.seq to entries.size.toLong() }
+        if (head != expected) throw JSONException("휴식 기록의 끝이나 개수가 머리 정보와 다름")
+        return entries
+    }
 
     /**
      * 기록 한 건을 원래 명령과 [previous](바로 앞 기록까지 다시 계산한 상태)로 다시 계산해 대조한다.
      * 기록에 적힌 직전 상태가 [previous]와 다르거나, 파싱에 성공해도 계산 결과·키가 다르면 손상이다.
      */
-    private fun verified(previous: RestBonusState, kind: String, key: String, command: String, raw: String): Entry {
+    private fun verified(seq: Long, previous: RestBonusState, kind: String, key: String, command: String, raw: String): Entry {
         val result = JSONObject(raw)
         val before = RestJson.state(result.getJSONObject("before"))
         if (before != previous) throw JSONException("휴식 기록이 직전 기록과 이어지지 않음")
@@ -158,7 +190,7 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
                 ) {
                     throw JSONException("출발 결과가 원래 명령과 다름")
                 }
-                Entry(kind, key, command, departure.state, departure)
+                Entry(seq, kind, key, command, departure.state, departure)
             }
             KIND_CONSUME -> {
                 val input = RestJson.consumeInput(JSONObject(command))
@@ -171,7 +203,7 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
                 val after = (RestBonus(input.rules).consume(before, input.elapsedMs) as? ContractResult.Success)?.value
                     ?: throw JSONException("저장된 소모 재계산 실패")
                 if (RestJson.consumeResult(before, after).toString() != result.toString()) throw JSONException("소모 결과가 원래 명령과 다름")
-                Entry(kind, key, command, after, null)
+                Entry(seq, kind, key, command, after, null)
             }
             else -> throw JSONException("휴식 기록 종류 오류")
         }

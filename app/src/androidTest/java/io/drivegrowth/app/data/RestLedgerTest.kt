@@ -51,10 +51,18 @@ class RestLedgerTest : InstrumentationTestCase() {
 
     private fun sql(vararg statements: String) = ok(store.atomic { db -> statements.forEach(db::execSQL); ContractResult.Success(Unit) })
 
+    /** 기록·머리 정보·번호 발급 상태를 형식까지 포함해 읽는다. 실패한 호출이 원본을 바꾸지 않았는지 본다. */
     private fun dump(): String = ok(store.atomic { db ->
-        ContractResult.Success(db.rawQuery("SELECT quote(seq) || '|' || quote(kind) || '|' || quote(key) || '|' || quote(command) || '|' || quote(result) FROM rest_log ORDER BY seq", null).use {
-            buildList { while (it.moveToNext()) add(it.getString(0)) }.joinToString("\n")
-        })
+        fun rows(sql: String) = db.rawQuery(sql, null).use { buildList { while (it.moveToNext()) add(it.getString(0)) } }
+        ContractResult.Success((
+            rows("SELECT quote(seq) || '|' || quote(prev) || '|' || quote(kind) || '|' || quote(key) || '|' || quote(command) || '|' || quote(result) FROM rest_log ORDER BY seq") +
+                rows("SELECT 'head|' || quote(id) || '|' || quote(last) || '|' || quote(count) FROM rest_head") +
+                rows("SELECT 'sequence|' || quote(seq) FROM sqlite_sequence WHERE name = 'rest_log'")
+            ).joinToString("\n"))
+    })
+
+    private fun logCount(): Int = ok(store.atomic { db ->
+        ContractResult.Success(db.rawQuery("SELECT count(*) FROM rest_log", null).use { it.moveToFirst(); it.getInt(0) })
     })
 
     private fun assertStorageFailureKeepsRows(vararg calls: () -> ContractResult<*>, label: String = "") {
@@ -75,7 +83,7 @@ class RestLedgerTest : InstrumentationTestCase() {
         // 앱을 다시 켜고 같은 출발을 다시 보내도 버프를 새로 발급하지 않고 당시 결과를 돌려준다.
         assertEquals(first, ok(ledger.depart(rules, stop(1))))
         assertEquals(RestBonusState(20 * minute, 1), state())
-        assertEquals(1, dump().lines().size)
+        assertEquals(1, logCount())
     }
 
     fun testSameStopWithAnotherInputOrRuleConflicts() {
@@ -165,7 +173,7 @@ class RestLedgerTest : InstrumentationTestCase() {
         val current = { ledger.state() }
         val replayConsume = { ledger.consume(rules, "drive-a", 1, 5 * minute) }
         val replayFirst = { ledger.depart(rules, stop(1)) }
-        sql("CREATE TABLE backup AS SELECT * FROM rest_log")
+        sql("CREATE TABLE backup AS SELECT * FROM rest_log", "CREATE TABLE head_backup AS SELECT * FROM rest_head")
         for ((corruption, calls) in listOf(
             "UPDATE rest_log SET result = replace(result, '\"remaining\":900000', '\"remaining\":1200000') WHERE kind = 'CONSUME'" to listOf(current, replayConsume),
             "UPDATE rest_log SET result = replace(result, '\"remaining\":900000', '\"remaining\":900000.5') WHERE kind = 'CONSUME'" to listOf(current, replayConsume),
@@ -186,9 +194,68 @@ class RestLedgerTest : InstrumentationTestCase() {
             sql(corruption)
             assertTrue("손상이 들어가지 않음: $corruption", dump() != clean)
             assertStorageFailureKeepsRows(*calls.toTypedArray(), label = corruption)
-            sql("DELETE FROM rest_log", "INSERT INTO rest_log SELECT * FROM backup")
+            sql("DELETE FROM rest_log", "INSERT INTO rest_log SELECT * FROM backup", "DELETE FROM rest_head", "INSERT INTO rest_head SELECT * FROM head_backup")
         }
         assertEquals(RestBonusState(15 * minute, 2), state())
+    }
+
+    fun testDeletedLastConsumeIsStorageFailureNotARestoredBonus() {
+        // 리뷰 재현 1: 20분 → 5분 소모(15분) 뒤 마지막 소모 기록만 지우면 20분으로 되살아나던 문제.
+        ok(ledger.depart(rules, stop(1)))
+        ok(ledger.consume(rules, "drive-a", 1, 5 * minute))
+        sql("DELETE FROM rest_log WHERE kind = 'CONSUME'")
+        assertStorageFailureKeepsRows(
+            { ledger.state() }, { ledger.consume(rules, "drive-a", 1, 5 * minute) }, { ledger.consume(rules, "drive-b", 1, minute) },
+            { ledger.depart(rules, stop(2)) },
+        )
+    }
+
+    fun testDeletedMiddleRecordIsStorageFailure() {
+        // 리뷰 재현 2: 0분 소모를 가운데 두고 지우면 남은 기록끼리는 맞아 보이던 문제.
+        ok(ledger.depart(rules, stop(1)))
+        ok(ledger.consume(rules, "drive-zero", 1, 0))
+        ok(ledger.depart(rules, stop(2, place = RestPlace.OTHER)))
+        sql("DELETE FROM rest_log WHERE kind = 'CONSUME'")
+        assertStorageFailureKeepsRows({ ledger.state() }, { ledger.consume(rules, "drive-zero", 1, 0) }, { ledger.depart(rules, stop(3)) })
+    }
+
+    fun testDeletedFirstRecordOrBrokenHeadIsStorageFailure() {
+        ok(ledger.depart(rules, stop(1)))
+        ok(ledger.consume(rules, "drive-a", 1, 5 * minute))
+        sql("CREATE TABLE backup AS SELECT * FROM rest_log", "CREATE TABLE head_backup AS SELECT * FROM rest_head")
+        for (corruption in listOf(
+            "DELETE FROM rest_log WHERE kind = 'DEPART'",
+            "DELETE FROM rest_head",
+            "DELETE FROM rest_log",
+            "UPDATE rest_head SET last = last - 1",
+            "UPDATE rest_head SET count = count + 1",
+            "UPDATE rest_head SET last = 'x'",
+            "UPDATE rest_log SET prev = 0",
+        )) {
+            val clean = dump()
+            sql("PRAGMA ignore_check_constraints = ON", corruption, "PRAGMA ignore_check_constraints = OFF")
+            assertTrue("손상이 들어가지 않음: $corruption", dump() != clean)
+            // CHECK를 우회한 값은 다시 열 때 저장소 전체 검사에 걸리므로 같은 연결에서 이 원장의 대조를 확인한다.
+            val before = dump()
+            assertEquals(corruption, ContractResult.Failure(ContractError.STORAGE_FAILURE), ledger.state())
+            assertEquals(corruption, ContractResult.Failure(ContractError.STORAGE_FAILURE), ledger.consume(rules, "drive-b", 1, minute))
+            assertEquals(corruption, before, dump())
+            sql("DELETE FROM rest_log", "INSERT INTO rest_log SELECT * FROM backup", "DELETE FROM rest_head", "INSERT INTO rest_head SELECT * FROM head_backup")
+        }
+        assertEquals(RestBonusState(15 * minute, 1), state())
+    }
+
+    fun testNumberGapsAreNormal() {
+        // AUTOINCREMENT 번호는 비어도 정상이다. 연결 관계만 맞으면 손상이 아니다.
+        ok(ledger.depart(rules, stop(1)))
+        sql("UPDATE sqlite_sequence SET seq = seq + 5 WHERE name = 'rest_log'")
+        assertEquals(RestBonusState(15 * minute, 1), ok(ledger.consume(rules, "drive-a", 1, 5 * minute)))
+        reopen()
+        assertEquals(RestBonusState(15 * minute, 1), state())
+        assertEquals(RestBonusState(15 * minute, 1), ok(ledger.consume(rules, "drive-a", 1, 5 * minute)))
+        assertEquals(listOf(1L, 7L), ok(store.atomic { db ->
+            ContractResult.Success(db.rawQuery("SELECT seq FROM rest_log ORDER BY seq", null).use { buildList { while (it.moveToNext()) add(it.getLong(0)) } })
+        }))
     }
 
     fun testTwoConnectionsDepartingTheSameStopIssueOneBonus() {
@@ -202,7 +269,7 @@ class RestLedgerTest : InstrumentationTestCase() {
             gate.countDown()
             assertEquals(ok(a.get(10, TimeUnit.SECONDS)), ok(b.get(10, TimeUnit.SECONDS)))
             reopen()
-            assertEquals(1, dump().lines().size)
+            assertEquals(1, logCount())
             assertEquals(RestBonusState(20 * minute, 1), state())
         } finally { pool.shutdownNow(); other.close() }
     }
