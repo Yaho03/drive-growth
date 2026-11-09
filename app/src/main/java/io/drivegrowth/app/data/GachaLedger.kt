@@ -85,7 +85,7 @@ internal class GachaLedger(private val store: SqliteGameChangeStore) {
                 return@atomic ContractResult.Success(GachaSettlement(command, settlement, savedProgress))
             }
         }
-        if (db.rawQuery("SELECT 1 FROM settlements WHERE request_id=?", arrayOf(command.requestId.value)).use { it.moveToFirst() })
+        if (store.requestUnavailable(db, command.requestId))
             return@atomic failure(ContractError.STATE_CONFLICT)
         val saved = when (val result = state(db)) {
             is ContractResult.Failure -> return@atomic result
