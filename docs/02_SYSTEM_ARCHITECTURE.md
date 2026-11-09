@@ -377,8 +377,9 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 |---|---|---|
 | `planLevelUp(owned, requestId, source, VehicleRef, activityOf)` | 비용 DEBIT + `VehicleWrite.Update`(레벨+1, 진행량 유지, 20이면 0)를 담은 불변 `GameChange` 계획을 반환하고, 호출자가 `commitGameChange`로 저장. **응답을 잃으면 보관한 같은 계획을 다시 제출**해 처음 정산을 재생한다(같은 requestId·다른 내용은 `STATE_CONFLICT`). 성공 뒤 계획을 새로 만들면 revision이 달라 새 요청으로 거절 | 없음·처분 `DATA_UNAVAILABLE`, revision 불일치·대여/반납/수리 필요 `STATE_CONFLICT`, 20레벨·최종 비용 Long 초과 `INVALID_INPUT`, 활동 조회 실패는 받은 오류 그대로, 잔액 부족·저장 실패는 저장소가 전체 거절 |
 | `planMaterial(owned, target, material, activityOf)` | **계산·검사만.** 대상 성장 Update와 재료 CONSUMED Update(성장값 보존) 두 개를 `MaterialPlan`으로 반환하고 저장하지 않음 | 같은 개체·다른 차종·20레벨 대상 `INVALID_INPUT`, 처분된 재료 `DATA_UNAVAILABLE`, revision 불일치·사용 중 `STATE_CONFLICT`, 대상·재료 활동 조회 실패는 받은 오류 그대로. 재료는 20레벨이어도 사용 가능 |
+| `prepareMaterial(store, requestId, source, target, material)` | 저장 측 `readMaterialState`의 두 개체·활동·버전으로 `planMaterial`을 실행해 비용0(PRD에 재료 강화 비용 없음) `MaterialCommand`를 만든다. 저장하지 않는다. 호출자가 `store.commitMaterial(command)`로 대상 성장·재료 CONSUMED를 한 정산에 확정하고, **응답을 잃으면 보관한 같은 command를 다시 commitMaterial**해 처음 정산을 재생한다 | 같은 개체 `INVALID_INPUT`, 저장 측 콘텐츠·규칙 버전이 앱과 다르면 `STATE_CONFLICT`, 상태·활동 조회 실패·활동 누락은 받은 오류 그대로(IDLE로 보정 안 함), 나머지는 `planMaterial`과 같다. 저장 실패는 저장소가 두 개체·잔액 모두 미반영 |
 
-재료 강화는 두 개체를 한 정산에 확정해야 하므로 위 「#48 후속 거래」의 다중 개체 명령이 #33·#34에 생긴 뒤 `MaterialPlan`을 한 건으로 커밋한다. 희귀도 수익 배율(1.0~1.3)과 대여료 반영은 영업 계산(B) 범위라 이번에 바꾸지 않았다.
+재료 강화는 #121 `MaterialChangeStore`(PR #147)로 두 개체를 한 정산에 확정한다. 메모리 참조 저장소에서 확정·재제출 재생·저장 실패 무변경을 시험했다. 실제 SQLite 저장·live 활동·DB 재개방·제품 화면 연결은 #122·#52의 후속이다. 희귀도 수익 배율(1.0~1.3)과 대여료 반영은 영업 계산(B) 범위라 이번에 바꾸지 않았다.
 
 #### #47 가챠 1회 지급
 
