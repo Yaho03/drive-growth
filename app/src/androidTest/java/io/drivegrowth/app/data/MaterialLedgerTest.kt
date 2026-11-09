@@ -254,6 +254,26 @@ class MaterialLedgerTest : InstrumentationTestCase() {
         assertEquals(failed(ContractError.STATE_CONFLICT),store.commitGacha(draw))
     }
 
+    fun testMissingMaterialHistoryFailsWithoutChangingCorruptedFile() {
+        val c = command().copy(cost = GameMoney(200))
+        val saved = ok(store.commitMaterial(c))
+        val cars = history(); val money = balance()
+        store.close()
+        raw { db ->
+            assertEquals(1L, db.rawQuery("SELECT count(*) FROM settlements WHERE request_id=?",
+                arrayOf(c.requestId.value)).use { it.moveToFirst(); it.getLong(0) })
+            db.execSQL("DELETE FROM material_requests WHERE request_id=?", arrayOf(c.requestId.value))
+        }
+        val file = context.getDatabasePath(name); val before = file.readBytes()
+        store = open(provide = false) // 현재 권위 없이도 자기 이력 손실을 먼저 식별한다.
+        for (retry in listOf(c, c.copy(cost = GameMoney(201)))) {
+            assertEquals(failed(ContractError.STORAGE_FAILURE), store.commitMaterial(retry))
+            assertEquals(cars, history()); assertEquals(money, balance())
+            assertEquals(setOf(saved.target, saved.material), history().toSet())
+        }
+        store.close(); assertTrue(before.contentEquals(file.readBytes())); store = open()
+    }
+
     fun testMissingCommonReceiptFailsWithoutChangingCorruptedFile() {
         val c = command(); ok(store.commitMaterial(c)); store.close()
         raw { it.execSQL("DELETE FROM settlements WHERE request_id='enhance'") }
