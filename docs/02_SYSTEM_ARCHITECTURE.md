@@ -814,3 +814,14 @@ main190 `af2ee70dee24c7ad9310372255d4b20d5ed79ee3`을 Rest c28 후속 후보의 
 C는 metadata/공개 읽기의 코드·호환 JVM8과 A c28 C1 GREEN을, D는 UTC16 및 day 코드·A SQL4의 후행12표 rollback GREEN을 각 배정 범위에서 수용했다. 전체 Rest/제품 승인으로 확대하지 않는다. 새 main190 조합 자동 검사와 원 c28 실제SQLite47·기존B Native65/추가Results1은 [06](06_VERIFICATION.md#rest-schema16과-main190-제품-호스트의-최종-로컬-조합--2026-11-10)에서 구분한다.
 
 main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결은 유지하지만, Rest의 실제 boot/domain/place·정책 권위/producer·명시 opt-in과 v1 RestHostSource 소비는 이 후보에서 새로 연결하지 않았다. #189 디자인은 기능 구현 이후 검토/적용한다는 최신 지시를 유지하며 schema17 꾸미기·새 core·SDK확장·새 producer·통합모의주행을 섞지 않는다.
+
+
+### 가게 꾸미기 순수 계약 — 2026-11-10
+
+`core.decoration`은 가게의 간판·색 표현 키 한 묶음에 대한 소유·선택·가격 검증을 담당한다. `DecorationCommand`는 원 request/profile/source, 품목·동작, 정의 버전, 예상 꾸미기 revision·가격을 보존한다. `prepareDecorationChange`는 같은 거래에서 읽은 실제 잔액·가게 레벨·소유 상태와 대조해 구매/적용 예정 결과를 반환하며 저장을 수행하지 않는다. 정의 목록과 소유 집합은 방어 복사한 읽기 전용 snapshot이다.
+
+`BUY_AND_APPLY`는 미소유·해금·정확한 가격을 검사한다. `APPLY_OWNED`는 이미 소유한 다른 품목을 비용 없이 적용하며 구매 해금 레벨을 다시 요구하지 않는다. 다른 프로필/출처는 `INVALID_INPUT`, 오래된 정의·revision·가격·중복 구매/현재 선택은 `STATE_CONFLICT`, 없는 정의는 `DATA_UNAVAILABLE`, 부족 잔액은 `INSUFFICIENT_FUNDS`다. 실패 시 입력 상태를 변경하지 않는다.
+
+같은 전체 원명령의 `replayDecorationChange`는 현재 정의·잔액·가게 레벨로 재계산하지 않고 당시 결과를 반환한다. 양수 구매만 기존 공통 `FACILITY`/`DEBIT` 정산을 갖는다. 무료 구매와 소유품 적용은 `settlement=null`인 typed 결과를 사용하며 가짜 0원 정산을 만들지 않는다. 전역 요청 소유권, 이전 상태와 원문·정산의 DB 연결, 잔액·소유·선택·revision·원결과의 원자 확정은 SQLite 소비자의 책임이다. 확인된 초기 empty/null 상태를 누락·손상·legacy의 보정값으로 사용하지 않는다.
+
+중앙 `trialDecorationDefinitions()`의 두 품목은 조정 가능한 시연 시험값이다. `neutral-sign`은 Lv1/0, `blue-sign`은 Lv2/100이며 별도 자동 지급이나 경제 효과가 없다. `themeKey`만 기존 `ShopAppearance`로 매핑한다. 자유 배치·차량 꾸미기·이미지·좌표·최종 색상을 새로 정하지 않으며 #189 최종 디자인 적용과 구분한다. 이 순수 계약 공급만으로 실제 저장·제품 화면·#55 전체 완료가 되지 않는다.

@@ -1831,3 +1831,14 @@ C최종판정은 ACCEPT_SCOPED_METADATA_PUBLIC_READ_CODE_JVM8_AND_A_C28_C1_GREEN
 준비/설치pull앱81bbefb1ebf7a61b95c2f7803d23130d26b456aa3ca4a108169e82200468ed14·시험bf94d969f3bae036aacfd76385dc2b3ea839c8bc14cf34109d80bed294fd2686는같았다. A 단독구간23:14:05~23:27:05KST/API34ARM64/user10·제품/환경19/19보존·자기권한/forward/heartbeat·공식Park/controls0/bridge비활성상태복원·자기2패키지정리·released/noFurtherAdb를회수했다. 신호요청전보호제품PID/서비스부재와매요청전6파일동일guard를확인했고제품데이터삭제/권한변경0이다. 실제원본 SDK의짧은이탈/복귀만확보했으며Activity재생성·프로세스kill·전원·장시간영업·실차/전체#51/#28완료로확대하지않는다.
 
 원문은 /private/tmp/drive-product-sdk-inactive-boundary-a-20261110/REPORT.md·summary.json 및 device/actual-sdk-boundary-proof.json·test-results.json·preservation.json/phase DB·SDK로그에보존한다. 이문서담당은위근거를직접대조하고3760ms·같은origin/최초anchor일치·설치pullhash·19보존/반환을확인했으며새ADB/장치/JUnit/Gradle실행0·source42변경0이다. 기존새조합612/제품·시험APK/Lint0/27은제품/시험/빌드입력불변의실제선행실행근거로유지한다.
+
+
+### 가게 꾸미기 순수 계약 검증 — 2026-11-10
+
+F의 고정 patch SHA-256 `a73c305af177e575afe5236fdd83a6341bcc097297d19c84842ed985d8f126e1`의 신규 4파일을 그대로 공급한다. 기존 공통 계약·fixture·app·Gradle을 바꾸지 않았다. 기준 원본은 main188이며 새 공급본은 Rest schema16·main190 제품 연결을 보존한다.
+
+작성자 검증은 원 420개에 신규 24개를 포함한 core 444개 통과다. A는 별도 ASCII 사본에서 원 24개와 독립 반례 4개, 총 28개를 실행해 실패·오류·생략 0과 필수 수정 0을 확인했다. 유료→무료→소유품 적용의 연속 동작, 무료 명령 종류가 다른 같은 ID 충돌, 정의 변경 뒤 소유권 적용, revision 상한 직전의 정상 확정/재생을 대조했다. A의 추가 시험 최초 컴파일 실패는 시험 코드의 nullable 접근 오류로 분리 보존했고 정식 원문 기대값이나 구현을 바꾸지 않았다. 원 24개는 444개에 포함되며 별도 실행 수를 합산하지 않는다.
+
+무료 결과의 가짜 금융 정산 거절, 양수 구매 정산 누락·불일치 거절, 목록/집합의 외부 변경 방지와 실패 무변경은 순수 시험 근거다. SQLite 재개방·전역 요청 ID·원자 rollback·host checkpoint·실제 UI·장치/프로세스·#55 및 #28 전체 완료를 뜻하지 않는다. E의 저장 구현과 F의 UI 소비는 별도 후보로 검증한다. 원문/API/독립 실행 근거는 로컬 `/private/tmp/drive-decoration-contract-20261110/`에 보존했다.
+
+새 Rest/main190 조합에서는 root가 core 444개·앱 612개 XML의 실패·오류·생략 0을 확인했다. 최초 전체 명령은 시험과 APK 이후 Lint에서 기존 Temurin17.0.6 ARM64의 C1 OSR 컴파일러 내부 오류(`assembler_aarch64.hpp:267`, `Field too big for insn`)로 종료됐다. 이 실행 전체를 성공으로 표시하지 않으며 crash/replay 로그를 로컬에 보존했다. 소스·의존성·공유 설정을 바꾸지 않고 이번 명령에만 `-XX:TieredStopAtLevel=1 -XX:-UseOnStackReplacement`를 적용해 재확인했다. 동일 명령은 1분28초에 성공했고 APK·Lint 오류0/경고27, 55개 작업 중5개 실행/50개 UP-TO-DATE였다. 기존 시험 XML 재사용을 새로운 1,056개 실행으로 합산하지 않는다. 저장소·문서 링크457개와 diff도 확인했다. 실제 기기 실행은 이번 순수 공급 범위에서0이다.
