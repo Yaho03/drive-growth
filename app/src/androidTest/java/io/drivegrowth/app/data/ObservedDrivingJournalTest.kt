@@ -22,7 +22,7 @@ class ObservedDrivingJournalTest:InstrumentationTestCase() {
     private val actor get()=GameIdentity(ok(store.localProfileId()),source)
     private fun open()=SqliteGameChangeStore(context,source,name)
     private fun <T> ok(r:ContractResult<T>):T {assertTrue(r.toString(),r is ContractResult.Success);return(r as ContractResult.Success).value}
-    override fun setUp(){super.setUp();name="observed-sqlite-${System.nanoTime()}.db";store=open();rules=ok(ok(AssetTrialDefinitionProvider(context.assets).load()).drivingIncomeRules())}
+    override fun setUp(){super.setUp();name="observed-sqlite-${System.nanoTime()}.db";store=open();ok(store.localProfileId());rules=ok(ok(AssetTrialDefinitionProvider(context.assets).load()).drivingIncomeRules())}
     override fun tearDown(){store.close();context.deleteDatabase(name);context.deleteDatabase(name+"-vehicle");super.tearDown()}
     private fun raw(f:(SQLiteDatabase)->Unit)=SQLiteDatabase.openDatabase(context.getDatabasePath(name).path,null,SQLiteDatabase.OPEN_READWRITE).use(f)
     private fun rows():List<String> = buildList{raw{db->for(t in listOf("account","settlements","driving_days","driving_drives","observed_driving_marker","observed_driving_state","observed_driving_receipts"))db.rawQuery("SELECT * FROM $t ORDER BY 1",null).use{r->while(r.moveToNext())add(t+":"+(0 until r.columnCount).joinToString("|"){if(r.isNull(it))"<null>"else r.getString(it)})}}}
@@ -107,6 +107,43 @@ class ObservedDrivingJournalTest:InstrumentationTestCase() {
     fun testFailedV12MigrationPreservesOriginalVersionAndWholeFile() {
         ok(store.activateObservedDriving(actor.profileId));store.close();raw{it.version=12};val file=context.getDatabasePath(name);val original=file.readBytes();store=open()
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.balance());store.close();assertTrue(original.contentEquals(file.readBytes()));raw{assertEquals(12,it.version);it.version=13};store=open()
+    }
+
+    fun testIndependentReceiptWithoutMarkerIsCorruptionNotInactiveModule() {
+        val t=pending();ok(drain());raw{it.execSQL("DELETE FROM observed_driving_marker")};val before=rows()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.observedDrivingReceipt(t.id))
+        assertEquals(before,rows())
+    }
+    fun testIndependentChangedRawNanOutboxCannotAckDifferentOriginalReceipt() {
+        ok(store.activateObservedDriving(actor.profileId))
+        fun gap(bits:Long)=DrivingGap(DrivingGapReason.INVALID_SIGNAL,null,RecordingClock(200000,EpochMillis(1794279800000)),observation(200000,Double.fromBits(bits)))
+        val t=trip().copy(gaps=listOf(gap(0x7ff8000000000042L)))
+        ok(save(read().copy(revision=1,outbox=listOf(t))));val original=ok(drain())
+        val changed=t.copy(gaps=listOf(gap(0x7ff8000000000043L)))
+        assertFalse(ObservedDrivingJson.trip(original.trip).toString()==ObservedDrivingJson.trip(changed).toString())
+        val altered=read().copy(outbox=listOf(changed));val payload=ObservedDrivingJson.state(altered).toString()
+        raw{it.execSQL("UPDATE observed_driving_state SET payload=?,digest=?",arrayOf(payload,ObservedDrivingJson.digest(payload)))}
+        val loaded=read();assertEquals(0x7ff8000000000043L,(loaded.outbox.single().gaps.single().observation!!.speedMps as Observation.Available).value.toRawBits())
+        val before=rows()
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),save(loaded.copy(revision=loaded.revision+1,outbox=emptyList())))
+        assertEquals(before,rows())
+    }
+
+    fun testIndependentReceiptReadbackMustCompareRawNanBitsExactly() {
+        ok(store.activateObservedDriving(actor.profileId))
+        fun gap(bits:Long)=DrivingGap(DrivingGapReason.INVALID_SIGNAL,null,RecordingClock(200000,EpochMillis(1794279800000)),observation(200000,Double.fromBits(bits)))
+        val t=trip().copy(gaps=listOf(gap(0x7ff8000000000042L)));ok(save(read().copy(revision=1,outbox=listOf(t))))
+        val before=rows()
+        val result=store.atomic { db ->
+            val paid=when(val r=store.driving.settle(rules,t.confirmed(source)!!)){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
+            val receipt=ObservedDrivingReceipt(t,paid)
+            val altered=ObservedDrivingJson.receipt(receipt.copy(trip=t.copy(gaps=listOf(gap(0x7ff8000000000043L))))).toString()
+            fun sql(value:String)="'"+value.replace("'","''")+"'"
+            db.execSQL("CREATE TRIGGER alter_observed_receipt AFTER INSERT ON observed_driving_receipts BEGIN UPDATE observed_driving_receipts SET payload="+sql(altered)+",digest="+sql(ObservedDrivingJson.digest(altered))+" WHERE drive_id=NEW.drive_id; END")
+            journal.recordCommit(db,actor,receipt)
+        }
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),result)
+        assertEquals(before,rows())
     }
 
 }
