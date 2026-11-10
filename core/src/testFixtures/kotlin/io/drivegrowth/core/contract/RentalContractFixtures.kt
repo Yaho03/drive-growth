@@ -83,14 +83,21 @@ class InMemoryGameChangeStore(
     private var gachaState: GachaState? = null,
     private val materialConfiguration: MaterialFixtureConfiguration? = null,
     private val repairConfiguration: RepairFixtureConfiguration? = null,
-) : GachaChangeStore, MaterialChangeStore, RepairChangeStore {
+    private val initializationConfiguration: InitializationFixtureConfiguration? = null,
+    private val firstRentalGiftConfiguration: FirstRentalGiftFixtureConfiguration? = null,
+) : FirstRentalGiftStore, MaterialChangeStore, RepairChangeStore, InitializationChangeStore {
     init {
         val gachaSource = gachaState?.authority?.source
         require(gachaSource == null || materialConfiguration == null || gachaSource == materialConfiguration.source) {
             "같은 메모리 원장의 가챠와 재료 출처는 같아야 한다"
         }
-        val sources = listOfNotNull(gachaSource, materialConfiguration?.source, repairConfiguration?.source)
+        val initializationSource = (initializationConfiguration?.state as? ContractResult.Success)?.value?.source
+        val sources = listOfNotNull(gachaSource, materialConfiguration?.source, repairConfiguration?.source, initializationSource, firstRentalGiftConfiguration?.source)
         require(sources.distinct().size <= 1) { "같은 메모리 원장의 출처는 같아야 한다" }
+        val initializationProfile = (initializationConfiguration?.state as? ContractResult.Success)?.value?.profileId
+        require(initializationProfile == null || firstRentalGiftConfiguration == null || initializationProfile == firstRentalGiftConfiguration.profileId) {
+            "초기화와 첫 영업 선물은 같은 프로필 원장을 사용해야 한다"
+        }
         materialConfiguration?.activities?.forEach { (id, activity) ->
             val repairActivity = repairConfiguration?.activities?.get(id)
             require(repairActivity == null || repairActivity == activity) { "같은 개체의 활동 입력은 같아야 한다" }
@@ -104,8 +111,181 @@ class InMemoryGameChangeStore(
     private val gachaCommitted = mutableMapOf<RequestId, GachaSettlement>()
     private val materialCommitted = mutableMapOf<RequestId, MaterialSettlement>()
     private val repairCommitted = mutableMapOf<RequestId, RepairSettlement>()
+    private var initializationResult = (((initializationConfiguration?.state as? ContractResult.Success)?.value?.status)
+        as? ProfileInitializationStatus.Existing)?.original
+    private var initializationMarker = initializationConfiguration?.marker
+    private var firstRentalGift = firstRentalGiftConfiguration?.granted
+    private var firstRentalGiftMarker = firstRentalGiftConfiguration?.marker
+    private var firstRentalGiftOriginalState = firstRentalGiftConfiguration?.originalState
     private var balance = initialBalance
     var nextCommitFailure: ContractError? = null
+
+    private fun hasFirstRentalGiftRequest(requestId: RequestId) = firstRentalGiftMarker?.requestId == requestId ||
+        firstRentalGift?.command?.requestId == requestId
+
+    /** 원래 결과와 당시 입력의 연결만 검증한다. 현재 잔액/가챠/영업 조회 실패로 과거 결과를 덮지 않는다. */
+    private fun readOriginalFirstRentalGift(): ContractResult<FirstRentalGiftSettlement?> {
+        val configuration = firstRentalGiftConfiguration ?: return failure(ContractError.DATA_UNAVAILABLE)
+        val original = firstRentalGift
+        val marker = firstRentalGiftMarker
+        val before = firstRentalGiftOriginalState
+        if (original == null && marker == null && before == null) return ContractResult.Success(null)
+        if (original == null || marker == null || before == null || before.granted != null ||
+            before.profileId != configuration.profileId || before.source != configuration.source)
+            return failure(ContractError.STORAGE_FAILURE)
+        val prepared = (prepareFirstRentalGift(original.command, before) as? ContractResult.Success)?.value
+            as? FirstRentalGiftPreparation.Ready ?: return failure(ContractError.STORAGE_FAILURE)
+        val transaction = original.transaction
+        if (original.balance != prepared.balance || original.progress != prepared.progress ||
+            original.marker != prepared.marker || marker != prepared.marker ||
+            transaction.requestId != original.command.requestId || transaction.source != original.command.source ||
+            transaction.ruleVersion != original.command.ruleVersion || transaction.kind != TransactionKind.GARAGE || transaction.money != null)
+            return failure(ContractError.STORAGE_FAILURE)
+        return ContractResult.Success(original)
+    }
+
+    @Synchronized
+    override fun readFirstRentalGift(profileId: ProfileId): ContractResult<FirstRentalGiftState> {
+        val configuration = firstRentalGiftConfiguration ?: return failure(ContractError.DATA_UNAVAILABLE)
+        if (profileId != configuration.profileId) return failure(ContractError.INVALID_INPUT)
+        val original = when (val read = readOriginalFirstRentalGift()) {
+            is ContractResult.Failure -> return read
+            is ContractResult.Success -> read.value
+        }
+        val currentGacha = gachaState ?: return failure(ContractError.DATA_UNAVAILABLE)
+        val rental = when (val read = configuration.firstCompletedRental) {
+            is ContractResult.Failure -> return read
+            is ContractResult.Success -> read.value
+        }
+        return ContractResult.Success(FirstRentalGiftState(configuration.profileId, configuration.source,
+            configuration.contentVersion, configuration.ruleVersion, balance, currentGacha.progress, rental, original))
+    }
+
+    @Synchronized
+    override fun commitFirstRentalGift(command: FirstRentalGiftCommand): ContractResult<FirstRentalGiftSettlement> {
+        val original = when (val read = readOriginalFirstRentalGift()) {
+            is ContractResult.Failure -> return read
+            is ContractResult.Success -> read.value
+        }
+        if (original != null) {
+            // 위에서 검증한 기록을 사용한다. 현재 권위/진행/완료 조회 없이 원래 전체 명령을 재생한다.
+            val history = checkNotNull(firstRentalGiftOriginalState).copy(granted = original)
+            return when (val replay = prepareFirstRentalGift(command, history)) {
+                is ContractResult.Failure -> replay
+                is ContractResult.Success -> ContractResult.Success((replay.value as FirstRentalGiftPreparation.Replay).result)
+            }
+        }
+        if (command.requestId in committed || command.requestId in gachaCommitted || command.requestId in materialCommitted ||
+            command.requestId in repairCommitted || hasInitializationRequest(command.requestId))
+            return failure(ContractError.STATE_CONFLICT)
+        val current = when (val read = readFirstRentalGift(command.profileId)) {
+            is ContractResult.Failure -> return read
+            is ContractResult.Success -> read.value
+        }
+        val prepared = when (val result = prepareFirstRentalGift(command, current)) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value as FirstRentalGiftPreparation.Ready
+        }
+        nextCommitFailure?.let {
+            nextCommitFailure = null
+            return failure(it)
+        }
+        val receipt = FirstRentalGiftSettlement(command, SettlementId("fixture-settlement-${command.requestId.value}"),
+            Transaction(TransactionId("fixture-transaction-${command.requestId.value}"), command.requestId,
+                TransactionKind.GARAGE, command.source, command.ruleVersion, null),
+            prepared.balance, prepared.progress, prepared.marker, confirmedAt)
+        // 현재 GachaProgress는 하나다. 같은 모니터에서 무료권/revision·마커·당시 입력/전체 결과만 함께 확정한다.
+        gachaState = checkNotNull(gachaState).copy(progress = prepared.progress)
+        firstRentalGiftOriginalState = current
+        firstRentalGiftMarker = prepared.marker
+        firstRentalGift = receipt
+        return ContractResult.Success(receipt)
+    }
+
+    @Synchronized
+    override fun readInitialization(profileId: ProfileId): ContractResult<InitializationState> {
+        val configured = when (val read = initializationConfiguration?.state ?: failure(ContractError.DATA_UNAVAILABLE)) {
+            is ContractResult.Failure -> return read
+            is ContractResult.Success -> read.value
+        }
+        if (profileId != configured.profileId) return failure(ContractError.INVALID_INPUT)
+        val original = initializationResult
+        val marker = initializationMarker
+        val status = if (original != null || marker != null) {
+            if (original == null || marker == null || !validInitializationResult(original, marker, configured))
+                return failure(ContractError.STORAGE_FAILURE)
+            ProfileInitializationStatus.Existing(original)
+        } else configured.status
+        return ContractResult.Success(configured.copy(status = status, balance = balance,
+            ownedVehicleCount = vehiclesById.values.count { it.lifecycle == VehicleLifecycle.OWNED }))
+    }
+
+    /** 과거 기록의 연결 검증에만 당시 명령을 쓴다. 현재 NEW 판별·재발급을 하지 않는다. */
+    private fun validInitializationResult(original: InitializationSettlement, marker: InitializationMarker,
+                                          configured: InitializationState): Boolean {
+        val command = original.command
+        val vehicle = (command.grant.vehicle as? VehicleWrite.Add)?.vehicle ?: return false
+        val money = command.grant.money ?: return false
+        // 현재 후보/버전으로 과거를 재계산하지 않고 저장된 명령의 형태를 기존 prepare로 검사한다.
+        val historical = configured.copy(contentVersion = command.contentVersion, ruleVersion = command.grant.ruleVersion,
+            status = ProfileInitializationStatus.New(command.evidence), balance = GameMoney(0), ownedVehicleCount = 0,
+            initialMoney = money.amount, initialGarageCapacity = command.garageCapacity, availableCandidates = setOf(vehicle.vehicleId))
+        val checked = (prepareInitialization(command, historical) as? ContractResult.Success)?.value
+            as? InitializationPreparation.Ready ?: return false
+        val transaction = original.grant.transaction
+        return original.marker == checked.marker && marker == checked.marker &&
+            original.garageCapacity == checked.garageCapacity && original.grant.balance == checked.balance &&
+            original.grant.changedVehicle == checked.vehicle && transaction.requestId == command.grant.requestId &&
+            transaction.kind == command.grant.kind && transaction.source == command.grant.source &&
+            transaction.ruleVersion == command.grant.ruleVersion && transaction.money == command.grant.money
+    }
+
+    private fun hasInitializationRequest(requestId: RequestId) = initializationMarker?.requestId == requestId ||
+        initializationResult?.command?.grant?.requestId == requestId
+
+    @Synchronized
+    override fun commitInitialization(command: InitializationCommand): ContractResult<InitializationSettlement> {
+        val current = when (val read = readInitialization(command.profileId)) {
+            is ContractResult.Failure -> return read
+            is ContractResult.Success -> read.value
+        }
+        // 기존 원래 명령은 현재 후보/잔액/revision 검사보다 먼저 재생한다.
+        if (initializationResult == null &&
+            (command.grant.requestId in committed || command.grant.requestId in gachaCommitted ||
+                command.grant.requestId in materialCommitted || command.grant.requestId in repairCommitted || hasFirstRentalGiftRequest(command.grant.requestId)))
+            return failure(ContractError.STATE_CONFLICT)
+        val prepared = when (val result = prepareInitialization(command, current)) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
+        }
+        if (prepared is InitializationPreparation.Replay) return ContractResult.Success(prepared.result)
+        prepared as InitializationPreparation.Ready
+        // 새 지급도 일반 Add처럼 처분 이력을 포함한 기존 개체 ID를 재사용하지 않는다.
+        if (prepared.vehicle.ownedVehicleId in vehiclesById) return failure(ContractError.STATE_CONFLICT)
+        nextCommitFailure?.let {
+            nextCommitFailure = null
+            return failure(it)
+        }
+        val grant = command.grant
+        val result = InitializationSettlement(command,
+            Settlement(SettlementId("fixture-settlement-${grant.requestId.value}"),
+                Transaction(TransactionId("fixture-transaction-${grant.requestId.value}"), grant.requestId,
+                    grant.kind, grant.source, grant.ruleVersion, grant.money),
+                prepared.balance, prepared.vehicle, confirmedAt), prepared.garageCapacity, prepared.marker)
+        val updatedGacha = gachaState?.let { state ->
+            val a = state.authority
+            state.copy(authority = GachaAuthority(a.source, a.contentVersion, a.ruleVersion, a.shopLevel,
+                prepared.garageCapacity, a.purchasePrice, a.pity, a.guaranteedFrom, a.unlockedVehicles, a.eligibleRarities))
+        }
+        // 같은 모니터에서 재화·첫 차·공간·마커·최초 결과를 함께 확정한다. 무료권은 생성하지 않는다.
+        balance = prepared.balance
+        vehiclesById[prepared.vehicle.ownedVehicleId] = prepared.vehicle
+        activities[prepared.vehicle.ownedVehicleId] = ContractResult.Success(VehicleActivity.IDLE)
+        initializationResult = result
+        initializationMarker = result.marker
+        gachaState = updatedGacha
+        return ContractResult.Success(result)
+    }
 
     @Synchronized
     override fun readRepairState(target: OwnedVehicleId): ContractResult<RepairState> {
@@ -130,7 +310,7 @@ class InMemoryGameChangeStore(
 
     @Synchronized
     override fun repairSettlement(requestId: RequestId): ContractResult<RepairSettlement?> {
-        if (requestId in committed || requestId in gachaCommitted || requestId in materialCommitted)
+        if (requestId in committed || requestId in gachaCommitted || requestId in materialCommitted || hasInitializationRequest(requestId) || hasFirstRentalGiftRequest(requestId))
             return failure(ContractError.STATE_CONFLICT)
         return ContractResult.Success(repairCommitted[requestId])
     }
@@ -143,7 +323,7 @@ class InMemoryGameChangeStore(
                 is ContractResult.Success -> ContractResult.Success(original)
             }
         }
-        if (command.requestId in committed || command.requestId in gachaCommitted || command.requestId in materialCommitted)
+        if (command.requestId in committed || command.requestId in gachaCommitted || command.requestId in materialCommitted || hasInitializationRequest(command.requestId) || hasFirstRentalGiftRequest(command.requestId))
             return failure(ContractError.STATE_CONFLICT)
         val current = when (val read = readRepairState(command.target.ownedVehicleId)) {
             is ContractResult.Failure -> return read
@@ -194,7 +374,7 @@ class InMemoryGameChangeStore(
         materialCommitted[request.requestId]?.let { original ->
             return if (original.command == request) ContractResult.Success(original) else failure(ContractError.STATE_CONFLICT)
         }
-        if (request.requestId in committed || request.requestId in gachaCommitted || request.requestId in repairCommitted) return failure(ContractError.STATE_CONFLICT)
+        if (request.requestId in committed || request.requestId in gachaCommitted || request.requestId in repairCommitted || hasInitializationRequest(request.requestId) || hasFirstRentalGiftRequest(request.requestId)) return failure(ContractError.STATE_CONFLICT)
         val current = when (val result = readMaterialState(request.target.ownedVehicleId, request.material.ownedVehicleId)) {
             is ContractResult.Failure -> return result
             is ContractResult.Success -> result.value
@@ -225,12 +405,13 @@ class InMemoryGameChangeStore(
 
     @Synchronized
     override fun commitGameChange(change: GameChange): ContractResult<Settlement> {
-        if (change.requestId in gachaCommitted || change.requestId in materialCommitted || change.requestId in repairCommitted) return failure(ContractError.STATE_CONFLICT)
+        if (change.requestId in gachaCommitted || change.requestId in materialCommitted || change.requestId in repairCommitted || hasInitializationRequest(change.requestId) || hasFirstRentalGiftRequest(change.requestId)) return failure(ContractError.STATE_CONFLICT)
         committed[change.requestId]?.let { (original, result) ->
             return if (original == change) ContractResult.Success(result) else failure(ContractError.STATE_CONFLICT)
         }
         val authority = gachaState?.authority
         val configuredSource = authority?.source ?: materialConfiguration?.source ?: repairConfiguration?.source
+            ?: (initializationConfiguration?.state as? ContractResult.Success)?.value?.source ?: firstRentalGiftConfiguration?.source
         if (configuredSource != null && change.source != configuredSource) return failure(ContractError.INVALID_INPUT)
         nextCommitFailure?.let {
             nextCommitFailure = null
@@ -243,7 +424,8 @@ class InMemoryGameChangeStore(
                 val vehicle = write.vehicle
                 if (vehicle.ownedVehicleId in vehiclesById) return failure(ContractError.STATE_CONFLICT)
                 // 명시적으로 구성한 권위 공간은 예전 Add 진입점과도 공유한다.
-                if (authority != null && vehiclesById.values.count { it.lifecycle == VehicleLifecycle.OWNED } >= authority.garageCapacity)
+                val capacity = authority?.garageCapacity ?: initializationResult?.garageCapacity
+                if (capacity != null && vehiclesById.values.count { it.lifecycle == VehicleLifecycle.OWNED } >= capacity)
                     return failure(ContractError.CAPACITY_EXCEEDED)
                 if (vehicle.revision != Revision(0) || vehicle.lifecycle != VehicleLifecycle.OWNED) {
                     return failure(ContractError.INVALID_INPUT)
@@ -315,7 +497,7 @@ class InMemoryGameChangeStore(
         gachaCommitted[command.requestId]?.let { original ->
             return if (original.command == command) ContractResult.Success(original) else failure(ContractError.STATE_CONFLICT)
         }
-        if (command.requestId in committed || command.requestId in materialCommitted || command.requestId in repairCommitted) return failure(ContractError.STATE_CONFLICT)
+        if (command.requestId in committed || command.requestId in materialCommitted || command.requestId in repairCommitted || hasInitializationRequest(command.requestId) || hasFirstRentalGiftRequest(command.requestId)) return failure(ContractError.STATE_CONFLICT)
         val state = gachaState ?: return failure(ContractError.DATA_UNAVAILABLE)
         val authority = state.authority
         val progress = state.progress
