@@ -607,7 +607,7 @@ GachaHostController는 확인 입력을 입구에서 한 번 고정하고 같은
 
 GachaOffers는 기존 appliedPercent와 선택적 GachaRatio를 받는다. GachaRatio는 모든 Rarity의 원시 Long 가중치·양수 Long 분모를 불변 Map으로 보존하고 음수/키/합을 검사한다(BigInteger 합으로 overflow 방지). 둘 중 하나는 필요하며 함께 주면 percent×분모=가중치×100을 정확히 비교한다. 일반 회차는 기존74.7/20/5/0.3%를 유지하고 보장 회차는0/53·0/53·50/53·3/53을 직접 표시한다. 임의 반올림·합100 잔여 배분·core 확률 변경 없이 정상 prepare/commit/retry로 이어진다. 순환소수는 정책 미정 오류가 아니다. 실제 권위/보장 후보 누락은 기존 오류를 유지한다.
 
-보존 입출력은 GachaHostState의 generation·pending GachaRequest(전체 확인 입력/attemptId)·GachaCommand 전체다. 같은 프로필의 최신 GachaUiState도 함께 복원하고 이전 owner는 release한다. durable checkpoint/codec와 MainActivity 조립은 미제공이며 새 DB/SharedPreferences를 만들지 않았다. 누락 command를 명시적 미준비 null로 보정하지 않는다. freeTickets가 기존 UI Int 범위를 넘으면 0으로 채우지 않고 DATA_UNAVAILABLE다.
+보존 입출력은 GachaHostState의 generation·pending GachaRequest(전체 확인 입력/attemptId)·GachaCommand 전체다. 같은 프로필의 최신 GachaUiState도 함께 복원하고 이전 owner는 release한다. durable checkpoint/codec와 Draw를 포함한 GachaHostController의 제품 조립은 미제공이다. 아래 MainActivity의 GachaBrowseHost는 조회만 연결하며 새 DB/SharedPreferences를 만들지 않았다. 누락 command를 명시적 미준비 null로 보정하지 않는다. freeTickets가 기존 UI Int 범위를 넘으면 0으로 채우지 않고 DATA_UNAVAILABLE다.
 
 ### #122 재료 강화 SQLite 확정 경계
 
@@ -643,3 +643,12 @@ SqliteGameChangeStore는 MaterialChangeStore.readMaterialState/commitMaterial을
 RentalRuntime는 UI 진입과 worker 저장 실행을 분리하고 한 작업만 수락한다. stop은 대기 작업·늦은 응답을 폐기하지만 이미 시작한 원장 확정을 취소하지 않는다. 재개 시 read/refresh와 원래 고정 방문 명령으로 조회/재생한다. 각 대여의 account·정산은 기존 원장의 개별 확정 경계이며 여러 대여를 하나의 원자 거래로 취급하지 않는다. firstCompleted는 실제 CompletedRental과 rentalId/settlementId를 반환하며 선물 지급을 수행하지 않는다. 방문 수와 완료 고객 수를 혼용하지 않는다.
 
 이 공급은 자동 NPC 방문 정의·버전 있는 제품 요금/시설 정책·실제 차량 관측/시계·프로필 store factory·Activity/UI와 연결된 상태가 아니다. 정의 없음은 DATA_UNAVAILABLE/명시 실패로 전달하고 시험용 SIMULATION 입력과 제품 공급을 구분한다. 원래 주차 시각만으로 앱 종료 중 공백을 연속 P로 추정하지 않는다. 고정 SIMULATION 입력의 독립 실제SQLite10개는 원본eb096에서 통과했다. 최신 게시head 재실행·프로세스/전원·제품 영업 성공은 아니며 실제 NPC/정의·coverage/clock·factory/Activity 연결은 후속이다.
+
+
+### #51 실제 가게 HOME·탐색과 가챠 조회 연결
+
+2026-11-10 호스트 연결: `MainActivity`의 HOME은 `ShopView`이며 `ShopHostMapper`가 기존 `StoredHostSource`의 순차 `HostSnapshot`을 표시한다. 잔액/개체 ID/이름·활동·양수 capacity는 실제 공급 결과만 쓰며 누락 활동은 미확인, 가게 레벨·시설·확장/꾸미기 명령은 공급 전까지 미지원이다. appearance의 간판·색은 고정 표시 스타일이며 저장 꾸미기 상태가 아니다. Shop revision은 표시 세대이고 DB/거래 revision이 아니다. 실제 초기화/승인 견적을 대신하지 않는다.
+
+HostSession의 같은 worker에서 `StoredGachaHostSource`→기존 `GachaStoreHostSource.read`를 연결한다. 현재 권위 부재는 DATA_UNAVAILABLE, 다른 조회 실패는 원래 오류다. 전체 요청/명령의 durable checkpoint/load가 미제공이라 실제 제안이 있어도 UNSUPPORTED로 표시해 Draw를 활성화하지 않는다. 메모리 checkpoint 성공으로 영속 보존을 가장하지 않으며 prepare/commit은 이 조회 호스트가 호출하지 않는다. 초기화도 실제 NEW/SQLite 공급 전에는 기존 Onboarding Unavailable을 유지한다. 필요한 입출력은 기존 #121/#122의 저장 연결 범위다.
+
+가챠 조회 호스트는 workGeneration(비동기 작업 무효화)과 frameGeneration(표시 세대)을 분리한다. Loading과 terminal Missing/Failure/Offers마다 표시 세대를 전진시켜 UI의 같은 세대 다른 내용 거절 규칙을 유지한다. 예전649의 Loading 잔류는 수정360에서 같은 고정 회귀와 실제 native terminal로 해결했으며 오래된 작업/gate 거절을 완화하지 않았다.

@@ -1531,3 +1531,16 @@ A는 exact473추적파일/정식9원문SHA 무변경을 확인하고 외부경�
 이는 고정clock/NPC·요금/SIMULATION과같은SQLite의시험이다. 권한누락은Missing(PERMISSION_DENIED) 입력이며 실제Android권한revoke가아니다. 재개방은DB재개방이고프로세스/전원시험·모든경쟁스케줄·실제고객/실차/SDK/선물지급이아니다. 제품NPC·20종별정의/verifiedclock·전체motioncoverage·같은profile factory/durable원래방문·MainActivity연결은남는다. 원문 rawinstrumentation이근거이고 XML은원문에서집계했다. 자기rentalruntimea2패키지정리·제품APK793e1db8/6데이터/권한·창/설정등19보존checksPASS·해당구간종료를회수했다. 다음장치queue는root배정이며조율자adb0이다.
 
 근거 /private/tmp/drive-rental-runtime-20261110/independent-review/ 및 independent-device-review/의 REPORT/summary/source·device에보존했다. 최신main정상통합에서 소유8파일바이트동일성과RentalLedger.Pending 조회delta만유지하고 helper/schema/진행중E소스를변경하지않는다. 실제10개는eb096실행이며새게시head장치재실행이아니다. 정확headCI/원격공급은연결PR에서확인하고 #41~43/#51/#54 및전체기능을닫지않는다. 수리/초기화/AppHost의미해결P2도이성공으로해결처리하지않는다.
+
+
+### 제품 HOME·가챠 조회와 표시 세대 수정의 독립 검증 — 2026-11-10
+
+AppHost 원6e8f672는 mainf1e0b45와Shop3dc를정상통합해 HOME ShopView·화면선택/Back·저장조회와GachaBrowseHost를연결했다. 원제품범위의독립코드CLEAR/직접JVM20(정식16+외부4,48초)·작성자core383/app190과빌드/Lint는별도근거다. 정식ResultsHostActivityTest101의Spinner준비전대기P2를64963fd에서제품/gate/원래정산기대완화없이수정하고소스컴파일25초·delta검토APPROVE를확인했다.
+
+A의정확649473추적소스/새빌드·설치pullSHA일치(앱09f8b854/시험9ca4014f), 원정식ShopHost1/ResultsHost1/Navigation1/ShopView9=12PASS를회수했다. 최초자기CAR_SPEED권한거부의gate준비실패/자기process종료이력은보존하고자기권한만부여후재실행했다. 제품권한변경0이다. 별도네이티브Spinner경로에서가챠Loading15초잔류와실제host→GachaInteraction외부1FAIL/오류0을확인했다. 같은generation의Loading수락뒤Missing이거절된P2로12PASS와분리해반려했고raw/캡처를보존했다.
+
+수정360c42ca는GachaBrowseHost/단위시험2파일만바꾸고작업무효화/표시generation을분리했다. MainActivity/차량입력/gate/Manifest와정식Android4파일은649와동일하다. 같은외부시험SHAaf8c01b24603bc2ac5d3f0a0b44f74051430a25a8b60cc1d88750665bc72bb7c/기대무변경의JVM1GREEN을확인했다(Loading1수락→Missing2수락). 새473archive/새빌드40초·설치pullSHA(앱f8dda2cd/시험2913a0a7)일치후 실제SDK재관측으로활성화된Spinner를native좌표로선택해가챠terminal Missing·뒤로가게·최상위Task숨김·복귀첫제한후새gate HOME을확인했다. 이전12개를360에서새로반복했다고쓰거나native경로를instrumentation개수로세지않는다.
+
+새계측A는 APPROVE_SCOPED_GACHA_FRAME_FIX_DEVICE·필수0을반환했고제품/6데이터·권한/차량·창/설정/전경등19보존checks/자기2패키지정리·해당구간종료를확인했다. 최초정리에서원전경Task가PAUSED였던649이력과기존DrivingView→지도task포커스만원복한뒤19/19일치한자료도보존한다. 새Activity/기어/속도/제품DB·AVD/서버reset은없다. 독립확인후게시담당은실제terminal/HOME PNG도직접열어OEM영역과앱영역을구분했다.
+
+원근거 /private/tmp/drive-app-host-integration-20261110/independent-review/ 및 independent-device-review/, display-frame-fix/independent-review/의REPORT/summary/원문·PNG·설치/보존자료에보존한다. 조회대상은시험출처의실제SQLite이고공급없는권위는Missing, 거래/영속전체명령미연결이면Draw/시설/초기화는Unsupported/Unavailable이다. 실제추첨/초기지급/관리·시설거래·제품NPC/clock·프로세스/전원·실차/새SDK D시험과전체51/52/54/55/56완료는남는다. 최종디자인은팀WIP/임시Views이며새미술작업이아니다. 게시head의소유10파일360동일성/최신main정상통합·CI는연결PR에서확인한다.
