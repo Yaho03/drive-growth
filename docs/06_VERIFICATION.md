@@ -1727,3 +1727,22 @@ A최종앱76150b8ac71c73e8ec00264f6876f33f62e9939dfbec754cee12a1d31302e639·시�
 새main187조합앱524는실패/오류/생략0이며위치24가이524에포함된다. 제품/시험APK·Lint0오류27경고는78tasks/2분18초에성공했다. 병합Manifest에서앱min28/target34,명시권한과SDKbinding권한·SDK1.1.3/서비스최소0.5.0metadata를확인했다. core와공통Gradle입력은같아core420은이전실행근거로재사용/이번재실행0이다. 저장소21/29/450·diff검사도통과했다. 이조합의새기기/ADB/원격쓰기0이며A660진단을새제품APK의실제실행으로쓰지않는다.
 
 실제B Main/HostSession의동의·권한dialog·전경수명/캐시무효화·close예외처리,센서clock축/신선도/정확도·장소inside/outside·휴식/주차/출발적격성·Rest지급,실제서비스미지원/강제오류/release실패주입·UI정체·background/프로세스/전원·실차는별도미검증이다. source=VEHICLE/Available을실차/휴식인정으로확대하지않고공공215점의임의반경/영역을만들지않는다. 이미완료한#13기준환경이슈는보존하고#40/#51/#28/#81의부분공급/잔여조건만별도로연결한다. AI검토는사람승인이아니며정확게시head/CI/main반영은root가확인한다.
+
+
+### Rest 6a4 세 수정의 main188 통합 검토 대기 — 2026-11-10
+
+정확6a4d820645cbd58c05959d7dd8a48f73746a5972를main188 c6c345d1866569cb3156229ba363312d1778fede 위에정상통합했다. 소스충돌/추가수정0이며변경41파일전부6a4와바이트동일하다. Main/HostSession/PendingRoute/factory/VehicleInput·Location6·시설12·Results14를보존했다. marker생산API는그대로이며시험fixture만schema16으로갱신했다. RankingReadSource의공통Rest주행reader소비는원본의의도된변경이고기존Provenance hook/typedFailure catch는보존했다. core/Gradle/Manifest불변·B0dd미포함이다. **새6a4 SQLite46과최종독립검토는미완료이며승인·완료·merge-ready를주장하지않는다.**
+
+원830의A실제Journal18+Ledger18=36PASS와C JVM16·별도receiver-overlap1FAIL을구분한다. 동일boot의서로다른receiver가0..1000/500..1500의겹친물리시간을입력하면Success/2000ms소모를반환한C/E원반례가있었고,9db는boot별물리cursor·원문검증을보완했다. 원830공개원문손상반례2의실제RED는A가실행하지않았으며실행한것으로바꾸지않는다. 정확9db의A Journal23+Ledger18=41PASS/정상footer는그원본범위로보존하고후속C1/D4실패를합산해소급변경하지않는다.
+
+C metadata소실추가1은정확9db+원C시험의실제1FAIL/오류·생략0/1.071초·정상실패footer다. 원Rest확정뒤observed receipts/state/marker DELETE의영향행수각1 단언3개가통과했고receipt/current/zone을호출했다. 첫receipt기대STORAGE_FAILURE에실제DATA_UNAVAILABLE이반환됐으며이미계산한current=DATA_UNAVAILABLE/zone=Missing(NO_DATA)도관측됐다. 후행current/zone기대단언과최종행보존단언은미도달이다. 이결과를금액손상이나전체행보존성공으로확대하지않는다.
+
+D SQL4는정확9db+원D시험의실제3PASS/1FAIL·오류·생략0/2.980초다. day AFTER ack trigger의day+1 뒤첫Storage기대에실제Success(amount15/day1000)가반환됐고뒤rows rollback단언은미도달이었다. 최종DB day1001을별도로조회/assert한증거는없다. 다른3의consumeID소유충돌rollback·응답유실원결과재생·상한뒤0원/소모/ack는각후행단언까지그원조합에서통과했다. 비교는원시험의선택12표행범위이며전체DB바이트불변이아니다.
+
+D의UTC A→B→A반례는물리elapsed중첩과별개다. 같은boot/domain A로돌아올때과거A의UTC cursor가소실돼원plan이Success(3Uses/2000ms소모)를반환했다. E는원D3를그대로보존해기존10+원D3=13중1RED를재현했고,수정뒤정상복귀/새boot/다른drive경계3을추가한16GREEN을확인했다. D의정확dfdc UTC수정독립16PASS/필수0은그UTC delta만수용한것이며가격식/SQL day/metadata·전체Rest최종승인이아니다.
+
+최종6a4는UTC cursor·신규ack뒤day정확후조건·활성Rest근거뒤관측모듈전체소실의세수정을포함한다. E원본698파일을manifestSHA와대조했고clean·8개후속fix파일·원시험SHA를확인했다. E본인앱569/APK/Lint0/27은원source검사다. 준비된E46은Journal23+Ledger18+D SQL4+C metadata1의고유46이며원본문/기대값을유지했다. E준비앱6b56430e898af72fde47c4f820284b3e93a7aced2fca7d84136fe8423b336e03·시험88c5135b82702bd8f9425fda0a916e9f3b705cf2c39630f64c1db91472e4f38b는파일hash만확인했고설치/실행SHA라고쓰지않는다. 새D4/C1의수정후행단언과원회귀의A46 GREEN은아직수신하지않았다.
+
+F복수departure1은정확9db+별도F시험의명시compact SIMULATION 조합으로7.967초PASS/정상footer·carry/두departure/단일입금/재생/rollback을확인한별도근거다. C1/day실패를해결한시험이아니며그F1을E46의source/APK/계획에넣거나46쌍을덮지않았다. 원830/9db·C/D/A실패/성공및새46준비자료는 /private/tmp/drive-rest-domain-utc-fix-20261110/REPORT.md와관련원본independent-review/device-review에분리보존했다.
+
+새main188조합은앱593 실패/오류/생략0,제품/시험APK·Lint오류0/경고27,78tasks/2분19초에성공했다. RestTimeline/동일D clock16은이593에포함되며별도합산하지않는다. core420은동일core/commonbuild입력의이전근거/이번재실행0이다. 저장소21/29/453·diff/소스동일성검사도통과했다. 이는로컬JVM/컴파일/APK/Lint결과이며새SQLite46/금융후조건통과나최종독립승인을대신하지않는다. mainCI42823800132는root인계시실행중으로만기록한다. 담당새기기/ADB/원격/canonical수정0이며실제B producer/Main/boot·domain/장소권위·SDK/프로세스·전원·실차·제품UI·전체#40/#39/#51/#57/#28/#122는미완료로유지한다.
