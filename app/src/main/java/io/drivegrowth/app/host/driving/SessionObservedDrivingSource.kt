@@ -7,6 +7,7 @@ import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.driving.DrivingIncomeRules
 import io.drivegrowth.app.data.RestDriveContext
 import io.drivegrowth.app.data.RestDepartureInput
+import io.drivegrowth.app.data.ObservedDrivingJson
 
 data class RestObservationBatch(val contexts:List<RestDriveContext>,val departures:List<RestDepartureInput>)
 /** 실제 수신/boot/장소 근거에서 원문을 만든다. DB·게임 상태 변경을 수행하지 않는 공급자다. */
@@ -23,8 +24,17 @@ class SessionObservedDrivingSource(
 ) {
  /** worker 시작 전 명시 설정한다. null은 기존 base 경로이며 Rest 활성화 후 base 지급은 저장소가 거절한다. */
  internal var restObservationProvider:RestObservationProvider?=null
+ private data class RestInput(val receiver:String,val frame:DrivingFrame?,val clock:RecordingClock) {
+  fun same(other:RestInput):Boolean = receiver==other.receiver&&clock==other.clock&&
+   if(frame==null||other.frame==null)frame==other.frame else frame.zone==other.frame.zone&&
+    ObservedDrivingJson.observation(frame.observation).toString()==ObservedDrivingJson.observation(other.frame.observation).toString()
+ }
+ private class RestCapture(val provider:RestObservationProvider,val input:RestInput,val previous:String,val next:RecordingState) {
+  var batch:RestObservationBatch?=null
+ }
+ private var restCapture:RestCapture?=null
  fun observe(receiver:String,frame:DrivingFrame,now:RecordingClock):ContractResult<DrivingRecordingResult> =
-  if(restObservationProvider!=null) captureAndDrain { state->reducer.observe(state,receiver,frame,now,rules()) }
+  if(restObservationProvider!=null) captureAndDrain(RestInput(receiver,frame,now)) { state->reducer.observe(state,receiver,frame,now,rules()) }
   else withSession { session,db,state ->
    when(val next=reducer.observe(state,receiver,frame,now,rules())) {
     is ContractResult.Failure -> next
@@ -32,7 +42,7 @@ class SessionObservedDrivingSource(
    }
   }
  fun pause(receiver:String,at:RecordingClock):ContractResult<DrivingRecordingResult> =
-  if(restObservationProvider!=null) captureAndDrain { state->reducer.pause(state,receiver,at) }
+  if(restObservationProvider!=null) captureAndDrain(RestInput(receiver,null,at)) { state->reducer.pause(state,receiver,at) }
   else withSession { session,db,state ->
    when(val next=reducer.pause(state,receiver,at)) {
     is ContractResult.Failure -> next
@@ -40,14 +50,27 @@ class SessionObservedDrivingSource(
    }
   }
  /** 관측/원증거 보관과 최종 금융 확정은 별도 거래다. 지급 실패 때문에 새 실제 관측을 버리지 않는다. */
- private fun captureAndDrain(reduce:(RecordingState)->ContractResult<RecordingState>):ContractResult<DrivingRecordingResult> {
+ private fun captureAndDrain(input:RestInput,reduce:(RecordingState)->ContractResult<RecordingState>):ContractResult<DrivingRecordingResult> {
   val provider=restObservationProvider?:return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
   val session=when(val r=games.open()){is ContractResult.Failure->return r;is ContractResult.Success->r.value}
   return session.use {
    val saved=session.store.atomic {db->
     val before=when(val r=journal.read(db,session.identity)){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
-    val next=when(val r=reduce(before)){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
-    val batch=when(val r=provider.prepare(before,next)){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
+    val actual=ObservedDrivingJson.state(before).toString()
+    // 저장 전 실패는 같은 원 제안을 재제출한다. 새 입력/현재 revision으로 원 drive ID를 바꾸지 않는다.
+    val capture=restCapture?.let { original->
+     if(original.provider!==provider||!original.input.same(input)||original.previous!=actual)
+      return@atomic ContractResult.Failure(ContractError.STATE_CONFLICT)
+     original
+    }?:run {
+     val next=when(val r=reduce(before)){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
+     RestCapture(provider,input,actual,next).also{restCapture=it}
+    }
+    val next=capture.next
+    val batch=capture.batch?:when(val r=provider.prepare(before,next)) {
+     is ContractResult.Failure->return@atomic r
+     is ContractResult.Success->r.value.also{capture.batch=it}
+    }
     when(val r=save(session,db,before,next)){is ContractResult.Failure->return@atomic r;is ContractResult.Success->Unit}
     var projection=when(val r=session.store.restDriving.projectionIn(db,session.identity)){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
     for(context in batch.contexts)when(val r=session.store.restDriving.captureIn(db,session.identity,projection.revision,next.revision,context)) {
@@ -60,7 +83,8 @@ class SessionObservedDrivingSource(
     }
     ContractResult.Success(next)
    }
-   var state=when(saved){is ContractResult.Failure->return@use saved;is ContractResult.Success->saved.value}
+   // capture 원자 확정과 아래 금융 drain은 별개다. drain 실패가 새 관측을 옛 제안에 묶지 않게 한다.
+   var state=when(saved){is ContractResult.Failure->return@use saved;is ContractResult.Success->{restCapture=null;saved.value}}
    val committed=mutableListOf<ObservedDrivingReceipt>()
    for(trip in state.outbox.toList()) {
     // 각 실패는 atomic 밖에서 해석한다. 부분 지급/소모를 waiting으로 삼켜 commit하지 않는다.
