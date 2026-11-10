@@ -672,3 +672,12 @@ worker 전용 `hostCommands`는 Gacha/단일 Garage GameChange/Material/Repair �
 GachaLiveHost→CheckpointGachaSource는 기존 GachaPull/공용 hostCommands의 worker save→execute→finish를 사용한다. UI 저널은 메모리 경계이며 durable typed 명령·당시 확정 결과를 복구한다. 결과의 차고 이동/명시 재조회에서 finish하고 SAVED만 명시 취소한다. STARTED/불명·finish 실패·알고 있는 원명령 누락을 정상 새 요청으로 바꾸지 않고 과거 명령을 현재 가격/새 난수로 재prepare하지 않는다. Garage도 같은 factory의 실제 원장을 사용하며 재료/레벨업/수리/판매/폐차 준비와 저장 응답의 비용/개체/잔액을 연결한다. 기존 명령/decoder와 공통 checkpoint를 재사용하고 별도 지갑/DB를 만들지 않는다.
 
 실제 첫 실행→1,000/첫 차→유료500 추첨→차고·확정 뒤 Activity/프로세스 재실행은 격리 패키지와 실제 SDK gate에서 확인했다. 무료권/수리/재료 등의 원장 경계 fixture 시험과 제품 native 실행은 구분한다. 첫 영업 선물 runtime·미완성 Expand/Quest/Delivery·전원/실차·모든 in-flight process 중단 검증은 포함하지 않는다. 세부 근거는 [검증 문서](06_VERIFICATION.md#제품-첫-실행가챠공통-factory-소비-독립-검증--2026-11-10)를 따른다.
+
+
+### 내 기록·시연 랭킹의 읽기 모듈 — 2026-11-10
+
+원58407d의 RankingReadSource는 기존 같은 profile/source SQLite를 한 snapshot으로 읽고6지표를 집계한다. 지급/지출·schema/helper를 바꾸지 않는다. 누적수익은 전체 확정원장/원인을 검증하고 판매·폐차를 포함·초기지급/환급 제외, 도감은ever-owned고유칸, 최고가는현재OWNED가격×희귀도수익배율이다. 기준은 [PRD](01_PRD.md#1차-랭킹-범위) 한곳을 따른다. RankingController/RankingView와 DemoRankingProvider는 실제내기록과합성참여자/예시순위를분리하고통신/계정/서버를추가하지않는다.
+
+실제0/Empty/Missing/Failure를구분한다. Android checked JSONException은지표경계의STORAGE_FAILURE로변환하고숫자를절삭하거나DB를수리하지않는다. 누적/주간이같은주행원장을검증하면그손상에서두지표가실패할수있으며모든손상에서다른5정상이라고보장하지않는다.
+
+departureZone hook은실제출발당시지역근거를요구한다. 기존LocalDate만있는기록을현재zone/정산시각/고정KST로바꾸지않고불명/다른지역은주간Missing이다. questCauses hook은같은DB의검증된원래Quest지급요청ID만공급한다. 미분류입금이있는데hook이없으면누적Missing이며잔액/미열람목록으로대체하지않는다. 실제생산자/영속근거는 #39/#45/#58/#122에서연결하고 MainActivity hook은별도다.

@@ -1570,3 +1570,14 @@ A의 정확cab529추적파일 원문/정식 기대 무변경·새APK 설치pullS
 원본6구간14:23:28~14:24:50KST/native14:25:51~14:34:26KST, API34 ARM64/user10. 원본 app a2f53772/testbcad69ba/nativeapp90b3bce3의 설치pullSHA 일치·두 구간19보존PASS·자기패키지/권한/잔여시험 정리·슬롯반환을 회수했다. 관측문구/스크롤/목적화면 이름을 바로잡은 외부harness 실패는 보존하고 지급/추첨 횟수·저장 기대를 바꾸지 않았다. 게시담당은 native 결과와 차고PNG를 직접 확인했으며 OEM 영역과 임시앱 화면을 구분했다. 조율자adb0이다.
 
 근거는 /private/tmp/drive-gacha-live-host-20261110/independent-review/ 및 independent-device-review/의 REPORT/summary·device/native 원문/DB사본/PNG/hash·보존자료다. 최신 main169/170 정상 통합에서 변경 앱/빌드34파일이cab와 동일하고 기존Runtime/수리guard/helper를 보존한다. 로컬 통합검사·정확head/CI는 연결 PR 또는 인계자료에서 확인하며 이 기기결과를 새 게시head 재실행으로 표시하지 않는다. 첫 선물 runtime·전체 가게/확장·Quest/Delivery·실제D전이/센서장애·전원·실차/전체 이슈 완료는 별도다.
+
+
+### 랭킹 모듈·Android JSON 오류 분리 수정 검증 — 2026-11-10
+
+b35c0bf의독립코드APPROVE와실제원본13중12PASS/1FAIL을별도보존한다. rewarded=1.5의Cursor.integer가던진Android checkedJSONException이RuntimeException catch를벗어나outerFailure가된P2다. 원58407d173ae4d5135404243db4b5c8d0d4a66d3e는명시import/catch만추가하고DB/숫자/정책/기존기대값을바꾸지않았다.
+
+A는같은원본2파일SHA/기대무변경·새APK/설치pullSHA일치로ReadSource9+View4=13PASS1.851초를확인했다. 원래실패method의주간Failure/다른지표와마지막DB파일bytes불변assertion까지도달·통과했다. 추가Android격리SQLite2PASS0.354초는RENTAL-only명시fixture의weeklyFailure/나머지5보존,기본정의의주행command손상에서누적+주간Failure/나머지4보존·DBbytes불변이다. 새실제15·실패/오류/생략0이며과거b35독립1PASS/작성자JVM197·Lint와합산하지않는다.
+
+491추적파일584동일·저자clean·외부overlay/기대변경0,appbf1d9da4/test605afd5d설치pullSHA일치. API34 ARM64/user10 14:51:22~14:55:52KST단독구간·자기2패키지제거/잔여시험없음·제품APK/6데이터·권한/차량/창/설정/전경등19보존PASS·반환을회수했다. 게시담당adb0. 원문/status/XML·원본SHA/보존근거는 /private/tmp/drive-ranking-local-demo-20261110/fix/independent-device-review/에보존했다.
+
+후속main173(4e100fb)과정상통합해소유12파일584동일·기존실제firstflow Main/HostSession/helper보존을확인했다. 새조합은랭킹JVM15PASS/계측Kotlin컴파일BUILD SUCCESSFUL26초·저장소21/29/413/diffPASS다. 이전e652의APK/Lint성공은그head범위로구분하며새원격정확headCI는메인이확인한다. MainActivity실제진입·실제SDK출발지역/Questhook·온라인/타인순위는미검증이다. 고정KST/Quest원인은명시fixture이며실제6지표전체완료로표시하지않는다. 이전b35실패를소급변경하지않는다.
