@@ -183,7 +183,7 @@ class QuestLedger(private val store:SqliteGameChangeStore,
         if(command.source!=store.source)return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
         // 같은 목표 기간은 요청ID/정의버전·zone을 바꿔도 두 번 지급하지 않는다.
         if(claims(db,command.profileId).any {overlaps(it.command,command.definition.id,command.period)})return@atomic ContractResult.Failure(ContractError.STATE_CONFLICT)
-        if(store.requestUnavailable(db,command.requestId))return@atomic ContractResult.Failure(ContractError.STATE_CONFLICT)
+        if(store.requestUnavailable(db,command.requestId,questClaim=true))return@atomic ContractResult.Failure(ContractError.STATE_CONFLICT)
         val catalog=when(val read=definitions()){is ContractResult.Failure->return@atomic read;is ContractResult.Success->read.value}
         if(catalog.definitions.none{it==command.definition})return@atomic ContractResult.Failure(ContractError.STATE_CONFLICT)
         val now=store.now()
@@ -202,7 +202,7 @@ class QuestLedger(private val store:SqliteGameChangeStore,
         insert(db,"INSERT INTO quest_claims VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",arrayOf(command.requestId.value,command.profileId.value,command.source.name,
             command.definition.id,command.period.startsAt.value,command.period.endsAt.value,encoded,QuestJson.progress(state).toString(),before.units,cutoff,since,LedgerJson.settlement(receipt).toString()))
         val confirmed=QuestClaimSettlement(command,state.copy(status=QuestStatus.CLAIMED),receipt)
-        if(recorded(db,command.requestId)!=confirmed)throw SQLiteException("Quest 정산·마커 삽입 확인 실패")
+        if(store.readBalance(db)!=plan.balance || recorded(db,command.requestId)!=confirmed)throw SQLiteException("Quest 정산·마커 삽입 확인 실패")
         ContractResult.Success(confirmed)
     }
     override fun claimedRequestIds(id:ProfileId):ContractResult<Set<RequestId>> = store.atomic { db->

@@ -63,7 +63,7 @@ class HostCheckpointStoreIntegrationTest : InstrumentationTestCase() {
         val first = initialized(); val profile = ok(store.localProfileId()); val before = rows()
         store.close()
         raw { db ->
-            db.execSQL("DROP TABLE host_command_checkpoint")
+            listOf("quest_events","quest_claims","quest_tracking").forEach{db.execSQL("DROP TABLE $it")};db.execSQL("DROP TABLE host_command_checkpoint")
             if (version == 8) { db.execSQL("DROP TABLE first_gift_requests"); db.execSQL("DROP TABLE first_gift_markers") }
             db.version = version
         }
@@ -74,7 +74,7 @@ class HostCheckpointStoreIntegrationTest : InstrumentationTestCase() {
         assertNull(ok(store.hostCommands.load(profile)))
         val c = command(first.grant.changedVehicle!!)
         ok(store.hostCommands.save(profile, c)); ok(store.hostCommands.execute(profile, c))
-        raw { assertEquals(10, it.version) }
+        raw { assertEquals(11, it.version) }
     }
     fun testV9MigrationPreservesProfileProgressAndOriginalResults() = upgrade(9)
     fun testV8MigrationAddsGiftAndCheckpointWithoutReplacingProfile() = upgrade(8)
@@ -86,7 +86,7 @@ class HostCheckpointStoreIntegrationTest : InstrumentationTestCase() {
         store = open()
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.balance())
         store.close(); assertTrue(before.contentEquals(file.readBytes()))
-        raw { db -> assertEquals(9, db.version); db.version = 10 }
+        raw { db -> assertEquals(9, db.version); db.version = 11 }
         store = open(); assertEquals(GameMoney(1000), ok(store.balance()))
     }
 }

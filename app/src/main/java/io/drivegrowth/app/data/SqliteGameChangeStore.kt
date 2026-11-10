@@ -8,6 +8,7 @@ import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteDatabaseCorruptException
 import android.database.sqlite.SQLiteOpenHelper
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.quest.QuestDefinitions
 import io.drivegrowth.core.content.GameContentSnapshot
 import io.drivegrowth.core.garage.CollectionKey
 import io.drivegrowth.core.garage.VehicleHistoryStore
@@ -29,6 +30,7 @@ class SqliteGameChangeStore(
     internal val repairContent: (() -> ContractResult<GameContentSnapshot>)? = null,
     internal val initializationAuthority: (() -> ContractResult<InitializationAuthority>)? = null,
     internal val firstGiftContent: (() -> ContractResult<GameContentSnapshot>)? = null,
+    internal val questDefinitions: (() -> ContractResult<QuestDefinitions>)? = null,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : FirstRentalGiftStore, MaterialChangeStore, RepairChangeStore, InitializationChangeStore, VehicleHistoryStore, Closeable {
     private val helper = LedgerHelper(context.applicationContext, databaseName, source, initialGachaProgress)
@@ -49,6 +51,7 @@ class SqliteGameChangeStore(
     val rental = RentalLedger(this)
     private val initialization = InitializationLedger(this, initializationAuthority)
     fun localProfileId() = initialization.profileId()
+    val quests = QuestLedger(this, ::localProfileId) { questDefinitions?.invoke() ?: ContractResult.Failure(ContractError.DATA_UNAVAILABLE) }
     val hostCommands = HostCommandCheckpointLedger(this)
     override fun readInitialization(profileId: ProfileId) = initialization.readInitialization(profileId)
     override fun commitInitialization(command: InitializationCommand) = initialization.commitInitialization(command)
@@ -93,7 +96,8 @@ class SqliteGameChangeStore(
 
     internal enum class RequestDomain { GENERAL, DELIVERY, DRIVING }
 
-    internal fun requestUnavailable(db: SQLiteDatabase, id: RequestId): Boolean {
+    internal fun requestUnavailable(db: SQLiteDatabase, id: RequestId, questClaim: Boolean = false): Boolean {
+        if (id.value.startsWith("quest/") && !(questClaim && id.value.startsWith("quest/claim/"))) return true
         if (id.value.startsWith("delivery/") || id.value.startsWith("drive/")) return true
         val queries = listOf(
             "SELECT 1 FROM settlements WHERE request_id=?",
@@ -104,7 +108,8 @@ class SqliteGameChangeStore(
             "SELECT 1 FROM repair_requests WHERE request_id=?",
             "SELECT 1 FROM initialization_requests WHERE request_id=?",
             "SELECT 1 FROM first_gift_requests WHERE request_id=?",
-            "SELECT 1 FROM first_gift_markers WHERE request_id=?")
+            "SELECT 1 FROM first_gift_markers WHERE request_id=?",
+            "SELECT 1 FROM quest_claims WHERE request_id=?")
         return queries.any { sql -> db.rawQuery(sql, arrayOf(id.value)).use { it.moveToFirst() } }
     }
 
@@ -115,7 +120,7 @@ class SqliteGameChangeStore(
         if (domain == RequestDomain.DELIVERY && change.kind != TransactionKind.DELIVERY ||
             domain == RequestDomain.DRIVING && change.kind != TransactionKind.DRIVING)
             return failure(ContractError.INVALID_INPUT)
-        for (table in listOf("visits", "gacha_requests", "delivery_requests", "material_requests", "repair_requests", "initialization_requests", "first_gift_requests", "first_gift_markers")) {
+        for (table in listOf("visits", "gacha_requests", "delivery_requests", "material_requests", "repair_requests", "initialization_requests", "first_gift_requests", "first_gift_markers", "quest_claims")) {
             val key = if (table == "visits") "id" else "request_id"
             if (db.rawQuery("SELECT 1 FROM $table WHERE $key=?", arrayOf(id)).use { it.moveToFirst() })
                 return failure(ContractError.STATE_CONFLICT)
@@ -138,6 +143,8 @@ class SqliteGameChangeStore(
                 ContractResult.Success(readRecordedSettlement(db, change) ?: throw SQLiteException("기존 정산 누락"))
             else failure(ContractError.STATE_CONFLICT)
         }
+        // 기존 GENERAL 원명령 replay 뒤에만 신규 Quest namespace를 예약한다.
+        if (id.startsWith("quest/")) return failure(ContractError.STATE_CONFLICT)
         if ((id.startsWith("delivery/") && domain != RequestDomain.DELIVERY) ||
             (id.startsWith("drive/") && domain != RequestDomain.DRIVING))
             return failure(ContractError.STATE_CONFLICT)
@@ -155,6 +162,7 @@ class SqliteGameChangeStore(
                 }
             }
         }
+        var beforeGrowth: OwnedVehicle? = null
         val vehicle = when (val write = change.vehicle) {
             null -> null
             is VehicleWrite.Add -> {
@@ -168,6 +176,7 @@ class SqliteGameChangeStore(
             }
             is VehicleWrite.Update -> {
                 val previous = findVehicle(db, write.ownedVehicleId) ?: return failure(ContractError.DATA_UNAVAILABLE)
+                beforeGrowth = previous
                 val activity = rental.activity(db, write.ownedVehicleId)
                 if (activity == VehicleActivity.RENTED ||
                     activity == VehicleActivity.RETURNING ||
@@ -190,6 +199,8 @@ class SqliteGameChangeStore(
         db.execSQL("UPDATE account SET balance = ? WHERE id = 1", arrayOf(balance.units))
         if (vehicle != null) writeVehicle(db, vehicle, change.vehicle is VehicleWrite.Add)
         insertSettlement(db, change.requestId, command, result)
+        val event = quests.onVehicleChanged(db, beforeGrowth, vehicle, result)
+        if (event is ContractResult.Failure) return event
         return ContractResult.Success(result)
     }
 
@@ -263,9 +274,18 @@ class SqliteGameChangeStore(
     }
 
     @Synchronized
-    fun markViewed(id: SettlementId): ContractResult<Unit> = storage {
-        val count = helper.writableDatabase.update("settlements", ContentValues().apply { put("viewed", 1) }, "settlement_id = ?", arrayOf(id.value))
-        if (count == 0) failure(ContractError.DATA_UNAVAILABLE) else ContractResult.Success(Unit)
+    fun markViewed(id: SettlementId): ContractResult<Unit> = atomic { db ->
+        val previous = db.rawQuery("SELECT request_id,result,viewed FROM settlements WHERE settlement_id=?", arrayOf(id.value)).use {
+            if (!it.moveToFirst()) return@atomic failure(ContractError.DATA_UNAVAILABLE)
+            val receipt = LedgerJson.settlement(JSONObject(it.text(1)))
+            if (receipt.settlementId != id || receipt.transaction.requestId.value != it.text(0) || receipt.transaction.source != source)
+                throw SQLiteException("열람 결과 연결 불일치")
+            receipt to (it.integer(2,0,1) == 1L)
+        }
+        if (!previous.second && db.update("settlements", ContentValues().apply { put("viewed",1) }, "settlement_id=? AND viewed=0", arrayOf(id.value)) != 1)
+            throw SQLiteException("최초 열람 갱신 누락")
+        // 최초0→1만 실제 현재 시각을 기록한다. 기존 boolean을 오늘 사건으로 backfill하지 않는다.
+        quests.onResultViewed(db, previous.first, previous.second)
     }
 
     @Synchronized
@@ -302,7 +322,7 @@ internal enum class LedgerFailureReason { SQLITE, CORRUPT, UNSUPPORTED_SCHEMA, S
 private class LedgerStorageException(val reason: LedgerFailureReason) : SQLiteException(reason.name)
 
 private class LedgerHelper(context: Context, name: String, private val source: InputSource, private val initialGachaProgress: GachaProgress?) : SQLiteOpenHelper(
-    context, name, null, 10,
+    context, name, null, 11,
     // Android 기본 핸들러의 손상 DB 삭제를 막고 원본을 보존한다.
     DatabaseErrorHandler { throw LedgerStorageException(LedgerFailureReason.CORRUPT) },
 ) {
@@ -325,13 +345,15 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         InitializationLedger.onNewDatabase(db, source)
         FirstRentalGiftLedger.createTables(db)
         HostCommandCheckpointLedger.createTables(db)
+        QuestLedger.createTables(db)
+        beginQuestTracking(db, true)
         initialGachaProgress?.let { GachaLedger.insertInitialProgress(db, it) }
     }
     private fun createDiscoveries(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE discoveries (vehicle_id TEXT NOT NULL, rarity TEXT NOT NULL, PRIMARY KEY(vehicle_id, rarity))")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion !in 1..9 || newVersion != 10) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
+        if (oldVersion !in 1..10 || newVersion != 11) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
         verifySource(db)
         // 기존 원장과 개체 JSON은 그대로 보존한다.
         if (oldVersion == 1) RentalLedger.createTables(db)
@@ -348,7 +370,19 @@ private class LedgerHelper(context: Context, name: String, private val source: I
             InitializationLedger.onExistingDatabase(db, source)
         }
         if (oldVersion < 9) FirstRentalGiftLedger.createTables(db)
-        HostCommandCheckpointLedger.createTables(db)
+        if (oldVersion < 10) HostCommandCheckpointLedger.createTables(db)
+        QuestLedger.createTables(db)
+        beginQuestTracking(db, false)
+    }
+    /** 이 버전은 세 실제 사건 hook과 함께 공급한다. onCreate 재진입 없이 이미 발급한 profile을 전달한다. */
+    private fun beginQuestTracking(db: SQLiteDatabase, fresh: Boolean) {
+        val profile = db.rawQuery("SELECT profile_id,source,proof_id FROM initialization_profile WHERE id=1", null).use {
+            if (!it.moveToFirst() || it.text(1) != source.name || (fresh && it.isNull(2)))
+                throw LedgerStorageException(LedgerFailureReason.INVALID_RECORD)
+            ProfileId(it.text(0))
+        }
+        if (QuestLedger.startTracking(db, profile, source, EpochMillis(System.currentTimeMillis()), fresh) is ContractResult.Failure)
+            throw LedgerStorageException(LedgerFailureReason.INVALID_RECORD)
     }
     override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)

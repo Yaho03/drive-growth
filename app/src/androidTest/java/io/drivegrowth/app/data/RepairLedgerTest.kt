@@ -210,18 +210,18 @@ class RepairLedgerTest : InstrumentationTestCase() {
             }
         };store=open();ok(store.commitRepair(c))
     }
-    fun testSupportedV1ThroughV9MigrationPreservesOriginalCoreRows() {
+    fun testSupportedV1ThroughV10MigrationPreservesOriginalCoreRows() {
         store.close()
         val base=context.getDatabasePath(name).readBytes()
-        for(version in 1..9) {
+        for(version in 1..10) {
             context.getDatabasePath(name).writeBytes(base)
             raw{db->
                 val introduced=mapOf(2 to listOf("rentals","visits","shop","facilities","rental_rest"),3 to listOf("discoveries"),4 to listOf("gacha_progress","gacha_requests"),
-                    5 to listOf("delivery_lists","delivery_requests","delivery_active","delivery_routes","delivery_outcomes","delivery_held","delivery_changes","driving_days","driving_drives","delivery_route_history","delivery_hold_outcomes"),6 to listOf("material_requests"),7 to listOf("repair_requests"),8 to listOf("initialization_requests","initialization_profile"),9 to listOf("first_gift_requests","first_gift_markers"),10 to listOf("host_command_checkpoint"))
+                    5 to listOf("delivery_lists","delivery_requests","delivery_active","delivery_routes","delivery_outcomes","delivery_held","delivery_changes","driving_days","driving_drives","delivery_route_history","delivery_hold_outcomes"),6 to listOf("material_requests"),7 to listOf("repair_requests"),8 to listOf("initialization_requests","initialization_profile"),9 to listOf("first_gift_requests","first_gift_markers"),10 to listOf("host_command_checkpoint"),11 to listOf("quest_events","quest_claims","quest_tracking"))
                 introduced.filterKeys{it>version}.values.flatten().forEach{db.execSQL("DROP TABLE $it")};db.version=version
             }
             store=open();assertEquals(GameMoney(1000),ok(store.balance()));assertEquals(car.copy(revision=Revision(1)),ok(store.listOwnedVehicles()).single())
-            assertNull(ok(store.repairSettlement(RequestId("not-committed"))));store.close();raw{assertEquals(10,it.version)}
+            assertNull(ok(store.repairSettlement(RequestId("not-committed"))));store.close();raw{assertEquals(11,it.version)}
         };store=open()
     }
     fun testFailedV6MigrationPreservesOriginalVersionAndBytes() {

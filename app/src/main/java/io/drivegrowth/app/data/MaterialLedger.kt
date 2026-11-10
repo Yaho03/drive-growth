@@ -74,6 +74,8 @@ internal class MaterialLedger(private val store: SqliteGameChangeStore) {
         store.insertSettlement(db, command.requestId, encoded, MaterialJson.receipt(result))
         db.execSQL("INSERT INTO material_requests VALUES (?,?,?,?)", arrayOf(command.requestId.value, encoded,
             MaterialJson.state(current).toString(), MaterialJson.result(result).toString()))
+        val event = store.quests.onVehicleChanged(db, current.target.vehicle, result.target, MaterialJson.receipt(result))
+        if (event is ContractResult.Failure) return@atomic event
         ContractResult.Success(result)
     }
 
