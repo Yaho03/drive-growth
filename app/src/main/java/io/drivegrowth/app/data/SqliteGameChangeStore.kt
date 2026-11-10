@@ -49,6 +49,7 @@ class SqliteGameChangeStore(
     val rental = RentalLedger(this)
     private val initialization = InitializationLedger(this, initializationAuthority)
     fun localProfileId() = initialization.profileId()
+    val hostCommands = HostCommandCheckpointLedger(this)
     override fun readInitialization(profileId: ProfileId) = initialization.readInitialization(profileId)
     override fun commitInitialization(command: InitializationCommand) = initialization.commitInitialization(command)
     private val firstGift = FirstRentalGiftLedger(this, { initialization.profileId() }, { id ->
@@ -301,7 +302,7 @@ internal enum class LedgerFailureReason { SQLITE, CORRUPT, UNSUPPORTED_SCHEMA, S
 private class LedgerStorageException(val reason: LedgerFailureReason) : SQLiteException(reason.name)
 
 private class LedgerHelper(context: Context, name: String, private val source: InputSource, private val initialGachaProgress: GachaProgress?) : SQLiteOpenHelper(
-    context, name, null, 9,
+    context, name, null, 10,
     // Android 기본 핸들러의 손상 DB 삭제를 막고 원본을 보존한다.
     DatabaseErrorHandler { throw LedgerStorageException(LedgerFailureReason.CORRUPT) },
 ) {
@@ -323,13 +324,14 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         InitializationLedger.createTables(db)
         InitializationLedger.onNewDatabase(db, source)
         FirstRentalGiftLedger.createTables(db)
+        HostCommandCheckpointLedger.createTables(db)
         initialGachaProgress?.let { GachaLedger.insertInitialProgress(db, it) }
     }
     private fun createDiscoveries(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE discoveries (vehicle_id TEXT NOT NULL, rarity TEXT NOT NULL, PRIMARY KEY(vehicle_id, rarity))")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion !in 1..8 || newVersion != 9) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
+        if (oldVersion !in 1..9 || newVersion != 10) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
         verifySource(db)
         // 기존 원장과 개체 JSON은 그대로 보존한다.
         if (oldVersion == 1) RentalLedger.createTables(db)
@@ -345,7 +347,8 @@ private class LedgerHelper(context: Context, name: String, private val source: I
             InitializationLedger.createTables(db)
             InitializationLedger.onExistingDatabase(db, source)
         }
-        FirstRentalGiftLedger.createTables(db)
+        if (oldVersion < 9) FirstRentalGiftLedger.createTables(db)
+        HostCommandCheckpointLedger.createTables(db)
     }
     override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
