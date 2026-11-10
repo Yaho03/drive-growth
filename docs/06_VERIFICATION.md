@@ -1544,3 +1544,16 @@ A의정확649473추적소스/새빌드·설치pullSHA일치(앱09f8b854/시험9c
 새계측A는 APPROVE_SCOPED_GACHA_FRAME_FIX_DEVICE·필수0을반환했고제품/6데이터·권한/차량·창/설정/전경등19보존checks/자기2패키지정리·해당구간종료를확인했다. 최초정리에서원전경Task가PAUSED였던649이력과기존DrivingView→지도task포커스만원복한뒤19/19일치한자료도보존한다. 새Activity/기어/속도/제품DB·AVD/서버reset은없다. 독립확인후게시담당은실제terminal/HOME PNG도직접열어OEM영역과앱영역을구분했다.
 
 원근거 /private/tmp/drive-app-host-integration-20261110/independent-review/ 및 independent-device-review/, display-frame-fix/independent-review/의REPORT/summary/원문·PNG·설치/보존자료에보존한다. 조회대상은시험출처의실제SQLite이고공급없는권위는Missing, 거래/영속전체명령미연결이면Draw/시설/초기화는Unsupported/Unavailable이다. 실제추첨/초기지급/관리·시설거래·제품NPC/clock·프로세스/전원·실차/새SDK D시험과전체51/52/54/55/56완료는남는다. 최종디자인은팀WIP/임시Views이며새미술작업이아니다. 게시head의소유10파일360동일성/최신main정상통합·CI는연결PR에서확인한다.
+
+
+### 초기화·첫 선물·checkpoint SQLite 통합81 독립 검증 — 2026-11-10
+
+원81bbaf30a2f5fd3d968abc66fa6404d1585af33d/schema10의 공통 helper/factory·초기화/첫 선물·typed checkpoint를 부분 공급한다. 독립 APPROVE_SCOPED_COMBINED81_SQLITE_SUPPLY·잔여 필수0을 회수했다. 이전627의 초기화 공백 고아정산/선물 전체요청 INSERT IGNORE 두 P2와 당시27/30/33PASS는 보존한다. 627→81 제품 수정은 trimStart 모양 판별과 선물 NEW 확정 끝 recorded==result 재조회 각1줄이며 원래 결과 우선 재생은 유지한다.
+
+같은 원 RED 소스 SHA Gift c77f9f64.../Init dc8097cf...·기대 무변경으로 두 개를 한 실행에서2PASS(0.414초), 초기화16+공개4+쓰기경계9=29PASS(4.426초), 선물25+공개9=34PASS(15.068초), 실제 helper checkpoint4PASS(1.006초)를 확인했다. 새 실제 실행 메서드 총69·실패/오류/생략0이며 겹친 fixture가 있어 독립 커버리지69개로 세지 않는다. Gift STORAGE_FAILURE/진행rev0/무료권0·관련8표 원래행 동일, Init read/Add 실패/차량3 보존·원래행/파일 bytes 동일과 정상 공백 legacy 배열 반례를 확인했다.
+
+checkpoint 모듈/시험5파일·helper/factory·연결4파일은627과 동일하다. 정식20+올바른 digest 독립3=627 실제23PASS를 해당 범위로 재사용했고81에서27전체 신규실행으로 표시하지 않는다. 실제 helper4는81에서 새 실행해 onCreate/save/execute/재개방/replay/finish와 v8/v9→10 프로필/진행/재화/개체/receipt 보존·실패 원본 보존을 확인했다. 기존 정식 원시변조20의 일부는 decoder 전에 digest에서 거절될 수 있다. 작성자core412/app186·이전 head/다른 기기 결과와 합산하지 않는다.
+
+독립493추적파일 전부81 동일·저자clean·정식 기대완화0, 새빌드35초 app e0e93e20/test41731414의 설치후 pull SHA 일치를 회수했다. API34 ARM64/user10의 단독 구간13:36:08~13:37:51 KST, 자기 combined81a 두패키지 정리/잔여시험없음·제품APK/6파일·권한/차량/창/설정/전경 등19보존PASS·슬롯반환을 확인했다. 게시 담당 adb0이다. 원문/메서드status/XML·설치hash/소스동일성과보존근거는 /private/tmp/drive122-first-gift-write-fix-evidence/independent-review/에 보존했다. 이전 whitespace 보고서도 이 같은 실행을 참조하며 중복 합산하지 않는다.
+
+최신 main168 정상 통합에서 변경 앱23파일이81과 바이트동일하고 이미 main의 수리guard·Runtime·AppHost를 보존했다. 정확 게시head CI는 연결 PR에서 확인하며 새 게시head 장치재실행으로 쓰지 않는다. 명시 SIMULATION/격리SQLite/DB재개방이고 제품 livefactory/save·execute·finish 소비·전체UI/명령·프로세스/전원·실차/전체 #50/#51/#52/#56/#121/#122 완료는 아니다. #44 Expand 후보도 별도다.
