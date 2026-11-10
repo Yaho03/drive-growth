@@ -1842,3 +1842,14 @@ F의 고정 patch SHA-256 `a73c305af177e575afe5236fdd83a6341bcc097297d19c84842ed
 무료 결과의 가짜 금융 정산 거절, 양수 구매 정산 누락·불일치 거절, 목록/집합의 외부 변경 방지와 실패 무변경은 순수 시험 근거다. SQLite 재개방·전역 요청 ID·원자 rollback·host checkpoint·실제 UI·장치/프로세스·#55 및 #28 전체 완료를 뜻하지 않는다. E의 저장 구현과 F의 UI 소비는 별도 후보로 검증한다. 원문/API/독립 실행 근거는 로컬 `/private/tmp/drive-decoration-contract-20261110/`에 보존했다.
 
 새 Rest/main190 조합에서는 root가 core 444개·앱 612개 XML의 실패·오류·생략 0을 확인했다. 최초 전체 명령은 시험과 APK 이후 Lint에서 기존 Temurin17.0.6 ARM64의 C1 OSR 컴파일러 내부 오류(`assembler_aarch64.hpp:267`, `Field too big for insn`)로 종료됐다. 이 실행 전체를 성공으로 표시하지 않으며 crash/replay 로그를 로컬에 보존했다. 소스·의존성·공유 설정을 바꾸지 않고 이번 명령에만 `-XX:TieredStopAtLevel=1 -XX:-UseOnStackReplacement`를 적용해 재확인했다. 동일 명령은 1분28초에 성공했고 APK·Lint 오류0/경고27, 55개 작업 중5개 실행/50개 UP-TO-DATE였다. 기존 시험 XML 재사용을 새로운 1,056개 실행으로 합산하지 않는다. 저장소·문서 링크457개와 diff도 확인했다. 실제 기기 실행은 이번 순수 공급 범위에서0이다.
+
+
+### 위치 영역 어댑터와 예외 회귀 검증 — 2026-11-11
+
+D 원5파일 후보의 광역 UOE 처리에서 기존 무인자 start의 예상 밖 오류를 UNSUPPORTED로 숨기는 회귀를 B가 발견했다. 기준 main의 같은 반례2는 통과했고 원 후보는 예외 소실·원예외 대신 정리 예외 반환으로2개 실패했다. D는 원5파일을 보존한 별도 사본에서 제품1파일의4줄 추가/4줄 삭제로 포트 null만 명시 처리하고 광역 catch를 제거했다. B의 수명주기2·동일 예외2 원문을 포함한 정확7파일 combined patch는 `3da410afd454f3305fc332337d785047b9f755418e90d2b19f7938ba33e9404c`다.
+
+D 본인 검증은 위치46개·전체core420/app546·APK/Lint 오류0/경고27이다. F는 별도 사본 전체688파일 동일성과 원문 시험을 대조하고 위치46개를50초에 직접 실행해 실패·오류·생략0·필수 수정0을 확인했다. 원42·추가4는46에 포함되며 별도 실행 수를 합산하지 않는다. root도 새main192 조합에서 원7파일의 작성자·F 사본과 바이트 동일성 및 F XML46개를 대조했다. 기존 위치 SDK의 실제 허용/거부 진단과 이번 JVM 영역 시험을 구분한다.
+
+실제 SDK 영역·제품 장소 권위·Main/소비자 연결·원격 해제 완료 ACK·Rest 지급·프로세스/전원·실차는 미검증이다. 이 변경은 SDK 버전·Gradle/Manifest·data/core·Main/HostSession·게임 규칙을 바꾸지 않는다. close/start 캐시 무효화와 발생시각/현재inside Missing의 기존 한계를 유지한다. 원문 실패/수정·독립 근거는 로컬 `/private/tmp/drive-location-area-exception-fix-d-20261111/`와 `/private/tmp/drive-location-area-rereview-f-20261111/`에 보존했다.
+
+최신 main192 조합의 root 검사는 앱634개·실패/오류/생략0, 제품APK·Lint 오류0/경고27로2분27초에 성공했다(53개 작업 모두 실행). 기존 core444는 입력이 같아 #192의 근거를 재사용하며 이번 신규 실행으로 세지 않는다. source7은 작성자/F 독립 사본과 바이트 동일하고 Main/HostSession·기존data/core/Manifest/Gradle을 보존했다. 새 결합본의 실제 장치 실행은0이다.
