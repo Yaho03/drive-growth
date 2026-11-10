@@ -21,7 +21,7 @@
 
 평소 이동을 탁송·차량 영입으로 연결하고, 주차 후 차량을 모으고 렌터카 가게를 확장하는 Pleos Connect 차량용 게임을 기획하고 있습니다.
 
-**HOME ShopView·가챠 조회·차고·도감·정산·첫 실행 안내를 실제 탐색에 부분 연결했습니다. 정산은 기존 SQLite 열람 저장·재조회·복원을 사용하며, 첫 실행은 같은 프로필 factory의 NEW 근거·SQLite 원자 지급과 원래 결과 조회에 연결합니다. legacy/불명은 미지원으로 유지합니다.** 실제 #50 지급·관리 경제 명령·앱 전체 흐름 완료와 구분합니다. Debug APK는 로컬 시험 산출물이며 제출 Release APK·실제 게임 시연 영상은 준비 전입니다.
+**HOME ShopView·가챠 조회·차고·도감·정산·첫 실행 안내를 실제 탐색에 부분 연결했습니다. 정산은 기존 SQLite 열람 저장·재조회·복원을 사용하며, 첫 실행은 같은 프로필 factory의 NEW 근거·SQLite 원자 지급과 원래 결과 조회에 연결합니다. legacy/불명은 미지원으로 유지합니다.** 초기 지급·가챠·관리 명령의 저장 연결은 #173에서 공급했으며, 실제 SDK 주행부터 전체 게임 흐름과 최종 제출 검증은 진행 중입니다. Debug APK는 로컬 시험 산출물이며 제출 Release APK·실제 게임 시연 영상은 준비 전입니다.
 
 처음 참여한다면 [4인 구현 시작 안내와 책임표](docs/08_PROJECT_PLAN.md)를 확인하세요. 기능 이슈 → 해당 PRD 항목 → 공통 데이터 계약 → 화면 명세 → 검증 명령 순서로 진행합니다. 공통 타입·거래 저장·fixture 구현은 기능 연결의 선행 작업입니다.
 
@@ -35,7 +35,7 @@
 
 ## 공통 소스와 실제 구현 범위
 
-`app/src`와 `core/src`는 선행 기술 검증 코드를 팀이 같은 버전으로 빌드·시험하기 위한 기반입니다. 기존 `DriveEngine`의 경험치·점수와 `DashboardView` 화면은 현재 렌터카 경제·화면 구현이 아닙니다. 차량 서비스·DO 선언의 정책 적합성은 #13에서 별도 확인합니다.
+`app/src`와 `core/src`에는 현재 렌터카 게임의 화면·계산·저장과 선행 검증 코드가 함께 있습니다. 과거 `DriveEngine`의 경험치·점수와 `DashboardView` 화면은 현재 렌터카 게임과 구분합니다. #13의 기준 환경 검증은 완료됐으며, 남은 차량 서비스·기록·음성 정책 조건은 #81에서 관리합니다.
 
 | 항목 | 확인한 범위 |
 |---|---|
@@ -54,10 +54,10 @@
 | Quest·Delivery schema12 저장 공급 | 실제 원인 기반 Quest 진행/단일 수령·원명령 저널과 Delivery 전체 명령·Hold 쓰기 검증을 기존 저장소에 연결. 원본 b897의 격리 SQLite Quest54·Delivery17 통과. 이후 Driving13은 #179, 같은 factory의 제품 Main/Progress·Delivery 소비는 #181에서 연결했다. typed 실패·foreign 원명령 보존을 유지하며 전체 기능/정책 검증은 별도다. [계약](docs/02_SYSTEM_ARCHITECTURE.md#questdelivery-schema12-저장-공급--2026-11-10)·[검증 범위](docs/06_VERIFICATION.md#questdelivery-schema12-통합-후보--2026-11-10) 참조 |
 | 시설·영업 쉬기 typed 소비 모듈 | 같은 factory의 실제 조회와 E 공용 checkpoint save→execute→finish·원명령 복구를 소비하는 모듈 공급 후보를 준비했다. 정확575 원본의 실제factory/SQLite9·View3·fake복구1 통과와 새조합 검사는 구분한다. 최신 Main/HOME·Shop·pending 등록은 B 별도 연결이며 꾸미기/최종아트·전체 #55 완료는 아니다. [계약](docs/02_SYSTEM_ARCHITECTURE.md#시설영업-쉬기-typed-소비-모듈--2026-11-10)·[검증](docs/06_VERIFICATION.md#시설영업-쉬기-소비-모듈-통합-검증--2026-11-10) 참조 |
 | 경제 시험값 동의 회수 | [기존 동의된 대여·확장 기준](docs/01_PRD.md#기존-동의된-대여확장-시험값)만 회수. 대여 기준/확장 조건·비용/용량은 중앙 TrialDefinition으로 공급하되 시험값 동의와 검증 범위를 구분. b-economy 전체표를 채택하지 않음 |
-| 랭킹 1차 범위 | [PRD 사용자 결정](docs/01_PRD.md#1차-랭킹-범위)으로 실제 내 기록 6개 지표와 분리된 시연용 랭킹을 포함. 누적 수익·주간 보상 반영 거리·과거 보유 도감 칸의 집계 기준도 확정. 같은 원장 조회·독립 RankingView/합성시연 모듈과 Android JSON 분리 수정은 실제 원본13+추가2로 검증. MainActivity 탐색·명시 Demo·Back/복원은 #181로 연결했다. 같은 factory의 실제 Quest 청구 원인·원출발 zone hook을 readRanking에 연결한 후속 후보를 준비했다. 정확 e9007ea의 공개 SIMULATION 저장 경로9개가 통과했고 누락/손상 및 조회 DB 불변을 구분했다. [현재 연결·검증 범위](docs/06_VERIFICATION.md#랭킹-공개-원인-조회-연결-검증--2026-11-10)를 따르며 정확 게시 head/CI·main 반영과 #58 종료 판단은 연결 PR에서 확인한다. 온라인은 향후 범위이며 1차 완료 게이트에서 제외한다 |
-| Rental·시설 schema15 저장 공급 | 중앙 시험 정의 v3, 고정 방문·요금·사고·커서와 종료 영업 원점을 같은 DB에 저장한다. 시설 구매는 원래 정산, 영업 쉬기는 비금융 원결과를 재생한다. 원 f99 Rental32·시설14와 요청 ID 반례 RED1→수정 d8 시설15 GREEN을 구분한다. 실제 Main 경제 이탈 driver·시설 화면·제품 DB 이전·Rest·SDK/전원 검증은 남아 있다. [검증 범위](docs/06_VERIFICATION.md#rental시설-schema15-정상-통합-후보--2026-11-10) 참조 종료 영업 currentInactive 복구 읽기 API는 별도 후보로 준비했으며 원marker/phase·Missing/Failure를 보존한다. [API 범위](docs/02_SYSTEM_ARCHITECTURE.md#종료-영업-현재-marker-복구-읽기-api--2026-11-10)와 [검증](docs/06_VERIFICATION.md#종료-영업-currentinactive-읽기-api-통합-검증--2026-11-10)을 따르고 최신 Main의 B 소비는 별도다. |
-| Rest schema16 검토 중 후보 | 원6a4의 관측/휴식 소모·단일 가격·day/provenance/ack와 UTC·day·metadata 소실 세 수정 후보를 main188에 정상 통합했다. 제품6a동일·F원문1만 추가한c28의 실제SQLite47은 후행단언까지 통과했다. 원E46쌍은 보존하며 최종독립회수·#190 이후main 조합검증 전에는 머지완료로 표시하지 않는다. B Main/producer·실제 장소/SDK/수명 연결은 미포함이고 원830/9db의 성공·추가 실패는 별도로 보존한다. [계약](docs/02_SYSTEM_ARCHITECTURE.md#rest-schema16-원자-저장세-수정의-검토-후보--2026-11-10)·[검증 대기](docs/06_VERIFICATION.md#rest-6a4-세-수정의-main188-통합-검토-대기--2026-11-10) 참조 |
-| 렌터카 runtime 부분 공급 | 기존 RentalLedger의 고정 방문·확인 구간·원래 주차 기준/최초 완료 조회 연결. 독립 코드app23/core13·SIMULATION 동일SQLite10개 통과. 실제 NPC/제품 정의·clock/coverage·durable 방문/factory/Activity·프로세스/실차는 후속 |
+| 랭킹 1차 범위 | 실제 내 기록6지표와 분리된 시연용 랭킹을 제공한다. 원출발 zone·실제 Quest 원인 hook은 #184/main에 반영했고 #58은 1차 범위 완료로 종료했다. 온라인 사용자 간 순위는 향후 연결이다. [검증](docs/06_VERIFICATION.md#랭킹-공개-원인-조회-연결-검증--2026-11-10) 참조 |
+| 자동 영업·시설·정산 제품 연결 | 같은 factory의 원관측 영업·앱 이탈/복귀·시설 HOME·전체 정산 이력을 연결한다. 원본 B의 실제 HOME/OS clock과 명시 SIM 영업을 포함한65개 장치 시험, 독립 C/D/F 검토를 구분한다. 실제 SDK D→이탈→재접속·프로세스/전원·실차·최종 UI는 남는다. [계약](docs/02_SYSTEM_ARCHITECTURE.md#원관측-영업과-시설전체-정산의-제품-호스트-연결--2026-11-10)·[검증](docs/06_VERIFICATION.md#제품-영업시설정산-호스트-연결-검증--2026-11-10) 참조 |
+| Rest schema16 검토 중 후보 | 원6a4의 관측/휴식 소모·단일 가격·day/provenance/ack와 UTC·day·metadata 소실 세 수정 후보를 main188에 정상 통합했다. 제품6a동일·F원문1만 추가한c28의 실제SQLite47은 후행단언까지 통과했다. 원E46쌍은 보존하며 C/D의 A47 최종 수용을 회수했고 #190 main을 정상 부모로 포함해 새 조합을 검사 중이다. #190의 영업·시설·Results Main 연결과 Rest producer·실제 장소/SDK 연결은 구분하며 원830/9db의 성공·추가 실패는 별도로 보존한다. [계약](docs/02_SYSTEM_ARCHITECTURE.md#rest-schema16-원자-저장세-수정의-검토-후보--2026-11-10)·[검증 대기](docs/06_VERIFICATION.md#rest-6a4-세-수정의-main188-통합-검토-대기--2026-11-10) 참조 |
+| 렌터카 runtime | 원방문·확인 구간·원 주차 기준을 기존 RentalLedger로 처리한다. 중앙 시험 정의와 실제 제품 source 연결을 공급했으며 명시 SIM 재접속/구성 변경 검증을 확보했다. 신호 공백·과거 고객 schedule을 합성하지 않고 실제 SDK 이탈/장기 영업·프로세스/실차는 구분한다. |
 | 렌터카 게임·추가 기능 | 상세 구현 이슈로 진행. 정책·수치·일부 동작은 결정 대기 |
 | 최종 APK·시연·실차 | 제출 산출물 미준비, 실차 미검증 |
 

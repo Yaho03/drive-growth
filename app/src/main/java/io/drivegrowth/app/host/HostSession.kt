@@ -31,6 +31,12 @@ internal class HostSession(context: Context, private val main: Executor, restore
         RecordingPolicy(policy.maxSignalAgeMs, policy.maxSampleGapMs, 1000, policy.requiredParkMs,
             policy.maxStationarySpeedMps, 0.5) // skew/출발속도는 D의 명시 기술 시험값.
     }
+    val rentalClock = io.drivegrowth.app.host.rental.DeviceRentalClock(context)
+    private val rentalSource = io.drivegrowth.app.host.rental.SessionRentalProductSource(games, {
+        io.drivegrowth.app.data.AssetTrialDefinitionProvider(context.assets).load()
+    }, recordingPolicy, rentalClock::read)
+    val rental = io.drivegrowth.app.host.rental.RentalProductHost(worker, main, rentalSource::observe,
+        rentalSource::reconnect, rentalSource::pauseObservations, rentalSource::inactive)
     private val drivingSource = SessionObservedDrivingSource(games, io.drivegrowth.app.data.SqliteObservedDrivingJournal(),
         ObservedDrivingReducer(recordingPolicy) { java.util.UUID.randomUUID().toString() }, {
             when (val loaded = io.drivegrowth.app.data.AssetTrialDefinitionProvider(context.assets).load()) {
@@ -42,10 +48,12 @@ internal class HostSession(context: Context, private val main: Executor, restore
     val driving = ObservedDrivingHost(worker, main,
         { RecordingClock(android.os.SystemClock.elapsedRealtime(), EpochMillis(System.currentTimeMillis())) },
         { receiver, frame, at ->
-            when (val activated = activateDriving(frame.observation.source)) {
+            val recorded = when (val activated = activateDriving(frame.observation.source)) {
                 is ContractResult.Failure -> activated
                 is ContractResult.Success -> drivingSource.observe(receiver, frame, at)
             }
+            rental.observed(receiver, frame, recorded)
+            recorded
         }, { receiver, at ->
             if (drivingActivated) drivingSource.pause(receiver, at) else ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         })
@@ -100,7 +108,12 @@ internal class HostSession(context: Context, private val main: Executor, restore
     val queries = HostQueryController(worker, main, source::read, null)
     val gacha = GachaLiveHost(CheckpointGachaSource(StoredGachaHostSource(context, games), SessionGachaJournal(games)), worker, main, queries::refresh)
     val ranking = io.drivegrowth.app.host.ranking.RankingController(worker, main, source::readRanking)
-    val results = ResultsHostController(worker, main, source::markViewed, queries::refresh, restoredResults)
+    val results = ResultsHostController(worker, main, source::markViewed, queries::refresh, restoredResults,
+        readHistory = { io.drivegrowth.app.data.SettlementHistoryReader.read(games) })
+
+    val facility = io.drivegrowth.app.host.facility.FacilityHostController(
+        io.drivegrowth.app.host.facility.FactoryFacilityHostSource(context, games,
+            io.drivegrowth.app.host.facility.CheckpointFacilityDurablePort()), worker, main)
 
     fun expansionWorker(action: () -> Unit) { worker.execute(action) }
     fun pendingRoute(done: (ContractResult<HostPage?>) -> Unit) {
@@ -110,7 +123,7 @@ internal class HostSession(context: Context, private val main: Executor, restore
                 is ContractResult.Success -> opened.value.use { game ->
                     when (val saved = game.store.hostCommands.load(game.identity.profileId)) {
                         is ContractResult.Failure -> saved
-                        is ContractResult.Success -> pendingHostPage(saved.value?.command)
+                        is ContractResult.Success -> pendingHostPage(saved.value?.command, facilityPageAvailable = true)
                     }
                 }
             }
@@ -120,7 +133,9 @@ internal class HostSession(context: Context, private val main: Executor, restore
 
     fun release() {
         driving.stop()
+        rental.pause()
         progression.release()
+        facility.release()
         delivery.release()
         deliveryNavigation.close()
         queries.release()

@@ -1729,6 +1729,46 @@ A최종앱76150b8ac71c73e8ec00264f6876f33f62e9939dfbec754cee12a1d31302e639·시�
 실제B Main/HostSession의동의·권한dialog·전경수명/캐시무효화·close예외처리,센서clock축/신선도/정확도·장소inside/outside·휴식/주차/출발적격성·Rest지급,실제서비스미지원/강제오류/release실패주입·UI정체·background/프로세스/전원·실차는별도미검증이다. source=VEHICLE/Available을실차/휴식인정으로확대하지않고공공215점의임의반경/영역을만들지않는다. 이미완료한#13기준환경이슈는보존하고#40/#51/#28/#81의부분공급/잔여조건만별도로연결한다. AI검토는사람승인이아니며정확게시head/CI/main반영은root가확인한다.
 
 
+### 제품 영업·시설·정산 호스트 연결 검증 — 2026-11-10
+
+정확 B0dd969f37fd588a7cea60be2694b812de1ad099e의 소유18파일과 main187의 data/core/Gradle/Manifest 보존을 직접 대조했다. 원본 본인검증 core420/app519·APK/시험APK·Lint 오류0/경고27과 마지막 OS clock 계측 추가 뒤 UP-TO-DATE 재확인은 별도 실행으로 합산하지 않는다. stub 시점의 같은 복구8개 중7실패와 구현 뒤8통과도 원본 기록으로 보존한다.
+
+독립 검토는 C의 UI/gate34, D의 시간/원관측20, F의 금융복구23(기존22+독립1)을 각각 실행해 필수 수정0으로 수용했다. 세 그룹에는 겹치는 기존 시험이 있으므로 합산해 새 고유 시험 수로 표시하지 않는다. F가 검토 중 제기한 giftAttempt 실패 표식은 실제 Main/onboarding.refresh 재시도 연결을 대조한 뒤 확정 결함으로 채택하지 않았다.
+
+A는 원본 B의 격리 패키지 io.drivegrowth.verify.rentalproductb에서 아래65개 고유 메서드를 첫 실행에 모두 통과했다. 실패·오류·생략0, 정상 그룹 footer와 후행 단언 도달을 확인했다.
+
+| 그룹 | 결과 | 시간 |
+|---|---|---|
+| 새 실제 HOME cold | 1/1 | 18.484초 |
+| 새 영업 SIMULATION | 2/2 | 3.793초 |
+| 새 실제 OS clock | 1/1 | 0.018초 |
+| 기존 Results | 11/11 | 1.511초 |
+| 기존 Ranking | 9/9 | 3.844초 |
+| 기존 Rental | 41/41 | 10.129초 |
+
+HOME은 기본DB 없는 자기 새 패키지에서 실제 SDK P gate를 거쳐 UI 첫 지급→쉬기ON→재생성/같은원명령→확인→OFF→확인을 수행했다. 잔액1000·동일 캐스퍼/revision0·비금융 결과2/원 초기화 금융 정산1을 확인했다. 위젯 performClick이며 물리 좌표 터치/CCP 검증은 아니다. 영업SIM2는 공개 초기화·source/SQLite journal/runtime·원 대여 재접속 정산·첫 선물 한번 지급·새 factory 복원과 구성 변경의 미확인 구간/잔액 보존을 확인했다. boot/clock/customer/신호는 명시 모의 입력이다. OS clock1의 실제 BOOT_COUNT/UTC/elapsed 읽기는 이 모의 입력과 구분했다.
+
+A source manifest690 항목은 모두 일치했으나 실제 Git 추적 파일691 중 공식 접수양식 DOCX1개가 빠져 있었다. 이를 전체 추적파일 완전 manifest로 표현하지 않으며 A의 전체 SHA에는 포함했다. 앱 SHA81bbefb1ebf7a61b95c2f7803d23130d26b456aa3ca4a108169e82200468ed14와 시험SHA bf94d969f3bae036aacfd76385dc2b3ea839c8bc14cf34109d80bed294fd2686는 설치 후 pull과 같았다. 22:28:51~22:31:33 KST 단독 사용 후 제품/환경19항목 보존, boot24·자기 권한 원복·패키지/계측/forward 정리와 반환을 확인했다. 원문은 /private/tmp/drive-product-main-followup-20261110/independent-device-review/에 보존했다.
+
+HOME 로그의 driver_deferred=DATA_UNAVAILABLE 두 건은 남아 있으며 이번 배정에서 실제 D를 입력/수신하지 않았다. 실제 SDK D→이탈→재접속 영업, 물리 주행 종료·프로세스/전원·실차는 별도 미검증이다. 최신 Main Results의 P 상태 UI 흐름은 아래 추가1에서 확인했다. 초기 P에서 과거 영업을 만들지 않는 상태와 실제 SDK 영업 성공을 구분한다. Rest·실제 위치/영역 등록·최종 디자인도 포함하지 않는다. 원65를 main188과 합친 새 APK의 장치 성공으로 확대하지 않으며 전체 #41~#44/#43/#51/#28 종료 근거로 사용하지 않는다.
+
+새 main188 조합은 B18파일과 기존 Location6·data/core/Gradle/Manifest를 직접 대조하고 앱543개를 실패·오류·생략0으로 실행했다. 제품/시험APK·Lint 오류0/경고27도 성공했다. 원본 B의 core420은 동일 입력의 실행 근거로 재사용하며 새 core 실행으로 합산하지 않는다. 문서 후속만 추가한 뒤 저장소/링크·diff를 재확인한다. 이 조합의 새 장치 실행은0이며 원본 A65와 구분한다.
+
+
+### 통합 모의주행 시연 계획 — 2026-11-10
+
+차가 없는 개발·시연 환경에서 차량 신호와 내비 모의주행을 수동으로 따로 조작하는 부담을 줄이도록, 별도 시연용 APK의 한 흐름 실행을 준비한다. 기존 게임 UI에서 플레이하고 명시 SIMULATION 입력으로 출발→이동→도착→주차→동일 게임 계산/지급/SQLite 저장·재실행을 연결하는 검증 도구다. 실제 SDK 도착 콜백을 합성해 수신 성공으로 기록하지 않으며 실제 차량 원장·프로필·패키지와 분리한다. 긴 시간은 명시 시연용 논리시계로만 진행하고 실제 센서/OS 시각과 섞지 않는다. 기존 게임 규칙·지갑·경제 계산을 복제하지 않고 release에서 시험 입력을 켤 수 없도록 한다.
+
+현재는 B의 별도 작업으로 설계·구현 중이며 사용 가능한 시연 기능이나 기존 시험 성공으로 표시하지 않는다. 기존 SDK/에뮬레이터 시험은 유지하고 실제 주행/UX 제한을 모의 P로 우회하지 않는다. #28에서 검증하며, 사용자 지시에 따라 #189 디자인 검토·적용은 진행 중인 기능 구현·검증 이후로 둔다.
+
+
+원본 B0dd에 독립 Native 시험1만 추가한 별도 조합도 실제 실행했다. ActualMainResultsHistoryIndependentTest는 실제 UI 첫 지급→HOME→Results 미확인/전체 필터·원 정산 선택·열람 전후 두 번의 Activity 재생성·Back/재진입을24.856초에 통과했다. 정상 OK(1 test)·여섯 stage·원 금융 행 불변과 RESULT_VIEWED 정확1의 마지막 단언까지 확인했다. 원690 항목에 공식 양식DOCX1과 새 시험1을 포함한 전체692파일, 설치 앱SHA83fb1c92ad321e69bff43c4b1b50e1cca291f433e8972ea34d041117bd366449·시험SHA d11a3b1ad043909c31e15321f19b0d77623af57f3db5038a20044dc03730ff4d를 대조했다. 원65/Results11과 다른 시험 조합이며 합쳐 하나의 실행으로 표시하지 않는다.
+
+22:55:47~23:01:20 KST 단독 슬롯·제품/환경19항목 보존과 자기 권한 원복/패키지 정리를 확인했다. 추가1 원문은 제품 source/기대값 변경 없이 저장소의 정식 Android 시험으로 보존하고 새 main188 조합에서 시험 APK 컴파일을15초에 확인했다. 제품/단위 입력은 기존543 검증본과 동일해 중복 실행으로 세지 않는다. 자체 로그의 driver_deferred=DATA_UNAVAILABLE3건과 실제SDK D 이탈·CCP/런처/프로세스/전원 미검증은 유지한다.
+
+[실제 HOME 화면](evidence/product-host-20261110/actual-home.png)과 [실제 전체 Results 화면](evidence/product-host-20261110/actual-results.png)은 같은 격리 앱/원 지급·열람 DB의 원본 ADB PNG다. 정식 시험 후 화면 선택/필터만3회 탭했고 금융·열람 요청 추가 없이 전후 원행과 RESULT_VIEWED1을 보존했다. HTML/목업/편집 이미지가 아니며 #189 디자인도 적용하지 않았다. 현재 임시 Views와 원B0dd 제품의 실행 증거이고 최신 결합본의 장치 실행으로 확대하지 않는다.
+
+
 ### Rest 6a4 세 수정의 main188 통합 검토 대기 — 2026-11-10
 
 정확6a4d820645cbd58c05959d7dd8a48f73746a5972를main188 c6c345d1866569cb3156229ba363312d1778fede 위에정상통합했다. 소스충돌/추가수정0이며변경41파일전부6a4와바이트동일하다. Main/HostSession/PendingRoute/factory/VehicleInput·Location6·시설12·Results14를보존했다. marker생산API는그대로이며시험fixture만schema16으로갱신했다. RankingReadSource의공통Rest주행reader소비는원본의의도된변경이고기존Provenance hook/typedFailure catch는보존했다. core/Gradle/Manifest불변·B0dd미포함이다. **이main188 로컬후보당시에는새SQLite결과대기였다. 후속c28의실제47통과는아래별도조합으로기록하며, #190이후Main조합·최종독립회수전까지머지보류다.**
