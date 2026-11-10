@@ -22,6 +22,7 @@ internal fun stripDeliveryCheckpointFixture(db:SQLiteDatabase) {
 
 /** schema14 metadata/열만 제거해 이전 helper의 실제 구조를 만든다. 기존 방문 세 열과 행을 보존한다. */
 internal fun stripRentalProductFixture(db:SQLiteDatabase) {
+    db.execSQL("DROP TABLE IF EXISTS facility_command_results")
     for(table in listOf("rental_product_marker","rental_product_state","rental_product_inactive"))db.execSQL("DROP TABLE IF EXISTS $table")
     val columns=db.rawQuery("PRAGMA table_info(visits)",null).use{r->buildList{while(r.moveToNext())add(r.getString(1))}}
     if("host_command" !in columns)return

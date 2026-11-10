@@ -221,7 +221,7 @@ class RepairLedgerTest : InstrumentationTestCase() {
                 stripDeliveryCheckpointFixture(db);introduced.filterKeys{it>version}.values.flatten().forEach{db.execSQL("DROP TABLE $it")};db.version=version
             }
             store=open();assertEquals(GameMoney(1000),ok(store.balance()));assertEquals(car.copy(revision=Revision(1)),ok(store.listOwnedVehicles()).single())
-            assertNull(ok(store.repairSettlement(RequestId("not-committed"))));store.close();raw{assertEquals(14,it.version)}
+            assertNull(ok(store.repairSettlement(RequestId("not-committed"))));store.close();raw{assertEquals(15,it.version)}
         };store=open()
     }
     fun testFailedV6MigrationPreservesOriginalVersionAndBytes() {

@@ -326,7 +326,7 @@ class MaterialLedgerTest : InstrumentationTestCase() {
         store.close();raw { db -> db.version=5 } // 기존 표와의 충돌로 이전 실패를 주입한다.
         val file=context.getDatabasePath(name);val before=file.readBytes();store=open()
         assertEquals(failed(ContractError.STORAGE_FAILURE),store.balance());store.close()
-        assertTrue(before.contentEquals(file.readBytes()));raw { it.version=14 };store=open()
+        assertTrue(before.contentEquals(file.readBytes()));raw { it.version=15 };store=open()
     }
 
     fun testIncomeSelectionAndEmptyVisitReserveIdsBeforeMaterialAndViceVersa() {
