@@ -9,5 +9,5 @@ internal fun pendingHostPage(command: HostCheckpointCommand?): HostPage? = when 
     is HostCheckpointCommand.Garage, is HostCheckpointCommand.Material, is HostCheckpointCommand.Repair -> HostPage.GARAGE
     is HostCheckpointCommand.Expand -> HostPage.HOME
     is HostCheckpointCommand.Delivery -> HostPage.DELIVERY
-    is HostCheckpointCommand.Quest -> null // 진행 화면 소비 전까지 다른 기능에서 실행하지 않는다.
+    is HostCheckpointCommand.Quest -> HostPage.PROGRESSION
 }

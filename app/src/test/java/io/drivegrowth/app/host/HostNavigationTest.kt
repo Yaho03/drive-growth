@@ -48,4 +48,11 @@ class HostNavigationTest {
         assertEquals(selected,navigation.selectedVehicleId);assertTrue(navigation.back())
     }
 
+    @org.junit.Test fun progressionBackReturnsHomeWithoutInventingGarageAction() {
+        val navigation = HostNavigation(page = HostPage.PROGRESSION)
+        org.junit.Assert.assertFalse(navigation.back())
+        org.junit.Assert.assertEquals(HostPage.HOME, navigation.page)
+        org.junit.Assert.assertNull(navigation.pendingGarageRequest)
+    }
+
 }

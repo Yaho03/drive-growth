@@ -91,6 +91,11 @@ class MainActivity : Activity() {
     private var pendingRouteFailed = false
     private var pendingRouteEnabled = false
     private lateinit var shop: ShopView
+    private lateinit var progression: io.drivegrowth.app.ui.progress.ProgressView
+    private var progressionFrame: io.drivegrowth.app.host.progression.ProgressionFrame? = null
+    private var lastProgressionScreen: io.drivegrowth.app.ui.progress.ProgressScreenState? = null
+    private var lastProgressionAccess: Boolean? = null
+    private var progressionRestoreFailed = false
     private lateinit var ranking: RankingView
     private var rankingState: RankingState = RankingState.Restricted
     private lateinit var delivery: DeliveryView
@@ -101,7 +106,7 @@ class MainActivity : Activity() {
     private lateinit var gacha: GachaView
     private var navigationGeneration = 0L
     private val destinations = listOf(HostPage.HOME to "가게", HostPage.GARAGE to "보유 차량", HostPage.COLLECTION to "도감",
-        HostPage.GACHA to "가챠", HostPage.DELIVERY to "탁송", HostPage.RANKING to "기록·랭킹", HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내")
+        HostPage.GACHA to "가챠", HostPage.PROGRESSION to "퀘스트·진행", HostPage.DELIVERY to "탁송", HostPage.RANKING to "기록·랭킹", HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내")
     private val mapper = GarageHostMapper()
     private val resultsMapper = ResultsHostMapper()
     private lateinit var results: ResultsView
@@ -150,6 +155,16 @@ class MainActivity : Activity() {
         session = lastNonConfigurationInstance as? HostSession ?: HostSession(applicationContext, { deliveryHandler.post(it) },
             ResultsStateBundle.decode(savedInstanceState?.getBundle("results")),
             OnboardingStateBundle.decode(savedInstanceState?.getBundle("onboardingHost")))
+        progression = io.drivegrowth.app.ui.progress.ProgressView(this) { event ->
+            if (allowed() && navigation.page == HostPage.PROGRESSION) session.progression.handle(event) else updateAccess()
+        }
+        if (lastNonConfigurationInstance == null) {
+            when (val decoded = io.drivegrowth.app.host.progression.ProgressionUiStateBundle.decode(savedInstanceState?.getBundle("progression"))) {
+                is ContractResult.Success -> session.progressionUi = decoded.value
+                is ContractResult.Failure -> progressionRestoreFailed = true
+            }
+        }
+        progression.restoreUiState(session.progressionUi)
         deliveryFrame = session.deliveryUi.frame ?: DeliveryFrame(0, DeliveryScreen.Loading)
         delivery = DeliveryView(this, { request ->
             session.deliveryUi = delivery.saveUiState()
@@ -272,6 +287,17 @@ class MainActivity : Activity() {
         setVisible(true)
         if (active) return
         active = true
+        session.progression.attach { frame ->
+            progressionFrame = frame
+            if (frame.retryComplete) progression.completeRetry()
+            if (frame.resolved.isNotEmpty()) {
+                progression.completePendingRecovery(frame.resolved)
+                if (allowed()) queries.refresh()
+            }
+            renderProgression()
+            session.progressionUi = progression.uiState
+        }
+        session.progression.restoreUiState(progression.uiState)
         session.ranking.attach { rankingState = it; ranking.render(it, allowed() && navigation.page == HostPage.RANKING) }
         if (results.uiState != session.results.uiState) results.restoreUiState(session.results.uiState)
         session.results.attach { id, result ->
@@ -292,6 +318,11 @@ class MainActivity : Activity() {
     }
 
     private fun stopObserving() {
+        session.progressionUi = progression.uiState
+        session.progression.setControlsEnabled(false)
+        session.progression.detach()
+        lastProgressionAccess = null
+        progression.render(io.drivegrowth.app.ui.progress.ProgressScreenState.Loading, false)
         session.results.remember(results.uiState)
         session.ranking.detach()
         session.results.detach()
@@ -304,6 +335,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        session.progressionUi = progression.uiState
+        session.progression.detach()
         session.deliveryUi = delivery.saveUiState()
         session.delivery.detach()
         session.deliveryNavigation.changed = null
@@ -325,6 +358,8 @@ class MainActivity : Activity() {
     override fun onRetainNonConfigurationInstance(): Any = session
 
     override fun onSaveInstanceState(outState: Bundle) {
+        session.progressionUi = progression.uiState
+        outState.putBundle("progression", io.drivegrowth.app.host.progression.ProgressionUiStateBundle.encode(progression.uiState))
         session.results.remember(results.uiState)
         outState.putBundle("results", ResultsStateBundle.encode(session.results.uiState))
         outState.putBundle("onboardingHost", OnboardingStateBundle.encode(session.onboarding.uiState))
@@ -352,6 +387,8 @@ class MainActivity : Activity() {
     private fun updateAccess() {
         val enabled = allowed()
         queries.setControlsEnabled(enabled)
+        session.progression.setControlsEnabled(enabled && navigation.page == HostPage.PROGRESSION)
+        renderProgression()
         val deliveryEnabled = enabled && navigation.page == HostPage.DELIVERY
         val deliveryGained = deliveryEnabled && !deliveryAccessEnabled
         deliveryAccessEnabled = deliveryEnabled
@@ -372,7 +409,8 @@ class MainActivity : Activity() {
     private fun refresh() {
         if (!allowed()) { updateAccess(); return }
         session.onboarding.refresh()
-        if (navigation.page == HostPage.DELIVERY) { session.deliveryNavigation.refresh(); session.delivery.refresh() }
+        if (navigation.page == HostPage.PROGRESSION) session.progression.refresh()
+        else if (navigation.page == HostPage.DELIVERY) { session.deliveryNavigation.refresh(); session.delivery.refresh() }
         else if (navigation.page == HostPage.HOME) expansionHost.load()
         else if (navigation.page == HostPage.GACHA) session.gacha.refresh()
         else if (navigation.page == HostPage.RANKING) session.ranking.refresh()
@@ -433,6 +471,10 @@ class MainActivity : Activity() {
         chrome.addView(links)
         if (navigation.page == HostPage.HOME && expansionState is ShopScreenState.Failure)
             chrome.addView(style.button("보관한 미실행 확장 요청 취소") { expansionHost.cancelSaved() })
+        if (navigation.page == HostPage.PROGRESSION) {
+            if (progressionRestoreFailed) chrome.addView(style.text("화면 상태를 복원하지 못해 저장 기록을 다시 확인합니다."))
+            chrome.addView(style.button("미시작 퀘스트 청구 취소 확인") { if (allowed()) session.progression.cancelSaved() })
+        }
         if (pendingRouteFailed)
             chrome.addView(style.button("보관 요청 종류를 다시 확인") { refreshPendingRoute() })
         pendingPage?.takeIf { it != navigation.page }?.let { target ->
@@ -440,6 +482,7 @@ class MainActivity : Activity() {
                 HostPage.GACHA -> "보관한 가챠 요청 확인"
                 HostPage.GARAGE -> "보관한 차량 관리 요청 확인"
                 HostPage.DELIVERY -> "보관한 탁송 요청 확인"
+                HostPage.PROGRESSION -> "보관한 퀘스트 청구 확인"
                 else -> "보관한 가게 확장 요청 확인"
             }) {
                 select(target)
@@ -470,7 +513,19 @@ class MainActivity : Activity() {
             }
 
             HostPage.RANKING -> showBody(ranking)
+            HostPage.PROGRESSION -> { renderProgression(); showBody(progression) }
         }
+    }
+
+    private fun renderProgression() {
+        if (!::progression.isInitialized) return
+        val frame = progressionFrame
+        val state = frame?.screen ?: io.drivegrowth.app.ui.progress.ProgressScreenState.Loading
+        val access = allowed() && navigation.page == HostPage.PROGRESSION && frame?.controlsEnabled == true
+        if (state == lastProgressionScreen && access == lastProgressionAccess) return
+        lastProgressionScreen = state
+        lastProgressionAccess = access
+        progression.render(state, access)
     }
 
     private fun renderDelivery(enabled: Boolean) {
@@ -690,6 +745,7 @@ class MainActivity : Activity() {
             if (navigation.page == HostPage.GACHA && gacha.handleBack()) return
             if (navigation.page == HostPage.DELIVERY && delivery.handleBack()) return
             if (navigation.page == HostPage.RANKING && ranking.handleBack()) return
+            if (navigation.page == HostPage.PROGRESSION && progression.handleBack()) return
             if (navigation.pendingGarageRequest != null) { cancelPreparation(); return }
             if (navigation.page == HostPage.GARAGE && garage.closeDetail()) return
             if (navigation.page == HostPage.RESULTS && results.closeDetail()) return
