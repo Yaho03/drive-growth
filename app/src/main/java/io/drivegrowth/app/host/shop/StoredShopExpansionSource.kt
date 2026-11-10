@@ -20,7 +20,15 @@ class StoredShopExpansionSource(
     } catch (_: SecurityException) { ContractResult.Failure(ContractError.PERMISSION_DENIED) }
       catch (_: SQLiteException) { ContractResult.Failure(ContractError.STORAGE_FAILURE) }
 
-    private fun readSnapshot(store: SqliteGameChangeStore, definition: ShopExpansionDefinition): ContractResult<ShopExpansionSnapshot> = store.atomic {
+    private fun readSnapshot(store: SqliteGameChangeStore, definition: ShopExpansionDefinition): ContractResult<ShopExpansionSnapshot> = store.atomic { db ->
+        db.rawQuery("SELECT balance FROM account WHERE id=1",null).use {
+            if(!it.moveToFirst())throw SQLiteException("가게 잔액 누락")
+            it.integer(0,0,Long.MAX_VALUE)
+        }
+        db.rawQuery("SELECT level,capacity FROM shop WHERE id=1",null).use {
+            if(!it.moveToFirst())throw SQLiteException("가게 상태 누락")
+            it.integer(0,1,Int.MAX_VALUE.toLong());it.integer(1,1,Int.MAX_VALUE.toLong())
+        }
         val actual=when(val r=store.localProfileId()){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
         if(actual!=profile)return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
         val shop=when(val r=store.rental.shop()){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
@@ -53,7 +61,11 @@ class StoredShopExpansionSource(
             val command=HostCheckpointCommand.Expand(request.requestId,source,definition.version,expand.offer)
             when(val saved=store.hostCommands.save(profile,command)) {
                 is ContractResult.Failure->saved
-                is ContractResult.Success->ContractResult.Success(command)
+                is ContractResult.Success->{
+                    val actual=when(val r=store.hostCommands.load(profile)){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
+                    if(actual!=saved.value)throw SQLiteException("확장 원명령의 실제 저장 불일치")
+                    ContractResult.Success(command)
+                }
             }
         } }
     }

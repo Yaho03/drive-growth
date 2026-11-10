@@ -25,7 +25,7 @@ internal fun mapShopExpansion(profile: ProfileId, source: InputSource, definitio
         val installed=facility in shop.facilities
         ShopFacility(facility,ShopOption("facility-${facility.name}",when(facility) {
             Facility.FUEL_STATION -> "주유소";Facility.INSURANCE -> "보험 시설";Facility.CAR_WASH -> "세차장"
-        },"시설 가격/정의 미제공",if(installed)"기존 설치 기록 · 이번 구매 연결 미지원" else "시설 구매 연결 미지원",
+        },"이번 확장 화면의 시설 구매 미연결",if(installed)"기존 설치 기록 · 이번 구매 연결 미지원" else "시설 구매 연결 미지원",
             if(installed)ShopAvailability.INSTALLED else ShopAvailability.UNKNOWN))
     }
     val screen=ShopScreenState.Content(Revision(0),"내 가게 · 저장 상태",shop.progress.shopLevel,shop.progress.ownedVehicles,
