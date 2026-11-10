@@ -1678,3 +1678,16 @@ A의 정확1ea+원래동일2파일hook 조합은 원7PASS1.728초·추가초기�
 새 모듈 조합은 core420·app472 시험이 실패/오류/생략0, 제품/시험APK와 Lint(오류0·경고27)가 성공했다.80tasks/2분28초이며 저장소·링크/diff 검사는 최종 인계/PR에서 확인한다. 이 조합의 새 장치실행과 담당 ADB는0이다. **A11은 head단독이나 최신B Main 연결의 실행이 아니다.** Main/HostSession의 readHistory 실제 주입·최신 gate/Bundle/탐색과 UI·Activity/프로세스·SDK/전원·실차는 B/관련 후속에서 구분 검증한다. 저장된 매출/시설보너스/가상사고/평가·단골 nullable 표시만 공급하며 미제공 감액/상한·시간 provenance는 확인불가로 남긴다. AI 보조 검토이며 별도 사람 승인·정확 원격CI/main 반영을 확보한 것으로 표시하지 않는다.
 
 후속 게시 준비는 PR #184가 main `fa03b9b289eaf101fd8e3a902af4c29df4f12214`에 반영된 뒤 그 main을 정상 부모로 통합했다. 소스 충돌은 없고 문서 끝의 두 추가 절 충돌은 랭킹·Results 기록을 모두 보존했다. Results14·Ranking5·E28과 현재 Main/HostSession/factory가 원본/최신main과 동일하다. 새 조합 앱480개는 실패/오류/생략0이며 이 실행에 포함된 Results30·Ranking23을 별도 실행 수로 합산하지 않는다. 제품/시험 APK·Lint(오류0·경고27)는78tasks/2분9초에 성공했고 저장소 필수21·문서29·링크439와diff검사를 통과했다. core와 공통 Gradle/앱 빌드 입력은 이전0e28 검증본과 동일하므로 core420은 그 이전 실행 근거로 재사용하고 이번 재실행으로 쓰지 않는다. A 원래11·F30 및 이전472/420과 새480을 구분한다. 이 조합의 새 기기/ADB 실행은0, 최신 Main readHistory 소비는 계속 B 별도 범위다. mainCI42811398819는 root 인계 시 진행 중이었으며 여기서 성공으로 변경하지 않는다. #58 종료와 #54/#51/#28 원격 변경 여부는 root 최종 기록을 따른다.
+
+
+### 시설·영업 쉬기 소비 모듈 통합 검증 — 2026-11-10
+
+C213과 최소 복구575584a의 모듈·시험12파일을 Results e936 후보 위에 정상 통합했다. 소스 충돌 없이12파일 모두 정확575와 바이트 동일하며 E28/d8 소유ID guard·랭킹5·Results14·기존 Main/HostSession/factory/HostPendingRoute를 보존했다. 원본 등록3파일patch와 B WIP는 포함하지 않았다. 같은 factory/직렬worker의 시설 조회·E공용 typed 원명령 소비 모듈이며 HOME/Shop/쉬기 event·pending 라우트의 최신 Main 등록은 B 별도 범위다. root가 PR #185로 Results 후보를 게시하고 CI 진행 중이라고 인계했으며, 여기서 main185 반영 완료로 쓰지 않는다.
+
+FACILITY-HOST-P2-1의 수정은 finish 성공으로 pending이 해제된 뒤 현재 facts 조회가 실패한 경우에도 Retry를 보이는 한 조건이다. 원213+동일F1은 선택/START1 뒤 기대 retry-null assertion이 자기 프로세스 crash 로그에 관측됐지만 정식method terminal0·정상footer 없음·collector error1이었다. 정식JUnit assertion 실패 보고0이고 후행Retry/오류해제/facts복구·finish/write각1 단언은 미도달이었다. 이를 정상 RED1 suite나 정상 suite 실행시간으로 바꾸지 않는다. 원C12 통과나 새575 결과로 이 관측을 덮지 않는다.
+
+A의 정확575 준비쌍은 원12와 동일F1을 합친13개가2.487초에 정상footer로 통과했다(실패/오류/생략0). 원12 본문과 F1 원문/기대가 같고 전체600소스·빌드/설치pull SHA를 확인했다. 이13은 실제 factory/SQLite9, 고정 입력 View3, fake backend View/controller 복구1이다. 추가F1은 활성Retry·performClick·오류해제·facts복구와 재시도 뒤 finish/write 각1회 단언까지 통과했으며 금융/SQLite/SDK 시험으로 확대하지 않는다. 실제9는 중앙offer/기존E슬롯의구매·쉬기·원결과재생·현재OFF/성장보존·foreign/누락/finish실패·SAVED/STARTED재개방 경계를 확인한다. 명시SIMULATION이며 실제HOME/SDK 입력은 아니다.
+
+A가 사용한 준비앱 a7166fc1312c712f2c782e48dd8e4ff4ac596d56de13702e037aa03c53e9f916, 시험7e656e94c00ecb0006e3d33554ae795675981819f4483338748f61258263b0ba는 전달원본과 설치pull이 각각 같다. API34 ARM64/user10,21:02:33~21:03:27KST 단독구간·19/19 제품/환경보존·자기패키지/프로세스/계측정리·반환을 확인했다. A 새빌드0이다. 원문/소스·설치hash/보존은 /private/tmp/drive-facility-read-recovery-fix-20261110/independent-device-review/에 보존한다. F 최종 APPROVE_SCOPED_FACILITY_READ_RECOVERY_CODE_AND_A575_SQLITE_VIEW13_GREEN은600소스/원12/F1·설치hash·정상footer/후행단언을 대조해 필수수정0으로 모듈 공급을 수용했다. F 새Gradle/장치0이며 C표적20·APK 근거를 확인했을 뿐 새실행 수에 합산하지 않는다.
+
+원575의 A13에는 E d8 저장guard가 없었다. 이번 후보는 이미 검토된 E0e55/d8을 그대로 보존하지만 이를 A13과 같은 결합본 장치검증으로 표시하지 않는다. 새 조합 앱500개는 실패/오류/생략0이며 시설20은 이500에 포함된다. 제품/시험APK·Lint(오류0·경고27)는78tasks/2분3초에 성공했고 저장소필수21·문서29·링크444 및diff검사를 통과했다. core와 공통/앱 Gradle입력은이전검증본과동일해 core420은이전실행근거로만재사용하고이번에재실행하지않았다. 이 후보 담당의 새장치/ADB/원격쓰기는0이다. 실제B Main/HOME·Shop구매·쉬기터치·gate/좁은창·구성변경/프로세스·SDK/전원·실차·꾸미기/최종아트와전체#44/#55/#28은별도다. AI보조검토를별도사람승인으로쓰지않으며정확게시head/CI/main반영은root가확인한다.

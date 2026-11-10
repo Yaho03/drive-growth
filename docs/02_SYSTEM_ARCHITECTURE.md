@@ -756,3 +756,12 @@ C 정확1ea3e6a의 SettlementHistoryReader는 같은 store의 전체 settlements
 ResultsHostController의 optional readHistory를 공급하며 미주입 기존 소비 경로는 유지한다. 실제 열람 쓰기는 기존 markViewed만 호출하고 성공 후 이력을 재조회한다. 표시 viewed의 Done과 실제 로컬 Pending 응답 해소는 구분하며 조회/필터/선택/복원이 열람·재화 지급을 자동 실행하지 않는다. 보관된 CompletedRental의 매출/시설 보너스/가상 사고/matchReview/washReview/단골 nullable만 표시한다. 미제공 감액·상한 원인이나 시간 provenance를 현재시각/최종금액에서 역산하지 않는다.
 
 최초 공급 후보는 main183 위 모듈·시험14파일만 정상 통합했고, 후속 후보는 PR #184가 반영된 main fa03b9b를 정상 부모로 포함한다. C1ea 모듈14·랭킹5·E 저장28파일과 현재 Main/HostSession/factory를 그대로 보존했다. MainActivity/HostSession의 최신 실제 readHistory 주입·gate/수동 재조회/historyState/Bundle·탐색 연결은 B의 별도 제품 작업이다. 옛 activity-hook.patch를 최신 Main에 덮지 않는다. 원래 A 검증은1ea+같은 원본2파일hook 조합이며 이 후보 또는 최신 B 제품 Main의 장치 실행으로 표시하지 않는다. 원래 실패·수정/실행과 새 로컬 조합의 범위는 [06](06_VERIFICATION.md#전체-정산-이력-모듈-공급-검증--2026-11-10)을 따른다. #54/#28 전체 완료는 아니다.
+
+
+### 시설·영업 쉬기 typed 소비 모듈 — 2026-11-10
+
+C213과 최소 복구 수정575584a의 모듈은 같은 GameSessionFactory의 작업별 session·기존 직렬 worker에서 시설 정의/가게/잔액/보유차량/활동·쉬기 설정을 읽고 E 공용 hostCommands만 소비한다. Buy는 전체 definitionVersion/FacilityOffer/request/source, Rest는 전체 VehicleRef/revision/expected/desired/request/source를 보존한다. save→execute→finish와 SAVED 취소를 구분하며 직접 rental.buy/setResting·새 지갑/DB/schema·경제 계산을 추가하지 않는다. 실제 원profile/source를 확인하고 다른 기능/출처의 슬롯은 Foreign으로 남긴다. load 실패를 빈 슬롯으로 바꾸지 않는다.
+
+원결과 재생은 현재 정의/개체/revision/쉬기보다 우선하고 새 명령의 최종 조건은 E의 같은 거래가 검사한다. 구매는 원래 금융 Settlement, 쉬기는 비금융 원명령의 before/after를 검증한다. 과거 ON 결과를 현재 ON으로 표시하거나 현재 OFF/차량 성장을 덮지 않는다. STARTED 원결과 누락·finish 실패는 원래 명령과 오류를 유지한다. 575 수정은 finish 성공으로 pending이 해제된 뒤 현재 facts 조회만 실패한 경우 Retry를 보이는 한 조건이며, 재조회가 새 save/execute/finish를 발급하지 않는다.
+
+이 게시 후보는 Results e936 위에 소유12파일만 정상 통합했다. E28의 d8 소유ID guard·랭킹5·Results14·현재 Main/HostSession/factory와 pending 경로를 보존했다. 원575의 A13에는 d8이 없으며 새 결합본의 장치 실행과 혼동하지 않는다. 최신 Main의 시설/HOME·Shop 원요청 응답·gate·pending 등록은 B 별도 작업이고 원래3파일 등록patch/B WIP는 적용하지 않았다. 이 모듈 공급만으로 기존 pending STATE_CONFLICT를 HOME 라우트로 바꾸지 않는다. 실제 실행 범위와 원213 crash 관측은 [06](06_VERIFICATION.md#시설영업-쉬기-소비-모듈-통합-검증--2026-11-10), 표시 연결은 [09](09_UI_UX_SPEC.md#시설영업-쉬기-소비-view-모듈--2026-11-10)를 따른다.
