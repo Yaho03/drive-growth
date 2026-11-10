@@ -170,7 +170,7 @@ internal class InitializationLedger(
         db.rawQuery("SELECT command FROM settlements WHERE request_id=?",arrayOf(FirstGrant.REQUEST_ID.value)).use { row ->
             if (row.moveToFirst()) {
                 val encoded = row.text(0)
-                if (encoded.startsWith("{") && JSONObject(encoded).optString("type")=="initialization-v1")
+                if (encoded.trimStart().startsWith("{") && JSONObject(encoded).optString("type")=="initialization-v1")
                     throw JSONException("초기화 공용 정산만 남음")
             }
         }
