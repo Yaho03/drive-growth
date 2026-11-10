@@ -1,6 +1,7 @@
 package io.drivegrowth.app.data
 
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.rental.ShopExpansion
 import org.json.JSONException
 import org.json.JSONObject
 
@@ -18,6 +19,7 @@ internal object HostCheckpointJson {
             is HostCheckpointCommand.Garage -> { kind = "garage"; value = LedgerJson.command(command.value) }
             is HostCheckpointCommand.Material -> { kind = "material"; value = MaterialJson.command(command.value) }
             is HostCheckpointCommand.Repair -> { kind = "repair"; value = RepairJson.command(command.value) }
+            is HostCheckpointCommand.Expand -> { kind = "expand"; value = expand(command) }
         }
         return JSONObject().put("type", "host-command-v1").put("profile", profile.value).put("kind", kind)
             .put("request", command.requestId.value).put("source", command.origin.name)
@@ -35,6 +37,7 @@ internal object HostCheckpointJson {
             "garage" -> HostCheckpointCommand.Garage(content, garage(value))
             "material" -> HostCheckpointCommand.Material(MaterialJson.command(value))
             "repair" -> HostCheckpointCommand.Repair(RepairJson.command(value))
+            "expand" -> expand(value)
             else -> throw JSONException("미지원 checkpoint 명령 종류")
         }
         if (!command.validFor(command.origin) || encode(profile, command) != text)
@@ -42,6 +45,19 @@ internal object HostCheckpointJson {
         return profile to command
     }
 
+    private fun expand(c: HostCheckpointCommand.Expand) = JSONObject().put("type","shop-expand-v1")
+        .put("request",c.requestId.value).put("source",c.source.name).put("definition",c.definitionVersion.value)
+        .put("rules",c.offer.ruleVersion.value).put("trial",c.offer.trial).put("fromLevel",c.offer.fromLevel)
+        .put("currentCapacity",c.offer.currentCapacity).put("nextCapacity",c.offer.nextCapacity)
+        .put("completedRentals",c.offer.requiredCustomers).put("price",c.offer.price.units)
+    private fun expand(j: JSONObject): HostCheckpointCommand.Expand {
+        if(j.getString("type")!="shop-expand-v1") throw JSONException("확장 명령 종류 오류")
+        val trial=j.get("trial") as? Boolean ?: throw JSONException("확장 시험값 형식 오류")
+        return HostCheckpointCommand.Expand(RequestId(j.getString("request")),InputSource.valueOf(j.getString("source")),
+            ContentVersion(j.getString("definition")),ShopExpansion(RuleVersion(j.getString("rules")),trial,
+                int(j,"fromLevel",1),int(j,"currentCapacity",1),int(j,"nextCapacity",1),int(j,"completedRentals"),
+                GameMoney(LedgerJson.integer(j,"price",0,Long.MAX_VALUE))))
+    }
     private fun gacha(c: GachaCommand) = JSONObject().put("type", "gacha-v1")
         .put("request", c.requestId.value).put("source", c.source.name).put("content", c.contentVersion.value)
         .put("rules", c.ruleVersion.value).put("revision", c.expectedRevision.value).put("shopLevel", c.shopLevel)

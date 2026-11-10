@@ -96,6 +96,7 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
         is HostCheckpointCommand.Garage -> wrap(store.commitGameChange(command.value)) { HostCheckpointResult.Garage(it) }
         is HostCheckpointCommand.Material -> wrap(store.commitMaterial(command.value)) { HostCheckpointResult.Material(it) }
         is HostCheckpointCommand.Repair -> wrap(store.commitRepair(command.value)) { HostCheckpointResult.Repair(it) }
+        is HostCheckpointCommand.Expand -> wrap(store.rental.expand(command.requestId,command.offer)) { HostCheckpointResult.Expand(it) }
     }
     private inline fun <A> wrap(result: ContractResult<A>, convert: (A) -> HostCheckpointResult): ContractResult<HostCheckpointResult> =
         when (result) { is ContractResult.Failure -> result; is ContractResult.Success -> ContractResult.Success(convert(result.value)) }
