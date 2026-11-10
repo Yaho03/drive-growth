@@ -240,4 +240,59 @@ class RentalProductJournalTest:InstrumentationTestCase() {
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),journal().advanceInactive(identity,interval));assertEquals(economic,rows(listOf("account","rentals","vehicles","settlements","quest_events")));assertEquals(interval,ok(journal().pendingInactive(identity)))
     }
 
+    fun testInactiveRecoveryDoesNotActivateAndOnlyTrueAbsenceIsNull() {
+        val before=rows();assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),journal().currentInactive(identity));assertEquals(before,rows())
+        ok(journal().activate(identity));val active=rows();assertNull(ok(journal().currentInactive(identity)));assertEquals(active,rows())
+        assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT),journal().currentInactive(identity.copy(profileId=ProfileId("foreign"))));assertEquals(active,rows())
+    }
+    fun testInactiveRecoveryFindsUnpreparedExitAfterReopenWithoutAnySupplierRead() {
+        ok(journal().activate(identity));now=at(1000);val marker=RequestId("recovery-unprepared");ok(journal().beginInactiveWhileDriving(identity,marker,now));val before=rows()
+        val fresh=GameSessionFactory(context,mapOf(source to name,InputSource.VEHICLE to name+"-vehicle"),source)
+        val read=SqliteRentalProductJournal(fresh,{error("조회에서 정의 공급자를 호출하면 안 됨")},{error("조회에서 현재 시각을 호출하면 안 됨")},{error("조회에서 원점을 다시 만들면 안 됨")})
+        val result=ok(read.currentInactive(identity))!!;assertEquals(identity,result.identity);assertEquals(marker,result.marker);assertEquals(at(1000),result.since)
+        assertEquals(RentalInactiveBasis.APPLICATION_EXIT_DRIVING,result.basis);assertEquals(ContractResult.Success(Observation.Available(at(1000))),result.policyOrigin);assertEquals(RentalInactivePhase.RECORDED,result.phase);assertNull(result.interval);assertEquals(before,rows())
+    }
+    fun testInactiveRecoveryKeepsLegacyPhysicalOriginDistinctFromActualStop() {
+        ok(journal().activate(identity));origin=Observation.Available(at(0));now=at(60000);val marker=RequestId("recovery-legacy-physical");ok(journal().beginInactive(identity,marker,now))
+        raw{db->val old=db.rawQuery("SELECT payload FROM rental_product_inactive",null).use{it.moveToFirst();it.getString(0)};val legacy=JSONObject(old).apply{remove("basis")}.toString();db.execSQL("UPDATE rental_product_inactive SET payload=?,digest=?",arrayOf(legacy,ObservedDrivingJson.digest(legacy)))}
+        val before=rows();now=at(90000);val r=ok(journal().currentInactive(identity))!!
+        assertEquals(RentalInactiveBasis.DRIVING_END,r.basis);assertEquals(at(60000),r.since);assertEquals(ContractResult.Success(Observation.Available(at(0))),r.policyOrigin);assertEquals(before,rows())
+    }
+    fun testInactiveRecoveryReturnsPreparedOriginalEndDespiteForeignSlotAndNewClock() {
+        directRental();val car=ok(store.listOwnedVehicles()).single();val block=manual(car);ok(store.hostCommands.save(identity.profileId,block));val marker=RequestId("recovery-prepared");ok(journal().beginInactive(identity,marker,now))
+        val original=RentalInactiveInterval(marker,now,now,at(1000));now=original.to;assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),journal().advanceInactive(identity,original))
+        now=at(2000);definitionsAvailable=false;val before=rows();val r=ok(journal().currentInactive(identity))!!
+        assertEquals(RentalInactivePhase.PREPARED,r.phase);assertEquals(original,r.interval);assertEquals(before,rows());assertEquals(block,ok(store.hostCommands.load(identity.profileId))!!.command)
+    }
+    fun testInactiveRecoverySeparatesCompletedWindowAndNextCurrentMarkerWithoutRepaying() {
+        directRental();val marker=RequestId("recovery-completed");ok(journal().beginInactiveWhileDriving(identity,marker,now));val original=RentalInactiveInterval(marker,now,now,at(7*3600000));now=original.to
+        val paid=ok(journal().advanceInactive(identity,original));assertTrue(paid.pending.isEmpty());assertNotNull(paid.firstCompleted);val before=rows()
+        val r=ok(journal().currentInactive(identity))!!;assertEquals(RentalInactivePhase.COMPLETED,r.phase);assertEquals(original,r.interval);assertEquals(before,rows())
+        now=at(7*3600000+1000);val next=RequestId("recovery-next");ok(journal().beginInactiveWhileDriving(identity,next,now));val after=rows();val current=ok(journal().currentInactive(identity))!!
+        assertEquals(next,current.marker);assertEquals(RentalInactivePhase.RECORDED,current.phase);assertNull(current.interval);assertEquals(ContractResult.Success(Observation.Available(at(0))),current.policyOrigin);assertEquals(after,rows())
+    }
+    fun testInactiveRecoveryPreservesMissingOriginInsteadOfCurrentStopOrP() {
+        ok(journal().activate(identity));origin=Observation.Missing(MissingReason.PERMISSION_DENIED);val marker=RequestId("recovery-missing");ok(journal().beginInactive(identity,marker,now));val before=rows();origin=Observation.Available(at(0));now=at(1000)
+        val r=ok(journal().currentInactive(identity))!!;assertEquals(ContractResult.Success(Observation.Missing(MissingReason.PERMISSION_DENIED)),r.policyOrigin);assertEquals(RentalInactiveBasis.DRIVING_END,r.basis);assertEquals(before,rows())
+    }
+    fun testInactiveRecoveryPreservesRecordedOriginFailureInsideValidMetadata() {
+        ok(journal().activate(identity));val failing=SqliteRentalProductJournal(games,{ContractResult.Success(definition)},{ContractResult.Success(now)},{ContractResult.Failure(ContractError.STORAGE_FAILURE)})
+        ok(failing.beginInactive(identity,RequestId("recovery-origin-error"),now));val before=rows();val r=ok(journal().currentInactive(identity))!!
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),r.policyOrigin);assertEquals(RentalInactivePhase.RECORDED,r.phase);assertEquals(before,rows())
+    }
+    fun testInactiveRecoveryRejectsMissingDigestForeignSourceAndUnknownBasisWithoutRepair() {
+        ok(journal().activate(identity));ok(journal().beginInactiveWhileDriving(identity,RequestId("recovery-damaged"),now))
+        var original="";raw{db->original=db.rawQuery("SELECT payload FROM rental_product_inactive",null).use{it.moveToFirst();it.getString(0)}}
+        for(kind in listOf("missing","digest","source","basis")) {
+            raw{db->when(kind){"missing"->db.execSQL("DELETE FROM rental_product_inactive");"digest"->db.execSQL("UPDATE rental_product_inactive SET digest='changed'");"source"->db.execSQL("UPDATE rental_product_inactive SET source='VEHICLE'");else->{val broken=JSONObject(original).put("basis","UNKNOWN").toString();db.execSQL("UPDATE rental_product_inactive SET payload=?,digest=?",arrayOf(broken,ObservedDrivingJson.digest(broken)))}}}
+            val before=rows();assertEquals(kind,ContractResult.Failure(ContractError.STORAGE_FAILURE),journal().currentInactive(identity));assertEquals(kind,before,rows())
+            raw{db->db.execSQL("DELETE FROM rental_product_inactive");db.execSQL("INSERT INTO rental_product_inactive(marker,profile,source,payload,digest) VALUES(?,?,?,?,?)",arrayOf("recovery-damaged",identity.profileId.value,source.name,original,ObservedDrivingJson.digest(original)))}
+        }
+    }
+    fun testInactiveRecoveryDoesNotTreatLostCurrentReferenceAsTrueAbsence() {
+        ok(journal().activate(identity));ok(journal().beginInactiveWhileDriving(identity,RequestId("recovery-dangling"),now))
+        raw{db->val old=db.rawQuery("SELECT payload FROM rental_product_state",null).use{it.moveToFirst();it.getString(0)};val broken=JSONObject(old).put("inactive",JSONObject.NULL).toString();db.execSQL("UPDATE rental_product_state SET payload=?,digest=?",arrayOf(broken,ObservedDrivingJson.digest(broken)))}
+        val before=rows();assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),journal().currentInactive(identity));assertEquals(before,rows())
+    }
+
 }

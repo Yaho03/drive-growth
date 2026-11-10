@@ -2,7 +2,7 @@
 
 제품 범위는 [01_PRD.md](01_PRD.md), 검증 증거는 [06_VERIFICATION.md](06_VERIFICATION.md)를 따른다. 개발 기반 결정과 과거 로컬 구현 기록을 구분하며, 과거 코드의 수치를 새 게임 기획의 최종 규칙으로 사용하지 않는다.
 
-기존 `app/src`·`core/src`는 공통 빌드·시험 재현을 위한 선행 기술 검증 코드다. 렌터카 기획의 구현으로 사용하지 않는다. 실제 게시 버전과 실행 결과는 검증 문서를 따른다.
+과거 `DriveEngine`·`DashboardView`의 시험 수치와 경험치는 현재 렌터카 게임 규칙의 근거로 사용하지 않는다. 현재 렌터카 구현의 계약·상태는 아래 해당 구현 절과 검증 문서를 따른다.
 
 ## 개발 기반 결정
 
@@ -35,7 +35,7 @@
 
 ## 렌터카 기획의 데이터·처리 계약 — 설계안, 미구현
 
-2026-11-03 제품 변경 반영. 경제 규칙과 확정 수치는 [PRD](01_PRD.md)의 기준을 참조한다. 아래는 구현 전에 지켜야 할 데이터 경계이며 DB 제품·클래스명·저장 스키마를 확정한 것은 아니다.
+2026-11-03 제품 변경 반영. 경제 규칙과 확정 수치는 [PRD](01_PRD.md)의 기준을 참조한다. 아래는 구현 전에 지켜야 할 데이터 경계이며 DB 제품·클래스명·저장 스키마를 확정한 것은 아니다. 이 표는 2026-11-03 당시의 개념 설계 기록이며, 현재 구현 계약·상태는 아래 후속 구현 절과 검증 문서를 따른다.
 
 | 책임 | 구분해 보존할 정보·처리 조건 |
 |---|---|
@@ -765,3 +765,12 @@ C213과 최소 복구 수정575584a의 모듈은 같은 GameSessionFactory의 �
 원결과 재생은 현재 정의/개체/revision/쉬기보다 우선하고 새 명령의 최종 조건은 E의 같은 거래가 검사한다. 구매는 원래 금융 Settlement, 쉬기는 비금융 원명령의 before/after를 검증한다. 과거 ON 결과를 현재 ON으로 표시하거나 현재 OFF/차량 성장을 덮지 않는다. STARTED 원결과 누락·finish 실패는 원래 명령과 오류를 유지한다. 575 수정은 finish 성공으로 pending이 해제된 뒤 현재 facts 조회만 실패한 경우 Retry를 보이는 한 조건이며, 재조회가 새 save/execute/finish를 발급하지 않는다.
 
 이 게시 후보는 Results e936 위에 소유12파일만 정상 통합한 뒤, PR #185가 반영된 main8c067b9를 정상 부모로 포함했다. main 부모 통합 직후 트리 차이는 없었다. E28의 d8 소유ID guard·랭킹5·Results14·현재 Main/HostSession/factory와 pending 경로를 보존했다. 원575의 A13에는 d8이 없으며 새 결합본의 장치 실행과 혼동하지 않는다. 최신 Main의 시설/HOME·Shop 원요청 응답·gate·pending 등록은 B 별도 작업이고 원래3파일 등록patch/B WIP는 적용하지 않았다. 이 모듈 공급만으로 기존 pending STATE_CONFLICT를 HOME 라우트로 바꾸지 않는다. 실제 실행 범위와 원213 crash 관측은 [06](06_VERIFICATION.md#시설영업-쉬기-소비-모듈-통합-검증--2026-11-10), 표시 연결은 [09](09_UI_UX_SPEC.md#시설영업-쉬기-소비-view-모듈--2026-11-10)를 따른다.
+
+
+### 종료 영업 현재 marker 복구 읽기 API — 2026-11-10
+
+E 정확efe4965의 SqliteRentalProductJournal.currentInactive(identity)는 기존 state.inactive가 가리키는 원marker를 기존 strict decoder로 읽어 RentalInactiveRecovery를 반환한다. identity/marker/실제since·DRIVING_END 또는 APPLICATION_EXIT_DRIVING basis·원래 policyOrigin과 원 interval/phase를 보존한다. RECORDED는원 interval미준비,PREPARED는준비한원interval,COMPLETED는저장된완료상태이며이phase자체가새금융영수증·지급완료UI를만들지않는다. basis없는검증된legacy는DRIVING_END로만해석하고현재시각/P/새receiver로원점을보충하지않는다.
+
+미활성은DATA_UNAVAILABLE,활성뒤현재참조와이력이모두없을때만Success(null)이다. foreign identity는INVALID_INPUT,현재참조/선택marker소실·digest/원문/출처/basis손상은바깥STORAGE_FAILURE다. 유효metadata안의원래policyOrigin Missing 또는명시Failure는안쪽값그대로반환한다. 정의·현재clock·policy공급자를재호출하지않고foreign금융slot이있어도조회한다. 조회가활성화·새marker/정산·schema/DB·원장수리를만들지않는다. 기존쓰기/codec/경제원점정책은그대로다.
+
+이후보는시설1ea4기준에정확2파일만정상통합한뒤, PR #186이반영된main1358f6e를정상부모로포함했다. 부모추가직후전체트리차이는없었다. 기존E28중해당2파일만원본efe로갱신하고나머지26·시설12·Results14·랭킹5·현재Main계열을보존한다. 실제Main이탈/구성변경분류와이API의최신B driver소비는별도작업이며Rest830후속을포함하지않는다. B는RECORDED의원marker/since에서실제복귀to를한번준비하고PREPARED의원whole interval을먼저재사용한다. COMPLETED를새미완료로만들지않는다. 실제원본조회·10개표행보존과새조합검사는 [06](06_VERIFICATION.md#종료-영업-currentinactive-읽기-api-통합-검증--2026-11-10)을따른다.
