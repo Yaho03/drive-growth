@@ -45,7 +45,7 @@ class OnboardingLiveSqliteTest : InstrumentationTestCase() {
         val name=names.getValue(InputSource.SIMULATION)
         SqliteGameChangeStore(context,InputSource.SIMULATION,name).use{ok(it.localProfileId())}
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path,null,SQLiteDatabase.OPEN_READWRITE).use{db->
-            for(table in listOf("initialization_profile","initialization_requests","first_gift_markers","first_gift_requests"))db.execSQL("DROP TABLE $table")
+            for(table in listOf("initialization_profile","initialization_requests","first_gift_markers","first_gift_requests","host_command_checkpoint"))db.execSQL("DROP TABLE $table")
             db.version=7
         }
         val f=factory();val source=StoredOnboardingHostSource(f);val snapshot=ok(source.read());assertTrue(snapshot.initialization.status is ProfileInitializationStatus.Unknown)
