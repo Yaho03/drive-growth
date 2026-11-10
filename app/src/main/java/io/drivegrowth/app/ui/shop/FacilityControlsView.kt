@@ -77,7 +77,7 @@ class FacilityControlsView(context:Context,private val onEvent:(FacilityControls
                 }.apply{tag="facility:rest:${row.vehicle.ownedVehicleId.value}"})
             }
         }
-        if(receipt==null)add(this@FacilityControlsView,button("다시 확인",!value.busy){
+        if(receipt==null || (value.error!=null && value.pending==null))add(this@FacilityControlsView,button("다시 확인",!value.busy){
             if(allowed && !state.busy && state==value)onEvent(FacilityControlsEvent.Retry)
         }.apply{tag="facility:retry"})
     }
