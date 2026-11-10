@@ -1714,7 +1714,7 @@ main186 후속 부모 통합 직후 이전0f042b1과 전체 트리 차이가 없
 
 ### FusedLocation SDK 6파일 통합 검증 — 2026-11-10
 
-D 정확92c4ee31f826b2713dd7c481d9791465385d90b5의6파일을main187 b2c1a2fa89734d4a9241ccc635701f63cf2085d2 위에정상통합했다. SDK의존성1줄·명시FUSED_LOCATION권한1줄과어댑터/mapper·원시험만추가됐고모두원92c와바이트동일하다. B Main/HostSession/VehicleInput·currentInactive2·시설12·Results14·랭킹5·전체data/host/core트리를보존했다. schema15를유지하고Rest schema16·A진단Activity/시험patch·F추가시험은포함하지않았다. mainCI42820687455는root인계시실행중이며여기서성공으로쓰지않는다.
+D 정확92c4ee31f826b2713dd7c481d9791465385d90b5의6파일을main187 b2c1a2fa89734d4a9241ccc635701f63cf2085d2 위에정상통합했다. SDK의존성1줄·명시FUSED_LOCATION권한1줄과어댑터/mapper·원시험만추가됐고모두원92c와바이트동일하다. B Main/HostSession/VehicleInput·currentInactive2·시설12·Results14·랭킹5·전체data/host/core트리를보존했다. schema15를유지하고Rest schema16·A진단Activity/시험patch·F추가시험은포함하지않았다. 원래 인계 때 실행 중이던 main #187 CI42820687455는 이후 두 검사 모두 성공했으며 root가 원격 결과를 확인했다. 이번 Location 후보 자체의 게시 후 CI와는 구분한다.
 
 원D본인검증은core420/app487(위치24포함)·APK/Lint0오류27경고다. F정확92c검토는원24+독립2=26PASS/42초·필수수정0이며JVM대체SDK/queue의release실패/재시작·close재진입·옛callback폐기를확인했다. F추가스레드감사는필수0/새시험0으로기존수용을유지했고A장치결과를사용하지않았다. currentadapter main호출계약과SDK공식main필수는구분하고,원격Proxy register/unregister의oneway전송과caller의PackageManager/권한검사/unbindService를분리했다. 실제최악지연/UI정체·원격해제완료ACK는검증하지않았다.
 
