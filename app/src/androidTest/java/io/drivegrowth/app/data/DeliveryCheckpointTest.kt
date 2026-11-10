@@ -124,4 +124,25 @@ class DeliveryCheckpointTest:InstrumentationTestCase() {
         assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),store.hostCommands.finish(profile,c));assertEquals(damaged,rows());assertEquals(HostCheckpointPhase.STARTED,ok(store.hostCommands.load(profile))!!.phase)
     }
 
+
+    // 독립 검토 재현: 이 사본에만 추가. 실제 기기 미실행이며 기대는 전체 rollback이다.
+    fun testIndependentIgnoredHeldDeletionMustNotConfirmRefund() {
+        fillGarage();choose(purchase);val arrive=arrival();execute(arrive);finish(arrive)
+        val refund=wrap(DeliveryCheckpointOperation.Hold(settle,request,EpochMillis(start.value+1000+86400000)))
+        ok(store.hostCommands.save(profile,refund))
+        raw{it.execSQL("CREATE TRIGGER ignore_held_delete BEFORE DELETE ON delivery_held BEGIN SELECT RAISE(IGNORE); END")}
+        val before=rows()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.hostCommands.execute(profile,refund))
+        assertEquals(before,rows())
+    }
+
+    // 독립 검토 재현: 보류 생성이 실제로 저장되지 않으면 활성/목록/원정산 전체를 보존해야 한다.
+    fun testIndependentIgnoredHeldInsertMustNotCompleteArrival() {
+        fillGarage();choose(purchase);val arrive=arrival()
+        ok(store.hostCommands.save(profile,arrive))
+        raw{it.execSQL("CREATE TRIGGER ignore_held_insert BEFORE INSERT ON delivery_held BEGIN SELECT RAISE(IGNORE); END")}
+        val before=rows()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.hostCommands.execute(profile,arrive))
+        assertEquals(before,rows())
+    }
 }
