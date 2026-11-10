@@ -10,6 +10,15 @@ import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.progression.VehicleActivity
 import org.json.JSONObject
 
+enum class RentalInactiveBasis { DRIVING_END, APPLICATION_EXIT_DRIVING }
+enum class RentalInactivePhase { RECORDED, PREPARED, COMPLETED }
+/** 복구 조회 결과다. 원점 조회 실패를 저장 손상과 구분하고, 실제 P/새 시각으로 보충하지 않는다. */
+data class RentalInactiveRecovery(val identity:GameIdentity,val marker:RequestId,val since:RentalClock,
+    val basis:RentalInactiveBasis,val policyOrigin:ContractResult<Observation<RentalClock>>,
+    val phase:RentalInactivePhase,val interval:RentalInactiveInterval?) {
+    init { require((phase==RentalInactivePhase.RECORDED)==(interval==null)) }
+}
+
 /** B port 그대로. 현재 시각과 마지막 주행 종료 권위는 공급자가 명시한다. */
 class SqliteRentalProductJournal(private val games:GameSessionFactory,
     private val definitions:()->ContractResult<RentalVisitDefinition>,
@@ -153,6 +162,28 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
         val j=inactive(db,identity,RequestId(key))?:throw SQLiteException("비활성 marker 소실")
         if(j.getBoolean("done")||j.isNull("command"))return@withDb ContractResult.Success(null)
         ContractResult.Success(RentalProductJson.interval(j.getJSONObject("command")))
+    }
+    /** 읽기만 한다. RECORDED도 반환하므로 준비 전 실제 onStop을 재실행 뒤 복구할 수 있다. */
+    fun currentInactive(identity:GameIdentity):ContractResult<RentalInactiveRecovery?> = withDb(identity){_,db->
+        val st=when(val r=state(db,identity)){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value}
+        val key=st.inactive
+        if(key==null) {
+            if(db.rawQuery("SELECT 1 FROM rental_product_inactive",null).use{it.moveToFirst()})throw SQLiteException("비활성 이력의 현재 marker 참조 소실")
+            return@withDb ContractResult.Success(null)
+        }
+        val marker=RequestId(key);val j=inactive(db,identity,marker)?:throw SQLiteException("비활성 현재 marker 원문 소실")
+        val origin=j.getJSONObject("origin")
+        val authority:ContractResult<Observation<RentalClock>> = when {
+            origin.has("clock")->ContractResult.Success(Observation.Available(RentalProductJson.clock(origin.getJSONObject("clock"))))
+            origin.has("applicationExit")->ContractResult.Success(Observation.Available(RentalProductJson.clock(origin.getJSONObject("applicationExit"))))
+            origin.has("missing")->ContractResult.Success(Observation.Missing(MissingReason.valueOf(origin.getString("missing"))))
+            else->ContractResult.Failure(ContractError.valueOf(origin.getString("error")))
+        }
+        val interval=if(j.isNull("command"))null else RentalProductJson.interval(j.getJSONObject("command"))
+        val phase=if(j.getBoolean("done"))RentalInactivePhase.COMPLETED else if(interval==null)RentalInactivePhase.RECORDED else RentalInactivePhase.PREPARED
+        // basis 없는 구형 원문은 기존 strict decoder가 검증한 DRIVING_END 형식뿐이다.
+        val basis=if(j.has("basis"))RentalInactiveBasis.valueOf(j.getString("basis")) else RentalInactiveBasis.DRIVING_END
+        ContractResult.Success(RentalInactiveRecovery(identity,marker,RentalProductJson.clock(j.getJSONObject("since")),basis,authority,phase,interval))
     }
     private fun snapshot(s:SqliteGameChangeStore):ContractResult<RentalRuntimeSnapshot> {
         val pending=when(val r=s.rental.pending()){is ContractResult.Failure->return r;is ContractResult.Success->r.value}
