@@ -339,3 +339,12 @@ RankingView/Controller는실제내기록6지표의기간/출처·Available0/Empt
 
 
 제품 페이지 연결 후보5c9514d5는 기존 임시 Views에 실제 내 기록/명시 시연, 탁송 목적지 확인/요청, Quest 진행/수령을 같은 세션으로 연결한다. 늦은 Intro보다 명시 탐색·복원 페이지를 우선하되 NEW의 아직 탐색하지 않은 HOME 첫 안내는 유지한다. 최종 픽셀 자산 적용이 아니며 현재5c의 원본 cold-wrapper1은 실제 SDKgate·Back2·복원·원장 불변까지 통과했으며 D의 Intro 독립 재검토도 수용됐고 좌표터치/CCP·전체 화면 검증은 별도다. 온라인순위·시설/자동영업·새종료영업원점 구현완료로 확대하지 않는다. 검증 범위는 [06](06_VERIFICATION.md#b-제품-연결-고정본의-게시-준비--2026-11-10)을 따른다.
+
+
+### 시설·영업 쉬기 소비 View 모듈 — 2026-11-10
+
+FacilityControlsView는 기존 임시 ShopStyle로 같은 실제 facts의 보유 차량·활동·현재 쉬기 설정과 당시 receipt를 구분한다. 이름/활동이 없으면 정상 이름/IDLE/OFF로 채우지 않고 제출을 막는다. SetResting은 현재 version·VehicleRef·expected/desired의 callback이고 실제 requestId/프로필·저장 권위는 호스트/E에 둔다. 오래된 버튼은 현재 gate/상태를 재확인한다. 제한·foreign·미지원·pending·원결과·조회 실패를 구분하며 과거 결과를 현재 토글 값으로 만들지 않는다.
+
+finish가 성공한 뒤 현재 facts 조회만 실패해 pending이 없는 경우에는 원receipt를 남기고 Retry를 제공한다. Retry는 기존 controller.refresh를 호출하며 복구 뒤 finish/write를 다시 호출하지 않는다. finish 실패로 pending이 남은 경우는 기존 원명령/명시 확인 경로를 유지한다. 실제 A575 검증에서 같은 F 추가1의 Retry/클릭·오류 해제/facts 복구·finish/write 각1 단언이 통과했다. 이 추가1은 fake backend View/controller 시험이며 금융/SQLite/SDK 입력 시험이 아니다.
+
+현재 공급은 View/호스트/typed 어댑터 모듈이다. Main/HOME·Shop 시설 구매와 원래 ShopRequest 응답·쉬기 event·세대/gate·pending 라우트의 최신 제품 연결은 B가 별도로 통합한다. 원본 등록patch를 최신Main에 덮지 않았고 새 미술/배치 엔진/꾸미기 영속화·최종아트는 추가하지 않았다. 실제 원본 장치13과 새조합 검사의 범위는 [06](06_VERIFICATION.md#시설영업-쉬기-소비-모듈-통합-검증--2026-11-10)을 따른다. #44/#55/#28 전체 완료는 아니다.
