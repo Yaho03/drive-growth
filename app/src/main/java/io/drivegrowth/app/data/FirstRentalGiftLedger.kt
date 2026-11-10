@@ -92,6 +92,7 @@ internal class FirstRentalGiftLedger(
         db.execSQL("INSERT INTO first_gift_markers VALUES(?,?,?,?)",arrayOf(id.value,command.requestId.value,command.cause.rentalId.value,command.cause.settlementId.value))
         db.execSQL("INSERT INTO first_gift_requests VALUES(?,?,?,?,?)",arrayOf(command.requestId.value,id.value,encoded,
             FirstGiftJson.state(before).toString(),FirstGiftJson.result(result).toString()))
+        if (recorded(db,id) != result) throw JSONException("선물 확정 전체 결과 연결 검증 실패")
         ContractResult.Success(result)
     }
 
