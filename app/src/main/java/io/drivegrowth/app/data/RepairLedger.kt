@@ -80,7 +80,8 @@ internal class RepairLedger(private val store: SqliteGameChangeStore) {
             Transaction(TransactionId(UUID.randomUUID().toString()), command.requestId, TransactionKind.GARAGE,
                 command.source, command.ruleVersion, prepared.money), prepared.balance, prepared.vehicle,
             prepared.activity, prepared.accidentCount, store.now())
-        db.execSQL("UPDATE account SET balance=? WHERE id=1", arrayOf(result.balance.units))
+        val accountChanged = db.update("account", ContentValues().apply { put("balance", result.balance.units) }, "id=1", null)
+        if (accountChanged != 1) throw SQLiteException("수리 잔액 갱신 대상 불일치")
         store.writeVehicle(db, result.vehicle)
         // 사고 영업은 지우지 않는다. 현재 NEEDS_REPAIR 한 건의 활동만 회복한다.
         val changed = db.update("rentals", ContentValues().apply { put("phase", VehicleActivity.IDLE.name) },

@@ -56,9 +56,9 @@ class FirstGiftStoreIntegrationTest : InstrumentationTestCase() {
     }
     fun testV8MigrationKeepsInitializedProfileProgressAndExistingResults() {
         val first=initialized();complete(first.grant.changedVehicle!!);val p=profile();val c=prepared();val receipts=ok(store.listUnviewedSettlements())
-        store.close();raw{db->db.execSQL("DROP TABLE first_gift_requests");db.execSQL("DROP TABLE first_gift_markers");db.version=8};store=open()
+        store.close();raw{db->db.execSQL("DROP TABLE first_gift_requests");db.execSQL("DROP TABLE first_gift_markers");db.execSQL("DROP TABLE host_command_checkpoint");db.version=8};store=open()
         assertEquals(p,profile());assertEquals(receipts,ok(store.listUnviewedSettlements()));assertEquals(GachaProgress(Revision(0),0,0),ok(store.readGachaState()).progress)
-        assertEquals(GachaProgress(Revision(1),0,1),ok(store.commitFirstRentalGift(c)).progress);store.close();raw{assertEquals(9,it.version)};store=open()
+        assertEquals(GachaProgress(Revision(1),0,1),ok(store.commitFirstRentalGift(c)).progress);store.close();raw{assertEquals(10,it.version)};store=open()
     }
     fun testOriginalGiftReplaysBeforeCurrentContentAndMissingProgress() {
         val first=initialized();complete(first.grant.changedVehicle!!);val c=prepared();val r=ok(store.commitFirstRentalGift(c));val p=profile()
@@ -82,7 +82,7 @@ class FirstGiftStoreIntegrationTest : InstrumentationTestCase() {
     fun testActualV7LegacyWithCompletionRemainsUnknownAndCannotClaim() {
         val car=OwnedVehicle(OwnedVehicleId("legacy-fixture"),VehicleId("hyundai_casper"),1,Revision(0),VehicleLifecycle.OWNED,Rarity.COMMON,0,GameMoney(0),VehicleAcquisitionSource.GACHA)
         ok(store.commitGameChange(GameChange(RequestId("legacy-add"),TransactionKind.GARAGE,source,content.ruleVersion,vehicle=VehicleWrite.Add(car))));complete(car)
-        store.close();raw{db->listOf("initialization_requests","initialization_profile","first_gift_requests","first_gift_markers").forEach{db.execSQL("DROP TABLE $it")};db.version=7};store=open()
+        store.close();raw{db->listOf("initialization_requests","initialization_profile","first_gift_requests","first_gift_markers","host_command_checkpoint").forEach{db.execSQL("DROP TABLE $it")};db.version=7};store=open()
         val p=profile();assertTrue(ok(store.readInitialization(p)).status is ProfileInitializationStatus.Unknown)
         assertEquals(failure(ContractError.DATA_UNAVAILABLE),FirstGrant(content).prepareOpeningGift(store,p,source))
         assertEquals(GachaProgress(Revision(0),0,0),ok(store.readGachaState()).progress);assertEquals(GameMoney(0),ok(store.balance()))
