@@ -108,7 +108,7 @@ class DeliveryCheckpointTest:InstrumentationTestCase() {
     fun testV11MigrationPreservesQuestCompletenessAndAllExistingRows() {
         val before=rows();var tracking:List<String> = emptyList();raw{db->tracking=db.rawQuery("SELECT * FROM quest_tracking",null).use{r->buildList{while(r.moveToNext())add((0 until r.columnCount).joinToString("|"){r.getString(it)})}}}
         store.close();raw{stripDeliveryCheckpointFixture(it);it.version=11};store=open();assertEquals(before,rows())
-        raw{db->assertEquals(12,db.version);val after=db.rawQuery("SELECT * FROM quest_tracking",null).use{r->buildList{while(r.moveToNext())add((0 until r.columnCount).joinToString("|"){r.getString(it)})}};assertEquals(tracking,after)}
+        raw{db->assertEquals(13,db.version);val after=db.rawQuery("SELECT * FROM quest_tracking",null).use{r->buildList{while(r.moveToNext())add((0 until r.columnCount).joinToString("|"){r.getString(it)})}};assertEquals(tracking,after)}
     }
     fun testIgnoredSaveAndNonfinalSavedRestorationCannotReportDurability() {
         val first=select();raw{it.execSQL("CREATE TRIGGER ignore_save BEFORE INSERT ON host_command_checkpoint BEGIN SELECT RAISE(IGNORE); END")};val initial=rows()

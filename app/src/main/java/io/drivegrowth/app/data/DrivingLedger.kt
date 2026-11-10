@@ -100,28 +100,38 @@ class DrivingLedger internal constructor(private val store: SqliteGameChangeStor
             put("day", result.day.day.toString())
             put("day_rewarded", result.day.rewardedMeters)
         })
-        ContractResult.Success(
-            DriveCommit(drive.driveId, result.recordedMeters, result.rewardedMeters, result.amount, result.day, recorded),
-        )
+        val committed=DriveCommit(drive.driveId,result.recordedMeters,result.rewardedMeters,result.amount,result.day,recorded)
+        if(readDrive(db,drive.driveId)?.commit!=committed || (recorded!=null && store.readBalance(db)!=recorded.balance))
+            throw android.database.sqlite.SQLiteException("주행 실제 이력/일누계/재화 쓰기 불일치")
+        ContractResult.Success(committed)
     }
 
-    private fun command(rules: DrivingIncomeRules, drive: ConfirmedDrive) = JSONObject()
+    private val records=DrivingRecordReader(store.source)
+    private fun command(rules:DrivingIncomeRules,drive:ConfirmedDrive)=records.command(rules,drive)
+    private fun readDay(db:SQLiteDatabase,day:LocalDate)=records.readDay(db,day)
+    private fun readDrive(db:SQLiteDatabase,id:String)=records.readDrive(db,id)
+    private fun hasSettlement(db:SQLiteDatabase,id:RequestId)=records.hasSettlement(db,id)
+}
+
+/** 같은 DB를 받는 recorder도 기존 원장의 원문/결과 검증을 재사용한다. 지급 API가 아니다. */
+internal class DrivingRecordReader(private val source:InputSource) {
+    fun command(rules: DrivingIncomeRules, drive: ConfirmedDrive) = JSONObject()
         .put("drive", drive.driveId).put("day", drive.departedOn.toString())
         .put("meters", drive.distance.meters).put("source", drive.distance.source.name)
         .put("rule", rules.ruleVersion.value).put("cap", rules.dailyCapMeters).put("perKm", rules.incomePerKm.units)
 
-    private fun readDay(db: SQLiteDatabase, day: LocalDate): DrivingDay? = db.rawQuery(
-        "SELECT rewarded FROM driving_days WHERE day = ? AND source = ?", arrayOf(day.toString(), store.source.name),
+    fun readDay(db: SQLiteDatabase, day: LocalDate): DrivingDay? = db.rawQuery(
+        "SELECT rewarded FROM driving_days WHERE day = ? AND source = ?", arrayOf(day.toString(), source.name),
     ).use { if (it.moveToFirst()) DrivingDay(day, it.integer(0, 0, Long.MAX_VALUE)) else null }
 
     /** 대조를 마친 주행 기록과 당시 결과. */
-    private class StoredDrive(val command: String, val commit: DriveCommit)
+    class StoredDrive(val command: String, val commit: DriveCommit)
 
     /**
      * 저장된 주행 기록을 읽는다. 원래 명령의 규칙·주행과 당시 하루 상태(반영 후 누적 - 이번 반영)로 다시 계산한 결과가
      * 저장된 거리·반영 거리·금액·하루 상태와 같아야 한다. 지급이 있으면 원래 DRIVING 지급과 맞는 정산이 있어야 하고, 0원이면 정산이 없어야 한다.
      */
-    private fun readDrive(db: SQLiteDatabase, driveId: String): StoredDrive? = db.rawQuery(
+    fun readDrive(db: SQLiteDatabase, driveId: String): StoredDrive? = db.rawQuery(
         "SELECT command, recorded, rewarded, amount, day, day_rewarded FROM driving_drives WHERE drive_id = ?", arrayOf(driveId),
     ).use {
         if (!it.moveToFirst()) return@use null
@@ -163,6 +173,6 @@ class DrivingLedger internal constructor(private val store: SqliteGameChangeStor
         return rules to drive
     }
 
-    private fun hasSettlement(db: SQLiteDatabase, requestId: RequestId): Boolean =
+    fun hasSettlement(db: SQLiteDatabase, requestId: RequestId): Boolean =
         db.rawQuery("SELECT 1 FROM settlements WHERE request_id = ?", arrayOf(requestId.value)).use { it.moveToFirst() }
 }

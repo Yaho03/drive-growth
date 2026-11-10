@@ -4,6 +4,7 @@ import android.database.sqlite.SQLiteDatabase
 
 /** schema12에서 만든 시험 DB를 실제 구버전 fixture 구조로 되돌린다. 제품 이전/복구 API가 아니다. */
 internal fun stripDeliveryCheckpointFixture(db:SQLiteDatabase) {
+    for(table in listOf("observed_driving_marker","observed_driving_state","observed_driving_receipts"))db.execSQL("DROP TABLE IF EXISTS $table")
     for(table in listOf("delivery_requests","delivery_changes","delivery_outcomes","delivery_hold_outcomes")) {
         val columns=db.rawQuery("PRAGMA table_info($table)",null).use{r->buildList{while(r.moveToNext())add(r.getString(1))}}
         if("host_command" !in columns)continue
