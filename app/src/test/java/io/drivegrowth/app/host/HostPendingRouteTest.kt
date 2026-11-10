@@ -8,6 +8,17 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class HostPendingRouteTest {
+    @Test fun providedHomeFacilityOwnerReceivesBothTypesWhileGarageKeepsThemForeign() {
+        val purchase = HostCheckpointCommand.FacilityPurchase(RequestId("facility"), InputSource.SIMULATION,
+            ContentVersion("definition"), io.drivegrowth.core.rental.FacilityOffer(
+                io.drivegrowth.core.rental.Facility.FUEL_STATION, RuleVersion("rule"), true, GameMoney(1)))
+        val resting = HostCheckpointCommand.VehicleResting(RequestId("resting"), InputSource.SIMULATION,
+            io.drivegrowth.core.garage.VehicleRef(OwnedVehicleId("vehicle"), Revision(0)), false, true)
+        for (command in listOf(purchase, resting)) {
+            assertEquals(ContractResult.Success(HostPage.HOME), pendingHostPage(command, facilityPageAvailable = true))
+            assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), restoreGaragePending(command))
+        }
+    }
     private val expand=HostCheckpointCommand.Expand(RequestId("expand"),InputSource.SIMULATION,ContentVersion("definition"),
         ShopExpansion(RuleVersion("rules"),true,1,3,5,3,GameMoney(500)))
     @Test fun expansionRoutesHomeButGarageCannotRestoreOrConsumeIt(){
