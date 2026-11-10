@@ -86,6 +86,16 @@ class SettlementHistoryReader(private val store:SqliteGameChangeStore) {
                                 vehicle.lifecycle!=write.lifecycle || vehicle.levelProgressPercent!=write.levelProgressPercent)bad("변경 결과 snapshot 불일치")
                         }
                     }
+                    "initialization-v1"->{
+                        val command=InitializationJson.command(json)
+                        if(command.profileId!=profile || command.evidence.profileId!=profile || command.evidence.source!=store.source ||
+                            command.grant.source!=store.source || InitializationJson.command(command).toString()!=raw)bad("초기 지급 명령 원문·식별 불일치")
+                        val state=required(store.readInitialization(profile))
+                        val original=(state.status as? ProfileInitializationStatus.Existing)?.original?:bad("초기 지급 원결과 누락")
+                        if(state.profileId!=profile || state.source!=store.source || original.command!=command || original.grant!=s ||
+                            original.marker.profileId!=profile || original.marker.requestId!=s.transaction.requestId ||
+                            original.marker.evidence!=command.evidence)bad("초기 지급 원결과·마커 연결 불일치")
+                    }
                     "gacha-v1"->{
                         typed(json,s,"rules")
                         val vehicle=LedgerJson.vehicle(json.getJSONObject("vehicle"))

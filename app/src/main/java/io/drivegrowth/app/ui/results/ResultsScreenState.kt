@@ -107,7 +107,7 @@ class ResultsInteraction(private val onEvent: (ResultsEvent) -> Unit) {
 
     /** 동기 callback과 다른 정산의 늦은 응답도 ID로 구분한다. 미요청/완료된 ID 응답은 무시한다. */
     fun completeMarkViewed(id: SettlementId, result: ContractResult<Unit>) {
-        if (readState(id) != ResultsReadState.Pending) return
+        if (uiState.readStates[id] != ResultsReadState.Pending) return
         val next = when (result) {
             is ContractResult.Success -> ResultsReadState.Done
             is ContractResult.Failure -> ResultsReadState.Failed(result.error)
