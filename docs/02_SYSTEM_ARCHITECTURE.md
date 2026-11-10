@@ -633,6 +633,9 @@ SqliteGameChangeStore는 MaterialChangeStore.readMaterialState/commitMaterial을
 스키마7은 repair_requests만 추가하고 지원 v1~v6의 기존 표/행을 보존한다. 실제 원격 머지 순서에서 번호를 다시 확인한다. 기존 구조 fixture의 schema7 준비 보완은 최종3c473dd의 시험 호환 커밋으로 실제 반영했으며 독립 실제 장치에서 수리23개·호환 표적7개로 이전/실패 rollback·다중 연결/재개방을 확인했다. 정합 구조 fixture이며 실제 옛 APK 제품 DB 이전·프로세스/실차 성공은 아니다. 초기화/첫 선물의 SQLite와 제품 관리 UI/프로세스 연결·전체 #122/#49는 후속이다.
 
 
+수리 account 무갱신 추가 경계: RepairLedger의 잔액 UPDATE는 영향행이 정확히1인지 검사한다. 예외 없는0행 갱신도 저장실패로 전달해 같은 atomic 경계의 차량/활동·공용/수리 기록을 전부 rollback한다. 원래 전체 명령의 재생 우선순위는 유지하고 현재 상태 검사로 과거 결과를 바꾸지 않는다. 원래3c의 RED와 수정51e의 같은 회귀 GREEN은 [06](06_VERIFICATION.md)의 후속 근거를 따른다.
+
+
 ### 렌터카 runtime의 고정 입력·확인 구간 연결 — 2026-11-10
 
 `app.runtime.rental.SqliteRentalRuntimeSource`는 명시 store factory가 연 같은 출처의 기존 RentalLedger에 고정 RentalVisit을 assign하고, 확인된 RentalTick에서 account→settle→finishReturn을 호출한다. 별도 영업 원장/고객 난수/수익 산식은 없다. Pending은 기존 parked_since를 엄격 정수로 읽어 원래 연속 주차 기준을 반환한다. source/clock/부팅 불일치·미래/역행·관측 공백은 실패/대여별 보류이며 미수신 구간을 Driving으로 바꾸지 않는다. epoch/elapsed는 공급자가 같은 부팅에서 보정한 쌍이어야 하고, 관측만료/실제 P·연속주차 판정·bootId 발급은 입력 공급 책임이다. runtime는 정상수익/감액을 직접 계산하지 않는다.
