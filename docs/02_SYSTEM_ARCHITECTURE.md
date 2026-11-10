@@ -363,23 +363,23 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 
 #### #34 저장 확장의 연결점과 기존 데이터 조건
 
-**PR #104 당시 범위**다. 현재 main은 아래 B 영업 원장의 schema2까지 제공한다. PR #116의 schema3·이력 조회는 검토 대기이며, 새 필드가 없는 옛 JSON의 복구 정책과는 다르다.
+**도입 범위와 현재 연결(2026-11-11 확인):** PR #104가 개체 필드·단일 변경·원래 정산 재생을 공급했고, PR #116의 처분 포함 이력·발견 저장, PR #140의 `Garage.collection(history)`, PR #149의 저장 조회 소비도 main에 반영됐다. 아래 표는 현재 코드의 연결점을 가리킨다. 새 필드가 없는 legacy JSON의 근거 기반 복구와 제품 앱 재실행·실제 표시 이벤트 검증은 이 공급과 구분한다. 이후 스키마 확장은 각 저장 공급 절을 따르며, 테이블 이전만으로 누락된 취득 정보를 복원했다고 간주하지 않는다.
 
-이번 SQLite 대응은 새 필드를 손실시키지 않기 위한 `LedgerJson.vehicle` 양방향, Update 명령 JSON·copy, 처분 성장값 보존 조건에 한정했다. 테이블·DB 이름·스키마 버전1·원자성·revision 책임은 바꾸지 않았다. 코드 반영·컴파일과 실제 저장/재실행 검증을 구분한다.
+PR #104 당시 SQLite 변경은 새 필드를 손실시키지 않는 `LedgerJson.vehicle` 양방향, Update 명령 JSON·copy, 처분 성장값 보존 조건에 한정했고 테이블·DB 이름·스키마 버전1·원자성·revision 책임을 유지했다. 현재 `LedgerJson`도 별도 파일이 아니라 `app/src/main/java/io/drivegrowth/app/data/SqliteGameChangeStore.kt` 안에 있다. 이 문서 확인은 SQLite 구현 변경이나 새 장치 시험이 아니다. 과거 실제 SQLite 검증은 [PR #104 검증 기록](06_VERIFICATION.md#pr-104-차량-숫자-decoder-수정--2026-11-07), 이번 최신 조합의 자동 검사는 [최신 재확인](06_VERIFICATION.md#46-공통-차량-계약의-최신-main-재확인--2026-11-11)을 따른다.
 
-| 기존 코드 위치 | 필요한 입력·출력과 후속 검증 |
+| 코드 위치·공급 | 입력·출력과 검증 조건 |
 |---|---|
 | `LedgerJson.vehicle` / `vehicles.payload` | rarity, levelProgressPercent, acquisitionCost, acquisitionSource 필수. 비기본 값 Add→재개방→보유 조회가 같아야 함 |
 | `LedgerJson.command` / `settlements.command` | Add의 전체 개체·Update 진행량 포함. 각 필드 하나만 다른 같은 requestId는 STATE_CONFLICT, 원장 추가 변경 없음 |
 | `LedgerJson.settlement` / `settlements.result` | 당시 차량 snapshot 보존. 성장·처분 후 DB 재개방 및 과거 Add/Update 재시도도 당시 snapshot과 정산ID·잔액 반환 |
-| `listOwnedVehicles` / `findVehicle` | 현재 보유와 처분 포함 이력은 다른 조회. #34는 모든 lifecycle의 개체 또는 영구 `(vehicleId, rarity)` 획득 키를 반환하는 조회를 연결해야 함. 처분 후에도 도감의 과거 보유 칸 유지 검증 |
-| 발견 기록: main 미제공, PR #116 작성·수정 대기 | 입력 `(vehicleId, rarity)`를 중복 없이 저장하고 재개방 뒤 같은 발견 키 집합 반환. 콘텐츠 참조 검증·출처별 원장 경계와 실패를 보존하며 `Garage.collection`의 discovered로 공급. 새 테이블/서명은 저장 담당과 후속 확정 |
+| `SqliteGameChangeStore.listOwnedVehicles` / `listVehicleHistory` → `Garage.collection(history)` | 현재 보유는 OWNED만, 이력은 SOLD·SCRAPPED·CONSUMED까지 마지막 개체 상태·취득 정보를 반환. `VehicleHistoryStore`를 통해 이력의 `(vehicleId, rarity)`와 발견 키를 소비한다. 현재 목록으로 과거 보유를 역산하지 않는다. PR #116/#140/#149의 공급·시험과 실제 제품 재실행 검증을 구분 |
+| `VehicleHistoryStore.recordDiscoveries(catalog, keys)` / `discoveredVehicles()` → SQLite `discoveries` | 명시 카탈로그의 `(vehicleId, rarity)` 집합을 검증·중복 없이 저장하고 같은 출처 DB에서 집합으로 조회. 실제 표시 이벤트의 키·목록/콘텐츠·규칙 버전·출처 확인은 호출 측 연결 조건이며, 이 API가 그 표시 근거를 저장하거나 목록 생성만으로 자동 발견 처리하는 것은 아님. 실제 표시 쓰기·실패/재시도·제품 재실행은 #46/#53/#28의 남은 범위 |
 | 기존 schema1 JSON | 새 필드 누락 시 기본값/자동 삭제 없이 실패. 처분 개체 한 건의 누락도 현재 조회가 모든 payload를 먼저 읽으므로 전체 보유 조회를 실패시킬 수 있음. 미확인 정산의 차량 snapshot 누락도 전체 정산 조회 실패 |
-| 과거 명령 재시도 | 옛 차량 Add/Update 명령은 새 명령과 JSON이 달라 result 읽기 전 STATE_CONFLICT. 차량 없는 과거 금액 명령은 동일 표현의 재생 경로 유지. 이 차이를 기기에서 검증해야 함 |
+| 과거 명령 재시도 | 새 필드 없는 옛 Add/Update 명령과 새 명령의 JSON은 달라 result 읽기 전 STATE_CONFLICT일 수 있음. 차량 없는 과거 금액 명령은 동일 표현·원래 정산 연결을 검증해 재생. PR #104의 격리 DB 검증은 기존 근거이며 이번에는 장치에서 재실행하지 않음 |
 
 이미 운영한 schema1 데이터가 새 필드를 가진 것으로 간주하지 않는다. 같은 DB 버전 안에서 payload 의미가 확장되므로 저장 담당이 실제 구버전 자료와 호환 전략을 검증해야 한다. 근거 있는 취득 기록 없이 COMMON·0·현재 차종가로 복구하거나, 새 DB/기존 데이터 삭제로 통과시키지 않는다. 확정 결과의 과거 값도 현재 개체로 재구성하지 않는다. 자동 이전은 이번에 제공하지 않는다.
 
-#48 후속 거래는 대상ID/revision·재료ID/revision·활동·차종/희귀도·규칙 버전에서 계산한 새 레벨/진행량과 필요한 재화 변경을 입력으로 받아야 한다. 한 정산에서 대상 성장 snapshot과 재료 CONSUMED snapshot을 함께 확정하고 취득 정보는 각각 보존해야 한다. 같은 개체 중복·활동 제한·revision 충돌·금액 부족이면 전부 미반영이어야 한다. 현재 단일 `GameChange` 두 번 호출로 이를 흉내 내지 않는다. 다중 개체 명령·결과 구조 자체는 #48·#34의 후속 연결이며 이번에는 구현하지 않는다. 가챠 티켓/보장 이력·초기 지급 이력·사고/활동·도감 영속 입력도 각 기존 담당의 범위다. 기존 `VehicleCare.levelAfterMaterial`의 +3레벨 시험 로직은 아래 #48 절에서 희귀도별 진행량 계산으로 교체했다.
+#48의 추가 거래는 아래 `MaterialChangeStore`·재료 강화 SQLite 절의 기존 공급을 소비한다. 대상ID/revision·재료ID/revision·활동·버전에서 계산한 새 레벨/진행량을 한 정산의 대상 성장 snapshot과 재료 CONSUMED snapshot에 연결하고 각각의 취득 정보를 보존한다. 같은 개체 중복·활동 제한·revision 충돌·금액 부족이면 전부 미반영이어야 하며, 단일 `GameChange` 두 번으로 나누지 않는다. PR #104 당시 후속이었던 다중 개체 거래를 다시 설계하지 않고 기존 명령·결과·저장·fixture를 재사용한다. 가챠·초기 지급·사고/활동·도감의 현재 공급과 남은 제품 연결은 각 기능 절과 #46/#122/#28을 따른다.
 
 #### #48 레벨업과 재료 강화
 
@@ -497,7 +497,7 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 | #39 도착·정산·임시 보관 | 활성 의뢰/revision·현재 경로와 연결 가능한 도착 증거·출처/시각·확인된 주행 구간·기한·보관 상태 → 수익/차량 지급 또는 확인 대기. 완료 슬롯 교체도 같은 거래 | 증거 부족은 대기·미지급. P·거리0·앱 보관 routeId만으로 도착 추정 금지(#80). 구매 만차의 24시간 보관/수령과 기한 뒤5% 공제, 미도착24시간 전액 환급은 서로 다른 상태·중복 방지 필요 |
 | #41~#44 영업·시설 | 방문/대여 ID·개체/revision·유형/요금·고객/사고 고정값·검증 구간/원래 주차시각·시설/확장 규칙 → 배정·정산·반납·영업 쉬기·가게/공간 snapshot | RentalLedger의 assign/account/pending/settle/finishReturn/activity/setResting/shop/buy/expand 유지. 신규 원장 대신 콘텐츠/차량 입력 어댑터 보완. 방문 건수와 완료 고객 기준을 동일시하지 않음. pending은 #167에서 원래 parkedSince의 엄격 조회를 공급하며 실제 검증clock/coverage 복원 입력은 연결부에서 보완. setResting은 현재 ID/불리언만 받으므로 UI 요청 동일성/최신 상태 대조를 연결부에서 구체화. [기존 동의된 시험값](01_PRD.md#기존-동의된-대여확장-시험값)은 버전 있는 정의로 공급한다. 일반Lv1 대여 기준을 모든 차종 요금으로 채우지 않고 확장은 확정 완료 고객 근거를 조회한다. 20종별 시간당료·고객 분포·미제공 시설 비용/효과·단골은 별도 정의/공급 대기 |
 | #49 수리·처분 | 개체/revision·확정 사고 누계/활동·차종가/취득액·최신 규칙 → 수리비/회복 또는 판매/폐차금·lifecycle·당시 정산. 사고 이력 보존·영업 점유와 같은 DB에서 검사 | 기존 단일 Update를 재사용. salePrice의 레벨 가산·실제 취득액 기준과 repairCost의 희귀도 비용 배율은 위 「#49 수리·판매·폐차 금액 계산」에 반영. 수리비 차감+NEEDS_REPAIR 종료는 원자 명령 확장. #116 반영된 사고 조회를 소비하며 처분 계획과 실제 저장/수리 연결을 구분 |
-| #46 도감·활동 | 처분 포함 획득/검증된 발견 키·출처/버전·활동/영업 쉬기 → Garage.collection/availableForRental의 입력 | Garage·현재 보유 조회·RentalLedger 활동은 유지. #116 API는 main 제공이며 #140의 core 소비는 snapshot 수정·재검토 후 main 공급. 제품 mapper의 DATA_UNAVAILABLE 경계는 후속 연결. 획득은 실제 지급에, 발견은 실제 표시한 탁송 후보/가챠 결과에 연결. 미선택 구매 후보도 발견으로 보존하며 발견 저장 실패를 기록 성공으로 표시하지 않음 |
+| #46 도감·활동 | 처분 포함 획득/검증된 발견 키·출처/버전·활동/영업 쉬기 → Garage.collection/availableForRental의 입력 | Garage·현재 보유 조회·RentalLedger 활동은 유지. #116 API·#140의 snapshot 수정된 core 소비·#149의 저장 조회→mapper는 main 제공. 실제 표시 이벤트 쓰기·제품 재실행과 활동/명령 연결의 남은 조건은 #46/#28에서 확인. 획득은 실제 지급에, 발견은 실제 표시한 탁송 후보/가챠 결과에 연결. 미선택 구매 후보도 발견으로 보존하며 발견 저장 실패를 기록 성공으로 표시하지 않음 |
 | #45 퀘스트·업적·채택 이벤트 | 버전 있는 정의(ID·기간/시간대·목표·보상·조건) + 중복 제거 가능한 원인 이벤트 ID/출처/확정 ID → 진행/완료/수령/만료 snapshot. 보상·수령 마커를 한 거래로 확정 | 기본 주행/탁송/영업/강화/수집 이벤트를 재생해도 진행/지급 한 번. 정의는 #24·#35, 계산은 경민, 공통 수령 저장은 후속. 제외된 거리 목표·주말/시즌을 생성하지 않음 |
 | #36·#39·#40 주행·휴식 | 같은 부팅의 관측 순서/단조 시각·UTC·출처·누락·확인된 구간/일자 + 휴식 장소/출발 증거 → 원인 구간·보상 반영 거리/상한·버프 상태/시작 이벤트/소모 커서 | 기존 차량 gate/DriveEngine 기록과 RestBonus 계산 유지. 경험치 SnapshotStore를 게임머니 원장으로 간주하지 않음. 구간 중복 제거·주행 수익/하루500km·버프 소모를 원자 저장·복원. 주행 서비스·음성 활성화는 #81 조건 충족 후 |
 | #55 꾸미기 | 채택 아이템/해금/가격/배치 영역·현재 배치 revision·선택/미리보기 → 확정 배치/구매 결과 | 미리보기는 무저장, 확정 시 소유/해금·가격·배치를 공통 거래로 검사. 아이템 정의/비용/배치 규칙은 #24 결정 대기. 시설 buy를 꾸미기 지급으로 임의 대체하지 않음 |
