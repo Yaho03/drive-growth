@@ -94,4 +94,29 @@ class InitializationWriteBoundaryTest : InstrumentationTestCase() {
             command.grant.source, command.grant.ruleVersion, vehicle = VehicleWrite.Add(car))))
         assertEquals(car, ok(store.listOwnedVehicles()).single())
     }
+    fun testWhitespaceInitializationOrphanFailsAndPreservesWholeFile() {
+        val car = ok(ledger.commitInitialization(command)).grant.changedVehicle!!
+        fun add(id: String) = GameChange(RequestId(id), TransactionKind.GARAGE, command.grant.source,
+            command.grant.ruleVersion, vehicle = VehicleWrite.Add(car.copy(ownedVehicleId = OwnedVehicleId(id))))
+        ok(store.commitGameChange(add("fill-one"))); ok(store.commitGameChange(add("fill-two")))
+        raw { db ->
+            db.execSQL("UPDATE initialization_profile SET marker_request=NULL WHERE id=1")
+            db.execSQL("DELETE FROM initialization_requests")
+            db.execSQL("UPDATE settlements SET command=? || command WHERE request_id=?",
+                arrayOf(" \n\t", command.grant.requestId.value))
+        }
+        store.close()
+        val file = context.getDatabasePath(name); val before = file.readBytes()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), ledger.readInitialization(command.profileId))
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.commitGameChange(add("fourth-car")))
+        store.close(); assertTrue(before.contentEquals(file.readBytes()))
+    }
+    fun testWhitespaceLegacyArrayIsNotAnInitializationOrphan() {
+        raw { db -> db.execSQL("INSERT INTO settlements(request_id,settlement_id,command,result,viewed) VALUES(?,?,?,?,?)",
+            arrayOf(FirstGrant.REQUEST_ID.value, "legacy-array-with-space", " \n[]", "{}", 1)) }
+        val car = (command.grant.vehicle as VehicleWrite.Add).vehicle.copy(ownedVehicleId = OwnedVehicleId("legacy-array-car"))
+        ok(store.commitGameChange(GameChange(RequestId("legacy-array-add"), TransactionKind.GARAGE,
+            command.grant.source, command.grant.ruleVersion, vehicle = VehicleWrite.Add(car))))
+        assertEquals(car, ok(store.listOwnedVehicles()).single())
+    }
 }
