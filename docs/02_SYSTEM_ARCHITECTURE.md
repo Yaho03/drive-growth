@@ -649,7 +649,7 @@ RentalRuntime는 UI 진입과 worker 저장 실행을 분리하고 한 작업만
 
 2026-11-10 호스트 연결: `MainActivity`의 HOME은 `ShopView`이며 `ShopHostMapper`가 기존 `StoredHostSource`의 순차 `HostSnapshot`을 표시한다. 잔액/개체 ID/이름·활동·양수 capacity는 실제 공급 결과만 쓰며 누락 활동은 미확인, 가게 레벨·시설·확장/꾸미기 명령은 공급 전까지 미지원이다. appearance의 간판·색은 고정 표시 스타일이며 저장 꾸미기 상태가 아니다. Shop revision은 표시 세대이고 DB/거래 revision이 아니다. 실제 초기화/승인 견적을 대신하지 않는다.
 
-HostSession의 같은 worker에서 `StoredGachaHostSource`→기존 `GachaStoreHostSource.read`를 연결한다. 현재 권위 부재는 DATA_UNAVAILABLE, 다른 조회 실패는 원래 오류다. 전체 요청/명령의 durable checkpoint/load가 미제공이라 실제 제안이 있어도 UNSUPPORTED로 표시해 Draw를 활성화하지 않는다. 메모리 checkpoint 성공으로 영속 보존을 가장하지 않으며 prepare/commit은 이 조회 호스트가 호출하지 않는다. 초기화도 실제 NEW/SQLite 공급 전에는 기존 Onboarding Unavailable을 유지한다. 필요한 입출력은 기존 #121/#122의 저장 연결 범위다.
+HostSession의 같은 worker에서 `StoredGachaHostSource`→기존 `GachaStoreHostSource.read`를 연결한다. 현재 권위 부재는 DATA_UNAVAILABLE, 다른 조회 실패는 원래 오류다. 전체 요청/명령의 durable checkpoint/load가 미제공이라 실제 제안이 있어도 UNSUPPORTED로 표시해 Draw를 활성화하지 않는다. 메모리 checkpoint 성공으로 영속 보존을 가장하지 않으며 prepare/commit은 이 조회 호스트가 호출하지 않는다. 아래 제품 세션 연결은 실제 NEW/SQLite 공급을 소비하며 legacy/불명은 Onboarding Unavailable을 유지한다. 필요한 입출력은 기존 #121/#122의 저장 연결 범위다.
 
 가챠 조회 호스트는 workGeneration(비동기 작업 무효화)과 frameGeneration(표시 세대)을 분리한다. Loading과 terminal Missing/Failure/Offers마다 표시 세대를 전진시켜 UI의 같은 세대 다른 내용 거절 규칙을 유지한다. 예전649의 Loading 잔류는 수정360에서 같은 고정 회귀와 실제 native terminal로 해결했으며 오래된 작업/gate 거절을 완화하지 않았다.
 
@@ -663,6 +663,15 @@ HostSession의 같은 worker에서 `StoredGachaHostSource`→기존 `GachaStoreH
 worker 전용 `hostCommands`는 Gacha/단일 Garage GameChange/Material/Repair 네 core 명령의 원래 typed 내용과 프로필·출처를 저장한다. save→execute→finish, 시작 load·원래 STARTED 복구, 명시 cancelUnstarted(SAVED)를 구분한다. checkpoint 자체는 완료 거래의 requestId 점유 목록에 넣지 않아 자기 실행을 막지 않으며 기존 완료 이력 namespace는 유지한다. 기존 decoder·원자 거래와 엄격 숫자 검증을 재사용한다.
 
 이는 전체 GachaRequest/UI/attemptId/Bundle의 영속 codec이나 제품 프로세스 복원 구현이 아니다. 실제 동일profile/source factory·비동기 호스트 소비·첫 선물 runtime·NPC/clock/coverage·제품 Activity/프로세스·전원/실차는 후속이다. #44의 신규 Expand 후보는 이 네 명령 공급에 포함하지 않는다. 정확 게시 head/CI는 연결 PR, 실제69 메서드실행과 checkpoint23 재사용 범위는 [검증 문서](06_VERIFICATION.md#초기화첫-선물checkpoint-sqlite-통합81-독립-검증--2026-11-10)를 따른다.
+
+
+### 제품 세션·첫 실행·가챠·차량 관리의 공통 저장 소비 — 2026-11-10
+
+원cab567은 C274의 GameSessionFactory/온보딩7파일과 Garage 공급을 포함한다. MainActivity/HostSession/StoredHostSource·가챠·차량 관리가 동일 factory/profile/source/store를 소비한다. 기존 DB 모드를 보존하고 두 모드 파일 공존/잘못된 source·손상·사라진 기존 DB를 새 프로필로 바꾸지 않는다. NEW는 실제 helper 근거를 소비하고 초기화/선물 상태를 누락 보정하지 않는다. UI Bundle은 선택/요청 식별만 저장하며 NEW 근거·완료를 만들지 않는다.
+
+GachaLiveHost→CheckpointGachaSource는 기존 GachaPull/공용 hostCommands의 worker save→execute→finish를 사용한다. UI 저널은 메모리 경계이며 durable typed 명령·당시 확정 결과를 복구한다. 결과의 차고 이동/명시 재조회에서 finish하고 SAVED만 명시 취소한다. STARTED/불명·finish 실패·알고 있는 원명령 누락을 정상 새 요청으로 바꾸지 않고 과거 명령을 현재 가격/새 난수로 재prepare하지 않는다. Garage도 같은 factory의 실제 원장을 사용하며 재료/레벨업/수리/판매/폐차 준비와 저장 응답의 비용/개체/잔액을 연결한다. 기존 명령/decoder와 공통 checkpoint를 재사용하고 별도 지갑/DB를 만들지 않는다.
+
+실제 첫 실행→1,000/첫 차→유료500 추첨→차고·확정 뒤 Activity/프로세스 재실행은 격리 패키지와 실제 SDK gate에서 확인했다. 무료권/수리/재료 등의 원장 경계 fixture 시험과 제품 native 실행은 구분한다. 첫 영업 선물 runtime·미완성 Expand/Quest/Delivery·전원/실차·모든 in-flight process 중단 검증은 포함하지 않는다. 세부 근거는 [검증 문서](06_VERIFICATION.md#제품-첫-실행가챠공통-factory-소비-독립-검증--2026-11-10)를 따른다.
 
 
 ### 내 기록·시연 랭킹의 읽기 모듈 — 2026-11-10

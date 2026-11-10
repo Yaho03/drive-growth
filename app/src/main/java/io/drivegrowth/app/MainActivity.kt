@@ -12,6 +12,10 @@ import android.widget.Spinner
 import android.widget.ArrayAdapter
 import android.widget.AdapterView
 import android.widget.LinearLayout
+import io.drivegrowth.app.host.garage.GarageCommandHost
+import io.drivegrowth.app.host.garage.GarageCommandState
+import io.drivegrowth.app.host.garage.GarageCommandView
+import io.drivegrowth.app.host.garage.GarageActionAvailability
 import io.drivegrowth.app.host.shop.ShopHostMapper
 import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.app.ui.shop.ShopEvent
@@ -24,6 +28,7 @@ import io.drivegrowth.app.host.HostNavigation
 import io.drivegrowth.app.host.HostPage
 import io.drivegrowth.app.host.HostQueryController
 import io.drivegrowth.app.host.HostQueryState
+import io.drivegrowth.app.host.onboarding.OnboardingStateBundle
 import io.drivegrowth.app.host.HostSession
 import io.drivegrowth.app.host.ResultsHostMapper
 import io.drivegrowth.app.host.ResultsStateBundle
@@ -55,6 +60,11 @@ class MainActivity : Activity() {
     private var input: VehicleInput? = null
     private var navigation = HostNavigation()
     private var screen: HostQueryState = HostQueryState.Restricted
+    private lateinit var management: GarageCommandHost
+    private lateinit var managementView: GarageCommandView
+    private var managementState: GarageCommandState = GarageCommandState.Idle
+    private var recoveredManagement = false
+    private var managementVisible = false
     private val shopMapper = ShopHostMapper()
     private lateinit var shop: ShopView
     private lateinit var gacha: GachaView
@@ -66,7 +76,8 @@ class MainActivity : Activity() {
     private val resultsMapper = ResultsHostMapper()
     private lateinit var results: ResultsView
     private lateinit var onboarding: OnboardingView
-    private var pendingOnboardingId: VehicleId? = null
+    private var onboardingState: OnboardingScreenState = OnboardingScreenState.Loading
+    private var routedNewProfile: String? = null
     private lateinit var queries: HostQueryController
     private lateinit var session: HostSession
     private lateinit var style: GarageStyle
@@ -95,26 +106,74 @@ class MainActivity : Activity() {
         val shopMode = ShopMode.entries.firstOrNull { it.name == savedInstanceState?.getString("shopMode") } ?: ShopMode.OVERALL
         shop.restoreUiState(ShopUiState(mode = shopMode, sceneScrollY = savedInstanceState?.getInt("shopSceneY", 0) ?: 0,
             controlsScrollY = savedInstanceState?.getInt("shopControlsY", 0) ?: 0))
-        gacha = GachaView(this, ::onGachaEvent)
         onboarding = OnboardingView(this, ::onOnboardingEvent)
-        onboarding.restoreSelection(savedInstanceState?.getString("onboardingSelection")?.let(::VehicleId))
-        pendingOnboardingId = savedInstanceState?.getString("onboardingPending")?.let(::VehicleId)
+        routedNewProfile = savedInstanceState?.getString("onboardingRoutedProfile")
         val deliveryHandler = handler
         session = lastNonConfigurationInstance as? HostSession ?: HostSession(applicationContext, { deliveryHandler.post(it) },
-            ResultsStateBundle.decode(savedInstanceState?.getBundle("results")))
+            ResultsStateBundle.decode(savedInstanceState?.getBundle("results")),
+            OnboardingStateBundle.decode(savedInstanceState?.getBundle("onboardingHost")))
+        gacha = GachaView(this, ::onGachaEvent, session.gacha.uiState)
         results.restoreUiState(session.results.uiState)
         queries = session.queries
+        management = GarageCommandHost(applicationContext, { handler.post(it) }, session.games) { state ->
+            val prior = managementState
+            managementState = state
+            if (state == GarageCommandState.Idle) managementVisible = false
+            if (state is GarageCommandState.Review || state is GarageCommandState.Running || state is GarageCommandState.Confirmed)
+                managementVisible = true
+            if ((state is GarageCommandState.Confirmed || state is GarageCommandState.Rejected) && allowed()) queries.refresh()
+            if (state == GarageCommandState.Idle && prior is GarageCommandState.Confirmed) {
+                navigation.pendingGarageRequest = null
+                managementVisible = false
+                garage.completeRequest()
+            }
+            if (::body.isInitialized) render()
+        }
+        managementView = GarageCommandView(this, { management.controller.confirm() }, ::cancelPreparation,
+            { management.controller.retry() }, { management.controller.cancelPending() }, { management.controller.chooseMaterial(it) }, { management.controller.acknowledge() })
         panel = style.column().apply { setBackgroundColor(style.base) }
         chrome = style.column().apply { setPadding(style.dp(16), 0, style.dp(16), 0) }
         body = FrameLayout(this)
         panel.addView(chrome)
         panel.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(panel)
-        session.gacha.attach { frame, enabled ->
+        session.gacha.attach({ frame, enabled ->
             gacha.render(frame, enabled && allowed())
-            if (frame.screen != io.drivegrowth.app.ui.gacha.GachaScreen.Loading)
-                gacha.uiState.reloadToken?.let(gacha::completeReload)
-        }
+            session.gacha.remember(gacha.uiState)
+            if (::chrome.isInitialized) render()
+        }, { request, result ->
+            gacha.complete(request, result); session.gacha.remember(gacha.uiState)
+        }, { token ->
+            gacha.completeReload(token); session.gacha.remember(gacha.uiState)
+        }, { key ->
+            gacha.resolveFailedRequest(key); session.gacha.remember(gacha.uiState)
+        })
+        session.onboarding.attach({ state, enabled ->
+            onboardingState = state
+            if (!onboarding.render(state, enabled && allowed())) {
+                // 기존 View의 Completed 역행 방지와 새 저장 조회 실패/프로필 세대를 분리한다.
+                onboarding = OnboardingView(this, ::onOnboardingEvent)
+                onboarding.restoreSelection(session.onboarding.uiState.selected)
+                onboarding.render(state, enabled && allowed())
+            }
+            onboarding.restoreSelection(session.onboarding.uiState.selected)
+            val profile = session.onboarding.uiState.identity?.profileId?.value
+            if (state is OnboardingScreenState.Intro && profile != null && routedNewProfile != profile) {
+                routedNewProfile = profile
+                navigation.page = HostPage.ONBOARDING
+            }
+            render()
+        }, {
+            // Completed의 이동 입력 잠금은 새 View에서 초기화하고 저장 결과를 다시 공급한다.
+            onboarding = OnboardingView(this, ::onOnboardingEvent)
+            onboarding.restoreSelection(session.onboarding.uiState.selected)
+            onboarding.render(onboardingState, allowed())
+            select(HostPage.HOME)
+        }, {
+            queries.refresh()
+            session.onboarding.refresh()
+        if (navigation.page == HostPage.GACHA) session.gacha.refresh()
+        })
         queries.attach {
             screen = it
             if (it is HostQueryState.Content) shopRevision = Math.addExact(shopRevision, 1)
@@ -177,8 +236,11 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        management.release()
         queries.detach()
+        session.gacha.remember(gacha.uiState)
         session.gacha.detach()
+        session.onboarding.detach()
         gacha.release()
         session.results.detach()
         if (!isChangingConfigurations) session.release()
@@ -190,8 +252,8 @@ class MainActivity : Activity() {
     override fun onSaveInstanceState(outState: Bundle) {
         session.results.remember(results.uiState)
         outState.putBundle("results", ResultsStateBundle.encode(session.results.uiState))
-        outState.putString("onboardingSelection", onboarding.selectedVehicleId?.value)
-        outState.putString("onboardingPending", (onboarding.pendingVehicleId ?: pendingOnboardingId)?.value)
+        outState.putBundle("onboardingHost", OnboardingStateBundle.encode(session.onboarding.uiState))
+        outState.putString("onboardingRoutedProfile", routedNewProfile)
         outState.putString("shopMode", shop.uiState.mode.name)
         outState.putInt("shopSceneY", shop.uiState.sceneScrollY)
         outState.putInt("shopControlsY", shop.uiState.controlsScrollY)
@@ -213,10 +275,14 @@ class MainActivity : Activity() {
         val enabled = allowed()
         queries.setControlsEnabled(enabled)
         session.gacha.setControlsEnabled(enabled && navigation.page == HostPage.GACHA)
+        session.onboarding.setControlsEnabled(enabled)
+        management.controller.setControlsEnabled(enabled)
+        if (enabled && !recoveredManagement) { recoveredManagement = true; management.controller.recover() }
     }
 
     private fun refresh() {
         if (!allowed()) { updateAccess(); return }
+        session.onboarding.refresh()
         if (navigation.page == HostPage.GACHA) session.gacha.refresh()
         else if (screen != HostQueryState.Loading) queries.refresh()
     }
@@ -224,7 +290,7 @@ class MainActivity : Activity() {
     private fun render() {
         val enabled = allowed()
         val garageState = when (val current = screen) {
-            is HostQueryState.Content -> mapper.garage(current.snapshot)
+            is HostQueryState.Content -> GarageActionAvailability.map(mapper.garage(current.snapshot), current.snapshot)
             is HostQueryState.Failure -> GarageScreenState.Error("조회 실패 (${current.error})")
             else -> GarageScreenState.Loading
         }
@@ -233,11 +299,12 @@ class MainActivity : Activity() {
             is HostQueryState.Failure -> CollectionScreenState.Error("조회 실패 (${current.error})")
             else -> CollectionScreenState.Loading
         }
+        managementView.render(managementState, enabled)
         shop.render(shopMapper.map(screen, Revision(shopRevision)), enabled)
         garage.render(garageState, enabled)
         collection.render(collectionState, enabled)
         results.render(resultsMapper.map(screen), enabled)
-        onboarding.render(unavailableOnboarding(), enabled)
+        onboarding.render(onboardingState, enabled)
         chrome.removeAllViews()
         if (!enabled) {
             showBody(style.text("주차 후 조작이 허용되면 이용할 수 있습니다."))
@@ -262,12 +329,15 @@ class MainActivity : Activity() {
         links.addView(destination, LinearLayout.LayoutParams(0, style.dp(56), 1f))
         links.addView(style.button("새로고침") { if (token == navigationGeneration) refresh() })
         chrome.addView(links)
-        navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE }?.let {
-            chrome.addView(style.text("관리 명령이 연결되지 않아 실행할 수 없어요. 이 요청은 실행되지 않았어요."))
+        if (navigation.page == HostPage.GACHA && session.gacha.failed)
+            chrome.addView(style.button("보관한 미실행 가챠 요청 취소") { session.gacha.cancelUnstarted() })
+        navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE && !managementVisible }?.let {
+            chrome.addView(style.text("이전 관리 준비 요청입니다. 최신 상태와 비용을 다시 확인해 주세요."))
+            chrome.addView(style.button("관리 조건 다시 조회") { managementVisible = true; management.controller.open(it) })
             chrome.addView(style.button("준비 요청 닫기") { cancelPreparation() })
         }
         when (navigation.page) {
-            HostPage.GARAGE -> showBody(garage)
+            HostPage.GARAGE -> showBody(if (managementVisible) managementView else garage)
             HostPage.COLLECTION -> showBody(collection)
             HostPage.RESULTS -> showBody(results)
             HostPage.ONBOARDING -> showBody(onboarding)
@@ -309,13 +379,23 @@ class MainActivity : Activity() {
             return
         }
         when (event) {
-            is GachaEvent.Reload -> session.gacha.refresh()
-            is GachaEvent.Draw -> gacha.complete(event.request, ContractResult.Failure(ContractError.DATA_UNAVAILABLE))
+            is GachaEvent.Reload -> { session.gacha.remember(gacha.uiState); session.gacha.refresh(event.token) }
+            is GachaEvent.Draw -> { session.gacha.remember(gacha.uiState); session.gacha.draw(event.request) }
             is GachaEvent.OpenGarage -> {
-                navigation.openAward(event.request.ownedVehicleId)
-                garage.restoreSelection(navigation.selectedVehicleId)
-                gacha.completeGarageNavigation(event.request)
-                updateAccess(); render()
+                session.gacha.acknowledge { result ->
+                    if (isDestroyed) return@acknowledge
+                    if (active && navigation.page == HostPage.GACHA && gacha.uiState.garagePending == event.request && allowed() && result is ContractResult.Success) {
+                        navigation.openAward(event.request.ownedVehicleId)
+                        garage.restoreSelection(navigation.selectedVehicleId)
+                        queries.refresh()
+                        gacha.completeGarageNavigation(event.request)
+                        session.gacha.remember(gacha.uiState)
+                        updateAccess(); render()
+                    } else {
+                        gacha.completeGarageNavigation(event.request)
+                        session.gacha.remember(gacha.uiState)
+                    }
+                }
             }
         }
     }
@@ -340,17 +420,9 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun unavailableOnboarding() = OnboardingScreenState.Unavailable(
-        if (pendingOnboardingId != null) "이전 요청의 지급 상태를 확인할 수 없어요. 초기 지급 조회가 아직 연결되지 않았어요."
-        else "초기 지급 이력 조회가 연결되지 않아 신규 프로필 여부를 확인할 수 없어요",
-    )
-
     private fun onOnboardingEvent(event: OnboardingEvent) {
         if (!allowed()) { updateAccess(); return }
-        when (event) {
-            OnboardingEvent.GoToShop, OnboardingEvent.Previous -> select(HostPage.HOME)
-            else -> Unit // 초기 지급 계약 미지원에서는 선택·확정·재시도를 실행하지 않는다.
-        }
+        session.onboarding.onEvent(event)
     }
 
     private fun onGarageEvent(event: GarageEvent) {
@@ -367,6 +439,8 @@ class MainActivity : Activity() {
                     return
                 }
                 navigation.pendingGarageRequest = event
+                managementVisible = true
+                management.controller.open(event)
                 render()
             }
         }
@@ -374,7 +448,9 @@ class MainActivity : Activity() {
 
     private fun cancelPreparation() {
         if (!allowed()) { updateAccess(); return }
+        if (managementState != GarageCommandState.Idle && !management.controller.cancel()) return
         navigation.pendingGarageRequest = null
+        managementVisible = false
         garage.completeRequest()
         render()
     }
@@ -395,6 +471,11 @@ class MainActivity : Activity() {
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
         if (allowed()) {
+            if (navigation.page == HostPage.GARAGE && managementVisible && managementState != GarageCommandState.Idle) {
+                if (managementState is GarageCommandState.Confirmed) management.controller.acknowledge()
+                else cancelPreparation()
+                return
+            }
             if (navigation.page == HostPage.HOME && shop.handleBack()) return
             if (navigation.page == HostPage.GACHA && gacha.handleBack()) return
             if (navigation.pendingGarageRequest != null) { cancelPreparation(); return }
