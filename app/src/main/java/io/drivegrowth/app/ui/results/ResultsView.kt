@@ -70,7 +70,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
         }
         addView(text(s(R.string.results_title), 32, bold = true))
         when (val current = interaction.state) {
-            ResultsScreenState.Loading -> addView(scroll(message(s(R.string.results_loading)), 0), LayoutParams(-1, 0, 1f))
+            ResultsScreenState.Loading -> addView(scroll(message(if (uiState.scope == ResultsScope.ALL) "정산 이력을 불러오고 있어요" else s(R.string.results_loading)), 0), LayoutParams(-1, 0, 1f))
             is ResultsScreenState.Error -> addView(scroll(problem(s(R.string.results_error), current.message, true), 0), LayoutParams(-1, 0, 1f))
             is ResultsScreenState.Missing -> addView(scroll(problem(s(R.string.results_missing), current.message, true).apply {
                 addView(text(s(R.string.results_missing_body), color = muted))
@@ -109,10 +109,19 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
             add(this, card().apply {
                 addView(text(context.getString(R.string.results_summary,
                     state.results.count { interaction.readState(it.settlement.settlementId) != ResultsReadState.Done }, state.results.size), 28, bold = true))
-                addView(text(s(R.string.results_history_unsupported), color = muted))
+                addView(text(if (state.historyAvailable) "열람한 정산도 전체 기록에 보관돼요." else s(R.string.results_history_unsupported), color = muted))
+                if (state.historyAvailable) addView(row().apply {
+                    ResultsScope.entries.forEach { scope ->
+                        addView(button(if (scope == ResultsScope.ALL) "전체 기록" else "미확인", primary = uiState.scope == scope) {
+                            interaction.scope(scope); drawScreen()
+                        }.apply { tag = "results:scope:${scope.name}" })
+                    }
+                })
             })
-            if (state.results.isEmpty()) add(this, message(s(R.string.results_empty), s(R.string.results_empty_body)))
-            state.results.forEach { value ->
+            if (interaction.visibleResults.isEmpty()) add(this, message(
+                if (state.historyAvailable && uiState.scope == ResultsScope.ALL) "저장된 정산 기록이 없어요" else s(R.string.results_empty),
+                if (state.historyAvailable) "현재 필터에서 표시할 정산이 없어요." else s(R.string.results_empty_body)))
+            interaction.visibleResults.forEach { value ->
                 val settlement = value.settlement
                 add(this, card().apply {
                     addView(text(kind(settlement.transaction.kind), 24, bold = true))
@@ -160,7 +169,9 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                 addView(text(pair(R.string.results_time, time(settlement)), color = muted))
             })
             add(this, vehicle(value))
-            add(this, text(s(R.string.results_details_unsupported), color = muted))
+            if (value.rental != null) add(this, rentalDetails(value))
+            else add(this, text(if ((interaction.state as? ResultsScreenState.Content)?.historyAvailable == true)
+                "추가 상세 정보는 확인할 수 없어요." else s(R.string.results_details_unsupported), color = muted))
             add(this, text(s(R.string.results_mark_note), color = muted))
             val read = interaction.readState(id)
             when (read) {
@@ -174,6 +185,25 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
             add(this, button(s(R.string.results_mark_viewed), interaction.canMarkViewed(id), primary = true) {
                 interaction.requestMarkViewed(id); drawScreen()
             }.apply { tag = "results:mark:${id.value}" })
+        }
+    }
+
+    private fun rentalDetails(value: ResultPresentation) = with(style) {
+        val rental = requireNotNull(value.rental)
+        val receipt = rental.receipt
+        card().apply {
+            tag = "results:rental-detail"
+            addView(text("가상 고객의 렌터카 영업 결과", 24, bold = true))
+            addView(text("대여 차량: ${value.rentalVehicleName ?: "차종명 확인 불가"}"))
+            addView(text("대여 차량 식별: ${rental.ownedVehicleId.value}", color = muted))
+            val amount = receipt.settlement.transaction.money?.takeIf { it.direction == MoneyDirection.CREDIT }?.amount
+            addView(text("확정 매출: ${amount?.let(::money) ?: "확인 불가"}"))
+            addView(text("매출에 포함된 시설 보너스: ${money(receipt.facilityBonus)}"))
+            addView(text("가상 영업 사고: ${if (receipt.accident) "발생" else "없음"}"))
+            addView(text("차종 궁합 리뷰 상승: ${if (receipt.matchReview) "있음" else "없음"}"))
+            addView(text("세차장 리뷰 상승: ${if (receipt.washReview) "있음" else "없음"}"))
+            addView(text("단골 여부: ${when (receipt.regularCustomer) { true -> "예"; false -> "아니요"; null -> "확인 불가" }}"))
+            addView(text("감액·상한 적용 내역: 확인할 수 없어요.", color = muted))
         }
     }
 

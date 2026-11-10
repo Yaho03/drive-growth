@@ -1665,3 +1665,16 @@ A는 정확 e9007ea의 준비 APK 쌍을 설치해 정식 RankingProvenanceBindi
 A의 전체649소스와 원본 시험3파일·설치 pull SHA가 준비 APK/metadata와 일치했다. API34 ARM64/user10의 단독 구간은20:36:18~20:37:09KST이며19/19 제품·환경 보존, 자기2패키지/프로세스 정리와 슬롯 반환을 확인했다. A의 새 빌드는0이며 C도 A9 원문/footer/XML/해시/DB 보존을 별도로 대조했다. 원문·설치/소스 해시·보존 자료는 /private/tmp/drive-ranking-provenance-hooks-20261110/independent-device-review/ 및 independent-review/에 있다. 이 게시 준비에서 ADB 실행은0이다.
 
 새 schema15 조합에서는 core420·app471 시험이 실패/오류/생략0, 제품/시험 APK·Lint(오류0·경고27)가 성공했다.80 tasks를2분4초에 실행했다. 이 조합의 새 장치 실행은0이며 A의 원schema13 실행을 schema15 전체 기기 회귀로 바꾸지 않는다. 과거 읽기 모듈13+추가2·같은factory binding2·5c cold-wrapper1은 각 원본 범위로 유지한다. 실제 SDK 관측·Native 탐색/Back·프로세스/전원·실차·온라인 순위를 새로 시험한 것이 아니다. PR #183은 root가 main1a919af에 머지했다고 인계했으며 mainCI42809815840은 인계 시 진행 중이다. 최종 정확 head/CI/main 반영·#58 종료는 연결 PR/root가 판단한다. #28·#51의 넓은 미완료 조건은 유지한다. AI 보조 검토를 별도 사람 승인으로 표시하지 않는다.
+
+
+### 전체 정산 이력 모듈 공급 검증 — 2026-11-10
+
+C 원본25c82c2의 전체 이력 reader·Results controller/mapper/Bundle/표시와 수정1ea3e6a를 main183 1a919af 위에 정상 통합했다. 모듈·시험14파일은 정확1ea와 모두 바이트 동일하며 MainActivity/HostSession·공통 factory·helper/schema/writer·E28은 main 그대로다. 옛 activity-hook.patch나 B의 미완료 제품 파일을 복사하지 않았다. README·이슈의 원격 반영은 root 담당이며 이 공급으로 전체 #54/#28을 완료 처리하지 않는다.
+
+원25c+원래2파일hook의 A 실제 정식7은5PASS/2FAIL(1.103초)이고 reader4/View1은 통과, factory2는 초기화 뒤 첫history read의 STORAGE_FAILURE에서 실패해 뒤 열람/재개방/Bundle 단언이 미도달이었다. 이 실패를 보존했다. 수정1ea는 기존 initialization-v1 canonical codec·readInitialization의 Existing.original/marker를 대조하고 표시 Done과 실제 로컬 Pending 응답 해소를 구분한다. F의 같은 반례1RED→동일1GREEN 및 기존29+같은1의JVM30 통과는 코드 검증 근거이며 Android 실행 수와 합산하지 않는다. F 최종 권고는 APPROVE 범위의 두P2 해소·필수수정0이고 전체 기능 승인으로 확대하지 않는다.
+
+A의 정확1ea+원래동일2파일hook 조합은 원7PASS1.728초·추가초기화4PASS1.391초, 실패/오류/생략0이다. 원7 source/기대 무변경·전체620파일·빌드/설치pull APK해시를 대조했고 factory2가 실제 초기조회→열람사건0→1/중복사건1회·재개방 원정산·scope/선택/Bundle·유실Pending 자동쓰기0까지 도달했다. 추가4는 정상 초기화의 전체이력/현재콘텐츠부재/행무변경과 proof/marker/nested grant 소수 손상의 실제mutation·실패/원본보존을 확인했다. 고유SIMULATION SQLite이며 API34 ARM64/user10,20:33:40~20:34:48KST 단독 구간·19/19 제품/환경보존·자기패키지/프로세스/계측정리·반환이다. 원문/설치·소스hash/보존은 /private/tmp/drive-results-history-fix-20261110/independent-device-review/와 independent-review/에 있다. 기존25c 실패를 새1ea 성공으로 소급변경하지 않는다.
+
+새 모듈 조합은 core420·app472 시험이 실패/오류/생략0, 제품/시험APK와 Lint(오류0·경고27)가 성공했다.80tasks/2분28초이며 저장소·링크/diff 검사는 최종 인계/PR에서 확인한다. 이 조합의 새 장치실행과 담당 ADB는0이다. **A11은 head단독이나 최신B Main 연결의 실행이 아니다.** Main/HostSession의 readHistory 실제 주입·최신 gate/Bundle/탐색과 UI·Activity/프로세스·SDK/전원·실차는 B/관련 후속에서 구분 검증한다. 저장된 매출/시설보너스/가상사고/평가·단골 nullable 표시만 공급하며 미제공 감액/상한·시간 provenance는 확인불가로 남긴다. AI 보조 검토이며 별도 사람 승인·정확 원격CI/main 반영을 확보한 것으로 표시하지 않는다.
+
+후속 게시 준비는 PR #184가 main `fa03b9b289eaf101fd8e3a902af4c29df4f12214`에 반영된 뒤 그 main을 정상 부모로 통합했다. 소스 충돌은 없고 문서 끝의 두 추가 절 충돌은 랭킹·Results 기록을 모두 보존했다. Results14·Ranking5·E28과 현재 Main/HostSession/factory가 원본/최신main과 동일하다. 새 조합 앱480개는 실패/오류/생략0이며 이 실행에 포함된 Results30·Ranking23을 별도 실행 수로 합산하지 않는다. 제품/시험 APK·Lint(오류0·경고27)는78tasks/2분9초에 성공했고 저장소 필수21·문서29·링크439와diff검사를 통과했다. core와 공통 Gradle/앱 빌드 입력은 이전0e28 검증본과 동일하므로 core420은 그 이전 실행 근거로 재사용하고 이번 재실행으로 쓰지 않는다. A 원래11·F30 및 이전472/420과 새480을 구분한다. 이 조합의 새 기기/ADB 실행은0, 최신 Main readHistory 소비는 계속 B 별도 범위다. mainCI42811398819는 root 인계 시 진행 중이었으며 여기서 성공으로 변경하지 않는다. #58 종료와 #54/#51/#28 원격 변경 여부는 root 최종 기록을 따른다.

@@ -27,4 +27,22 @@ class ResultsHostMapper {
             }
         }
     }
+    fun history(read: io.drivegrowth.core.contract.ContractResult<io.drivegrowth.app.data.SettlementHistorySnapshot>): ResultsScreenState = when (read) {
+        is io.drivegrowth.core.contract.ContractResult.Failure -> if (read.error == ContractError.DATA_UNAVAILABLE)
+            ResultsScreenState.Missing("정산 이력을 확인할 수 없어요") else ResultsScreenState.Error("정산 이력을 읽지 못했어요 (${read.error})")
+        is io.drivegrowth.core.contract.ContractResult.Success -> {
+            val data = read.value
+            val rows = data.entries
+            if (rows.map { it.settlement.settlementId }.distinct().size != rows.size ||
+                rows.map { it.settlement.transaction.requestId }.distinct().size != rows.size ||
+                rows.any { it.settlement.transaction.source != data.identity.source ||
+                    (it.rental != null && it.rental.receipt.settlement != it.settlement) })
+                ResultsScreenState.Error("정산 이력의 식별·출처·영업 연결을 확인할 수 없어요")
+            else ResultsScreenState.Content(Collections.unmodifiableList(rows.map {
+                ResultPresentation(it.settlement, it.settlement.changedVehicle?.vehicleId?.let(data.vehicleNames::get),
+                    it.viewed, it.rental, it.rentalVehicleId?.let(data.vehicleNames::get))
+            }), ResultsOrigin.STORED, historyAvailable = true)
+        }
+    }
+
 }

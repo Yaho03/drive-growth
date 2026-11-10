@@ -747,3 +747,12 @@ FacilityPurchase와 VehicleResting은 공용typed checkpoint를 쓰며 구매는
 B 정확 e9007ea의 읽기 연결은 StoredHostSource.readRanking에서 같은 GameSessionFactory/store의 localProfileId·QuestLedger.claimedRequestIds·observedDrivingReceipt를 기존 RankingReadSource snapshot 안에서 소비한다. 공개 조회가 실제 profile/source·원명령/원정산·원출발 zone의 무결성을 검증한다. 현재 zone·고정 KST·요청 ID 접두사로 과거 원인을 생성하지 않는다. 원profile 조회 실패는 Failure로 유지하고 미활성 legacy journal·없는 원영수증만 Missing으로 구분한다. 손상·권한 등 typed 오류는 의존 지표의 Failure로 전달하며 누락을 정상0으로 바꾸지 않는다.
 
 기존 집계 API/SQL/JSON·경제 계산과 같은 factory를 유지한다. helper/schema·쓰기 경로·지갑·새 DB는 추가하지 않는다. schema15 PR #183의 정확 후보 e3f3a8a 위에 정상 통합했고 랭킹 소유5파일은 e9007ea와 동일하다. PR #183의 원격 게시와 main 머지는 구분한다. 공개 SIMULATION 저장→조회 검증과 실제 SDK/Native 탐색의 구분은 [06 실행 근거](06_VERIFICATION.md#랭킹-공개-원인-조회-연결-검증--2026-11-10)를 따른다.
+
+
+### 전체 정산 이력·영업 상세의 읽기 모듈 공급 — 2026-11-10
+
+C 정확1ea3e6a의 SettlementHistoryReader는 같은 store의 전체 settlements·실제 viewed와 기존 typed 원명령/원결과를 대조해 읽기 전용 Snapshot을 제공한다. 열람한 정산도 전체 이력에 남으며 미확인/전체 필터와 선택은 ResultsUiState·기존 Bundle 경계에 보존한다. 같은 실제 GameSessionFactory의 작업별 session을 소비하지만 여러 기능 조회 전체를 하나의 원자 snapshot이라고 약속하지 않는다. 현재 콘텐츠 부재는 차량 이름 미제공이고 과거 정산 삭제/정상 빈 목록으로 대체하지 않는다. 초기 지급은 기존 canonical codec·readInitialization의 Existing.original/marker를 검증하고 지급을 재실행하지 않는다.
+
+ResultsHostController의 optional readHistory를 공급하며 미주입 기존 소비 경로는 유지한다. 실제 열람 쓰기는 기존 markViewed만 호출하고 성공 후 이력을 재조회한다. 표시 viewed의 Done과 실제 로컬 Pending 응답 해소는 구분하며 조회/필터/선택/복원이 열람·재화 지급을 자동 실행하지 않는다. 보관된 CompletedRental의 매출/시설 보너스/가상 사고/matchReview/washReview/단골 nullable만 표시한다. 미제공 감액·상한 원인이나 시간 provenance를 현재시각/최종금액에서 역산하지 않는다.
+
+최초 공급 후보는 main183 위 모듈·시험14파일만 정상 통합했고, 후속 후보는 PR #184가 반영된 main fa03b9b를 정상 부모로 포함한다. C1ea 모듈14·랭킹5·E 저장28파일과 현재 Main/HostSession/factory를 그대로 보존했다. MainActivity/HostSession의 최신 실제 readHistory 주입·gate/수동 재조회/historyState/Bundle·탐색 연결은 B의 별도 제품 작업이다. 옛 activity-hook.patch를 최신 Main에 덮지 않는다. 원래 A 검증은1ea+같은 원본2파일hook 조합이며 이 후보 또는 최신 B 제품 Main의 장치 실행으로 표시하지 않는다. 원래 실패·수정/실행과 새 로컬 조합의 범위는 [06](06_VERIFICATION.md#전체-정산-이력-모듈-공급-검증--2026-11-10)을 따른다. #54/#28 전체 완료는 아니다.
