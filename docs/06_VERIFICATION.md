@@ -1750,7 +1750,7 @@ HOME은 기본DB 없는 자기 새 패키지에서 실제 SDK P gate를 거쳐 U
 
 A source manifest690 항목은 모두 일치했으나 실제 Git 추적 파일691 중 공식 접수양식 DOCX1개가 빠져 있었다. 이를 전체 추적파일 완전 manifest로 표현하지 않으며 A의 전체 SHA에는 포함했다. 앱 SHA81bbefb1ebf7a61b95c2f7803d23130d26b456aa3ca4a108169e82200468ed14와 시험SHA bf94d969f3bae036aacfd76385dc2b3ea839c8bc14cf34109d80bed294fd2686는 설치 후 pull과 같았다. 22:28:51~22:31:33 KST 단독 사용 후 제품/환경19항목 보존, boot24·자기 권한 원복·패키지/계측/forward 정리와 반환을 확인했다. 원문은 /private/tmp/drive-product-main-followup-20261110/independent-device-review/에 보존했다.
 
-HOME 로그의 driver_deferred=DATA_UNAVAILABLE 두 건은 남아 있으며 이번 배정에서 실제 D를 입력/수신하지 않았다. 실제 SDK D→이탈→재접속 영업, 물리 주행 종료·프로세스/전원·실차는 별도 미검증이다. 최신 Main Results의 P 상태 UI 흐름은 아래 추가1에서 확인했다. 초기 P에서 과거 영업을 만들지 않는 상태와 실제 SDK 영업 성공을 구분한다. Rest·실제 위치/영역 등록·최종 디자인도 포함하지 않는다. 원65를 main188과 합친 새 APK의 장치 성공으로 확대하지 않으며 전체 #41~#44/#43/#51/#28 종료 근거로 사용하지 않는다.
+원65의 HOME 로그 driver_deferred=DATA_UNAVAILABLE 두 건과 당시 실제 D 미입력/미수신 기록은 보존한다. 후속 B0dd 수동 관측에서는 실제 SDK D→짧은 명시 Back 이탈→같은 Activity 복귀·P 복귀와 원marker 소비를 확인했다(아래 별도 절). 완료 대여/첫 선물·장시간 종료 수익·프로세스/전원·실차 검증은 남는다. 최신 Main Results의 P 상태 UI 흐름은 아래 추가1에서 확인했다. 초기 P에서 과거 영업을 만들지 않는 상태와 실제 SDK 영업 성공을 구분한다. Rest·실제 위치/영역 등록·최종 디자인도 포함하지 않는다. 원65를 main188과 합친 새 APK의 장치 성공으로 확대하지 않으며 전체 #41~#44/#43/#51/#28 종료 근거로 사용하지 않는다.
 
 새 main188 조합은 B18파일과 기존 Location6·data/core/Gradle/Manifest를 직접 대조하고 앱543개를 실패·오류·생략0으로 실행했다. 제품/시험APK·Lint 오류0/경고27도 성공했다. 원본 B의 core420은 동일 입력의 실행 근거로 재사용하며 새 core 실행으로 합산하지 않는다. 문서 후속만 추가한 뒤 저장소/링크·diff를 재확인한다. 이 조합의 새 장치 실행은0이며 원본 A65와 구분한다.
 
@@ -1764,7 +1764,7 @@ HOME 로그의 driver_deferred=DATA_UNAVAILABLE 두 건은 남아 있으며 이�
 
 원본 B0dd에 독립 Native 시험1만 추가한 별도 조합도 실제 실행했다. ActualMainResultsHistoryIndependentTest는 실제 UI 첫 지급→HOME→Results 미확인/전체 필터·원 정산 선택·열람 전후 두 번의 Activity 재생성·Back/재진입을24.856초에 통과했다. 정상 OK(1 test)·여섯 stage·원 금융 행 불변과 RESULT_VIEWED 정확1의 마지막 단언까지 확인했다. 원690 항목에 공식 양식DOCX1과 새 시험1을 포함한 전체692파일, 설치 앱SHA83fb1c92ad321e69bff43c4b1b50e1cca291f433e8972ea34d041117bd366449·시험SHA d11a3b1ad043909c31e15321f19b0d77623af57f3db5038a20044dc03730ff4d를 대조했다. 원65/Results11과 다른 시험 조합이며 합쳐 하나의 실행으로 표시하지 않는다.
 
-22:55:47~23:01:20 KST 단독 슬롯·제품/환경19항목 보존과 자기 권한 원복/패키지 정리를 확인했다. 추가1 원문은 제품 source/기대값 변경 없이 저장소의 정식 Android 시험으로 보존하고 새 main188 조합에서 시험 APK 컴파일을15초에 확인했다. 제품/단위 입력은 기존543 검증본과 동일해 중복 실행으로 세지 않는다. 자체 로그의 driver_deferred=DATA_UNAVAILABLE3건과 실제SDK D 이탈·CCP/런처/프로세스/전원 미검증은 유지한다.
+22:55:47~23:01:20 KST 단독 슬롯·제품/환경19항목 보존과 자기 권한 원복/패키지 정리를 확인했다. 추가1 원문은 제품 source/기대값 변경 없이 저장소의 정식 Android 시험으로 보존하고 새 main188 조합에서 시험 APK 컴파일을15초에 확인했다. 제품/단위 입력은 기존543 검증본과 동일해 중복 실행으로 세지 않는다. 추가Results1 자체 로그의 driver_deferred=DATA_UNAVAILABLE3건은 당시 기록으로 보존한다. 실제 SDK 짧은 이탈/복귀는 후속 B0dd 별도 수동 관측에서 확인했으며, 이 시험의 새 실행이나 CCP/실제 런처·프로세스/전원 검증으로 합산하지 않는다.
 
 [실제 HOME 화면](evidence/product-host-20261110/actual-home.png)과 [실제 전체 Results 화면](evidence/product-host-20261110/actual-results.png)은 같은 격리 앱/원 지급·열람 DB의 원본 ADB PNG다. 정식 시험 후 화면 선택/필터만3회 탭했고 금융·열람 요청 추가 없이 전후 원행과 RESULT_VIEWED1을 보존했다. HTML/목업/편집 이미지가 아니며 #189 디자인도 적용하지 않았다. 현재 임시 Views와 원B0dd 제품의 실행 증거이고 최신 결합본의 장치 실행으로 확대하지 않는다.
 
@@ -1813,4 +1813,21 @@ A단독슬롯은API34ARM64/user10에서22:38:37~22:40:00KST였다.19/19제품/�
 
 C최종판정은 ACCEPT_SCOPED_METADATA_PUBLIC_READ_CODE_JVM8_AND_A_C28_C1_GREEN, D는 APPROVE_SCOPED_SQL_DAY_FIX_WITH_A_SQL4_GREEN이다. C/D는원A47의제품698동일·시험원문·설치hash/footer와각C1/D4후행12표단언GREEN을회수했다. D UTC16은기존정확source근거재사용이며새SQL47에합산하지않는다. 원9db실패와미도달·F명시축소SIMULATION·원E46쌍보존은앞절대로유지한다.
 
-새결합본의장치/ADB실행은0이다. A의c28 SQLite47과B0dd Native65·별도ActualMainResults1은각원본/조합근거이며새main190+Rest제품APK의장치성공으로쓰지않는다. 실제SDK D→이탈→재접속·Rest장소/boot/domain/권위·프로세스/전원·실차·최종UI/디자인과전체이슈완료는별도다. mainCI42833687083은메인인계당시진행중인값으로만기록한다. 원격쓰기/canonical변경0이며정확게시head·PR CI/사람리뷰예외·main반영및이슈부분동기화는게시담당이확인한다.
+새결합본의장치/ADB실행은0이다. A의c28 SQLite47과B0dd Native65·별도ActualMainResults1은각원본/조합근거이며새main190+Rest제품APK의장치성공으로쓰지않는다. 원B0dd의실제SDK D→짧은이탈/복귀·P복귀와원marker소비는후속별도수동관측으로확인했다. 완료대여/첫선물·장시간종료수익·새Rest결합본장치검증, Rest장소/boot/domain/권위·프로세스/전원·실차·최종UI/디자인과전체이슈완료는별도다. mainCI42833687083은메인인계당시진행중인값으로만기록한다. 원격쓰기/canonical변경0이며정확게시head·PR CI/사람리뷰예외·main반영및이슈부분동기화는게시담당이확인한다.
+
+
+### B0dd 원본의 실제 SDK 짧은 이탈·복귀 경계 회수 — 2026-11-10
+
+정확 제품 `0dd969f37fd588a7cea60be2694b812de1ad099e`의 기존 격리쌍 `io.drivegrowth.verify.rentalproductb/.test`에서 A가 별도 수동 SDK 경계를 관측했다. 원691소스/제품·시험·fixture·기대값·Gradle/Manifest·가격/임계값 변경0, A새빌드0·JUnit0이다. 기존Native65/Results추가1/Rest47 및 새Rest/main190 앱612와 합산하지 않는다. **새Rest 결합APK의 장치 실행 결과가 아니다.**
+
+공식 Virtual Console browser/session heartbeat를 연결해 bridge/emulator/DDS ready를 확인한 뒤 공식 gear/controls 요청과 실제 SDK 수신·원관측 DB·UI를 각각 대조했다. D정차는 실제0m/s·DRIVE·UX제한, 콘솔20km/h 요청 뒤 D이동은 실제 저장5.555555820465088m/s·열린원trip/영업marker 활성화를 확인했다. 실제포커스를입증한뒤 Back으로 자체UI가숨겨졌고 같은Activity/PID의D복귀에서도제한을유지했다. 이후 SDK PARK/0/UXfalse·원trip종료·HOME/시설복귀를확인했다. callback/mockclock·gate/UXoverride·VHAL주입·시스템서비스패치/재시작·재부팅/AVD초기화는하지않았다.
+
+첫 시도는 windows dump의 포커스필드 부재로 Back 전에 안전중단하고 Park/controls0으로 원복했다. 두 번째는 displays dump의 실제 포커스를 확인해 목표 경계를 완료했다. 초기 UI 준비의 스크롤 중단과 같은 공개흐름 재개도 원보고에 남겼다. 이들을 제품 결함·정식JUnit 실패나 두 번의 성공으로 바꾸지 않는다.
+
+원 `APPLICATION_EXIT_DRIVING` marker의 since/origin을복귀뒤유지했고, 숨김뒤command=null/done=false에서 같은원점from과최초수락SDK anchor의UTC/elapsed에정확히일치하는to를한번준비해done=true로소비했다. 원점→최초수신은양시계모두 **3,760ms**였고 P복귀뒤에도같은완료marker/명령이었다. observation_gap APP_HIDDEN2755ms는관측재시작기준이어서경제window3760ms와구분한다. 완료marker를금융성공으로표시하지않는다. 최종잔액1000·금융정산1(초기지급)·방문1·대여0·원관측주행영수증2이며완료대여/첫영업선물·장시간30분/8시간수익은미검증이다.
+
+이번PID의driver_deferred=DATA_UNAVAILABLE2건은초기/복귀NO_DATA frame과대응했고후속실제D frame과같은marker완료를확인했다. 지속DDS불통/영구driver실패라고판정하지않는다. 다만같은error코드로identity미준비·미활성P/currentInactive·관측실패의정확callsite를모두구분한것은아니며새추적hook도넣지않았다. 원65의경고2/추가Results1의경고3과이번PID의경고2를같은로그로합치거나새금융성공을추정하지않는다.
+
+준비/설치pull앱81bbefb1ebf7a61b95c2f7803d23130d26b456aa3ca4a108169e82200468ed14·시험bf94d969f3bae036aacfd76385dc2b3ea839c8bc14cf34109d80bed294fd2686는같았다. A 단독구간23:14:05~23:27:05KST/API34ARM64/user10·제품/환경19/19보존·자기권한/forward/heartbeat·공식Park/controls0/bridge비활성상태복원·자기2패키지정리·released/noFurtherAdb를회수했다. 신호요청전보호제품PID/서비스부재와매요청전6파일동일guard를확인했고제품데이터삭제/권한변경0이다. 실제원본 SDK의짧은이탈/복귀만확보했으며Activity재생성·프로세스kill·전원·장시간영업·실차/전체#51/#28완료로확대하지않는다.
+
+원문은 /private/tmp/drive-product-sdk-inactive-boundary-a-20261110/REPORT.md·summary.json 및 device/actual-sdk-boundary-proof.json·test-results.json·preservation.json/phase DB·SDK로그에보존한다. 이문서담당은위근거를직접대조하고3760ms·같은origin/최초anchor일치·설치pullhash·19보존/반환을확인했으며새ADB/장치/JUnit/Gradle실행0·source42변경0이다. 기존새조합612/제품·시험APK/Lint0/27은제품/시험/빌드입력불변의실제선행실행근거로유지한다.
