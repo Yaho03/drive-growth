@@ -76,16 +76,16 @@
 |---|---|---|---|
 | 탁송 선택·진행·변경·취소 | [확인](design-assets/ui-v3/4w-landscape-delivery-confirm.png)·[진행](design-assets/ui-v3/4x-landscape-delivery-in-progress.png) 및 변경·만료 시안. `DeliveryView`의 독립 표시·선택·확인 UI 있음 | 수익/구매 후보 카드, 선택 전후 비교, 변경 기회·처리 중·실패의 정보 위계를 최종 스타일로 맞춘다. 긴 목적지·좁은 창에서도 비용과 확정 버튼을 읽을 수 있게 한다. | 제품 탐색, 목적지 입력, 실제 후보·활성 의뢰·도착/정산 결과와 연결 |
 | 정산·영업 결과 | [정산](design-assets/ui-v3/4y-landscape-settlement.png)·[상세](design-assets/ui-v3/4n-settlement-detail.png) 시안. `ResultsView`와 공통 탐색 연결 있음 | 수익 출처·획득 차량·영업 결과를 구분하고 짧은 결과 연출과 요약을 적용한다. 미확인/열람 완료·빈 결과·재조회 실패 표현을 통일한다. | 실제 각 기능의 확정 결과·저장·과거 기록 공급과 제출 흐름 검증 |
-| 첫 실행·첫 차량 | [첫 실행](design-assets/ui-v3/5b-landscape-first-run.png) 시안. `OnboardingView`와 탐색 진입점 있음 | 선택 차량 비교 카드, 선택·확정·지급 결과, 첫 가게로 이어지는 짧은 안내를 같은 스타일로 완성한다. | 현재 호스트는 미지원 상태를 공급한다. 실제 최초 지급·프로필 초기화·복원 연결 필요 |
+| 첫 실행·첫 차량 | [첫 실행](design-assets/ui-v3/5b-landscape-first-run.png) 시안. `OnboardingView`와 탐색 진입점 있음 | 선택 차량 비교 카드, 선택·확정·지급 결과, 첫 가게로 이어지는 짧은 안내를 같은 스타일로 완성한다. | 같은 세션 factory의 실제 NEW/기존 지급 조회·초기화에 연결했다. legacy/불명은 미지원이며 전체 튜토리얼/중단 복원·실차 검증은 남음 |
 
 ### 가챠·퀘스트·휴식·랭킹
 
 | 화면 | 계획한 디자인·현재 있는 것 | 더 만들거나 적용할 것 | 별도로 남은 연결 |
 |---|---|---|---|
-| 가챠 | [가챠](design-assets/ui-v3/5a-landscape-gacha.png) 시안. `GachaView`·별도 호스트 있음 | 가격·확률·보장 안내를 최신 공급값으로 표시하고 추첨 전 확인·처리 중·차량 결과의 모습을 통일한다. 구 시안의 3,000을 그대로 복사하지 않는다. | 공통 탐색, 실제 권한·명령·저장 및 중단 복원 연결 |
+| 가챠 | [가챠](design-assets/ui-v3/5a-landscape-gacha.png) 시안. `GachaView`·별도 호스트 있음 | 가격·확률·보장 안내를 최신 공급값으로 표시하고 추첨 전 확인·처리 중·차량 결과의 모습을 통일한다. 구 시안의 3,000을 그대로 복사하지 않는다. | 공통 탐색·같은 프로필/SQLite의 유료 추첨과 확정 뒤 재실행은 연결·검증했다. 첫 선물 실제 수신·전원/실차·모든 처리 중 중단은 남음 |
 | 퀘스트·업적 | [퀘스트·업적](design-assets/ui-v3/5c-landscape-quests-achievements.png) 시안. `ProgressView`의 독립 표시 UI 있음 | 진행·잠금·청구 가능·수령·만료를 한눈에 구분하고 목록·상세·보상 확인을 다듬는다. | 실제 정의·진행·보상·저장 결과 공급 |
 | 휴식 | [휴게소](design-assets/ui-v3/4c-rest-stop-open.png)·[보너스 설명](design-assets/ui-v3/4t-rest-bonus-info.png) 시안. 휴식 상태 표시 UI 있음 | 주차 중에 조건·대기·적용·판정 불가를 차분하게 설명하는 카드와 문구를 다듬는다. 운전을 재촉하는 카운트다운·게임 알림을 새로 넣지 않는다. | 실제 휴식 판정·보상 상태 공급. 음성 허용·플랫폼 검증은 별도 기준 확인 |
-| 랭킹 | [랭킹](design-assets/ui-v3/5d-landscape-ranking.png) 시안 있음. 확인한 앱 UI 경로에는 전용 랭킹 View 없음 | 실제 내 기록과 시연용 예시를 구분하고 지표·기간·누락/빈 목록·조회 실패를 연결한다. 최종 미술 작업은 디자인팀 WIP 기준을 따른다. | [PRD 1차 범위](01_PRD.md#1차-랭킹-범위) 확정, 실제 구현·검증은 미완료. 온라인 사용자 간 순위는 향후 연결 |
+| 랭킹 | [랭킹](design-assets/ui-v3/5d-landscape-ranking.png) 시안과 RankingView·실제 원장 조회/명시 합성 시연 모듈 있음 | 실제 내 기록과 시연용 예시를 구분하고 지표·기간·누락/빈 목록·조회 실패를 연결한다. 최종 미술 작업은 디자인팀 WIP 기준을 따른다. | [PRD 1차 범위](01_PRD.md#1차-랭킹-범위) 확정, 모듈/격리SQLite·View는 검증했고 MainActivity/실제 날짜·Quest hook은 후속. 온라인 사용자 간 순위는 향후 연결 |
 
 코드 확인 위치: [공통 탐색](../app/src/main/java/io/drivegrowth/app/MainActivity.kt), [기능별 UI](../app/src/main/java/io/drivegrowth/app/ui/). 이 표는 비교 기준 커밋의 코드 현황이며 이슈의 현재 담당·ready·종료 상태를 대신하지 않는다.
 

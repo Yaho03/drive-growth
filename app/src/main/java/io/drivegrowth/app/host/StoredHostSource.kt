@@ -15,11 +15,19 @@ import io.drivegrowth.core.progression.VehicleActivity
 import java.util.Collections
 
 /** worker의 읽기 진입점. 개별 조회를 원자적인 일괄 조회로 취급하지 않는다. databaseName은 격리 시험용이다. */
-internal class StoredHostSource(context: Context, private val databaseName: String? = null) {
+internal class StoredHostSource(context: Context, private val databaseName: String? = null, private val sessions: GameSessionFactory? = null) {
     private val context = context.applicationContext
 
     private fun openStore() = if (databaseName == null) SqliteGameChangeStore(context, InputSource.SIMULATION)
         else SqliteGameChangeStore(context, InputSource.SIMULATION, databaseName)
+
+    private fun <T> withStore(action: (SqliteGameChangeStore, InputSource) -> ContractResult<T>): ContractResult<T> {
+        val factory = sessions ?: return openStore().use { action(it, InputSource.SIMULATION) }
+        return when (val opened = factory.open()) {
+            is ContractResult.Failure -> opened
+            is ContractResult.Success -> opened.value.use { action(it.store, it.identity.source) }
+        }
+    }
 
     fun read(): ContractResult<HostSnapshot> {
         var operation = "content"
@@ -27,14 +35,14 @@ internal class StoredHostSource(context: Context, private val databaseName: Stri
             val content = (AssetGameContent(context.assets).load() as? ContentLoad.Loaded)?.snapshot
                 ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
             operation = "ledger-read"
-            openStore().use { store -> readStoredHostSnapshot(content, InputSource.SIMULATION, LedgerHostReads(store)) }
+            withStore { store, source -> readStoredHostSnapshot(content, source, LedgerHostReads(store)) }
         } catch (error: RuntimeException) {
             failure(operation, error)
         }
     }
 
     fun markViewed(id: SettlementId): ContractResult<Unit> = try {
-        openStore().use { it.markViewed(id) }
+        withStore { store, _ -> store.markViewed(id) }
     } catch (error: RuntimeException) {
         failure("mark-viewed", error)
     }

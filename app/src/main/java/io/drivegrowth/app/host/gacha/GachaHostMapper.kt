@@ -40,6 +40,13 @@ fun mapGachaOffers(content: GameContentSnapshot, state: GachaState, balance: Gam
 
 /** callback 자체가 아닌 저장소의 전체 결과만 표시한다. 현재 잔액/개체로 원래 결과를 덮지 않는다. */
 internal fun resultFrame(input: GachaDrawInput, command: GachaCommand, result: GachaSettlement): ContractResult<GachaScreen.Result> {
+    val name = input.offers.content?.catalog?.vehicles?.singleOrNull { it.vehicleId == command.award.vehicle.vehicleId }?.displayName
+    return storedGachaResult(command, result, name, input.offers.origin)
+}
+
+/** 재실행 복구는 현재 후보·가격·권위 없이 저장된 전체 명령과 최초 정산만 검사한다. */
+internal fun storedGachaResult(command: GachaCommand, result: GachaSettlement,
+    name: String? = null, origin: GachaOrigin = GachaOrigin.STORED): ContractResult<GachaScreen.Result> {
     val tx = result.settlement.transaction
     val money = command.award.vehicle.acquisitionCost.takeIf { it.units > 0 }?.let { MoneyChange(MoneyDirection.DEBIT, it) }
     if (result.command != command || result.settlement.changedVehicle != command.award.vehicle ||
@@ -47,7 +54,6 @@ internal fun resultFrame(input: GachaDrawInput, command: GachaCommand, result: G
         tx.kind != TransactionKind.GARAGE || tx.money != money || command.expectedRevision.value == Int.MAX_VALUE ||
         result.progress.revision.value != command.expectedRevision.value + 1 || result.progress.drawsSinceGuarantee != command.award.nextCounter)
         return ContractResult.Failure(ContractError.STORAGE_FAILURE)
-    val name = input.offers.content?.catalog?.vehicles?.singleOrNull { it.vehicleId == command.award.vehicle.vehicleId }?.displayName
     return ContractResult.Success(GachaScreen.Result(GachaConfirmedResult(result.settlement, name,
-        "저장된 차량 지급 결과", input.offers.origin)))
+        "저장된 차량 지급 결과 · 당시 확정 잔액", origin)))
 }
