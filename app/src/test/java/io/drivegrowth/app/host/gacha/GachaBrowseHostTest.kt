@@ -54,4 +54,53 @@ class GachaBrowseHostTest {
         host.attach { f, _ -> frame = f }; host.setControlsEnabled(true)
         assertEquals(ContractError.STORAGE_FAILURE, (frame!!.screen as GachaScreen.Failure).error)
     }
+    @Test fun allTerminalFramesAreAcceptedByTheRealInteraction() {
+        val offers = GachaOffers(null,null,null,null,null,GameMoney(900),null,emptyList(),GachaAvailability.READY,GachaOrigin.STORED)
+        for (result in listOf(ContractResult.Failure(ContractError.DATA_UNAVAILABLE), ContractResult.Failure(ContractError.STORAGE_FAILURE), ContractResult.Success(offers))) {
+            val source = Source(); source.result = result
+            val interaction = GachaInteraction({})
+            val frames = mutableListOf<GachaFrame>()
+            val host = GachaBrowseHost(source,Executor{it.run()},Executor{it.run()})
+            host.attach { frame, enabled -> frames.add(frame); assertTrue(interaction.render(frame,enabled)) }
+            host.setControlsEnabled(true)
+            assertFalse(interaction.frame!!.screen is GachaScreen.Loading)
+            assertTrue(frames.zipWithNext().all { (a,b) -> a.generation < b.generation })
+        }
+    }
+    @Test fun refreshDuringInflightReadDiscardsOldReplyAndPublishesOnlyLatestTerminal() {
+        val source=Source(); val worker=Queue(); val main=Queue(); val interaction=GachaInteraction({})
+        val frames=mutableListOf<GachaFrame>()
+        val host=GachaBrowseHost(source,worker,main)
+        host.attach { frame,enabled -> frames.add(frame);assertTrue(interaction.render(frame,enabled)) }
+        host.setControlsEnabled(true);val old=frames.last();worker.run()
+        host.refresh();main.run() // 이전 응답이 새 Loading을 덮지 못한다.
+        assertTrue(interaction.frame!!.screen is GachaScreen.Loading)
+        source.result=ContractResult.Failure(ContractError.STORAGE_FAILURE);worker.run();main.run()
+        assertEquals(2,source.reads);assertTrue(interaction.frame!!.screen is GachaScreen.Failure)
+        assertEquals(1,frames.count{it.screen is GachaScreen.Failure});assertFalse(frames.any{it.screen is GachaScreen.Missing})
+        assertFalse(interaction.render(old,true)) // 기존 stale-frame 거절을 유지한다.
+    }
+    @Test fun detachAndReattachDoNotLetOldWorkPublishOrReuseThePreviousGate() {
+        val source=Source(); val worker=Queue(); val main=Queue(); val first=mutableListOf<GachaFrame>()
+        val host=GachaBrowseHost(source,worker,main)
+        host.attach { frame,_ -> first.add(frame) };host.setControlsEnabled(true);worker.run()
+        host.detach();val count=first.size
+        val current=GachaInteraction({})
+        host.attach { frame,enabled -> assertTrue(current.render(frame,enabled)) }
+        assertFalse(current.controlsEnabled)
+        host.setControlsEnabled(true);main.run();assertTrue(current.frame!!.screen is GachaScreen.Loading)
+        worker.run();main.run()
+        assertEquals(count,first.size);assertEquals(2,source.reads)
+        assertTrue(current.frame!!.screen is GachaScreen.Missing);assertTrue(current.controlsEnabled)
+    }
+    @Test fun consecutiveReadsHaveIncreasingDisplayFramesWithoutCancellingTheirOwnWork() {
+        val source=Source();val interaction=GachaInteraction({});val frames=mutableListOf<GachaFrame>()
+        val host=GachaBrowseHost(source,Executor{it.run()},Executor{it.run()})
+        host.attach { frame,enabled -> frames.add(frame);assertTrue(interaction.render(frame,enabled)) }
+        host.setControlsEnabled(true)
+        repeat(3) {host.refresh();assertTrue(interaction.frame!!.screen is GachaScreen.Missing)}
+        assertEquals(4,source.reads)
+        assertTrue(frames.zipWithNext().all{(a,b)->a.generation < b.generation})
+        assertTrue(interaction.controlsEnabled)
+    }
 }
