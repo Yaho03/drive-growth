@@ -38,7 +38,7 @@ class NavigationDestinationConfirmationTest {
         state.setEnabled(false); state.accept(raw()); assertNull(state.snapshot)
         state.setEnabled(true); assertTrue(state.confirm() is ContractResult.Failure)
     }
-    @Test fun `모의 출처는 신선한 같은 연결의 SDK 모의 안내만 인정하고 실차는 추정하지 않는다`() {
+    @Test fun `신선한 SDK 안내 모드로 입력을 분류하고 모의와 정상 경로를 섞지 않는다`() {
         val simulated = identity.copy(source = InputSource.SIMULATION)
         val raw = raw().copy(guidance = NavigationField.Value(NavigationGuidance(null, "SIMULATION_GUIDING", true), stamp))
         assertEquals(Observation.Available(InputSource.SIMULATION), deliveryEstimateSource(simulated, raw) { true })
@@ -47,7 +47,7 @@ class NavigationDestinationConfirmationTest {
         val old = raw.copy(guidance = NavigationField.Value(NavigationGuidance(null, "SIMULATION_GUIDING", true), stamp.copy(connectionGeneration = 6)))
         assertEquals(Observation.Missing(MissingReason.NO_DATA), deliveryEstimateSource(simulated, old) { true })
         val ordinary = raw.copy(guidance = NavigationField.Value(NavigationGuidance(null, "ROUTE_GUIDING", true), stamp))
-        assertEquals(Observation.Missing(MissingReason.NO_DATA), deliveryEstimateSource(identity, ordinary) { true })
+        assertEquals(Observation.Available(InputSource.VEHICLE), deliveryEstimateSource(identity, ordinary) { true })
     }
 
 }

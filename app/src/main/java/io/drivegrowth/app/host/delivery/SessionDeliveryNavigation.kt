@@ -52,7 +52,7 @@ class SessionDeliveryNavigation(context: Context, private val main: Executor) : 
     override fun close() { enabled = false; epoch++; confirmation.setEnabled(false); changed = null; source.close() }
 }
 
-/** 명시 모의 안내의 신선한 SDK 근거만 분류한다. VEHICLE 프로필은 실제 주행 분류 근거가 아니다. */
+/** 신선한 SDK 안내 모드로 예정거리 입력 경로를 분류한다. 실차 시험·도착 인증이 아니다. */
 internal fun deliveryEstimateSource(identity: GameIdentity, raw: NavigationSnapshot,
     fresh: (NavigationStamp) -> Boolean): Observation<InputSource> {
     val guidance = raw.guidance as? NavigationField.Value ?: return Observation.Missing(MissingReason.NO_DATA)
@@ -60,6 +60,10 @@ internal fun deliveryEstimateSource(identity: GameIdentity, raw: NavigationSnaps
         guidance.stamp.connectionGeneration != raw.stamp.connectionGeneration ||
         raw.connection != NavigationConnection.CONNECTED_OBSERVED) return Observation.Missing(MissingReason.NO_DATA)
     if (!fresh(guidance.stamp)) return Observation.Missing(MissingReason.STALE)
-    return if (identity.source == InputSource.SIMULATION && guidance.value.mode == "SIMULATION_GUIDING")
-        Observation.Available(InputSource.SIMULATION) else Observation.Missing(MissingReason.NO_DATA)
+    val source = when (guidance.value.mode) {
+        "ROUTE_GUIDING" -> InputSource.VEHICLE
+        "SIMULATION_GUIDING" -> InputSource.SIMULATION
+        else -> return Observation.Missing(MissingReason.NO_DATA)
+    }
+    return if (source == identity.source) Observation.Available(source) else Observation.Missing(MissingReason.NO_DATA)
 }
