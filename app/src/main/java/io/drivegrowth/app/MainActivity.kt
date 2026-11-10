@@ -76,6 +76,7 @@ class MainActivity : Activity() {
     private val interaction = ForegroundInteraction()
     private var input: VehicleInput? = null
     private var drivingStatus: String? = null
+    private var rentalFingerprint: Any? = null
     private var navigation = HostNavigation()
     private var screen: HostQueryState = HostQueryState.Restricted
     private lateinit var management: GarageCommandHost
@@ -314,7 +315,8 @@ class MainActivity : Activity() {
         setVisible(true)
         if (active) return
         active = true
-        session.driving.start { result ->
+        rentalFingerprint = null
+        val rentalReceiver = session.driving.start { result ->
             val status = when (result) {
                 is ContractResult.Failure -> {
                     android.util.Log.w("DriveGrowthDriving", "recording_failure code=${result.error}")
@@ -331,6 +333,26 @@ class MainActivity : Activity() {
                 }
             }
             if (drivingStatus != status) { drivingStatus = status; if (::chrome.isInitialized) render() }
+        }
+        session.rental.start(rentalReceiver) { result ->
+            when (result) {
+                is ContractResult.Failure -> if (rentalFingerprint != result.error) {
+                    rentalFingerprint = result.error
+                    android.util.Log.w("DriveGrowthRental", "driver_deferred code=${result.error}")
+                    queries.refresh(); session.onboarding.refresh()
+                }
+                is ContractResult.Success -> {
+                    val snapshot = result.value
+                    val fingerprint = listOf(snapshot.pending.map { it.id to it.phase }, snapshot.firstCompleted?.rentalId,
+                        snapshot.deferred.toMap())
+                    if (rentalFingerprint != fingerprint) {
+                        rentalFingerprint = fingerprint
+                        queries.refresh(); session.progression.refresh(); session.ranking.refresh(); session.onboarding.refresh()
+                        if (navigation.page == HostPage.RESULTS) session.results.refreshHistory()
+                        if (snapshot.deferred.isNotEmpty()) android.util.Log.w("DriveGrowthRental", "motion_ranges_deferred")
+                    }
+                }
+            }
         }
         session.progression.attach { frame ->
             progressionFrame = frame
@@ -378,6 +400,7 @@ class MainActivity : Activity() {
         input?.stop()
         input = null
         session.driving.stop() // 같은 serial worker 뒤에 실제 중단 시각과 receiver 경계를 보존한다.
+        session.rental.pause()
         session.progressionUi = progression.uiState
         session.progression.setControlsEnabled(false)
         session.progression.detach()
@@ -392,6 +415,11 @@ class MainActivity : Activity() {
         updateAccess()
         input?.stop()
         input = null
+    }
+
+    override fun onStop() {
+        session.rental.inactive(isChangingConfigurations, session.rentalClock.read())
+        super.onStop()
     }
 
     override fun onDestroy() {
@@ -868,6 +896,7 @@ class MainActivity : Activity() {
         // 다중 창에서 Task를 뒤로 보내도 RESUMED·표시가 유지되는 경우를 함께 처리한다.
         stopObserving()
         setVisible(false)
+        session.rental.inactive(false, session.rentalClock.read()) // 실제 사용자 숨김. 뒤따르는 onStop은 원마커를 보존한다.
         moveTaskToBack(true)
     }
 }

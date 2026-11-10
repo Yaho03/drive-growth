@@ -31,6 +31,12 @@ internal class HostSession(context: Context, private val main: Executor, restore
         RecordingPolicy(policy.maxSignalAgeMs, policy.maxSampleGapMs, 1000, policy.requiredParkMs,
             policy.maxStationarySpeedMps, 0.5) // skew/출발속도는 D의 명시 기술 시험값.
     }
+    val rentalClock = io.drivegrowth.app.host.rental.DeviceRentalClock(context)
+    private val rentalSource = io.drivegrowth.app.host.rental.SessionRentalProductSource(games, {
+        io.drivegrowth.app.data.AssetTrialDefinitionProvider(context.assets).load()
+    }, recordingPolicy, rentalClock::read)
+    val rental = io.drivegrowth.app.host.rental.RentalProductHost(worker, main, rentalSource::observe,
+        rentalSource::reconnect, rentalSource::pauseObservations, rentalSource::inactive)
     private val drivingSource = SessionObservedDrivingSource(games, io.drivegrowth.app.data.SqliteObservedDrivingJournal(),
         ObservedDrivingReducer(recordingPolicy) { java.util.UUID.randomUUID().toString() }, {
             when (val loaded = io.drivegrowth.app.data.AssetTrialDefinitionProvider(context.assets).load()) {
@@ -42,10 +48,12 @@ internal class HostSession(context: Context, private val main: Executor, restore
     val driving = ObservedDrivingHost(worker, main,
         { RecordingClock(android.os.SystemClock.elapsedRealtime(), EpochMillis(System.currentTimeMillis())) },
         { receiver, frame, at ->
-            when (val activated = activateDriving(frame.observation.source)) {
+            val recorded = when (val activated = activateDriving(frame.observation.source)) {
                 is ContractResult.Failure -> activated
                 is ContractResult.Success -> drivingSource.observe(receiver, frame, at)
             }
+            rental.observed(receiver, frame, recorded)
+            recorded
         }, { receiver, at ->
             if (drivingActivated) drivingSource.pause(receiver, at) else ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         })
@@ -125,6 +133,7 @@ internal class HostSession(context: Context, private val main: Executor, restore
 
     fun release() {
         driving.stop()
+        rental.pause()
         progression.release()
         facility.release()
         delivery.release()
