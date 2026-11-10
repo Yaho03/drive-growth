@@ -12,6 +12,10 @@ import android.widget.Spinner
 import android.widget.ArrayAdapter
 import android.widget.AdapterView
 import android.widget.LinearLayout
+import io.drivegrowth.app.host.garage.GarageCommandHost
+import io.drivegrowth.app.host.garage.GarageCommandState
+import io.drivegrowth.app.host.garage.GarageCommandView
+import io.drivegrowth.app.host.garage.GarageActionAvailability
 import io.drivegrowth.app.host.shop.ShopHostMapper
 import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.app.ui.shop.ShopEvent
@@ -55,6 +59,10 @@ class MainActivity : Activity() {
     private var input: VehicleInput? = null
     private var navigation = HostNavigation()
     private var screen: HostQueryState = HostQueryState.Restricted
+    private lateinit var management: GarageCommandHost
+    private lateinit var managementView: GarageCommandView
+    private var managementState: GarageCommandState = GarageCommandState.Idle
+    private var recoveredManagement = false
     private val shopMapper = ShopHostMapper()
     private lateinit var shop: ShopView
     private lateinit var gacha: GachaView
@@ -104,6 +112,18 @@ class MainActivity : Activity() {
             ResultsStateBundle.decode(savedInstanceState?.getBundle("results")))
         results.restoreUiState(session.results.uiState)
         queries = session.queries
+        management = GarageCommandHost(applicationContext, { handler.post(it) }) { state ->
+            val prior = managementState
+            managementState = state
+            if ((state is GarageCommandState.Confirmed || state is GarageCommandState.Rejected) && allowed()) queries.refresh()
+            if (state == GarageCommandState.Idle && prior is GarageCommandState.Confirmed) {
+                navigation.pendingGarageRequest = null
+                garage.completeRequest()
+            }
+            if (::body.isInitialized) render()
+        }
+        managementView = GarageCommandView(this, { management.controller.confirm() }, ::cancelPreparation,
+            { management.controller.retry() }, { management.controller.cancelPending() }, { management.controller.chooseMaterial(it) }, { management.controller.acknowledge() })
         panel = style.column().apply { setBackgroundColor(style.base) }
         chrome = style.column().apply { setPadding(style.dp(16), 0, style.dp(16), 0) }
         body = FrameLayout(this)
@@ -177,6 +197,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        management.release()
         queries.detach()
         session.gacha.detach()
         gacha.release()
@@ -213,6 +234,8 @@ class MainActivity : Activity() {
         val enabled = allowed()
         queries.setControlsEnabled(enabled)
         session.gacha.setControlsEnabled(enabled && navigation.page == HostPage.GACHA)
+        management.controller.setControlsEnabled(enabled)
+        if (enabled && !recoveredManagement) { recoveredManagement = true; management.controller.recover() }
     }
 
     private fun refresh() {
@@ -224,7 +247,7 @@ class MainActivity : Activity() {
     private fun render() {
         val enabled = allowed()
         val garageState = when (val current = screen) {
-            is HostQueryState.Content -> mapper.garage(current.snapshot)
+            is HostQueryState.Content -> GarageActionAvailability.map(mapper.garage(current.snapshot), current.snapshot)
             is HostQueryState.Failure -> GarageScreenState.Error("조회 실패 (${current.error})")
             else -> GarageScreenState.Loading
         }
@@ -233,6 +256,7 @@ class MainActivity : Activity() {
             is HostQueryState.Failure -> CollectionScreenState.Error("조회 실패 (${current.error})")
             else -> CollectionScreenState.Loading
         }
+        managementView.render(managementState, enabled)
         shop.render(shopMapper.map(screen, Revision(shopRevision)), enabled)
         garage.render(garageState, enabled)
         collection.render(collectionState, enabled)
@@ -262,12 +286,13 @@ class MainActivity : Activity() {
         links.addView(destination, LinearLayout.LayoutParams(0, style.dp(56), 1f))
         links.addView(style.button("새로고침") { if (token == navigationGeneration) refresh() })
         chrome.addView(links)
-        navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE }?.let {
-            chrome.addView(style.text("관리 명령이 연결되지 않아 실행할 수 없어요. 이 요청은 실행되지 않았어요."))
+        navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE && managementState == GarageCommandState.Idle }?.let {
+            chrome.addView(style.text("이전 관리 준비 요청입니다. 최신 상태와 비용을 다시 확인해 주세요."))
+            chrome.addView(style.button("관리 조건 다시 조회") { management.controller.open(it) })
             chrome.addView(style.button("준비 요청 닫기") { cancelPreparation() })
         }
         when (navigation.page) {
-            HostPage.GARAGE -> showBody(garage)
+            HostPage.GARAGE -> showBody(if (managementState == GarageCommandState.Idle) garage else managementView)
             HostPage.COLLECTION -> showBody(collection)
             HostPage.RESULTS -> showBody(results)
             HostPage.ONBOARDING -> showBody(onboarding)
@@ -367,6 +392,7 @@ class MainActivity : Activity() {
                     return
                 }
                 navigation.pendingGarageRequest = event
+                management.controller.open(event)
                 render()
             }
         }
@@ -374,6 +400,7 @@ class MainActivity : Activity() {
 
     private fun cancelPreparation() {
         if (!allowed()) { updateAccess(); return }
+        if (managementState != GarageCommandState.Idle && !management.controller.cancel()) return
         navigation.pendingGarageRequest = null
         garage.completeRequest()
         render()
@@ -395,6 +422,11 @@ class MainActivity : Activity() {
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
         if (allowed()) {
+            if (navigation.page == HostPage.GARAGE && managementState != GarageCommandState.Idle) {
+                if (managementState is GarageCommandState.Confirmed) management.controller.acknowledge()
+                else cancelPreparation()
+                return
+            }
             if (navigation.page == HostPage.HOME && shop.handleBack()) return
             if (navigation.page == HostPage.GACHA && gacha.handleBack()) return
             if (navigation.pendingGarageRequest != null) { cancelPreparation(); return }
