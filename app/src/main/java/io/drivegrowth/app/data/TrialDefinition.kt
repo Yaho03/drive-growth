@@ -6,6 +6,7 @@ import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.rental.*
 import io.drivegrowth.core.delivery.*
 import io.drivegrowth.core.driving.DrivingIncomeRules
+import io.drivegrowth.core.driving.RestRules
 import java.util.Collections
 
 /** 숫자 입력만 공급한다. Quest 진행/기간/청구 가능 여부를 만들지 않는다. */
@@ -15,7 +16,7 @@ data class TrialQuestNumbers(val goal: Int, val reward: GameMoney) {
 class TrialDefinition internal constructor(
     val expansions: ShopExpansionDefinition, rates: Map<VehicleId,GameMoney>, facilities: Map<Facility,FacilityOffer>,
     val fuelBonusPerRental: GameMoney, quests: Map<String,TrialQuestNumbers>, provenance: Map<String,String>,
-    internal val delivery: TrialDeliveryRules, internal val driving: DrivingIncomeRules, internal val rental:TrialRentalInputs,
+    internal val delivery: TrialDeliveryRules, internal val driving: DrivingIncomeRules, internal val rental:TrialRentalInputs,internal val rest:RestRules,internal val restPricing:RestPricingPolicy,
 ) {
     val version get()=expansions.version
     val rules get()=expansions.rules
@@ -28,6 +29,8 @@ class TrialDefinition internal constructor(
     fun deliveryChangeRules():ContractResult<DeliveryChangeRules> = ContractResult.Success(delivery.change)
     fun deliverySettlementRules():ContractResult<DeliverySettlementRules> = ContractResult.Success(delivery.settlement)
     fun drivingIncomeRules():ContractResult<DrivingIncomeRules> = ContractResult.Success(driving)
+    fun restRules():ContractResult<RestRules> = ContractResult.Success(rest)
+    fun restPricingPolicy():ContractResult<RestPricingPolicy> = ContractResult.Success(restPricing)
     fun rentalRate(id:VehicleId):ContractResult<GameMoney> = rentalRates[id]?.let { ContractResult.Success(it) }
         ?: ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
     fun questNumbers(id:String):ContractResult<TrialQuestNumbers> = questRewards[id]?.let { ContractResult.Success(it) }
@@ -47,7 +50,7 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
             is ContractResult.Failure->return r
             is ContractResult.Success->r.value
         }
-        val names=setOf("rental_rates","facilities","fuel_bonus","quest_rewards","provenance","delivery_bands","delivery_prices","delivery_proposal","delivery_change","delivery_settlement","driving","rental_visits","rental_categories","rental_durations","rental_customers")
+        val names=setOf("rental_rates","facilities","fuel_bonus","quest_rewards","provenance","delivery_bands","delivery_prices","delivery_proposal","delivery_change","delivery_settlement","driving","rental_visits","rental_categories","rental_durations","rental_customers","rest")
         val sections=linkedMapOf<String,MutableList<List<String>>>()
         var current:String?=null
         for(line in lines.drop(marker)) {
@@ -118,8 +121,11 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
             io.drivegrowth.app.runtime.rental.product.RentalCustomerWeight(SimulatedCustomer(age.toInt(),months.toInt()),regular,weight.toInt())
         };require(customerInputs.toSet().size==customerInputs.size)
         val rental=TrialRentalInputs(categories,categoryBasis,demand,durations.mapValues{it.value.first},durations.mapValues{it.value.second},customerInputs,visit.i("max_replay_visits"),visit.n("interval_ms"),java.math.RoundingMode.valueOf(visit.getValue("rounding")))
+        val rest=scalar("rest",setOf("min_driving_ms","min_parked_ms","bonus_duration_ms","bonus_percent","pricing_policy"))
+        val pricing=RestPricingPolicy.entries.singleOrNull{it.id==rest.getValue("pricing_policy")}?:throw IllegalArgumentException("휴식 가격 기술 정책")
         ContractResult.Success(TrialDefinition(expansion,rates,facilities,GameMoney(number(fuel[0][1])),quests,provenance,delivery,
-            DrivingIncomeRules(expansion.rules,drive.n("daily_cap_meters"),GameMoney(drive.n("income_per_km"))),rental))
+            DrivingIncomeRules(expansion.rules,drive.n("daily_cap_meters"),GameMoney(drive.n("income_per_km"))),rental,
+            RestRules(expansion.rules,rest.n("min_driving_ms"),rest.n("min_parked_ms"),rest.n("bonus_duration_ms"),rest.i("bonus_percent")),pricing))
     } catch (_:IllegalArgumentException) { ContractResult.Failure(ContractError.INVALID_INPUT) }
       catch (_:IllegalStateException) { ContractResult.Failure(ContractError.INVALID_INPUT) }
 }

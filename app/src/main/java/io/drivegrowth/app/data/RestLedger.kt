@@ -109,6 +109,7 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
             if (stored.command != command) return failure(ContractError.STATE_CONFLICT)
             return ContractResult.Success(stored.after)
         }
+        if(store.requestUnavailable(db,io.drivegrowth.core.contract.RequestId(consumeId))) return failure(ContractError.STATE_CONFLICT)
         val before = entries.lastOrNull()?.after ?: RestBonusState.NONE
         if (before.lastStopNumber != afterStop) return failure(ContractError.STATE_CONFLICT)
         val after = when (val result = RestBonus(rules).consume(before, elapsedMs)) {
@@ -130,12 +131,17 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
             put("command", command)
             put("result", result.toString())
         })
+        if(seq<1)throw JSONException("휴식 원문 저장 실패")
         val headId = db.insertWithOnConflict("rest_head", null, ContentValues().apply {
             put("id", 1)
             put("last", seq)
             put("count", entries.size + 1L)
         }, SQLiteDatabase.CONFLICT_REPLACE)
         if (headId != 1L) throw JSONException("휴식 머리 정보 저장 실패")
+        val written=chain(db)
+        val last=written.lastOrNull()
+        if(written.size!=entries.size+1||last==null||last.seq!=seq||last.kind!=kind||last.key!=key||last.command!=command)
+            throw JSONException("휴식 원문/머리 실제 저장 불일치")
     }
 
     /**

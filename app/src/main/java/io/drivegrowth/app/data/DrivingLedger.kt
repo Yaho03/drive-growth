@@ -74,6 +74,9 @@ class DrivingLedger internal constructor(private val store: SqliteGameChangeStor
             if (stored.command != command) return@atomic failure(ContractError.STATE_CONFLICT)
             return@atomic ContractResult.Success(stored.commit)
         }
+        val restActive=db.rawQuery("SELECT 1 FROM rest_module",null).use{it.moveToFirst()}
+        if(!restActive&&db.rawQuery("SELECT 1 FROM rest_contexts UNION ALL SELECT 1 FROM rest_departures UNION ALL SELECT 1 FROM rest_driving_receipts UNION ALL SELECT 1 FROM rest_log UNION ALL SELECT 1 FROM rest_head",null).use{it.moveToFirst()})throw android.database.sqlite.SQLiteException("휴식 marker 없는 이력에 기본 지급 불가")
+        if(restActive)return@atomic failure(ContractError.STATE_CONFLICT)
         if (hasSettlement(db, requestId)) return@atomic failure(ContractError.STATE_CONFLICT)
 
         val result = when (val settled = DrivingIncome(rules).settle(readDay(db, drive.departedOn), drive)) {
@@ -106,6 +109,17 @@ class DrivingLedger internal constructor(private val store: SqliteGameChangeStor
         ContractResult.Success(committed)
     }
 
+    /** 같은 Rest 외부 atomic 전용이다. composite 원결과/커서/ack 쓰기 뒤 shared reader가 재검증한다. */
+    internal fun settleRestIn(db:SQLiteDatabase,c:RestPricedCommand):ContractResult<DriveCommit> {
+        if(c.context.identity.source!=store.source)return failure(ContractError.INVALID_INPUT)
+        val priced=when(val r=RestDrivingRecords.calculate(c)){is ContractResult.Failure->return r;is ContractResult.Success->r.value.price.settlement}
+        if(readDay(db,priced.drive.departedOn)!=c.dayBefore||db.rawQuery("SELECT 1 FROM driving_drives WHERE drive_id=?",arrayOf(priced.drive.driveId)).use{it.moveToFirst()}||hasSettlement(db,RequestId("drive/${priced.drive.driveId}")))return failure(ContractError.STATE_CONFLICT)
+        val settlement=priced.change?.let{change->when(val r=store.record(db,change,LedgerJson.command(change).toString(),SqliteGameChangeStore.RequestDomain.DRIVING)){is ContractResult.Failure->return r;is ContractResult.Success->r.value}}
+        if(db.insertWithOnConflict("driving_days",null,ContentValues().apply{put("day",priced.day.day.toString());put("source",store.source.name);put("rewarded",priced.day.rewardedMeters)},SQLiteDatabase.CONFLICT_REPLACE)<0||readDay(db,priced.day.day)!=priced.day)throw android.database.sqlite.SQLiteException("휴식 주행 일누계 실제 저장 불일치")
+        if(db.insertOrThrow("driving_drives",null,ContentValues().apply{put("drive_id",priced.drive.driveId);put("command",RestDrivingJson.priced(c).toString());put("recorded",priced.recordedMeters);put("rewarded",priced.rewardedMeters);put("amount",priced.amount.units);put("day",priced.day.day.toString());put("day_rewarded",priced.day.rewardedMeters)})<0)throw android.database.sqlite.SQLiteException("휴식 주행 원명령 무삽입")
+        return ContractResult.Success(DriveCommit(priced.drive.driveId,priced.recordedMeters,priced.rewardedMeters,priced.amount,priced.day,settlement))
+    }
+
     private val records=DrivingRecordReader(store.source)
     private fun command(rules:DrivingIncomeRules,drive:ConfirmedDrive)=records.command(rules,drive)
     private fun readDay(db:SQLiteDatabase,day:LocalDate)=records.readDay(db,day)
@@ -125,7 +139,7 @@ internal class DrivingRecordReader(private val source:InputSource) {
     ).use { if (it.moveToFirst()) DrivingDay(day, it.integer(0, 0, Long.MAX_VALUE)) else null }
 
     /** 대조를 마친 주행 기록과 당시 결과. */
-    class StoredDrive(val command: String, val commit: DriveCommit)
+    class StoredDrive(val command: String, val commit: DriveCommit,val rest:VerifiedRestDrive?=null)
 
     /**
      * 저장된 주행 기록을 읽는다. 원래 명령의 규칙·주행과 당시 하루 상태(반영 후 누적 - 이번 반영)로 다시 계산한 결과가
@@ -140,17 +154,25 @@ internal class DrivingRecordReader(private val source:InputSource) {
         val rewarded = it.integer(2, 0, Long.MAX_VALUE)
         val amount = GameMoney(it.integer(3, 0, Long.MAX_VALUE))
         val day = DrivingDay(DeliveryJson.date(it.text(4)), it.integer(5, 0, Long.MAX_VALUE))
-        val (rules, drive) = commandInput(JSONObject(command))
-        if (drive.driveId != driveId || command(rules, drive).toString() != command) throw JSONException("주행 명령 형식 오류")
+        val json=JSONObject(command)
+        val rest=if(json.has("type")) {
+            val c=RestDrivingJson.priced(json)
+            if(RestDrivingJson.priced(c).toString()!=command)throw JSONException("휴식 주행 명령 형식 오류")
+            RestDrivingRecords.verify(db,source,c)
+        }else null
+        val base=if(rest==null)commandInput(json) else null
+        val drive=rest?.calculation?.price?.settlement?.drive?:checkNotNull(base).second
+        if(drive.distance.source!=source||drive.driveId!=driveId||rest==null&&command(checkNotNull(base).first,drive).toString()!=command)throw JSONException("주행 명령 형식 오류")
         if (rewarded > day.rewardedMeters) throw JSONException("하루 반영 거리 불일치")
         // 하루 반영 거리는 줄지 않는다. 지금 하루 상태가 이 주행 직후 값보다 작으면 둘 중 하나가 손상이다.
         val current = readDay(db, day.day) ?: throw JSONException("하루 상태 누락")
         if (current.rewardedMeters < day.rewardedMeters) throw JSONException("하루 반영 거리 불일치")
         val before = DrivingDay(day.day, day.rewardedMeters - rewarded)
-        val expected = when (val result = DrivingIncome(rules).settle(before, drive)) {
+        val expected = rest?.calculation?.price?.settlement?:when (val result = DrivingIncome(checkNotNull(base).first).settle(before, drive)) {
             is ContractResult.Failure -> throw JSONException("저장된 주행 재계산 실패: ${result.error}")
             is ContractResult.Success -> result.value
         }
+        if(rest!=null&&(rest.command.dayBefore?.rewardedMeters?:0L)!=before.rewardedMeters)throw JSONException("휴식 주행 원 일누계 불일치")
         if (expected.recordedMeters != recorded || expected.rewardedMeters != rewarded || expected.amount != amount || expected.day != day) {
             throw JSONException("주행 결과가 원래 명령과 다름")
         }
@@ -159,7 +181,9 @@ internal class DrivingRecordReader(private val source:InputSource) {
             null -> if (hasSettlement(db, requestId)) throw JSONException("0원 주행에 정산이 있음") else null
             else -> readRecordedSettlement(db, change) ?: throw JSONException("주행 수익 정산 누락")
         }
-        StoredDrive(command, DriveCommit(driveId, recorded, rewarded, amount, day, settlement))
+        val commit=DriveCommit(driveId, recorded, rewarded, amount, day, settlement)
+        if(rest!=null)RestDrivingRecords.verifyReceipt(db,rest,commit)
+        StoredDrive(command,commit,rest)
     }
 
     private fun commandInput(j: JSONObject): Pair<DrivingIncomeRules, ConfirmedDrive> {

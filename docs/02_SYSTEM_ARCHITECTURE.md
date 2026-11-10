@@ -794,3 +794,23 @@ DeviceRentalClock은 실제 OS BOOT_COUNT·UTC·elapsedRealtime을 읽는다. re
 Main HOME은 시설의 typed 구매/쉬기 요청과 원결과를 소비하고, Results는 전체 history·전체/미확인 필터·선택·열람 및 Bundle 복원을 연결한다. 기존 gate·Back·세대/epoch/receiver 검사를 유지하며 제한 뒤 UI 응답으로 새 명령을 발행하지 않는다. stop 전에 수락한 원관측의 영속 처리와 stop 뒤 UI 전달은 구분한다.
 
 B 원본0dd969f는 main187에 기반한다. 새 통합은 main188의 위치 SDK 공급을 보존하며 B 소유18파일을 그대로 반영한다. 위치 SDK의 실제 Main 등록과 Rest 원자 저장은 이 연결에 포함하지 않는다. 신호 공백·지나간 방문·legacy 원점을 현재값으로 채우지 않으므로 일부 종료 영업은 보류될 수 있다. [실제 원본 시험과 새로운 조합](06_VERIFICATION.md#제품-영업시설정산-호스트-연결-검증--2026-11-10)은 구분한다.
+
+
+### Rest schema16 원자 저장·세 수정의 검토 후보 — 2026-11-10
+
+이절은정확6a4d820의main188통합검토후보다. 원E46 source/APK/계획은고정보존하며제품6a동일+F원문1의c28 조합은A실제SQLite47을통과했다. 최종독립회수와#190후최신Main조합검증은남아있으며전체승인·완료·merge-ready로표시하지않는다. 원830은관측원문/segment별boot·clock-domain·장소관측sidecar와여러pending departure를같은helper에보존하고schema16·중앙TrialDefinition v4를준비했다. 원정수거리/출발일·일500km·기존1h/5m/20m/150%와선택된chronological-prefix-rational-v1을보존하며원drive금액을한번내린다. base입금뒤별도bonus CREDIT를만들거나원drive를조각정산으로나누지않는다.
+
+명시Rest활성화는실제profile/source·기존observed module과진행중trip/outbox조건을검증한다. 기존metadata가남은legacy를현재boot/proof로채택하지않는다. phase1은원관측save와context/actualdeparture준비를보관할뿐지급/확정Rest갱신이아니다. phase2는원순서plan·소모/새departure·단일금융/day·원결과/provenance/ack를같은거래로처리하고기존원결과재생이현재정의/상태보다우선한다. confirmed core와effective pending projection을구분한다. 기존v1 RestHostSource가이새typed writer를구현했다고표시하지않고B0dd의실제producer/Main연결은포함하지않았다.
+
+9db는동일boot의물리elapsed/raw중복과공개원문검증을보완한원본이다. 후속6a4의세수정은(1)물리cursor와별개로(boot,domain)UTC cursor를보존해A→B→A복귀의UTC퇴행을거절,(2)신규ack뒤실제day가paid.day와정확히맞지않으면전체rollback,(3)활성Rest근거뒤observed marker/state/receipts전체소실을진짜미활성부재로숨기지않는것이다. 새금액/기본clock/단계성공을합성하지않고과거정상원결과재생을현재day로거절하지않는다. 후속A의c28실행에서C metadata/공개읽기와D day의후행12표행보존/rollback단언까지통과했다.
+
+정상통합41파일은6a4원문과같고Main/HostSession·Location6·시설12·Results14·marker의생산API를보존했다. RankingReadSource는공통DrivingRecordReader로Rest가격원결과를읽는의도된변경이며기존Provenance hook/typedFailure catch·원출발지역검사는유지한다. marker시험은schema16fixture만원본대로갱신했다. 실제boot/domain/장소·정책권위/B opt-in·UI/SDK·프로세스/전원·실차는별도다. 원830/9db의성공과C/D/A실패·미도달을 [06](06_VERIFICATION.md#rest-6a4-세-수정의-main188-통합-검토-대기--2026-11-10)에서분리하며F복수departure1은제품불변의후속c28에시험파일로만통합했으며원E46쌍과별도조합으로보존한다.
+
+
+### Rest와 main190의 공급 경계 — 2026-11-10
+
+main190 `af2ee70dee24c7ad9310372255d4b20d5ed79ee3`을 Rest c28 후속 후보의 정상 부모로 포함했다. Rest 소스/시험/자산42파일은 정확c28과 같고 B18·ActualMainResults 정식 시험1·PNG2·Location6 및 기존 main 공급을 보존했다. 생산 소스 충돌/추가 수정0이며 README의 현재 공급 행과 양쪽02/06추가 절을 모두 보존해 문서3곳의 동시 추가 충돌만 병합했다.
+
+C는 metadata/공개 읽기의 코드·호환 JVM8과 A c28 C1 GREEN을, D는 UTC16 및 day 코드·A SQL4의 후행12표 rollback GREEN을 각 배정 범위에서 수용했다. 전체 Rest/제품 승인으로 확대하지 않는다. 새 main190 조합 자동 검사와 원 c28 실제SQLite47·기존B Native65/추가Results1은 [06](06_VERIFICATION.md#rest-schema16과-main190-제품-호스트의-최종-로컬-조합--2026-11-10)에서 구분한다.
+
+main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결은 유지하지만, Rest의 실제 boot/domain/place·정책 권위/producer·명시 opt-in과 v1 RestHostSource 소비는 이 후보에서 새로 연결하지 않았다. #189 디자인은 기능 구현 이후 검토/적용한다는 최신 지시를 유지하며 schema17 꾸미기·새 core·SDK확장·새 producer·통합모의주행을 섞지 않는다.
