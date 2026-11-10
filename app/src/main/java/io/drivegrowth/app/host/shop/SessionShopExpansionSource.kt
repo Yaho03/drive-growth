@@ -41,9 +41,10 @@ class SessionShopExpansionSource(context: Context, private val games: GameSessio
 
 /** Activity의 실제 허용 전이를 연결한다. controller의 busy/원명령 정책은 그대로 사용한다. */
 class ShopExpansionAccess(private val host: ShopExpansionHostController) {
-    private var enabled = false
+    private var enabled: Boolean? = null
     fun setControlsEnabled(value: Boolean) {
-        val gained = value && !enabled
+        if (enabled == value) return
+        val gained = value && enabled != true
         enabled = value
         host.setControlsEnabled(value)
         if (gained) host.load()
