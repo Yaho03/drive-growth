@@ -24,12 +24,10 @@ class SessionDeliveryNavigation(context: Context, private val main: Executor) : 
     val port: DeliveryNavigationPort = FNavigationDeliveryPort(
         { identity -> confirmation.bind(identity); confirmation.snapshot },
         { identity, _ -> confirmation.selected(identity) },
-        { identity, raw ->
-            // 명시 SDK 모의 안내만 모의로 분류한다. VEHICLE 프로필이나 ROUTE_GUIDING만으로 실차 증거를 만들지 않는다.
-            if (identity.source == InputSource.SIMULATION &&
-                (raw.guidance as? NavigationField.Value)?.value?.mode == "SIMULATION_GUIDING")
-                Observation.Available(InputSource.SIMULATION) else Observation.Missing(MissingReason.NO_DATA)
-        },
+        { identity, raw -> deliveryEstimateSource(identity, raw) { stamp ->
+            val age = SystemClock.elapsedRealtime() - stamp.receivedElapsedMillis
+            age in 0..5_000L
+        } },
         { Observation.Missing(MissingReason.NO_DATA) },
         { stamp -> val age = SystemClock.elapsedRealtime() - stamp.receivedElapsedMillis; age in 0..5_000L },
         { identity, _ ->
@@ -52,4 +50,16 @@ class SessionDeliveryNavigation(context: Context, private val main: Executor) : 
     fun refresh() { if (enabled) source.refresh() }
     fun confirm(): ContractResult<DeliveryDestinationSelection> = confirmation.confirm()
     override fun close() { enabled = false; epoch++; confirmation.setEnabled(false); changed = null; source.close() }
+}
+
+/** 명시 모의 안내의 신선한 SDK 근거만 분류한다. VEHICLE 프로필은 실제 주행 분류 근거가 아니다. */
+internal fun deliveryEstimateSource(identity: GameIdentity, raw: NavigationSnapshot,
+    fresh: (NavigationStamp) -> Boolean): Observation<InputSource> {
+    val guidance = raw.guidance as? NavigationField.Value ?: return Observation.Missing(MissingReason.NO_DATA)
+    if (guidance.stamp.source != NavigationSource.PLEOS_NAVI_SDK ||
+        guidance.stamp.connectionGeneration != raw.stamp.connectionGeneration ||
+        raw.connection != NavigationConnection.CONNECTED_OBSERVED) return Observation.Missing(MissingReason.NO_DATA)
+    if (!fresh(guidance.stamp)) return Observation.Missing(MissingReason.STALE)
+    return if (identity.source == InputSource.SIMULATION && guidance.value.mode == "SIMULATION_GUIDING")
+        Observation.Available(InputSource.SIMULATION) else Observation.Missing(MissingReason.NO_DATA)
 }

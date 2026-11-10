@@ -94,6 +94,7 @@ class MainActivity : Activity() {
     private lateinit var ranking: RankingView
     private var rankingState: RankingState = RankingState.Restricted
     private lateinit var delivery: DeliveryView
+    private var deliveryAccessEnabled = false
     private var deliveryReceipt: DeliveryHostReceipt? = null
     private lateinit var deliveryBody: LinearLayout
     private var deliveryFrame = DeliveryFrame(0, DeliveryScreen.Loading)
@@ -352,8 +353,11 @@ class MainActivity : Activity() {
         val enabled = allowed()
         queries.setControlsEnabled(enabled)
         val deliveryEnabled = enabled && navigation.page == HostPage.DELIVERY
+        val deliveryGained = deliveryEnabled && !deliveryAccessEnabled
+        deliveryAccessEnabled = deliveryEnabled
         session.deliveryNavigation.setControlsEnabled(deliveryEnabled)
         session.delivery.setControlsEnabled(deliveryEnabled)
+        if (deliveryGained) session.delivery.refresh()
         session.gacha.setControlsEnabled(enabled && navigation.page == HostPage.GACHA)
         session.ranking.setControlsEnabled(enabled && navigation.page == HostPage.RANKING)
         session.onboarding.setControlsEnabled(enabled)
@@ -544,7 +548,6 @@ class MainActivity : Activity() {
         navigation.page = page
         navigation.returnPage = HostPage.HOME
         updateAccess()
-        if (page == HostPage.DELIVERY) session.delivery.refresh()
         render()
     }
 
