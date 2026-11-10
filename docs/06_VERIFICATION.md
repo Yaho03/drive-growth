@@ -1803,3 +1803,14 @@ F원문1은원carry1500ms/seed7원에서두departure anchor1/3·stop1/2를보관
 격리restutcmultie쌍의앱80bf65e48da9dd5eb6743a04daab97904e64bdee700d90fbdd5fe71e2a94ad37·시험36977065ba4f7e1ba5c7b214593fb5b6fda884fffa4e4a62bcc8ad3ac98039e2는metadata/준비파일/실제설치pull SHA가같았다. 원E46의restutcfixe쌍/계획은그대로보존했고이번설치대상이아니다. A새빌드0이며작성자c28 APK준비1분5초/62tasks와부모569/Lint0/27/core420을새실행으로바꾸지않는다. 이로컬통합담당도기존main188 앱593검사이후Gradle/장치/ADB새실행0이다.
 
 A단독슬롯은API34ARM64/user10에서22:38:37~22:40:00KST였다.19/19제품/환경보존·자기2패키지/프로세스/계측/추가forward0·반환/released/noFurtherAdb를회수했다. 제품데이터초기화·권한/기어/속도/GPS/창설정변경0이며실제기어D를새로요청/수신하지않았다. 실제SDK/place/Main/제품UI·프로세스/전원·실차는이저장시험의결과가아니다. 원문/source699·설치hash/XML/footer/반환은 /private/tmp/drive-rest-domain-utc-multi-regression-20261110/independent-device-review/에보존한다. 최종C/D회수와#190후Main부모포함·정확head조합검증/CI는게시담당의후속이며전체이슈완료를표시하지않는다.
+
+
+### Rest schema16과 main190 제품 호스트의 최종 로컬 조합 — 2026-11-10
+
+기존 후보3139204에 정확main190 `af2ee70dee24c7ad9310372255d4b20d5ed79ee3`을 정상 부모로 포함한 소스 merge는9d7e21e97c148a77c132ff08831ff66f4260b308이다. Rest42파일 모두c28원문과바이트동일하며 B18+ActualMainResults시험1/PNG2·Location6·기존공급을 보존했다. core/Gradle/Manifest도main190과같다. 생산소스충돌/임의추가수정0이고 문서3곳의동시추가는양쪽근거를보존해병합했다.
+
+새조합에서 :app:testDebugUnitTest·assembleDebug·lintDebug·assembleDebugAndroidTest를오프라인/JDK17로실행했다. **앱612 전부PASS·실패/오류/생략0, 제품/시험APK·Lint오류0/경고27,1분42초/78tasks(25실행53UP-TO-DATE)**이다. RestTimeline13+D원문clock3=16은612에포함된다. core/공통입력이같아기존420은재사용/이번core재실행0이며 app593/main188과app543/B main188·E569를612에더하지않는다. 최종문서후속뒤에도제품/시험소스·빌드입력이실제검사한merge와같음을확인했다. 저장소필수21/문서29/링크455·diff/source동일성검사도통과했다.
+
+C최종판정은 ACCEPT_SCOPED_METADATA_PUBLIC_READ_CODE_JVM8_AND_A_C28_C1_GREEN, D는 APPROVE_SCOPED_SQL_DAY_FIX_WITH_A_SQL4_GREEN이다. C/D는원A47의제품698동일·시험원문·설치hash/footer와각C1/D4후행12표단언GREEN을회수했다. D UTC16은기존정확source근거재사용이며새SQL47에합산하지않는다. 원9db실패와미도달·F명시축소SIMULATION·원E46쌍보존은앞절대로유지한다.
+
+새결합본의장치/ADB실행은0이다. A의c28 SQLite47과B0dd Native65·별도ActualMainResults1은각원본/조합근거이며새main190+Rest제품APK의장치성공으로쓰지않는다. 실제SDK D→이탈→재접속·Rest장소/boot/domain/권위·프로세스/전원·실차·최종UI/디자인과전체이슈완료는별도다. mainCI42833687083은메인인계당시진행중인값으로만기록한다. 원격쓰기/canonical변경0이며정확게시head·PR CI/사람리뷰예외·main반영및이슈부분동기화는게시담당이확인한다.

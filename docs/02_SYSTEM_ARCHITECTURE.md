@@ -805,3 +805,12 @@ B 원본0dd969f는 main187에 기반한다. 새 통합은 main188의 위치 SDK 
 9db는동일boot의물리elapsed/raw중복과공개원문검증을보완한원본이다. 후속6a4의세수정은(1)물리cursor와별개로(boot,domain)UTC cursor를보존해A→B→A복귀의UTC퇴행을거절,(2)신규ack뒤실제day가paid.day와정확히맞지않으면전체rollback,(3)활성Rest근거뒤observed marker/state/receipts전체소실을진짜미활성부재로숨기지않는것이다. 새금액/기본clock/단계성공을합성하지않고과거정상원결과재생을현재day로거절하지않는다. 후속A의c28실행에서C metadata/공개읽기와D day의후행12표행보존/rollback단언까지통과했다.
 
 정상통합41파일은6a4원문과같고Main/HostSession·Location6·시설12·Results14·marker의생산API를보존했다. RankingReadSource는공통DrivingRecordReader로Rest가격원결과를읽는의도된변경이며기존Provenance hook/typedFailure catch·원출발지역검사는유지한다. marker시험은schema16fixture만원본대로갱신했다. 실제boot/domain/장소·정책권위/B opt-in·UI/SDK·프로세스/전원·실차는별도다. 원830/9db의성공과C/D/A실패·미도달을 [06](06_VERIFICATION.md#rest-6a4-세-수정의-main188-통합-검토-대기--2026-11-10)에서분리하며F복수departure1은제품불변의후속c28에시험파일로만통합했으며원E46쌍과별도조합으로보존한다.
+
+
+### Rest와 main190의 공급 경계 — 2026-11-10
+
+main190 `af2ee70dee24c7ad9310372255d4b20d5ed79ee3`을 Rest c28 후속 후보의 정상 부모로 포함했다. Rest 소스/시험/자산42파일은 정확c28과 같고 B18·ActualMainResults 정식 시험1·PNG2·Location6 및 기존 main 공급을 보존했다. 생산 소스 충돌/추가 수정0이며 README의 현재 공급 행과 양쪽02/06추가 절을 모두 보존해 문서3곳의 동시 추가 충돌만 병합했다.
+
+C는 metadata/공개 읽기의 코드·호환 JVM8과 A c28 C1 GREEN을, D는 UTC16 및 day 코드·A SQL4의 후행12표 rollback GREEN을 각 배정 범위에서 수용했다. 전체 Rest/제품 승인으로 확대하지 않는다. 새 main190 조합 자동 검사와 원 c28 실제SQLite47·기존B Native65/추가Results1은 [06](06_VERIFICATION.md#rest-schema16과-main190-제품-호스트의-최종-로컬-조합--2026-11-10)에서 구분한다.
+
+main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결은 유지하지만, Rest의 실제 boot/domain/place·정책 권위/producer·명시 opt-in과 v1 RestHostSource 소비는 이 후보에서 새로 연결하지 않았다. #189 디자인은 기능 구현 이후 검토/적용한다는 최신 지시를 유지하며 schema17 꾸미기·새 core·SDK확장·새 producer·통합모의주행을 섞지 않는다.
