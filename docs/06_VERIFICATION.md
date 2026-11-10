@@ -1473,3 +1473,19 @@ main38b3b51의 #147 계약/메모리 참조·#148 VehicleUpgrade.prepareMaterial
 설치 후 pull APK SHA가 빌드본과 두패키지 모두 일치했다. 자기 material156green2패키지를 제거하고 제품APK793e1db8·정확6파일·권한·설정·기존 전면 상태/관측 가능한 주차0 보존과 슬롯 반환을 확인했다. 기어 직접 조회는 user-build 제한으로 불가해 측정 성공으로 기록하지 않았다. AVD/서버/5580 변경은 없다.
 
 게시 담당은 최신 main과 양쪽06 기록을 정상 통합하고 수정2파일·앱 전체 tree가 검토068ce4a1과 동일함을 확인했다. 이전 장치26개를 새 게시 head 실행으로 쓰지 않으며 새 정확 head CI와 원리뷰 해결·main 공급은 [PR #156](https://github.com/Yaho03/drive-growth/pull/156)을 따른다. schema6은 material_requests 추가와 지원 v1~v5 정합 구조 fixture 이전 범위이고 옛 APK 최초 쓰기/제품DB 이전·실제 강화 UI·durable 명령/프로세스/실차와 다른 SQLite 명령은 별도다.
+
+
+### #143 원래 이력 누락 해결·head 무삽입 P2 수정
+
+작성자6bb01c7의 prev/head/count/tail 저장으로 원래 tail 소비·0ms 중간 소비 삭제 독립2개가 기대값 변경 없이 통과했다. 기존 로컬1e980d7은 별도 보존하고 중복 게시하지 않았다. 이후 head insert 반환을 무시하는 경계에서 독립18개 중17PASS/1FAIL·오류0·2.673초를 확인했다. IGNORE 시 Success remaining900000·새로그/allocator 확정·stale head라는 부분 반영이며 ABORT 비교는 rollback/재시도까지 통과했다. raw 행/head/allocator 관측을 전체 DB bytes 검사나 실제 금전/중복보상·제품DB 손실 재현으로 쓰지 않는다.
+
+위임 수정d12965e7은 반환행1을 확인해 무삽입을 기존 저장 실패 경계로 전달한다. 독립 코드 검토와 실제 정식15+원래삭제2+head ABORT/IGNORE2=19개가 API34/ARM64/사용자10 격리환경에서 모두 통과(실패/오류0·2.588초)했다. 원본 source464개와 독립 기대값/SHA를 보존했고 과거18개/실패 및 다른head 실행을 합산하지 않는다. 원래 삭제·정상gap·재생/rollback·IGNORE 같은 기대값이 포함됐다.
+
+설치 후 pull 앱/시험APK SHA가 빌드본과 일치했고 자기 rest143c2패키지 제거·활성instrumentation 없음·제품APK/정확6파일/권한·창/설정 등18개 보존 확인을 마쳤다. C의 전체lease는 이어지는 Shop 순차검증에 유지돼 전체슬롯반환으로 표시하지 않는다. 게시 담당은 수정2파일 바이트 동일성을 유지해 최신main과 기록을 정상 병합했다. 새 게시head의 새장치 실행이나 실제 위치/운전 근거·제품수익·UI/프로세스/전원·실차 성공은 아니다. 최종head/CI·원리뷰 해결·main 공급은 [PR #143](https://github.com/Yaho03/drive-growth/pull/143)을 따른다.
+
+
+### #121 첫 영업 선물 메모리 참조·초기화 통합 독립 검토 — 2026-11-10
+
+선물78cd12d의 기존 독립 코드65PASS·구조60PASS를 별도 과거 근거로 회수했다. 초기화 기존 ID 덮어쓰기 guard b0c1288을 정상 통합한88bb671의 소스466개·선물2파일/초기화2파일/공유fixture 예상 합성본 SHA 동일성을 직접 대조한 독립 검토는 APPROVE·필수0이다. 정식 선물14+가챠21+프로필22+초기화15+원문 초기화 회귀9+새 공유 경계3=84개 PASS(실패/오류/생략0,30분13초). 작성자 전체403개·기존65/60/24와 합산하지 않는다. 새 공유 경계는 초기화→선물→재생, 처분ID 초기화 거절 뒤 선물 보존, 초기화/선물 동시 확정20회(시험1개)다.
+
+이미 초기화는 #159로 main 공급됐으므로 이번 게시에는 선물 자체3파일 delta와 KDoc/문서만 남긴다. 최신 main92dd2a34와 정상 통합해 수정 소스가 독립88bb와 같은지 확인하며 새 정확 게시 head CI는 연결 PR에 기록한다. 당시03/06 과거 기록과 #151 wrapper main 공급을 유지했다. 이는 명시 SIMULATION 완료 근거의 같은 메모리 원장 참조이며, 실제 RentalLedger/live·SQLite/재개방·NEW issuer/legacy 복구·제품 UI/프로세스·SDK/실차 및 #121/#50/#122 전체 완료가 아니다. 원문 근거는 /private/tmp/drive121-init-gift-integration-20261109/independent-review/에 보존했다.

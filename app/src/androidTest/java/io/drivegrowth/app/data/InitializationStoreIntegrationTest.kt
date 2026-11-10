@@ -35,7 +35,7 @@ class InitializationStoreIntegrationTest : InstrumentationTestCase() {
     }
     fun testActualLegacyUpgradeHasIdentityButNoNewProofOrPayout() {
         ok(store.commitGameChange(GameChange(RequestId("legacy-income"),TransactionKind.RENTAL,source,content.ruleVersion,MoneyChange(MoneyDirection.CREDIT,GameMoney(17)))))
-        store.close();SQLiteDatabase.openDatabase(context.getDatabasePath(name).path,null,SQLiteDatabase.OPEN_READWRITE).use{db->db.execSQL("DROP TABLE initialization_requests");db.execSQL("DROP TABLE initialization_profile");db.execSQL("DROP TABLE first_gift_requests");db.execSQL("DROP TABLE first_gift_markers");db.version=7}
+        store.close();SQLiteDatabase.openDatabase(context.getDatabasePath(name).path,null,SQLiteDatabase.OPEN_READWRITE).use{db->db.execSQL("DROP TABLE initialization_requests");db.execSQL("DROP TABLE initialization_profile");db.execSQL("DROP TABLE first_gift_requests");db.execSQL("DROP TABLE first_gift_markers");db.execSQL("DROP TABLE host_command_checkpoint");db.version=7}
         store=open();val profile=ok(store.localProfileId());assertTrue(ok(store.readInitialization(profile)).status is ProfileInitializationStatus.Unknown)
         assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),FirstGrant(content).choose(store,profile,VehicleId("hyundai_casper")));assertEquals(GameMoney(17),ok(store.balance()))
         store.close();store=open();assertEquals(profile,ok(store.localProfileId()))

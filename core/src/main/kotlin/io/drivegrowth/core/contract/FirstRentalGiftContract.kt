@@ -47,7 +47,8 @@ sealed interface FirstRentalGiftPreparation {
 }
 
 /**
- * 구현은 후속이다. 같은 요청/전체 명령은 최초 전체 결과, 다른 요청/원인/내용의 이미 지급된 프로필은 STATE_CONFLICT다.
+ * testFixtures의 같은 메모리 원장 참조가 제공된다. 실제 SQLite/live 공급은 후속이다.
+ * 같은 요청/전체 명령은 최초 전체 결과, 다른 요청/원인/내용의 이미 지급된 프로필은 STATE_CONFLICT다.
  * 다른 종류의 기존 요청 ID도 STATE_CONFLICT다. 현재 상태 조회보다 원래 요청/최초 결과 재생을 먼저 검사한다.
  * #116 최초 완료 정산은 같은 프로필/출처 원장에서 읽고 프로필 마커·현재 GachaProgress revision과 같은 잠금/DB에서 검사한다.
  * 저장 측은 granted의 command/transaction(GARAGE·money=null)/progress/marker 연결을 검증한 뒤 공급한다.
