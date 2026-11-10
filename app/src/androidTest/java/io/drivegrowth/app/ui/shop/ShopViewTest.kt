@@ -143,4 +143,40 @@ class ShopViewTest : InstrumentationTestCase() {
         assertEquals(Revision(5),(events.single() as ShopEvent.Submit).request.selection.revision)
     }
 
+
+    fun testSceneUsesAppWidthAndKeepsUnknownFactsInNarrowAndWideWindows() {
+        val state = ShopPreviewStates.normal().copy(name = "긴 가게 이름과 확인해야 할 간판 문구", capacity = 6)
+        val view = onUi { ShopView(instrumentation.targetContext) {}.apply { render(state,true) } }
+        for (width in listOf(480,936,1360)) {
+            layout(view,width,650);onUi { view.render(state,true) };layout(view,width,650)
+            onUi {
+                val scene = view.findViewWithTag<ShopSceneView>("shop:scene")
+                assertTrue(scene.width > 0);assertTrue(scene.height > 0)
+                if(width>=840) assertTrue("전경은 관리 열보다 넓어야 함",scene.width>view.findViewWithTag<View>("shop:controls-scroll").width)
+                val bitmap=android.graphics.Bitmap.createBitmap(scene.width,scene.height,android.graphics.Bitmap.Config.ARGB_8888)
+                scene.draw(android.graphics.Canvas(bitmap))
+                assertTrue("실제 전경 드로잉",bitmap.getPixel(scene.width/2,scene.height/2)!=bitmap.getPixel(scene.width/2,scene.height-3))
+                bitmap.recycle()
+            }
+        }
+        onUi {
+            view.render(ShopPreviewStates.missing(),true)
+            assertTrue(view.findViewWithTag<ShopSceneView>("shop:scene").contentDescription.contains("미제공"))
+            assertFalse(text(view).contains("0 게임머니"))
+            view.render(state,false);assertNull(view.findViewWithTag<View>("shop:scene"))
+        }
+    }
+    fun testSceneModeAndScrollRestoreDoNotCreateTransactionsOrPreviewSuccess() = onUi {
+        val events=mutableListOf<ShopEvent>();val state=ShopPreviewStates.normal()
+        val view=ShopView(instrumentation.targetContext,events::add)
+        view.restoreUiState(ShopUiState(mode=ShopMode.VEHICLES,sceneScrollY=180,controlsScrollY=240));view.render(state,true)
+        assertEquals(ShopMode.VEHICLES,view.uiState.mode);assertEquals(180,view.uiState.sceneScrollY);assertEquals(240,view.uiState.controlsScrollY)
+        button(view,"shop:preview:expand").performClick();button(view,"shop:confirm").performClick()
+        assertEquals(1,events.size);assertFalse(button(view,"shop:mode:OVERALL").isEnabled)
+        button(view,"shop:mode:OVERALL").performClick();assertEquals(ShopMode.VEHICLES,view.uiState.mode)
+        assertEquals(5,view.findViewWithTag<ShopSceneView>("shop:scene").model.slots)
+        val saved=view.uiState;val restored=ShopView(instrumentation.targetContext,events::add)
+        restored.restoreUiState(saved);restored.render(state,true)
+        assertEquals(saved.pending,restored.uiState.pending);assertEquals(1,events.size)
+    }
 }

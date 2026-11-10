@@ -10,7 +10,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 
-/** 기존 Garage와 ui-v3의 카드·색·여백을 따른다. 새로운 자산은 사용하지 않는다. */
+/** 기존 Garage와 ui-v3의 카드·색·여백을 따른다. 중립 전경 자산은 ShopSceneView가 직접 그린다. */
 internal class ShopStyle(private val context: Context) {
     val base = Color.rgb(14, 16, 20)
     val panel = Color.rgb(26, 29, 35)
