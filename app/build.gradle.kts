@@ -19,6 +19,7 @@ android {
 }
 dependencies {
     implementation(project(":core"))
+    implementation("ai.pleos.playground:NaviHelper:3.0.5")
     compileOnly(files("${android.sdkDirectory}/platforms/android-35/optional/android.car.jar"))
     testImplementation("junit:junit:4.13.2")
     testImplementation(testFixtures(project(":core")))

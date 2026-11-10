@@ -667,6 +667,13 @@ worker 전용 `hostCommands`는 Gacha/단일 Garage GameChange/Material/Repair �
 이는 전체 GachaRequest/UI/attemptId/Bundle의 영속 codec이나 제품 프로세스 복원 구현이 아니다. 실제 동일profile/source factory·비동기 호스트 소비·첫 선물 runtime·NPC/clock/coverage·제품 Activity/프로세스·전원/실차는 후속이다. #44의 신규 Expand 후보는 이 네 명령 공급에 포함하지 않는다. 정확 게시 head/CI는 연결 PR, 실제69 메서드실행과 checkpoint23 재사용 범위는 [검증 문서](06_VERIFICATION.md#초기화첫-선물checkpoint-sqlite-통합81-독립-검증--2026-11-10)를 따른다.
 
 
+### 내 기록·시연 랭킹의 읽기 모듈 — 2026-11-10
+
+원58407d의 RankingReadSource는 기존 같은 profile/source SQLite를 한 snapshot으로 읽고6지표를 집계한다. 지급/지출·schema/helper를 바꾸지 않는다. 누적수익은 전체 확정원장/원인을 검증하고 판매·폐차를 포함·초기지급/환급 제외, 도감은ever-owned고유칸, 최고가는현재OWNED가격×희귀도수익배율이다. 기준은 [PRD](01_PRD.md#1차-랭킹-범위) 한곳을 따른다. RankingController/RankingView와 DemoRankingProvider는 실제내기록과합성참여자/예시순위를분리하고통신/계정/서버를추가하지않는다.
+
+실제0/Empty/Missing/Failure를구분한다. Android checked JSONException은지표경계의STORAGE_FAILURE로변환하고숫자를절삭하거나DB를수리하지않는다. 누적/주간이같은주행원장을검증하면그손상에서두지표가실패할수있으며모든손상에서다른5정상이라고보장하지않는다.
+
+departureZone hook은실제출발당시지역근거를요구한다. 기존LocalDate만있는기록을현재zone/정산시각/고정KST로바꾸지않고불명/다른지역은주간Missing이다. questCauses hook은같은DB의검증된원래Quest지급요청ID만공급한다. 미분류입금이있는데hook이없으면누적Missing이며잔액/미열람목록으로대체하지않는다. 실제생산자/영속근거는 #39/#45/#58/#122에서연결하고 MainActivity hook은별도다.
 ### 제품 세션·첫 실행·가챠·차량 관리의 공통 저장 소비 — 2026-11-10
 
 원cab567은 C274의 GameSessionFactory/온보딩7파일과 Garage 공급을 포함한다. MainActivity/HostSession/StoredHostSource·가챠·차량 관리가 동일 factory/profile/source/store를 소비한다. 기존 DB 모드를 보존하고 두 모드 파일 공존/잘못된 source·손상·사라진 기존 DB를 새 프로필로 바꾸지 않는다. NEW는 실제 helper 근거를 소비하고 초기화/선물 상태를 누락 보정하지 않는다. UI Bundle은 선택/요청 식별만 저장하며 NEW 근거·완료를 만들지 않는다.
@@ -717,3 +724,12 @@ D의 고정 관측 recorder7파일과 E `0681fbfe`의 저장 공급을 main178 �
 schema13은 marker·전체 상태 revision CAS·원출발 provenance를 같은 DB에 보존한다. 기능은 worker의 `activateObservedDriving(profileId)`로 명시 활성화하며 조회가 새 프로필/재화·빈 상태를 만들지 않는다. raw 비유한 관측은 gap의 double bits로 보존하고 canonical 원문으로 전체 동일성을 비교한다. 같은 거래에서 save→기존 DrivingLedger 정산→최초 결과 검증→provenance 저장/재조회→outbox ack를 처리한다. 실패·손상·출처 혼합·필수 쓰기 무갱신은 실패로 전달하고 원래 결과 재생은 현재 상태보다 우선한다. marker 없이 이력이 남은 고아 상태를 미활성으로 숨기지 않는다.
 
 출발 당시 UTC/zone/rules와 원정산을 보존하고 현재 zone/날짜로 legacy 기록을 재해석하지 않는다. 금액은 기존 중앙 TrialDefinition의 drivingIncomeRules와 DrivingLedger를 재사용하며 일500km·출발한 날 기준을 바꾸지 않는다. 휴식 효과·미관측 구간을 합성하지 않는다. main178의 foreign 명령 STATE_CONFLICT·빈 checkpoint만 null인 조회와 RentalLedger Pending.parkedSince/엄격 조회를 보존했다. 실제 신호 수신·제품 수명 연결·플랫폼/정책 허용은 이 저장 공급의 완료와 별도다.
+
+
+### 공용 세션의 제품 페이지 연결 후보 — 2026-11-10
+
+B 고정5c9514d5의 후보는 main179의 저장 공급 위에 Delivery·Progress·랭킹 페이지와 실제 내비 어댑터·관측 Driving 전달을 조립한다. 같은 GameSessionFactory/단일 worker와 기존 typed journal을 소비하며 새로운 지갑·data/helper/schema를 만들지 않는다. pending 조회의 ContractResult 실패는 그대로 전달하고, 실제로 연결한 Quest/Delivery만 해당 페이지로 안내한다. null은 보관 명령이 없을 때만 허용하며 다른 기능의 명령을 실행/취소하지 않는다. 기존 parkedSince와 schema13 원문은 유지한다.
+
+NEW Intro 자동 진입은 아직 명시 탐색하지 않은 HOME에서만 허용한다. 늦은 Intro로 명시 탐색/Back의 HOME복귀·복원 페이지를 덮지 않으며 이 UI 기억을 신규 판별/지급 증거로 사용하지 않는다. 기존 안전 gate, SDK UI-thread 큐/worker 경계·timeout/deadline과 원래 성공/실패 의미는 B 고정본 그대로다. NaviHelper3.0.5와 기존 제품 연결에 필요한 NAVI_ROUTE/NAVI_ROUTE_SEARCH 선언을 포함하며 정책 허용/실제 도착의 보장은 아니다.
+
+자동 영업 순수 방문 계획·선저장 포트가 포함되지만 실제 자동 영업 전체·시설/배치·새 종료영업 정책의 구현은 별도다. PR180의 실제 앱 이탈 경제 원점 정책과 Activity 재생성 구분을 코드에 반영한 것으로 표시하지 않는다. A의 정확5c 원본 cold-wrapper1은13.006초에 통과했다. 원래 gate·wait·Back2·복원·잔액/차량 보존의 범위이며 좌표 터치나 실제 도착/전체 기능 성공은 아니다. D의 최소 Intro 독립 재검토는 표적 JVM30개 통과·추가 필수 지적0으로 수용됐으며, A의 같은5c cold 실행 근거를 별도로 대조했다.
