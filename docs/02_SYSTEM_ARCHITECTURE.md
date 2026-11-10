@@ -616,3 +616,5 @@ SqliteGameChangeStore는 MaterialChangeStore.readMaterialState/commitMaterial을
 스키마6은 material_requests만 추가하며 지원 v1~v5의 기존 표/행/정산·렌털·발견·가챠·탁송/주행 이력을 보존한다. 이전 중 실패는 SQLiteOpenHelper 거래로 롤백하고 원본을 보존한다. 스키마5 공급이 main에 반영된 뒤 준비한 버전이며 향후 PR 머지 순서가 달라지면 재확인한다. 최초 결과 재생은 현재 버전 공급/활동/성장/처분과 독립적이며 원래 상태+명령의 순수 검증 결과, 공용 정산의 ID/출처/종류/규칙/금액/잔액/시각 및 두 역할을 대조한다. JSON 정수·금액/차량은 공용 LedgerJson decoder를 재사용해 소수/문자열/지수/범위 초과를 보정하지 않고 STORAGE_FAILURE로 반환한다. 수리/초기화/선물 실제 commit·제품 UI/권위 공급·프로세스/실차 연결과 #122 전체 완료는 별도 후속이다.
 
 재료 SQLite의 자기 material-v1 공용 정산이 남고 material_requests 행만 누락된 경우는 정상 타 기능 ID 충돌과 구분해 STORAGE_FAILURE로 거절한다. 누락 snapshot을 현재 개체에서 재구성하지 않으며 원본을 보존한다. 정상 같은 명령의 최초 전체 결과 재생·다른 입력/다른 기능 ID의 STATE_CONFLICT는 유지한다.
+
+휴식 원장의 head 쓰기도 같은 거래의 필수 확정이다. rest_head의 singleton 행1 삽입 결과를 검사하고 무삽입/실패는 STORAGE_FAILURE로 전달해 로그·head·allocator를 함께 rollback한다. 정상 seq gap을 손상으로 거절하지 않으며 연결/머리 정보의 누락 검증·같은 요청 재생·실패 재시도는 유지한다.
