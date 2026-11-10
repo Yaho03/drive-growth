@@ -39,4 +39,15 @@ class HostPendingRouteTest {
         assertEquals(RequestId("chosen"),command.operation.requestId)
     }
 
+    @Test fun providedQuestPageReturnsTypedSuccessAndGaragePreservesForeignCommand() {
+        val zone=java.time.ZoneId.of("UTC")
+        val definition=io.drivegrowth.core.quest.QuestDefinition("daily-result-viewed",RuleVersion("q"),
+            io.drivegrowth.core.quest.QuestCadence.DAILY,io.drivegrowth.core.quest.QuestAction.RESULT_VIEWED,1,GameMoney(10),zone,true)
+        val command=HostCheckpointCommand.Quest(io.drivegrowth.core.quest.QuestClaimCommand(RequestId("quest/claim/foreign"),
+            ProfileId("profile"),InputSource.SIMULATION,definition,io.drivegrowth.core.quest.QuestPeriod(
+                io.drivegrowth.core.quest.QuestCadence.DAILY,java.time.LocalDate.of(2026,11,10),zone),Revision(0)))
+        assertEquals(ContractResult.Success(HostPage.PROGRESSION),pendingHostPage(command))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),restoreGaragePending(command))
+    }
+
 }

@@ -12,6 +12,13 @@ class HostNavigation(
     var pendingGarageRequest: GarageEvent.RequestAction? = null,
     var returnPage: HostPage = HostPage.HOME,
 ) {
+    /** 초기 안내의 지연 응답. 금융/NEW 판별은 호출자의 검증된 profile에 맡긴다. */
+    fun acceptInitialIntro(profile: String?, alreadyRouted: String?, automaticEntryAllowed: Boolean): String? {
+        if (profile == null || profile == alreadyRouted) return alreadyRouted
+        if (automaticEntryAllowed && page == HostPage.HOME) page = HostPage.ONBOARDING
+        return profile
+    }
+
     fun openAward(id: OwnedVehicleId) {
         page = HostPage.GARAGE
         selectedVehicleId = id

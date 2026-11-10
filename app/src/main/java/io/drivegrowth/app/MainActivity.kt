@@ -114,6 +114,7 @@ class MainActivity : Activity() {
     private lateinit var onboarding: OnboardingView
     private var onboardingState: OnboardingScreenState = OnboardingScreenState.Loading
     private var routedNewProfile: String? = null
+    private var automaticIntroAllowed = true
     private lateinit var queries: HostQueryController
     private lateinit var session: HostSession
     private lateinit var style: GarageStyle
@@ -152,6 +153,8 @@ class MainActivity : Activity() {
             (savedInstanceState?.getInt("rankingY", 0) ?: 0).coerceAtLeast(0)))
         onboarding = OnboardingView(this, ::onOnboardingEvent)
         routedNewProfile = savedInstanceState?.getString("onboardingRoutedProfile")
+        automaticIntroAllowed = if (savedInstanceState?.containsKey("onboardingAutoEntryAllowed") == true)
+            savedInstanceState.getBoolean("onboardingAutoEntryAllowed") else savedInstanceState == null && lastNonConfigurationInstance == null
         val deliveryHandler = handler
         session = lastNonConfigurationInstance as? HostSession ?: HostSession(applicationContext, { deliveryHandler.post(it) },
             ResultsStateBundle.decode(savedInstanceState?.getBundle("results")),
@@ -228,10 +231,8 @@ class MainActivity : Activity() {
             }
             onboarding.restoreSelection(session.onboarding.uiState.selected)
             val profile = session.onboarding.uiState.identity?.profileId?.value
-            if (state is OnboardingScreenState.Intro && profile != null && routedNewProfile != profile) {
-                routedNewProfile = profile
-                navigation.page = HostPage.ONBOARDING
-            }
+            if (state is OnboardingScreenState.Intro)
+                routedNewProfile = navigation.acceptInitialIntro(profile, routedNewProfile, automaticIntroAllowed)
             render()
         }, {
             // Completed의 이동 입력 잠금은 새 View에서 초기화하고 저장 결과를 다시 공급한다.
@@ -394,6 +395,7 @@ class MainActivity : Activity() {
         outState.putBundle("results", ResultsStateBundle.encode(session.results.uiState))
         outState.putBundle("onboardingHost", OnboardingStateBundle.encode(session.onboarding.uiState))
         outState.putString("onboardingRoutedProfile", routedNewProfile)
+        outState.putBoolean("onboardingAutoEntryAllowed", automaticIntroAllowed)
         outState.putString("rankingMode", ranking.uiState.mode.name)
         outState.putString("rankingMetric", ranking.uiState.metric.name)
         outState.putInt("rankingY", ranking.uiState.scrollY)
@@ -631,6 +633,7 @@ class MainActivity : Activity() {
 
     private fun select(page: HostPage) {
         if (!allowed()) { updateAccess(); return }
+        automaticIntroAllowed = false
         navigation.page = page
         navigation.returnPage = HostPage.HOME
         updateAccess()
@@ -766,6 +769,7 @@ class MainActivity : Activity() {
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
+        automaticIntroAllowed = false
         if (allowed()) {
             if (navigation.page == HostPage.GARAGE && managementVisible && managementState != GarageCommandState.Idle) {
                 if (managementState is GarageCommandState.Confirmed) management.controller.acknowledge()
