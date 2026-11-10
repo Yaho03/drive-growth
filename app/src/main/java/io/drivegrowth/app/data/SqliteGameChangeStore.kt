@@ -322,7 +322,7 @@ internal enum class LedgerFailureReason { SQLITE, CORRUPT, UNSUPPORTED_SCHEMA, S
 private class LedgerStorageException(val reason: LedgerFailureReason) : SQLiteException(reason.name)
 
 private class LedgerHelper(context: Context, name: String, private val source: InputSource, private val initialGachaProgress: GachaProgress?) : SQLiteOpenHelper(
-    context, name, null, 11,
+    context, name, null, 12,
     // Android 기본 핸들러의 손상 DB 삭제를 막고 원본을 보존한다.
     DatabaseErrorHandler { throw LedgerStorageException(LedgerFailureReason.CORRUPT) },
 ) {
@@ -347,13 +347,14 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         HostCommandCheckpointLedger.createTables(db)
         QuestLedger.createTables(db)
         beginQuestTracking(db, true)
+        DeliveryCheckpointStorage.addColumns(db)
         initialGachaProgress?.let { GachaLedger.insertInitialProgress(db, it) }
     }
     private fun createDiscoveries(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE discoveries (vehicle_id TEXT NOT NULL, rarity TEXT NOT NULL, PRIMARY KEY(vehicle_id, rarity))")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion !in 1..10 || newVersion != 11) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
+        if (oldVersion !in 1..11 || newVersion != 12) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
         verifySource(db)
         // 기존 원장과 개체 JSON은 그대로 보존한다.
         if (oldVersion == 1) RentalLedger.createTables(db)
@@ -371,8 +372,11 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         }
         if (oldVersion < 9) FirstRentalGiftLedger.createTables(db)
         if (oldVersion < 10) HostCommandCheckpointLedger.createTables(db)
-        QuestLedger.createTables(db)
-        beginQuestTracking(db, false)
+        if(oldVersion<11) {
+            QuestLedger.createTables(db)
+            beginQuestTracking(db, false)
+        }
+        DeliveryCheckpointStorage.addColumns(db)
     }
     /** 이 버전은 세 실제 사건 hook과 함께 공급한다. onCreate 재진입 없이 이미 발급한 profile을 전달한다. */
     private fun beginQuestTracking(db: SQLiteDatabase, fresh: Boolean) {

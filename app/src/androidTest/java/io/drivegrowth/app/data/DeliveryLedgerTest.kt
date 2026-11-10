@@ -132,7 +132,7 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.balance())
         store.close()
         assertTrue(before.contentEquals(file.readBytes()))
-        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db -> db.version = 11 }
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db -> db.version = 12 }
         store = open()
     }
 

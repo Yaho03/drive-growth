@@ -97,13 +97,13 @@ class QuestStoreIntegrationTest: InstrumentationTestCase() {
     }
     fun testV10UpgradePreservesOriginalRowsAndKeepsEarlierPeriodUnknown() {
         val r=receipt();ok(store.markViewed(r.settlementId));val before=rows().filter{!it.startsWith("quest_")};store.close()
-        raw{db->listOf("quest_events","quest_claims","quest_tracking").forEach{db.execSQL("DROP TABLE $it")};db.version=10}
+        raw{db->listOf("quest_events","quest_claims","quest_tracking").forEach{db.execSQL("DROP TABLE $it")};stripDeliveryCheckpointFixture(db);db.version=10}
         store=open();assertEquals(profile,ok(store.localProfileId()));assertEquals(before,rows().filter{!it.startsWith("quest_")});assertTrue(states().all{it.status==QuestStatus.UNKNOWN&&it.count==null})
         ok(store.markViewed(r.settlementId));raw{db->db.rawQuery("SELECT COUNT(*) FROM quest_events",null).use{it.moveToFirst();assertEquals(0,it.getInt(0))}}
     }
     fun testV10MigrationFailurePreservesVersionAndWholeFile() {
         store.close();raw{it.version=10};val file=context.getDatabasePath(name);val before=file.readBytes();store=open()
-        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.balance());store.close();assertTrue(before.contentEquals(file.readBytes()));raw{assertEquals(10,it.version);it.version=11};store=open()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.balance());store.close();assertTrue(before.contentEquals(file.readBytes()));raw{assertEquals(10,it.version);it.version=12};store=open()
     }
     fun testQuestNamespaceReservedFromNewGenericAndCheckpointCommands() {
         val change=GameChange(RequestId("quest/claim/wrong-owner"),TransactionKind.GARAGE,source,definition.rules,MoneyChange(MoneyDirection.CREDIT,GameMoney(1)))

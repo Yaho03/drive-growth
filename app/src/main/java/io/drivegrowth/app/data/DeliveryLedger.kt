@@ -170,6 +170,9 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
     }
 
     /** 현재 활성 의뢰. 없으면 null이다. */
+    /** 실제 보류 대금/변경 사용 여부. 조회는 상태를 바꾸지 않는다. */
+    fun terms(): ContractResult<DeliveryTerms?> = store.atomic { db -> ContractResult.Success(readTerms(db)) }
+
     fun active(): ContractResult<ActiveDelivery?> = store.atomic { db -> ContractResult.Success(readActive(db)) }
 
     /**

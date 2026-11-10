@@ -27,7 +27,7 @@ class TrialQuestDefinitionsTest {
     @Test fun missingOrUnexpectedQuestKeyIsFailureWithoutSyntheticDefault() {
         val d=definition()
         for(numbers in listOf(d.questRewards-"daily-result-viewed",d.questRewards+("unknown" to TrialQuestNumbers(1,GameMoney(1))))) {
-            val malformed=TrialDefinition(d.expansions,d.rentalRates,d.facilityOffers,d.fuelBonusPerRental,numbers,d.provenance)
+            val malformed=TrialDefinition(d.expansions,d.rentalRates,d.facilityOffers,d.fuelBonusPerRental,numbers,d.provenance,d.delivery,d.driving)
             assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),malformed.questDefinitions(ZoneId.of("UTC")))
         }
     }
