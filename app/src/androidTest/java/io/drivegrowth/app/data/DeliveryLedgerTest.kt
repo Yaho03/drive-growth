@@ -54,7 +54,7 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
     }
 
     private val deliveryTables = listOf("delivery_lists", "delivery_requests", "delivery_active", "delivery_routes",
-        "delivery_outcomes", "delivery_held", "delivery_changes", "driving_days", "driving_drives", "delivery_route_history", "delivery_hold_outcomes", "material_requests", "repair_requests")
+        "delivery_outcomes", "delivery_held", "delivery_changes", "driving_days", "driving_drives", "delivery_route_history", "delivery_hold_outcomes", "material_requests", "repair_requests", "initialization_requests", "initialization_profile", "first_gift_requests", "first_gift_markers", "host_command_checkpoint")
 
     fun testV4MigrationPreservesExistingMoneyVehiclesDiscoveryAndProgress() {
         val before = ok(store.listUnviewedSettlements())
@@ -132,7 +132,7 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.balance())
         store.close()
         assertTrue(before.contentEquals(file.readBytes()))
-        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db -> db.version = 7 }
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db -> db.version = 10 }
         store = open()
     }
 

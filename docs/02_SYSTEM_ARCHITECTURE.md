@@ -138,7 +138,7 @@ Manifest의 `distractionOptimized=true`와 `dataSync` Foreground Service 선언,
 
 ## 첫 병렬 구현의 공통 계약 초안
 
-#27 작업 산출물이다. 아래는 기능 담당자가 검토할 문서 계약이며 Kotlin 모델·DB 구현 완료가 아니다. 제품 규칙의 미정값은 #24에서 정한다. 첫 구현에서 필요한 경계를 먼저 정하고 온라인·전체 콘텐츠까지 한 번에 확정하지 않는다.
+#27 작업 산출물이다. 아래는 기능 담당자가 검토할 문서 계약이며 Kotlin 모델·DB 구현 완료가 아니다. 미정 숫자는 [PRD 시연용 시험값 운영](01_PRD.md#1차-시연용-시험값-운영)에 따라 버전 있는 단일 정의/provider로 공급하고, 수치 밖의 미정 제품 의미·정책은 #24에서 정한다. 첫 구현에서 필요한 경계를 먼저 정하고 온라인·전체 콘텐츠까지 한 번에 확정하지 않는다.
 
 ### 타입·식별자·입력 출처
 
@@ -493,7 +493,7 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 | #37 후보·선택 | 일자/거리 구간/출처·목적지/경로 세대·관측/예상 거리·콘텐츠/규칙·고정 후보/다음 번호·선택 → 저장 목록·활성 한 건·전체 선택 요청 이력/당시 결과. 구매 결제와 선택을 같은 확정으로 처리 | #112 계산 유지. 정원이 DeliveryLedger·직렬화·시험과 후보별 발견 키를 공급, D가 실제 표시된 목록 ID/버전·희귀도 있는 구매 후보 키를 전달하고 경민의 검토된 발견 저장 API로 기록한다. 미선택 후보도 발견/미획득으로 유지하며 생성만 한 미표시 후보·희귀도 없는 수익 후보에 키를 만들지 않는다. 경민이 공용 연결 책임. [#37 조율](https://github.com/Yaho03/drive-growth/issues/37#issuecomment-6705230075)의 분담·원자성·출처/요청 ID 조건 유지 |
 | #38 변경·취소 | 활성 의뢰 ID/revision·원래 결제/사용한 변경 기회·실제+새 예상 거리·새 선택/차액·규칙 → 변경/포기·차액 결제/환급·기회 소비·이력. 한 요청으로 확정 | #112 선택/오류 재사용, 독립 계산 가능. 잔액 부족이면 원래 의뢰/돈/기회 유지. 최저 희귀도·취소 최소액 등 #24 제안은 확정 전 |
 | #39 도착·정산·임시 보관 | 활성 의뢰/revision·현재 경로와 연결 가능한 도착 증거·출처/시각·확인된 주행 구간·기한·보관 상태 → 수익/차량 지급 또는 확인 대기. 완료 슬롯 교체도 같은 거래 | 증거 부족은 대기·미지급. P·거리0·앱 보관 routeId만으로 도착 추정 금지(#80). 구매 만차의 24시간 보관/수령과 기한 뒤5% 공제, 미도착24시간 전액 환급은 서로 다른 상태·중복 방지 필요 |
-| #41~#44 영업·시설 | 방문/대여 ID·개체/revision·유형/요금·고객/사고 고정값·검증 구간/원래 주차시각·시설/확장 규칙 → 배정·정산·반납·영업 쉬기·가게/공간 snapshot | RentalLedger의 assign/account/pending/settle/finishReturn/activity/setResting/shop/buy/expand 유지. 신규 원장 대신 콘텐츠/차량 입력 어댑터 보완. 방문 건수와 완료 고객 기준을 동일시하지 않음. pending은 원래 parkedSince를 반환하지 않으므로 복원 입력을 보완. setResting은 현재 ID/불리언만 받으므로 UI 요청 동일성/최신 상태 대조를 연결부에서 구체화. [기존 동의된 시험값](01_PRD.md#기존-동의된-대여확장-시험값)은 버전 있는 정의로 공급한다. 일반Lv1 대여 기준을 모든 차종 요금으로 채우지 않고 확장은 확정 완료 고객 근거를 조회한다. 20종별 시간당료·고객 분포·미제공 시설 비용/효과·단골은 별도 정의/공급 대기 |
+| #41~#44 영업·시설 | 방문/대여 ID·개체/revision·유형/요금·고객/사고 고정값·검증 구간/원래 주차시각·시설/확장 규칙 → 배정·정산·반납·영업 쉬기·가게/공간 snapshot | RentalLedger의 assign/account/pending/settle/finishReturn/activity/setResting/shop/buy/expand 유지. 신규 원장 대신 콘텐츠/차량 입력 어댑터 보완. 방문 건수와 완료 고객 기준을 동일시하지 않음. pending은 #167에서 원래 parkedSince의 엄격 조회를 공급하며 실제 검증clock/coverage 복원 입력은 연결부에서 보완. setResting은 현재 ID/불리언만 받으므로 UI 요청 동일성/최신 상태 대조를 연결부에서 구체화. [기존 동의된 시험값](01_PRD.md#기존-동의된-대여확장-시험값)은 버전 있는 정의로 공급한다. 일반Lv1 대여 기준을 모든 차종 요금으로 채우지 않고 확장은 확정 완료 고객 근거를 조회한다. 20종별 시간당료·고객 분포·미제공 시설 비용/효과·단골은 별도 정의/공급 대기 |
 | #49 수리·처분 | 개체/revision·확정 사고 누계/활동·차종가/취득액·최신 규칙 → 수리비/회복 또는 판매/폐차금·lifecycle·당시 정산. 사고 이력 보존·영업 점유와 같은 DB에서 검사 | 기존 단일 Update를 재사용. salePrice의 레벨 가산·실제 취득액 기준과 repairCost의 희귀도 비용 배율은 위 「#49 수리·판매·폐차 금액 계산」에 반영. 수리비 차감+NEEDS_REPAIR 종료는 원자 명령 확장. #116 반영된 사고 조회를 소비하며 처분 계획과 실제 저장/수리 연결을 구분 |
 | #46 도감·활동 | 처분 포함 획득/검증된 발견 키·출처/버전·활동/영업 쉬기 → Garage.collection/availableForRental의 입력 | Garage·현재 보유 조회·RentalLedger 활동은 유지. #116 API는 main 제공이며 #140의 core 소비는 snapshot 수정·재검토 후 main 공급. 제품 mapper의 DATA_UNAVAILABLE 경계는 후속 연결. 획득은 실제 지급에, 발견은 실제 표시한 탁송 후보/가챠 결과에 연결. 미선택 구매 후보도 발견으로 보존하며 발견 저장 실패를 기록 성공으로 표시하지 않음 |
 | #45 퀘스트·업적·채택 이벤트 | 버전 있는 정의(ID·기간/시간대·목표·보상·조건) + 중복 제거 가능한 원인 이벤트 ID/출처/확정 ID → 진행/완료/수령/만료 snapshot. 보상·수령 마커를 한 거래로 확정 | 기본 주행/탁송/영업/강화/수집 이벤트를 재생해도 진행/지급 한 번. 정의는 #24·#35, 계산은 경민, 공통 수령 저장은 후속. 제외된 거리 목표·주말/시즌을 생성하지 않음 |
@@ -506,7 +506,7 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 
 1. 기간 delta와 절대 시각을 분리한다. 같은 부팅의 elapsed는 순서·관측 간격용, UTC는 영속 사건/기한/일자 근거다. 재부팅·시계 역행·출처 혼합·관측 공백을 확인된 주행으로 채우지 않는다. #43의 기존 주차30분/30%/8시간 커서를 재사용하고 #40의 state.copy 시험을 SQLite 복원으로 바꾸지 않는다. 짧은 P 정차 합산·일반 주차 중 소모 정책은 #24의 미확정 항목이다.
 2. 첫 지급·최초 영업 선물·가챠/강화/수리·시설·탁송·보상 수령은 동일 DB의 요청 이력과 점유/용량을 대조한다. 기존 SQLite Update가 이미 검사하는 RENTED/RETURNING/NEEDS_REPAIR 제한은 유지하고 다중 개체·수리 회복·최종 공간 조건만 필요한 구간에 확장한다.
-3. 현재 main은 #116 schema3·#136 schema4를 보존하는 #139 통합 schema5를 제공한다. 후속 이전은 경민·정원이 실제 머지 순서로 조율한다. **미래 버전 번호를 여기서 확정하지 않는다.** #116 반영본 위에서 탁송 공용 연결을 갱신하는 기본 순서와 독립 Ledger 작업의 병렬 진행은 #37 댓글을 따른다. 같은 버전에 서로 다른 스키마를 만들지 않는다.
+3. 현재 공용 저장소는 #139 schema5·#156 schema6·#162 schema7을 보존하고 아래 초기화/선물/checkpoint의 통합 schema10을 제공한다. 후속 이전은 경민·정원이 실제 머지 순서로 조율한다. **미래 버전 번호를 여기서 확정하지 않는다.** #116 반영본 위에서 탁송 공용 연결을 갱신하는 기본 순서와 독립 Ledger 작업의 병렬 진행은 #37 댓글을 따른다. 같은 버전에 서로 다른 스키마를 만들지 않는다.
 4. 테이블 이전과 개체 payload 복구는 별개다. 기존 schema1의 새 필드 없는 개체/정산·처분 이력은 자동 COMMON/0이나 빈 NEW로 바꾸지 않는다. 지원 구버전의 원본/부속 파일 보존·이전 실패 롤백, 알 수 없는/미래 버전 거절, 모든 조회의 엄격한 숫자/불리언 검증을 저장 후속에서 시험한다. 복구·사용자 초기화·백업 채택 정책은 #24 결정 전 임의 구현하지 않는다.
 5. 계약 후속은 소비 파트의 정상/누락/충돌/정책 미정 fixture와 전체 요청 재생을 검증하고, 저장 후속은 실제 SQLite에서 두 요청 경쟁·다중 개체 한쪽 실패·커밋 전/후 장애·현재 상태 변화 뒤 재생·오연결/손상·DB 재개방·지원 버전 이전을 검증한다. Activity 재생성·DB 재개방·프로세스 재시작은 각각 별도 근거다. 기능 PR의 실제 소비 뒤 #28에서 연결·UI 제한·버전/출처·중복 지급을 확인한다. 이 문서 작성은 제품 시험 통과 근거가 아니다.
 
@@ -607,7 +607,7 @@ GachaHostController는 확인 입력을 입구에서 한 번 고정하고 같은
 
 GachaOffers는 기존 appliedPercent와 선택적 GachaRatio를 받는다. GachaRatio는 모든 Rarity의 원시 Long 가중치·양수 Long 분모를 불변 Map으로 보존하고 음수/키/합을 검사한다(BigInteger 합으로 overflow 방지). 둘 중 하나는 필요하며 함께 주면 percent×분모=가중치×100을 정확히 비교한다. 일반 회차는 기존74.7/20/5/0.3%를 유지하고 보장 회차는0/53·0/53·50/53·3/53을 직접 표시한다. 임의 반올림·합100 잔여 배분·core 확률 변경 없이 정상 prepare/commit/retry로 이어진다. 순환소수는 정책 미정 오류가 아니다. 실제 권위/보장 후보 누락은 기존 오류를 유지한다.
 
-보존 입출력은 GachaHostState의 generation·pending GachaRequest(전체 확인 입력/attemptId)·GachaCommand 전체다. 같은 프로필의 최신 GachaUiState도 함께 복원하고 이전 owner는 release한다. durable checkpoint/codec와 MainActivity 조립은 미제공이며 새 DB/SharedPreferences를 만들지 않았다. 누락 command를 명시적 미준비 null로 보정하지 않는다. freeTickets가 기존 UI Int 범위를 넘으면 0으로 채우지 않고 DATA_UNAVAILABLE다.
+보존 입출력은 GachaHostState의 generation·pending GachaRequest(전체 확인 입력/attemptId)·GachaCommand 전체다. 같은 프로필의 최신 GachaUiState도 함께 복원하고 이전 owner는 release한다. durable checkpoint/codec와 Draw를 포함한 GachaHostController의 제품 조립은 미제공이다. 아래 MainActivity의 GachaBrowseHost는 조회만 연결하며 새 DB/SharedPreferences를 만들지 않았다. 누락 command를 명시적 미준비 null로 보정하지 않는다. freeTickets가 기존 UI Int 범위를 넘으면 0으로 채우지 않고 DATA_UNAVAILABLE다.
 
 ### #122 재료 강화 SQLite 확정 경계
 
@@ -615,7 +615,7 @@ SqliteGameChangeStore는 MaterialChangeStore.readMaterialState/commitMaterial을
 
 확정 순서는 기존 재료 요청/최초 결과의 무결성 검증·동일 명령 재생 → 공용 요청 ID 충돌 검사 → 최신 버전/revision/활동/잔액 검증 → 두 차량·비용·공용 정산·최초 전체 결과 저장이다. 서로 다른 요청이 같은 재료를 소비하거나 배정/처분과 경쟁하면 같은 DB 거래의 현재 조건으로 판정한다. 단일 GameChange 두 건으로 나누지 않는다. 공용 settlements에는 동일 거래의 메타데이터를 연결하고, material_requests에는 전체 명령·검증 당시 상태·역할별 두 snapshot을 포함한 최초 MaterialSettlement를 저장한다. 두 역할을 현재 차량이나 nullable 단일 changedVehicle에서 재구성하지 않는다. 비용0은 money=null이며 가짜0원 결제를 만들지 않는다. 기존 가챠/대여 방문/무금액 탁송 선택과 요청 ID 공간을 공유한다.
 
-스키마6은 material_requests만 추가하며 지원 v1~v5의 기존 표/행/정산·렌털·발견·가챠·탁송/주행 이력을 보존한다. 이전 중 실패는 SQLiteOpenHelper 거래로 롤백하고 원본을 보존한다. 스키마5 공급이 main에 반영된 뒤 준비한 버전이며 향후 PR 머지 순서가 달라지면 재확인한다. 최초 결과 재생은 현재 버전 공급/활동/성장/처분과 독립적이며 원래 상태+명령의 순수 검증 결과, 공용 정산의 ID/출처/종류/규칙/금액/잔액/시각 및 두 역할을 대조한다. JSON 정수·금액/차량은 공용 LedgerJson decoder를 재사용해 소수/문자열/지수/범위 초과를 보정하지 않고 STORAGE_FAILURE로 반환한다. 수리 SQLite commit은 아래 #162로 공급됐고 초기화/선물 SQLite·제품 UI/권위 공급·프로세스/실차 연결과 #122 전체 완료는 별도 후속이다.
+스키마6은 material_requests만 추가하며 지원 v1~v5의 기존 표/행/정산·렌털·발견·가챠·탁송/주행 이력을 보존한다. 이전 중 실패는 SQLiteOpenHelper 거래로 롤백하고 원본을 보존한다. 스키마5 공급이 main에 반영된 뒤 준비한 버전이며 향후 PR 머지 순서가 달라지면 재확인한다. 최초 결과 재생은 현재 버전 공급/활동/성장/처분과 독립적이며 원래 상태+명령의 순수 검증 결과, 공용 정산의 ID/출처/종류/규칙/금액/잔액/시각 및 두 역할을 대조한다. JSON 정수·금액/차량은 공용 LedgerJson decoder를 재사용해 소수/문자열/지수/범위 초과를 보정하지 않고 STORAGE_FAILURE로 반환한다. 수리 SQLite commit은 아래 #162로 공급됐고 초기화/선물 SQLite는 아래 schema10으로 부분 공급하며 제품 UI/권위 공급·프로세스/실차 연결과 #122 전체 완료는 별도 후속이다.
 
 재료 SQLite의 자기 material-v1 공용 정산이 남고 material_requests 행만 누락된 경우는 정상 타 기능 ID 충돌과 구분해 STORAGE_FAILURE로 거절한다. 누락 snapshot을 현재 개체에서 재구성하지 않으며 원본을 보존한다. 정상 같은 명령의 최초 전체 결과 재생·다른 입력/다른 기능 ID의 STATE_CONFLICT는 유지한다.
 
@@ -630,4 +630,45 @@ SqliteGameChangeStore는 MaterialChangeStore.readMaterialState/commitMaterial을
 
 전체 RepairCommand와 지급 전 RepairState 및 당시 전체 RepairSettlement를 repair_requests에 보존한다. 공용 settlements/지갑/차량/대여 테이블을 재사용하며 비용 차감·revision+1·NEEDS_REPAIR→IDLE·두 종류의 정산 기록을 한 거래로 확정한다. 사고 이력·영업 쉬기·희귀도·레벨/진행량·취득 정보는 보존한다. 비용0은 money=null이다. 원래 전체 결과를 현재 콘텐츠/활동보다 먼저 검증·재생하며 다른 전체 입력/도메인 ID는 충돌, 한쪽 이력 누락·손상은 STORAGE_FAILURE다. 원래 결과를 현재 값으로 재구성하지 않는다.
 
-스키마7은 repair_requests만 추가하고 지원 v1~v6의 기존 표/행을 보존한다. 실제 원격 머지 순서에서 번호를 다시 확인한다. 기존 구조 fixture의 schema7 준비 보완은 최종3c473dd의 시험 호환 커밋으로 실제 반영했으며 독립 실제 장치에서 수리23개·호환 표적7개로 이전/실패 rollback·다중 연결/재개방을 확인했다. 정합 구조 fixture이며 실제 옛 APK 제품 DB 이전·프로세스/실차 성공은 아니다. 초기화/첫 선물의 SQLite와 제품 관리 UI/프로세스 연결·전체 #122/#49는 후속이다.
+스키마7은 repair_requests만 추가하고 지원 v1~v6의 기존 표/행을 보존한다. 실제 원격 머지 순서에서 번호를 다시 확인한다. 기존 구조 fixture의 schema7 준비 보완은 최종3c473dd의 시험 호환 커밋으로 실제 반영했으며 독립 실제 장치에서 수리23개·호환 표적7개로 이전/실패 rollback·다중 연결/재개방을 확인했다. 정합 구조 fixture이며 실제 옛 APK 제품 DB 이전·프로세스/실차 성공은 아니다. 초기화/첫 선물 SQLite는 아래 schema10으로 부분 공급하며 제품 관리 UI/프로세스 연결·전체 #122/#49는 후속이다.
+
+
+수리 account 무갱신 추가 경계: RepairLedger의 잔액 UPDATE는 영향행이 정확히1인지 검사한다. 예외 없는0행 갱신도 저장실패로 전달해 같은 atomic 경계의 차량/활동·공용/수리 기록을 전부 rollback한다. 원래 전체 명령의 재생 우선순위는 유지하고 현재 상태 검사로 과거 결과를 바꾸지 않는다. 원래3c의 RED와 수정51e의 같은 회귀 GREEN은 [06](06_VERIFICATION.md)의 후속 근거를 따른다.
+
+
+### 렌터카 runtime의 고정 입력·확인 구간 연결 — 2026-11-10
+
+`app.runtime.rental.SqliteRentalRuntimeSource`는 명시 store factory가 연 같은 출처의 기존 RentalLedger에 고정 RentalVisit을 assign하고, 확인된 RentalTick에서 account→settle→finishReturn을 호출한다. 별도 영업 원장/고객 난수/수익 산식은 없다. Pending은 기존 parked_since를 엄격 정수로 읽어 원래 연속 주차 기준을 반환한다. source/clock/부팅 불일치·미래/역행·관측 공백은 실패/대여별 보류이며 미수신 구간을 Driving으로 바꾸지 않는다. epoch/elapsed는 공급자가 같은 부팅에서 보정한 쌍이어야 하고, 관측만료/실제 P·연속주차 판정·bootId 발급은 입력 공급 책임이다. runtime는 정상수익/감액을 직접 계산하지 않는다.
+
+RentalRuntime는 UI 진입과 worker 저장 실행을 분리하고 한 작업만 수락한다. stop은 대기 작업·늦은 응답을 폐기하지만 이미 시작한 원장 확정을 취소하지 않는다. 재개 시 read/refresh와 원래 고정 방문 명령으로 조회/재생한다. 각 대여의 account·정산은 기존 원장의 개별 확정 경계이며 여러 대여를 하나의 원자 거래로 취급하지 않는다. firstCompleted는 실제 CompletedRental과 rentalId/settlementId를 반환하며 선물 지급을 수행하지 않는다. 방문 수와 완료 고객 수를 혼용하지 않는다.
+
+이 공급은 자동 NPC 방문 정의·버전 있는 제품 요금/시설 정책·실제 차량 관측/시계·프로필 store factory·Activity/UI와 연결된 상태가 아니다. 정의 없음은 DATA_UNAVAILABLE/명시 실패로 전달하고 시험용 SIMULATION 입력과 제품 공급을 구분한다. 원래 주차 시각만으로 앱 종료 중 공백을 연속 P로 추정하지 않는다. 고정 SIMULATION 입력의 독립 실제SQLite10개는 원본eb096에서 통과했다. 최신 게시head 재실행·프로세스/전원·제품 영업 성공은 아니며 실제 NPC/정의·coverage/clock·factory/Activity 연결은 후속이다.
+
+
+### #51 실제 가게 HOME·탐색과 가챠 조회 연결
+
+2026-11-10 호스트 연결: `MainActivity`의 HOME은 `ShopView`이며 `ShopHostMapper`가 기존 `StoredHostSource`의 순차 `HostSnapshot`을 표시한다. 잔액/개체 ID/이름·활동·양수 capacity는 실제 공급 결과만 쓰며 누락 활동은 미확인, 가게 레벨·시설·확장/꾸미기 명령은 공급 전까지 미지원이다. appearance의 간판·색은 고정 표시 스타일이며 저장 꾸미기 상태가 아니다. Shop revision은 표시 세대이고 DB/거래 revision이 아니다. 실제 초기화/승인 견적을 대신하지 않는다.
+
+HostSession의 같은 worker에서 `StoredGachaHostSource`→기존 `GachaStoreHostSource.read`를 연결한다. 현재 권위 부재는 DATA_UNAVAILABLE, 다른 조회 실패는 원래 오류다. 전체 요청/명령의 durable checkpoint/load가 미제공이라 실제 제안이 있어도 UNSUPPORTED로 표시해 Draw를 활성화하지 않는다. 메모리 checkpoint 성공으로 영속 보존을 가장하지 않으며 prepare/commit은 이 조회 호스트가 호출하지 않는다. 초기화도 실제 NEW/SQLite 공급 전에는 기존 Onboarding Unavailable을 유지한다. 필요한 입출력은 기존 #121/#122의 저장 연결 범위다.
+
+가챠 조회 호스트는 workGeneration(비동기 작업 무효화)과 frameGeneration(표시 세대)을 분리한다. Loading과 terminal Missing/Failure/Offers마다 표시 세대를 전진시켜 UI의 같은 세대 다른 내용 거절 규칙을 유지한다. 예전649의 Loading 잔류는 수정360에서 같은 고정 회귀와 실제 native terminal로 해결했으며 오래된 작업/gate 거절을 완화하지 않았다.
+
+
+### 초기화·첫 영업 선물·명령 checkpoint의 공통 SQLite 공급 — 2026-11-10
+
+원81bbaf30의 `SqliteGameChangeStore`는 같은 DB의 InitializationChangeStore/FirstRentalGiftStore와 `localProfileId()`/`hostCommands`를 제공한다. schema8은 초기화 프로필·전체 요청, schema9는 첫 영업 선물의 마커·전체 요청, 통합 schema10은 미확정 호스트 명령 표를 추가한다. 실제 helper의 onCreate에서만 빈 DB 검증 뒤 NEW 근거를 발급하며 기존 v1~v9 이전은 원본 표/행을 보존하고 기존 프로필에 신규 지급 근거를 만들지 않는다. 이전 실패·미래 버전은 원본을 보존한다. 빈 차고·이력 부재에서 신규로 추정하지 않는다.
+
+초기화는 같은 원장의 재화/첫 개체/공간/프로필 마커·전체 결과를, 선물은 실제 첫 완료 영업 rentalId/settlementId/source와 연결한 무료권1/진행 revision·마커/공용 정산·전체 결과를 함께 확정한다. 같은 전체 명령의 최초 결과는 현재 권위/후보/성장/처분·진행보다 먼저 재생한다. 손상/한쪽 누락은 STORAGE_FAILURE이며 0/정상 미지급으로 보정하지 않는다. 초기화 고아 정산 검사는 공백 JSON에도 적용하고, 선물 NEW 확정 끝의 전체 결과 재조회가 실패하면 같은 거래를 rollback한다. 초기화 이후 일반 Add도 공용 공간을 검사한다. 원래 수리 계좌 guard와 RentalRuntime은 유지한다.
+
+worker 전용 `hostCommands`는 Gacha/단일 Garage GameChange/Material/Repair 네 core 명령의 원래 typed 내용과 프로필·출처를 저장한다. save→execute→finish, 시작 load·원래 STARTED 복구, 명시 cancelUnstarted(SAVED)를 구분한다. checkpoint 자체는 완료 거래의 requestId 점유 목록에 넣지 않아 자기 실행을 막지 않으며 기존 완료 이력 namespace는 유지한다. 기존 decoder·원자 거래와 엄격 숫자 검증을 재사용한다.
+
+이는 전체 GachaRequest/UI/attemptId/Bundle의 영속 codec이나 제품 프로세스 복원 구현이 아니다. 실제 동일profile/source factory·비동기 호스트 소비·첫 선물 runtime·NPC/clock/coverage·제품 Activity/프로세스·전원/실차는 후속이다. #44의 신규 Expand 후보는 이 네 명령 공급에 포함하지 않는다. 정확 게시 head/CI는 연결 PR, 실제69 메서드실행과 checkpoint23 재사용 범위는 [검증 문서](06_VERIFICATION.md#초기화첫-선물checkpoint-sqlite-통합81-독립-검증--2026-11-10)를 따른다.
+
+
+### 확장 조건의 확정 완료 고객 조회 — 2026-11-10
+
+원542649a의 RentalLedger.completedRentalCount()는 같은 DB의 rentals/settlements를 기존 decodeCompleted로 검증하고 rentalId/settlementId 고유 건수를 반환한다. 누락·손상·공유 정산/정확 소문자 rental/settle/ 고아는 STORAGE_FAILURE이며 정상0/미완료로보정하지않는다. 타 도메인 대문자 prefix는 자기 고아로 취급하지 않는다.
+
+expand는 기존 purchase atomic 안에서만 완료수를 preview의 servedCustomers에 공급하고 단계/공간/차감을 함께확정한다. 원래 동일 전체요청 replay를 현재조건보다먼저 유지한다. shop().servedCustomers의 방문수·보험/buy 의미는바꾸지않으며 제품미리보기는별도completedRentalCount를소비해야한다. 현재원래정산이검증되면무료/사고영업도완료이며현개체/잔액으로과거완료를추정하지않는다.
+
+최신main Runtime Pending의 parkedSince/엄격정수조회를정상통합해보존했다. helper/schema/새원장은변경하지않았다. 이부분은버전있는실제확장정의·시설비용/효과·제품source/UI·영속Expand명령모두를제공하지않으며동의된시험값은 [PRD](01_PRD.md#기존-동의된-대여확장-시험값)를따른다.
