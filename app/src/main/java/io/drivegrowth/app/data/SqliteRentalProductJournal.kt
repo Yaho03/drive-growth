@@ -80,12 +80,19 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
         if(it.text(0)!=id.profileId.value||it.text(1)!=id.source.name||j.getString("marker")!=marker.value||it.text(3)!=ObservedDrivingJson.digest(raw))throw SQLiteException("비활성 원문 프로필/출처 손상")
         val since=RentalProductJson.clock(j.getJSONObject("since"));val done=j.get("done") as? Boolean?:throw org.json.JSONException("비활성 done 형식")
         if(done&&j.isNull("command"))throw SQLiteException("비활성 확정 원문 누락")
+        val basis=if(j.has("basis"))j.getString("basis") else "DRIVING_END"
+        if(basis !in setOf("DRIVING_END","APPLICATION_EXIT_DRIVING"))throw SQLiteException("비활성 경제 근거 종류 손상")
         val origin=j.getJSONObject("origin")
         if(origin.length()!=1)throw SQLiteException("비활성 원점 종류 손상")
         val authority=when {
             origin.has("clock")->RentalProductJson.clock(origin.getJSONObject("clock")).let{at->
+                if(basis!="DRIVING_END")throw SQLiteException("물리 종료 원점/앱 이탈 근거 혼합")
                 if(!continuous(at,since))throw SQLiteException("비활성 원점 시계 불일치")
                 JSONObject().put("clock",RentalProductJson.clock(at))
+            }
+            origin.has("applicationExit")->RentalProductJson.clock(origin.getJSONObject("applicationExit")).let{at->
+                if(basis!="APPLICATION_EXIT_DRIVING"||!continuous(at,since))throw SQLiteException("앱 이탈 경제 원점 불일치")
+                JSONObject().put("applicationExit",RentalProductJson.clock(at))
             }
             origin.has("missing")->JSONObject().put("missing",MissingReason.valueOf(origin.getString("missing")).name)
             origin.has("error")->JSONObject().put("error",ContractError.valueOf(origin.getString("error")).name)
@@ -96,6 +103,7 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
         }
         val canonical=JSONObject().put("marker",marker.value).put("since",RentalProductJson.clock(since)).put("origin",authority)
             .put("command",command?.let(RentalProductJson::interval)?:JSONObject.NULL).put("done",done)
+        if(j.has("basis"))canonical.put("basis",basis)
         if(canonical.toString()!=raw)throw SQLiteException("비활성 전체 원문 손상")
         j
     }
@@ -105,17 +113,38 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
         else if(db.update("rental_product_inactive",values,"marker=?",arrayOf(j.getString("marker")))!=1)throw SQLiteException("비활성 원문 무갱신")
         if(inactive(db,id,RequestId(j.getString("marker")))?.toString()!=raw)throw SQLiteException("비활성 실제 쓰기 불일치")
     }
-    override fun beginInactive(identity:GameIdentity,marker:RequestId,since:RentalClock):ContractResult<Unit> = withDb(identity){_,db->
+    override fun beginInactive(identity:GameIdentity,marker:RequestId,since:RentalClock)=begin(identity,marker,since,false)
+    /** 실제 onStop에 주행 중임을 확인한 B 공급자만 호출한다. P·물리 주행 종료·휴식 근거가 아니다. */
+    fun beginInactiveWhileDriving(identity:GameIdentity,marker:RequestId,since:RentalClock)=begin(identity,marker,since,true)
+    private fun begin(identity:GameIdentity,marker:RequestId,since:RentalClock,drivingExit:Boolean):ContractResult<Unit> = withDb(identity){_,db->
         val st=when(val r=state(db,identity)){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value}
-        inactive(db,identity,marker)?.let{return@withDb if(RentalProductJson.clock(it.getJSONObject("since"))==since)ContractResult.Success(Unit) else conflict()}
+        val basis=if(drivingExit)"APPLICATION_EXIT_DRIVING" else "DRIVING_END"
+        inactive(db,identity,marker)?.let{return@withDb if(RentalProductJson.clock(it.getJSONObject("since"))==since&&(if(it.has("basis"))it.getString("basis") else "DRIVING_END")==basis)ContractResult.Success(Unit) else conflict()}
+        var previousExit:RentalClock?=null
         st.inactive?.let{
             val old=inactive(db,identity,RequestId(it))?:throw SQLiteException("비활성 현재 marker 누락")
             if(!old.getBoolean("done"))return@withDb conflict()
             if(!continuous(RentalProductJson.interval(old.getJSONObject("command")).to,since))return@withDb conflict()
+            old.getJSONObject("origin").takeIf{it.has("applicationExit")}?.let{origin->previousExit=RentalProductJson.clock(origin.getJSONObject("applicationExit"))}
         }
         val now=when(val r=clock()){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value};if(!continuous(since,now))return@withDb data()
-        val origin=when(val r=policyOrigin(identity)){is ContractResult.Failure->JSONObject().put("error",r.error.name);is ContractResult.Success->when(val o=r.value){is Observation.Missing->JSONObject().put("missing",o.reason.name);is Observation.Available->{if(!continuous(o.value,since))return@withDb data();JSONObject().put("clock",RentalProductJson.clock(o.value))}}}
-        val j=JSONObject().put("marker",marker.value).put("since",RentalProductJson.clock(since)).put("origin",origin).put("command",JSONObject.NULL).put("done",false)
+        val prior=previousExit
+        val origin=if(drivingExit&&prior==null)JSONObject().put("applicationExit",RentalProductJson.clock(since))
+        else when(val r=policyOrigin(identity)) {
+            is ContractResult.Failure->JSONObject().put("error",r.error.name)
+            is ContractResult.Success->when(val o=r.value) {
+                is Observation.Missing->if(drivingExit&&prior!=null)JSONObject().put("applicationExit",RentalProductJson.clock(prior)) else JSONObject().put("missing",o.reason.name)
+                is Observation.Available->{
+                    if(!continuous(o.value,since))return@withDb data()
+                    if(drivingExit) {
+                        // 같은 주행 중 재접속은 원점을 유지한다. 실제 새 물리 종료 근거가 있어야 다음 주기로 바뀐다.
+                        val at=if(prior!=null&&o.value.epoch.value<=prior.epoch.value)prior else since
+                        JSONObject().put("applicationExit",RentalProductJson.clock(at))
+                    } else JSONObject().put("clock",RentalProductJson.clock(o.value))
+                }
+            }
+        }
+        val j=JSONObject().put("marker",marker.value).put("since",RentalProductJson.clock(since)).put("origin",origin).put("command",JSONObject.NULL).put("done",false).put("basis",basis)
         writeInactive(db,identity,j,true);RentalProductStorage.update(db,st,st.copy(inactive=marker.value));ContractResult.Success(Unit)
     }
     /** 응답 유실/재실행 때 새 to를 만들기 전에 이 원래 준비 구간부터 복구한다. */
@@ -145,8 +174,9 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
             val j=inactive(db,identity,interval.marker)?:return@withDb data()
             if(j.getBoolean("done"))return@withDb snapshot(s.store)
             when(val r=free(s)){is ContractResult.Failure->return@withDb r;else->Unit}
-            val origin=j.getJSONObject("origin");if(!origin.has("clock"))return@withDb if(origin.has("error"))ContractResult.Failure(ContractError.valueOf(origin.getString("error"))) else data()
-            val policy=RentalProductJson.clock(origin.getJSONObject("clock"));if(!continuous(policy,interval.originalSince))return@withDb data()
+            val origin=j.getJSONObject("origin");val key=when{origin.has("clock")->"clock";origin.has("applicationExit")->"applicationExit";else->null}
+            if(key==null)return@withDb if(origin.has("error"))ContractResult.Failure(ContractError.valueOf(origin.getString("error"))) else data()
+            val policy=RentalProductJson.clock(origin.getJSONObject(key));if(!continuous(policy,interval.originalSince))return@withDb data()
             val active=when(val r=s.store.rental.pending()){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value}
             for(rental in active) {
                 if(rental.phase==VehicleActivity.RENTED) {

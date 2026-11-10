@@ -33,4 +33,12 @@ class TrialRentalDefinitionTest {
         assertTrue(planned.toString(),planned is ContractResult.Success);val p=(planned as ContractResult.Success).value!!
         assertEquals(d.returns.getValue(p.visit.request.hours),p.visit.terms.returnMinutes);assertEquals(1801000L,p.next.nextAt.epoch.value);assertEquals(1L,p.next.sequence);assertEquals(d.rates,p.visit.hourlyRates)
     }
+
+    @Test fun independentMissingCategoryMalformedWeightsAndClockSettingsNeverDefault() {
+        val original=asset("trial-definitions.csv");val ids=catalog().vehicles.map{it.vehicleId}.toSet()
+        for(bad in listOf(original.replace("hyundai_casper,SMALL,market-small,1\n",""),
+            original.replace("interval_ms,1800000","interval_ms,-1"),original.replace("max_replay_visits,16","max_replay_visits,2147483648"),
+            original.replace("22,6,false,20","22,6,unknown,20")))
+            assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT),parseTrialDefinition(bad,ids))
+    }
 }

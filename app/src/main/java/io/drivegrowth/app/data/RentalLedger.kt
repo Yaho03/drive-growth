@@ -287,9 +287,15 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             }
             val change = GameChange(request, TransactionKind.RENTAL, store.source, RuleVersion(row.getString(0)),
                 MoneyChange(MoneyDirection.CREDIT, amount))
-            when (val result = store.record(db, change, JSONArray(listOf("settle", id.value)).toString())) {
+            val command=JSONArray(listOf("settle",id.value)).toString()
+            if(db.rawQuery("SELECT 1 FROM settlements WHERE request_id=?",arrayOf(request.value)).use{it.moveToFirst()})throw SQLiteException("대여 정산의 원래 연결 소실")
+            when (val result = store.record(db, change, command)) {
                 is ContractResult.Failure -> result
                 is ContractResult.Success -> {
+                    if(store.readBalance(db)!=result.value.balance)throw SQLiteException("대여 실제 입금 쓰기 불일치")
+                    db.rawQuery("SELECT settlement_id,command,result FROM settlements WHERE request_id=?",arrayOf(request.value)).use{r->
+                        if(!r.moveToFirst()||r.text(0)!=result.value.settlementId.value||r.text(1)!=command||r.text(2)!=LedgerJson.settlement(result.value).toString())throw SQLiteException("대여 최초 정산 실제 원문 불일치")
+                    }
                     db.execSQL("UPDATE rentals SET phase='RETURNING',settlement_request=?,rounding=? WHERE id=?", arrayOf(request.value,rounding.name,id.value))
                     db.rawQuery("SELECT phase,settlement_request,rounding FROM rentals WHERE id=?",arrayOf(id.value)).use{r->
                         if(!r.moveToFirst()||r.text(0)!="RETURNING"||r.text(1)!=request.value||r.text(2)!=rounding.name)throw SQLiteException("대여 정산 실제 상태 쓰기 불일치")
