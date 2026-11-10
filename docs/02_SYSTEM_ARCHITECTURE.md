@@ -774,3 +774,12 @@ E 정확efe4965의 SqliteRentalProductJournal.currentInactive(identity)는 기�
 미활성은DATA_UNAVAILABLE,활성뒤현재참조와이력이모두없을때만Success(null)이다. foreign identity는INVALID_INPUT,현재참조/선택marker소실·digest/원문/출처/basis손상은바깥STORAGE_FAILURE다. 유효metadata안의원래policyOrigin Missing 또는명시Failure는안쪽값그대로반환한다. 정의·현재clock·policy공급자를재호출하지않고foreign금융slot이있어도조회한다. 조회가활성화·새marker/정산·schema/DB·원장수리를만들지않는다. 기존쓰기/codec/경제원점정책은그대로다.
 
 이후보는시설1ea4기준에정확2파일만정상통합한뒤, PR #186이반영된main1358f6e를정상부모로포함했다. 부모추가직후전체트리차이는없었다. 기존E28중해당2파일만원본efe로갱신하고나머지26·시설12·Results14·랭킹5·현재Main계열을보존한다. 실제Main이탈/구성변경분류와이API의최신B driver소비는별도작업이며Rest830후속을포함하지않는다. B는RECORDED의원marker/since에서실제복귀to를한번준비하고PREPARED의원whole interval을먼저재사용한다. COMPLETED를새미완료로만들지않는다. 실제원본조회·10개표행보존과새조합검사는 [06](06_VERIFICATION.md#종료-영업-currentinactive-읽기-api-통합-검증--2026-11-10)을따른다.
+
+
+### FusedLocation SDK 등록·전경 어댑터 공급 — 2026-11-10
+
+D 정확92c4ee3의6파일은FusedLocation1.1.3 의존성과FUSED_LOCATION권한·ForegroundPleosLocation/PleosLocationFix·원24시험을공급한다. 기존NaviHelper3.0.5/앱min28·target34와같은GameContract/저장·schema15를유지하고Main/HostSession/VehicleInput에서자동시작하지않는다. 최신B제품의동의/권한요청·전경수명·close실패처리와세션캐시무효화는별도연결이다. close는Missing을발행하지않으므로종료된위치캐시를소비자가직접무효화한다.
+
+start/close의main호출은현재어댑터의상태직렬화API계약이다. SDK자체main필수조건이나임의다중스레드동시호출안전성을확정하지않는다. 세대/현재권한을전달직전에검사하고수신elapsed/UTC를main queue소비시각으로바꾸지않는다. 권한거부/미지원/null·알려진오류는명시Missing이며첫callback전에는NO_DATA다. release실패는원client소유권과예외를보존해새연결생성을막는다. 예상밖RuntimeException도정리시도뒤숨기지않는다. F추가정적감사의원격register/unregisterProxy는oneway전송이며원격완료응답동기대기로단정하지않는다. PackageManager·권한검사·unbindService의caller경계와최악지연미측정은유지한다.
+
+source=VEHICLE/Available은SDK원시출처/형식가용성이며실차·센서clock축/신선도/정확도·휴식장소inside/outside·주차/출발·Rest인정을뜻하지않는다. rawconfidence를m로환산하거나rawtimestamp를현재값으로보정하지않는다. 공공좌표점으로임의반경/영역을만들지않고background/프로세스·전원·정책허용을가정하지않는다. A실제SDK진단과F26·추가스레드감사/새조합검사는 [06](06_VERIFICATION.md#fusedlocation-sdk-6파일-통합-검증--2026-11-10)에서구분한다. main187 위에원6파일만정상통합했고B Main/HostSession·currentInactive/앞모듈·schema15를보존하며Rest schema16은포함하지않았다.

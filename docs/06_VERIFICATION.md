@@ -1710,3 +1710,20 @@ A는정확efe 준비쌍에서원32+새9=41개를9.858초에정상footer로통과
 
 
 main186 후속 부모 통합 직후 이전0f042b1과 전체 트리 차이가 없었고 최종 소스·빌드입력도 그 검증본과 같다. 따라서 앱500·제품/시험APK·Lint0/27·78tasks2분은0f042b1의실제실행근거로재사용하며이번새실행으로쓰지않는다. 이번에는부모/트리·원blob/소스동일성·저장소21/29/447·diff/clean만새로확인하고Gradle/기기/ADB는재실행하지않았다. 최신Main의B소비/실제이탈·구성변경구분과Rest830후속은계속이후보에포함하지않는다.
+
+
+### FusedLocation SDK 6파일 통합 검증 — 2026-11-10
+
+D 정확92c4ee31f826b2713dd7c481d9791465385d90b5의6파일을main187 b2c1a2fa89734d4a9241ccc635701f63cf2085d2 위에정상통합했다. SDK의존성1줄·명시FUSED_LOCATION권한1줄과어댑터/mapper·원시험만추가됐고모두원92c와바이트동일하다. B Main/HostSession/VehicleInput·currentInactive2·시설12·Results14·랭킹5·전체data/host/core트리를보존했다. schema15를유지하고Rest schema16·A진단Activity/시험patch·F추가시험은포함하지않았다. 원래 인계 때 실행 중이던 main #187 CI42820687455는 이후 두 검사 모두 성공했으며 root가 원격 결과를 확인했다. 이번 Location 후보 자체의 게시 후 CI와는 구분한다.
+
+원D본인검증은core420/app487(위치24포함)·APK/Lint0오류27경고다. F정확92c검토는원24+독립2=26PASS/42초·필수수정0이며JVM대체SDK/queue의release실패/재시작·close재진입·옛callback폐기를확인했다. F추가스레드감사는필수0/새시험0으로기존수용을유지했고A장치결과를사용하지않았다. currentadapter main호출계약과SDK공식main필수는구분하고,원격Proxy register/unregister의oneway전송과caller의PackageManager/권한검사/unbindService를분리했다. 실제최악지연/UI정체·원격해제완료ACK는검증하지않았다.
+
+A의실제실행은원92c에진단debugActivity/Android시험2파일·기존debugManifest등록1곳을더한660파일조합이다. 원658중제품adapter/Main/HostSession·원24시험/Gradle/mainManifest는그대로며실제SDK를그대로호출하는decorator를internal시험입구에주입했다. 위치/오류callback을합성하지않았지만제품publicconstructor 자체의새Native실행이나최신B Main연결·무패치head단독실행으로표시하지않는다. 최종같은APK의허용1은3.612초PASS/정상footer, supported=true·initialize/isSupported/register각1반환·실제nonnull onChanged1/오류0·Available1/초기NO_DATA1이었다. unregister/release각1·close반환,종료후3초관측/queue drain의adapter전달0을확인했다. 최종거부1은18.250초PASS/정상footer로PERMISSION_DENIED1·SDK생성/init/register0·rawcallback/Available0·close반환·종료뒤전달0이었다. 관측시간범위를미래영구무callback이나서비스완료보장으로확대하지않는다.
+
+앞선초기probe허용1PASS3.820초와거부비교1FAIL3.252초/오류0/정상실패footer는보존한다. 거부실패는SDK시작전즉시hasWindowFocus assertion이었다. 진단Activity의실제focus latch로최대5초기다린뒤같은검사를수행하도록시험만보완했고제품어댑터/SDK값/기대조건을완화하지않았다. 총4회진단을최종한번의무결성공으로축약하지않으며F26/D487과합산하지않는다. 실제수신시각/SDK원timestamp·confidence를보존했지만시각차를지연SLA/센서신선도검증으로,confidence5.0을정확도m로해석하지않았다.
+
+A최종앱76150b8ac71c73e8ec00264f6876f33f62e9939dfbec754cee12a1d31302e639·시험72df227ede1d977f052d72154b282ea85cf25d3e808e15487450e0df915f8f20의파일/built/설치pull SHA가같았다. API34 ARM64/user10·21:29:34~21:34:23KST단독구간·19/19제품/환경보존·자기2패키지/프로세스/계측/forward정리·반환이다. 기존SDK공유서비스PID는유지되고close뒤hasBound=false를관측했으며서비스강제종료는하지않았다. 좌표원문은로컬진단자료에만보존하고여기에는옮기지않았다. A소스/설치hash/원문footer/보존근거는 /private/tmp/drive-location-sdk-build-20261110/independent-device-review/, F26/추가감사는 independent-review/ 및 thread-audit/다.
+
+새main187조합앱524는실패/오류/생략0이며위치24가이524에포함된다. 제품/시험APK·Lint0오류27경고는78tasks/2분18초에성공했다. 병합Manifest에서앱min28/target34,명시권한과SDKbinding권한·SDK1.1.3/서비스최소0.5.0metadata를확인했다. core와공통Gradle입력은같아core420은이전실행근거로재사용/이번재실행0이다. 저장소21/29/450·diff검사도통과했다. 이조합의새기기/ADB/원격쓰기0이며A660진단을새제품APK의실제실행으로쓰지않는다.
+
+실제B Main/HostSession의동의·권한dialog·전경수명/캐시무효화·close예외처리,센서clock축/신선도/정확도·장소inside/outside·휴식/주차/출발적격성·Rest지급,실제서비스미지원/강제오류/release실패주입·UI정체·background/프로세스/전원·실차는별도미검증이다. source=VEHICLE/Available을실차/휴식인정으로확대하지않고공공215점의임의반경/영역을만들지않는다. 이미완료한#13기준환경이슈는보존하고#40/#51/#28/#81의부분공급/잔여조건만별도로연결한다. AI검토는사람승인이아니며정확게시head/CI/main반영은root가확인한다.
