@@ -825,3 +825,12 @@ main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결
 같은 전체 원명령의 `replayDecorationChange`는 현재 정의·잔액·가게 레벨로 재계산하지 않고 당시 결과를 반환한다. 양수 구매만 기존 공통 `FACILITY`/`DEBIT` 정산을 갖는다. 무료 구매와 소유품 적용은 `settlement=null`인 typed 결과를 사용하며 가짜 0원 정산을 만들지 않는다. 전역 요청 소유권, 이전 상태와 원문·정산의 DB 연결, 잔액·소유·선택·revision·원결과의 원자 확정은 SQLite 소비자의 책임이다. 확인된 초기 empty/null 상태를 누락·손상·legacy의 보정값으로 사용하지 않는다.
 
 중앙 `trialDecorationDefinitions()`의 두 품목은 조정 가능한 시연 시험값이다. `neutral-sign`은 Lv1/0, `blue-sign`은 Lv2/100이며 별도 자동 지급이나 경제 효과가 없다. `themeKey`만 기존 `ShopAppearance`로 매핑한다. 자유 배치·차량 꾸미기·이미지·좌표·최종 색상을 새로 정하지 않으며 #189 최종 디자인 적용과 구분한다. 이 순수 계약 공급만으로 실제 저장·제품 화면·#55 전체 완료가 되지 않는다.
+
+
+### FusedLocation 영역 수신과 권위의 구분 — 2026-11-11
+
+기존 `ForegroundPleosLocation`의 같은 SDK client에 외부 공급 원형 영역 1개의 등록·해제를 연결한다. `start(area, onArea)`는 등록된 alertId와 일치하는 ENTER/EXIT만 전달한다. 등록 전·이전 세대·외부 ID·종료 뒤 이벤트는 폐기하고, 알려진 등록 ID는 해제 실패 시 client와 함께 보존해 새 연결이 겹치지 않게 한다. 영역 포트가 실제로 없을 때만 `UNSUPPORTED`다. initialize/register/add 등 실제 SDK 호출의 예상 밖 RuntimeException은 정리 후 원예외를 전파하고 정리 실패는 suppressed로 보존한다.
+
+`PleosAreaDefinition`은 외부 검증자가 공급한 경계·출처/사용 조건·버전을 담으며 형식 검사가 장소 권위를 보증하지 않는다. 공식 SDK1.1.3의 공개 영역 이벤트는 alertId·transition을 제공한다. 발생시각·초기 inside·현재 inside는 제공된 것으로 간주하지 않는다. callback 수신 elapsed/UTC는 수신 사실이며 `RestAreaProof`의 현재 장소·발생 시각으로 승격하지 않는다. 원 위치 timestamp/confidence도 신선도나 정확도(m)로 환산하지 않는다.
+
+소비자는 close/start 전 또는 cleanup 성공과 관계없는 finally에서 캐시를 무효화해야 한다. close는 마지막 Missing 전달을 보장하지 않고 새 start의 Missing도 비동기다. 제품 영역 정의는 아직0개이며 공공 215좌표점·공식 sample의 시험 반경으로 제품 경계를 만들지 않는다. 유효한 현재 장소·시각 권위가 없으면 휴식 장소는 Missing이다. Main 등록·권한 동의·실제 SDK 영역/Rest 지급은 별도 연결·검증 범위다. 근거는 [공식 릴리즈 노트](https://document.pleos.ai/docs/pleos-only/release-note/sdk-release-note)와 [공식 샘플](https://github.com/Pleos-Playground/pleos-sample-fusedlocation-app)의1.1.3 공개 API 및 실제 AAR 대조다.
