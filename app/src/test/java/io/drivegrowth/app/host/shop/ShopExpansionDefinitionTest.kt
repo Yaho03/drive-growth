@@ -4,7 +4,7 @@ import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.rental.ShopExpansion
 import org.junit.Assert.*
 import org.junit.Test
-import io.drivegrowth.app.data.AssetShopExpansionProvider
+import io.drivegrowth.app.data.AssetTrialDefinitionProvider
 import java.io.IOException
 
 internal val expansionDefinitionFixture = """definition_version,trial-shop-expansion-2026-11-10-v1
@@ -36,7 +36,7 @@ class ShopExpansionDefinitionTest {
             assertEquals(bad,ContractResult.Failure(ContractError.INVALID_INPUT),parseShopExpansionDefinition(bad))
     }
     @Test fun missingAssetDoesNotSupplyDefaultOrFreeExpansion() {
-        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),AssetShopExpansionProvider { throw IOException("missing") }.load())
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),AssetTrialDefinitionProvider({ throw IOException("missing") },{ ContractResult.Success(emptySet()) }).load())
     }
     @Test fun callerCannotReplaceSharedDefinitionStages() {
         val definition=(parseShopExpansionDefinition(expansionDefinitionFixture) as ContractResult.Success).value

@@ -86,8 +86,11 @@ class ShopExpansionLiveSourceTest : InstrumentationTestCase() {
     }
     fun testChangedDefinitionBeforeSaveRejectsStaleSelectionWithoutCharge() {
         repeat(3){complete(it)};val adapter=source();val snapshot=ok(adapter.read());val before=rows()
-        val text=context.assets.open("content/shop-expansions.csv").bufferedReader().use{it.readText()}.replace("2026-11-10-v1","2026-11-10-v2")
-        definition=parseShopExpansionDefinition(text)
+        val text=context.assets.open("content/trial-definitions.csv").bufferedReader().use{it.readText()}.replace("2026-11-10-v1","2026-11-10-v2")
+        definition=when(val r=parseTrialDefinition(text,content.catalog.vehicles.map{it.vehicleId}.toSet())) {
+            is ContractResult.Failure->r
+            is ContractResult.Success->ContractResult.Success(r.value.expansions)
+        }
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),adapter.prepare(snapshot,request(snapshot)))
         assertEquals(before,rows());assertNull(ok(adapter.pending()))
     }
