@@ -15,6 +15,7 @@ class ResultsHostController(
     private val write: (SettlementId) -> ContractResult<Unit>,
     private val refresh: () -> Unit,
     restored: ResultsUiState = ResultsUiState(),
+    private val readHistory: (() -> ContractResult<io.drivegrowth.app.data.SettlementHistorySnapshot>)? = null,
 ) {
     var uiState: ResultsUiState = restored.copy(
         readStates = immutable(restored.readStates.mapValues { (_, value) ->
@@ -24,28 +25,69 @@ class ResultsHostController(
     )
         private set
     private var onResult: ((SettlementId, ContractResult<Unit>) -> Unit)? = null
-    private var released = false
+    @Volatile private var released = false
+    @Volatile private var historyEnabled = false
+    @Volatile private var historyGeneration = 0L
+    private var history: io.drivegrowth.app.data.SettlementHistorySnapshot? = null
+    private var onHistory: ((io.drivegrowth.app.ui.results.ResultsScreenState) -> Unit)? = null
+    val hasHistorySource get() = readHistory != null
+    var historyState: io.drivegrowth.app.ui.results.ResultsScreenState = io.drivegrowth.app.ui.results.ResultsScreenState.Loading
+        private set
+
+    fun attachHistory(listener: (io.drivegrowth.app.ui.results.ResultsScreenState) -> Unit) {
+        if (!released) { onHistory = listener; listener(historyState) }
+    }
+    fun setControlsEnabled(value: Boolean) {
+        if (released || historyEnabled == value) return
+        historyEnabled = value; historyGeneration++
+        if (value) refreshHistory()
+    }
+    fun refreshHistory(): Boolean {
+        val read = readHistory ?: return false
+        if (released || !historyEnabled) return false
+        val generation = ++historyGeneration
+        history = null
+        historyState = io.drivegrowth.app.ui.results.ResultsScreenState.Loading
+        onHistory?.invoke(historyState)
+        worker.execute {
+            val result = if (!released && historyEnabled && generation == historyGeneration) read()
+                else ContractResult.Failure(ContractError.UX_RESTRICTED)
+            main.execute historyReply@{
+                if (released || !historyEnabled || generation != historyGeneration) return@historyReply
+                val mapped = ResultsHostMapper().history(result)
+                history = if (mapped is io.drivegrowth.app.ui.results.ResultsScreenState.Content)
+                    (result as ContractResult.Success).value else null
+                historyState = mapped
+                uiState = uiState.copy(retryPending = false)
+                onHistory?.invoke(historyState)
+            }
+        }
+        return true
+    }
 
     fun attach(listener: (SettlementId, ContractResult<Unit>) -> Unit) {
         if (!released) onResult = listener
     }
 
-    fun detach() { onResult = null }
+    fun detach() { onResult = null; onHistory = null }
 
     /** 표시 View의 선택·조회 재시도만 기억한다. 열람 완료는 실제 저장 응답만 만든다. */
     fun remember(value: ResultsUiState) {
-        uiState = uiState.copy(selectedId = value.selectedId, retryPending = value.retryPending)
+        uiState = uiState.copy(selectedId = value.selectedId, retryPending = value.retryPending, scope = value.scope)
     }
 
     fun completeQuery() { uiState = uiState.copy(retryPending = false) }
 
     fun markViewed(id: SettlementId, snapshot: HostSnapshot?, controlsEnabled: Boolean): Boolean {
-        if (released || !controlsEnabled || snapshot == null || uiState.selectedId != id ||
-            uiState.readStates[id] == ResultsReadState.Done || uiState.readStates.values.any { it == ResultsReadState.Pending } ||
-            snapshot.unviewedSettlements.none { it.settlementId == id && it.transaction.source == snapshot.source }) return false
+        val eligible = if (hasHistorySource) historyEnabled && history?.let { data ->
+            data.entries.any { !it.viewed && it.settlement.settlementId == id && it.settlement.transaction.source == data.identity.source }
+        } == true else snapshot?.let { data -> data.unviewedSettlements.any { it.settlementId == id && it.transaction.source == data.source } } == true
+        if (released || !controlsEnabled || !eligible || uiState.selectedId != id ||
+            uiState.readStates[id] == ResultsReadState.Done || uiState.readStates.values.any { it == ResultsReadState.Pending }) return false
         uiState = uiState.copy(readStates = immutable(uiState.readStates + (id to ResultsReadState.Pending)))
         worker.execute {
-            val result = write(id)
+            val result = if (released || (hasHistorySource && !historyEnabled)) ContractResult.Failure(ContractError.UX_RESTRICTED)
+                else write(id)
             main.execute {
                 if (!released) {
                     val next = when (result) {
@@ -54,7 +96,10 @@ class ResultsHostController(
                     }
                     uiState = uiState.copy(readStates = immutable(uiState.readStates + (id to next)))
                     onResult?.invoke(id, result)
-                    if (result is ContractResult.Success) refresh()
+                    if (result is ContractResult.Success && !released) {
+                        refresh()
+                        if (hasHistorySource && historyEnabled) refreshHistory()
+                    }
                 }
             }
         }
@@ -63,6 +108,7 @@ class ResultsHostController(
 
     fun release() {
         released = true
+        historyEnabled = false; historyGeneration++
         detach()
     }
 
