@@ -773,4 +773,4 @@ E 정확efe4965의 SqliteRentalProductJournal.currentInactive(identity)는 기�
 
 미활성은DATA_UNAVAILABLE,활성뒤현재참조와이력이모두없을때만Success(null)이다. foreign identity는INVALID_INPUT,현재참조/선택marker소실·digest/원문/출처/basis손상은바깥STORAGE_FAILURE다. 유효metadata안의원래policyOrigin Missing 또는명시Failure는안쪽값그대로반환한다. 정의·현재clock·policy공급자를재호출하지않고foreign금융slot이있어도조회한다. 조회가활성화·새marker/정산·schema/DB·원장수리를만들지않는다. 기존쓰기/codec/경제원점정책은그대로다.
 
-이후보는시설1ea4기준에정확2파일만정상통합했다. 기존E28중해당2파일만원본efe로갱신하고나머지26·시설12·Results14·랭킹5·현재Main계열을보존한다. 실제Main이탈/구성변경분류와이API의최신B driver소비는별도작업이며Rest830후속을포함하지않는다. B는RECORDED의원marker/since에서실제복귀to를한번준비하고PREPARED의원whole interval을먼저재사용한다. COMPLETED를새미완료로만들지않는다. 실제원본조회·10개표행보존과새조합검사는 [06](06_VERIFICATION.md#종료-영업-currentinactive-읽기-api-통합-검증--2026-11-10)을따른다.
+이후보는시설1ea4기준에정확2파일만정상통합한뒤, PR #186이반영된main1358f6e를정상부모로포함했다. 부모추가직후전체트리차이는없었다. 기존E28중해당2파일만원본efe로갱신하고나머지26·시설12·Results14·랭킹5·현재Main계열을보존한다. 실제Main이탈/구성변경분류와이API의최신B driver소비는별도작업이며Rest830후속을포함하지않는다. B는RECORDED의원marker/since에서실제복귀to를한번준비하고PREPARED의원whole interval을먼저재사용한다. COMPLETED를새미완료로만들지않는다. 실제원본조회·10개표행보존과새조합검사는 [06](06_VERIFICATION.md#종료-영업-currentinactive-읽기-api-통합-검증--2026-11-10)을따른다.
