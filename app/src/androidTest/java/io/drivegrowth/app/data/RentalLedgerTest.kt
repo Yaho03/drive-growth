@@ -310,6 +310,7 @@ class RentalLedgerTest : InstrumentationTestCase() {
         val unviewed = ok(store.listUnviewedSettlements())
         store.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+            stripRentalProductFixture(it)
             for (table in deliveryTables) it.execSQL("DROP TABLE $table")
             it.execSQL("DROP TABLE discoveries")
             it.execSQL("DROP TABLE gacha_progress")
@@ -393,6 +394,7 @@ class RentalLedgerTest : InstrumentationTestCase() {
     fun testUpgradeFromV1KeepsAccountAndOriginalVehicle() {
         store.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path,null,SQLiteDatabase.OPEN_READWRITE).use { db ->
+            stripRentalProductFixture(db)
             listOf("visits","rentals","shop","facilities","rental_rest","discoveries","gacha_progress","gacha_requests").plus(deliveryTables).forEach { db.execSQL("DROP TABLE "+it) }
             db.version=1
         }

@@ -75,11 +75,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
     fun assign(request: RentalRequest, catalog: VehicleCatalogSnapshot, categories: Map<VehicleId, RentalCategory>,
                hourlyRates: Map<VehicleId, GameMoney>, terms: RentalTerms): ContractResult<OwnedVehicleId?> = store.atomic { db ->
         val id = request.id.value
-        val command = JSONArray(listOf(request.desired.value, request.hours, catalog.contentVersion.value,
-            terms.rules.value, terms.customer.age, terms.customer.licensedMonths, terms.roll, terms.start.value,
-            terms.returnMinutes, terms.fuelBonus.units, terms.rounding?.name, terms.regularCustomer,
-            categories.entries.sortedBy { it.key.value }.map { listOf(it.key.value, it.value.name) },
-            hourlyRates.entries.sortedBy { it.key.value }.map { listOf(it.key.value, it.value.units) })).toString()
+        val command = RentalVisitCommand.encode(request,catalog,categories,hourlyRates,terms)
         db.rawQuery("SELECT command,assigned FROM visits WHERE id=?", arrayOf(id)).use {
             if (it.moveToFirst()) return@atomic if (it.getString(0) == command)
                 ContractResult.Success(it.getString(1)?.let(::OwnedVehicleId)) else conflict()
@@ -101,7 +97,10 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             is ContractResult.Failure -> return@atomic result
         }
         val selected = (plan as? AssignmentPlan.Candidate)?.vehicle?.ownedVehicleId
-        db.execSQL("INSERT INTO visits VALUES(?,?,?)", arrayOf(id, command, selected?.value))
+        db.execSQL("INSERT INTO visits(id,command,assigned) VALUES(?,?,?)", arrayOf(id, command, selected?.value))
+        db.rawQuery("SELECT command,assigned FROM visits WHERE id=?",arrayOf(id)).use {
+            if(!it.moveToFirst()||it.text(0)!=command||(if(it.isNull(1))null else it.text(1))!=selected?.value)throw SQLiteException("방문 실제 원문/결과 삽입 누락")
+        }
         if (plan !is AssignmentPlan.Candidate) return@atomic ContractResult.Success(null)
         val v = plan.vehicle
         if (v.revision.value == Int.MAX_VALUE) return@atomic conflict()
@@ -121,26 +120,39 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
                 end + terms.returnMinutes * 60_000L, terms.start.value, quote.fare.toPlainString(),
                 quote.facilityBonus.units, terms.rounding?.name, quote.accident.bit, quote.exactMatchReviewBoost.bit,
                 quote.carWashReviewBoost.bit, terms.regularCustomer?.bit))
-        db.execSQL("UPDATE vehicles SET payload=? WHERE owned_id=?", arrayOf(
-            LedgerJson.vehicle(v.copy(revision = Revision(v.revision.value + 1))).toString(), v.ownedVehicleId.value))
+        val bumped=v.copy(revision=Revision(v.revision.value+1));store.writeVehicle(db,bumped)
+        if(store.findVehicle(db,v.ownedVehicleId)!=bumped)throw SQLiteException("배정 실제 개체 revision 쓰기 불일치")
+        db.rawQuery("SELECT owned_id,version,start,end,return_end,cursor,weighted,fare,bonus,phase,rounding,accident,match_review,wash_review,regular_customer FROM rentals WHERE id=?",arrayOf(id)).use {
+            if(!it.moveToFirst()||it.text(0)!=selected?.value||it.text(1)!=terms.rules.value||it.integer(2,0,Long.MAX_VALUE)!=terms.start.value||it.integer(3,0,Long.MAX_VALUE)!=end||it.integer(4,0,Long.MAX_VALUE)!=end+terms.returnMinutes*60000L||it.integer(5,0,Long.MAX_VALUE)!=terms.start.value||it.text(6)!="0"||it.text(7)!=quote.fare.toPlainString()||it.integer(8,0,Long.MAX_VALUE)!=quote.facilityBonus.units||it.text(9)!="RENTED")throw SQLiteException("배정 실제 대여 입력 쓰기 불일치")
+            if((if(it.isNull(10))null else it.text(10))!=terms.rounding?.name||it.strictBoolean(11)!=quote.accident||it.strictBoolean(12)!=quote.exactMatchReviewBoost||it.strictBoolean(13)!=quote.carWashReviewBoost||(if(it.isNull(14))null else it.strictBoolean(14))!=terms.regularCustomer)throw SQLiteException("배정 실제 고객/사고/반올림 쓰기 불일치")
+        }
         ContractResult.Success(selected)
     }
 
     /** 호출자가 확인한 연속 주행/주차 구간. 화면 가시성만으로 주행을 추정하지 않는다. */
-    fun account(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?) = store.atomic { db ->
+    fun account(id:RequestId,from:EpochMillis,to:EpochMillis,parkedSince:EpochMillis?)=accountBasis(id,from,to,parkedSince,true)
+
+    /** 원점은 마지막 주행 종료다. 앱 onStop을 물리 주차로 저장하지 않는다. */
+    fun accountInactive(id:RequestId,from:EpochMillis,to:EpochMillis,policyOrigin:EpochMillis)=accountBasis(id,from,to,policyOrigin,false)
+
+    private fun accountBasis(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?, physical:Boolean) = store.atomic { db ->
         if (from.value < 0 || to.value < 0 || (parkedSince != null && parkedSince.value !in 0..from.value))
             return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
-        db.rawQuery("SELECT cursor,end,weighted,parked_since FROM rentals WHERE id=?", arrayOf(id.value)).use {
+        db.rawQuery("SELECT cursor,end,weighted,parked_since,start FROM rentals WHERE id=?", arrayOf(id.value)).use {
             if (!it.moveToFirst()) return@atomic missing()
-            val cursor = it.getLong(0)
-            val end = minOf(it.getLong(1), to.value)
+            val cursor=it.integer(0,0,Long.MAX_VALUE);val end=minOf(it.integer(1,0,Long.MAX_VALUE),to.value)
+            val oldPark=if(it.isNull(3))null else it.integer(3,0,Long.MAX_VALUE)
+            val start=it.integer(4,0,Long.MAX_VALUE);val previous=it.text(2).toBigDecimal()
+            if(cursor !in start..it.integer(1,start,Long.MAX_VALUE)||previous.signum()<0||previous>(cursor-start).toBigDecimal()||oldPark?.let{p->p>cursor}==true)throw SQLiteException("대여 누적/커서 범위 손상")
             if (end <= cursor || to.value < from.value) return@atomic ContractResult.Success(EpochMillis(cursor))
             if (from.value > cursor) return@atomic conflict()
-            if (parkedSince != null && !it.isNull(3) && it.getLong(3) != parkedSince.value) return@atomic conflict()
-            val increment = parkedSince?.let { start -> parkingIncomeWindow(start, EpochMillis(cursor), EpochMillis(end)).equivalentMillis() }
-                ?: (end - cursor).toBigDecimal()
-            db.execSQL("UPDATE rentals SET cursor=?, weighted=?, parked_since=? WHERE id=?",
-                arrayOf<Any?>(end, (it.getString(2).toBigDecimal() + increment).toPlainString(), parkedSince?.value, id.value))
+            if (parkedSince != null && oldPark!=null && oldPark != parkedSince.value) return@atomic conflict()
+            val increment = parkedSince?.let { start -> parkingIncomeWindow(start, EpochMillis(cursor), EpochMillis(end)).equivalentMillis() } ?: (end-cursor).toBigDecimal()
+            val amount=(previous+increment).toPlainString();val persistedPark=if(physical)parkedSince?.value else oldPark
+            if(db.update("rentals",android.content.ContentValues().apply{put("cursor",end);put("weighted",amount);if(persistedPark==null)putNull("parked_since")else put("parked_since",persistedPark)},"id=?",arrayOf(id.value))!=1)throw SQLiteException("대여 누적 무갱신")
+            db.rawQuery("SELECT cursor,weighted,parked_since FROM rentals WHERE id=?",arrayOf(id.value)).use{r->
+                if(!r.moveToFirst()||r.integer(0,0,Long.MAX_VALUE)!=end||r.text(1)!=amount||(if(r.isNull(2))null else r.integer(2,0,Long.MAX_VALUE))!=persistedPark)throw SQLiteException("대여 실제 누적 쓰기 불일치")
+            }
             ContractResult.Success(EpochMillis(end))
         }
     }
@@ -279,6 +291,9 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
                 is ContractResult.Failure -> result
                 is ContractResult.Success -> {
                     db.execSQL("UPDATE rentals SET phase='RETURNING',settlement_request=?,rounding=? WHERE id=?", arrayOf(request.value,rounding.name,id.value))
+                    db.rawQuery("SELECT phase,settlement_request,rounding FROM rentals WHERE id=?",arrayOf(id.value)).use{r->
+                        if(!r.moveToFirst()||r.text(0)!="RETURNING"||r.text(1)!=request.value||r.text(2)!=rounding.name)throw SQLiteException("대여 정산 실제 상태 쓰기 불일치")
+                    }
                     val event = store.quests.onRentalCompleted(db, id, result.value)
                     if (event is ContractResult.Failure) return@atomic event
                     ContractResult.Success(receipt(result.value))
@@ -294,7 +309,8 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             if (phase == VehicleActivity.RENTED || now.value < it.getLong(0)) return@atomic conflict()
             if (phase != VehicleActivity.RETURNING) return@atomic ContractResult.Success(phase)
             val next = if (it.getInt(1) == 1) VehicleActivity.NEEDS_REPAIR else VehicleActivity.IDLE
-            db.execSQL("UPDATE rentals SET phase=? WHERE id=?", arrayOf(next.name, id.value))
+            if(db.update("rentals",android.content.ContentValues().apply{put("phase",next.name)},"id=? AND phase='RETURNING'",arrayOf(id.value))!=1)throw SQLiteException("대여 반납 무갱신")
+            db.rawQuery("SELECT phase FROM rentals WHERE id=?",arrayOf(id.value)).use{r->if(!r.moveToFirst()||r.text(0)!=next.name)throw SQLiteException("대여 반납 실제 상태 쓰기 불일치")}
             ContractResult.Success(next)
         }
     }
@@ -354,4 +370,16 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         }
 
     private val Boolean.bit get() = if (this) 1 else 0
+}
+
+/** 기존 assign의 원문 형식을 그대로 공유한다. 별도 거래/차량 모델이 아니다. */
+internal object RentalVisitCommand {
+    fun encode(v:io.drivegrowth.app.runtime.rental.RentalVisit)=encode(v.request,v.catalog,v.categories,v.hourlyRates,v.terms)
+    fun encode(request:RentalRequest,catalog:VehicleCatalogSnapshot,categories:Map<VehicleId,RentalCategory>,hourlyRates:Map<VehicleId,GameMoney>,terms:RentalTerms):String {
+        return JSONArray(listOf(request.desired.value, request.hours, catalog.contentVersion.value,
+            terms.rules.value, terms.customer.age, terms.customer.licensedMonths, terms.roll, terms.start.value,
+            terms.returnMinutes, terms.fuelBonus.units, terms.rounding?.name, terms.regularCustomer,
+            categories.entries.sortedBy { it.key.value }.map { listOf(it.key.value, it.value.name) },
+            hourlyRates.entries.sortedBy { it.key.value }.map { listOf(it.key.value, it.value.units) })).toString()
+    }
 }

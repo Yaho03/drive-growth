@@ -15,7 +15,7 @@ data class TrialQuestNumbers(val goal: Int, val reward: GameMoney) {
 class TrialDefinition internal constructor(
     val expansions: ShopExpansionDefinition, rates: Map<VehicleId,GameMoney>, facilities: Map<Facility,FacilityOffer>,
     val fuelBonusPerRental: GameMoney, quests: Map<String,TrialQuestNumbers>, provenance: Map<String,String>,
-    internal val delivery: TrialDeliveryRules, internal val driving: DrivingIncomeRules,
+    internal val delivery: TrialDeliveryRules, internal val driving: DrivingIncomeRules, internal val rental:TrialRentalInputs,
 ) {
     val version get()=expansions.version
     val rules get()=expansions.rules
@@ -47,7 +47,7 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
             is ContractResult.Failure->return r
             is ContractResult.Success->r.value
         }
-        val names=setOf("rental_rates","facilities","fuel_bonus","quest_rewards","provenance","delivery_bands","delivery_prices","delivery_proposal","delivery_change","delivery_settlement","driving")
+        val names=setOf("rental_rates","facilities","fuel_bonus","quest_rewards","provenance","delivery_bands","delivery_prices","delivery_proposal","delivery_change","delivery_settlement","driving","rental_visits","rental_categories","rental_durations","rental_customers")
         val sections=linkedMapOf<String,MutableList<List<String>>>()
         var current:String?=null
         for(line in lines.drop(marker)) {
@@ -100,8 +100,26 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
             proposal.i("income_offer_count"),proposal.i("purchase_offer_count"),DeliveryRounding.valueOf(proposal.getValue("rounding"))),
             DeliveryChangeRules(expansion.rules,change.i("cancel_fee_percent")),
             DeliverySettlementRules(expansion.rules,settle.n("arrival_window_ms"),settle.n("hold_window_ms"),settle.i("hold_refund_fee_percent")))
+        val visit=scalar("rental_visits",setOf("interval_ms","max_replay_visits","rounding"));require(visit.n("interval_ms")==1800000L&&visit.i("max_replay_visits")>0)
+        val categoryRows=sections.getValue("rental_categories");require(categoryRows.first()==listOf("vehicle_id","category","basis","demand_weight"))
+        val categories=linkedMapOf<VehicleId,RentalCategory>();val categoryBasis=linkedMapOf<VehicleId,String>();val demand=linkedMapOf<VehicleId,Int>()
+        for(row in categoryRows.drop(1)) {
+            require(row.size==4);val id=VehicleId(row[0]);require(id !in categories)
+            categories[id]=RentalCategory.valueOf(row[1]);require(row[2] in setOf("market-small","body-sedan","body-suv","body-mpv"));categoryBasis[id]=row[2]
+            val weight=number(row[3]);require(weight in 1..Int.MAX_VALUE);demand[id]=weight.toInt()
+        };require(categories.keys==knownVehicles)
+        val durations=records("rental_durations",listOf("hours","weight","return_minutes")) {
+            val hour=number(it[0]);val weight=number(it[1]);val returned=number(it[2]);require(hour in setOf(1L,3L,6L)&&weight in 1..Int.MAX_VALUE&&returned in setOf(15L,30L,60L));hour.toInt() to (weight.toInt() to returned.toInt())
+        };require(durations.keys==setOf(1,3,6))
+        val customers=sections.getValue("rental_customers");require(customers.first()==listOf("age","licensed_months","regular","weight")&&customers.size>1)
+        val customerInputs=customers.drop(1).map {row->
+            require(row.size==4);val age=number(row[0]);val months=number(row[1]);val weight=number(row[3]);require(age<=Int.MAX_VALUE&&months<=Int.MAX_VALUE&&weight in 1..Int.MAX_VALUE)
+            val regular=when(row[2]){"true"->true;"false"->false;else->throw IllegalArgumentException("단골 입력")}
+            io.drivegrowth.app.runtime.rental.product.RentalCustomerWeight(SimulatedCustomer(age.toInt(),months.toInt()),regular,weight.toInt())
+        };require(customerInputs.toSet().size==customerInputs.size)
+        val rental=TrialRentalInputs(categories,categoryBasis,demand,durations.mapValues{it.value.first},durations.mapValues{it.value.second},customerInputs,visit.i("max_replay_visits"),visit.n("interval_ms"),java.math.RoundingMode.valueOf(visit.getValue("rounding")))
         ContractResult.Success(TrialDefinition(expansion,rates,facilities,GameMoney(number(fuel[0][1])),quests,provenance,delivery,
-            DrivingIncomeRules(expansion.rules,drive.n("daily_cap_meters"),GameMoney(drive.n("income_per_km")))))
+            DrivingIncomeRules(expansion.rules,drive.n("daily_cap_meters"),GameMoney(drive.n("income_per_km"))),rental))
     } catch (_:IllegalArgumentException) { ContractResult.Failure(ContractError.INVALID_INPUT) }
       catch (_:IllegalStateException) { ContractResult.Failure(ContractError.INVALID_INPUT) }
 }
