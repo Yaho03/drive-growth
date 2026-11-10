@@ -147,13 +147,16 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
 
     /** 앱 재실행 시 이어갈 대여와 마지막 반영 시각. */
     data class Pending(val id: RequestId, val vehicle: OwnedVehicleId, val phase: VehicleActivity,
-                       val cursor: EpochMillis, val end: EpochMillis, val returnEnd: EpochMillis)
+                       val cursor: EpochMillis, val end: EpochMillis, val returnEnd: EpochMillis,
+                       val parkedSince: EpochMillis? = null)
 
     fun pending() = store.atomic { db ->
-        db.rawQuery("SELECT id,owned_id,phase,cursor,end,return_end FROM rentals WHERE phase IN ('RENTED','RETURNING') ORDER BY start,id", null).use {
+        db.rawQuery("SELECT id,owned_id,phase,cursor,end,return_end,parked_since FROM rentals WHERE phase IN ('RENTED','RETURNING') ORDER BY start,id", null).use {
             ContractResult.Success(buildList {
                 while (it.moveToNext()) add(Pending(RequestId(it.getString(0)), OwnedVehicleId(it.getString(1)),
-                    VehicleActivity.valueOf(it.getString(2)), EpochMillis(it.getLong(3)), EpochMillis(it.getLong(4)), EpochMillis(it.getLong(5))))
+                    VehicleActivity.valueOf(it.getString(2)), EpochMillis(it.strictInteger(3, 0, Long.MAX_VALUE)),
+                    EpochMillis(it.strictInteger(4, 0, Long.MAX_VALUE)), EpochMillis(it.strictInteger(5, 0, Long.MAX_VALUE)),
+                    if (it.isNull(6)) null else EpochMillis(it.strictInteger(6, 0, Long.MAX_VALUE))))
             })
         }
     }
