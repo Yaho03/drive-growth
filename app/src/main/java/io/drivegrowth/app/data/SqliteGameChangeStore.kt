@@ -27,8 +27,9 @@ class SqliteGameChangeStore(
     internal val materialVersions: (() -> ContractResult<MaterialVersions>)? = null,
     /** 검증된 현재 콘텐츠 공급. 조회 중 상태 변경 없이 같은 버전의 가격/규칙을 제공한다. */
     internal val repairContent: (() -> ContractResult<GameContentSnapshot>)? = null,
+    internal val initializationAuthority: (() -> ContractResult<InitializationAuthority>)? = null,
     private val clock: () -> Long = System::currentTimeMillis,
-) : GachaChangeStore, MaterialChangeStore, RepairChangeStore, VehicleHistoryStore, Closeable {
+) : GachaChangeStore, MaterialChangeStore, RepairChangeStore, InitializationChangeStore, VehicleHistoryStore, Closeable {
     private val helper = LedgerHelper(context.applicationContext, databaseName, source, initialGachaProgress)
 
     /** 디스크 쓰기 후 COMMIT 이전의 실패를 재현하기 위한 모듈 내부 시험 지점. */
@@ -45,6 +46,10 @@ class SqliteGameChangeStore(
     val delivery = DeliveryLedger(this)
     val driving = DrivingLedger(this)
     val rental = RentalLedger(this)
+    private val initialization = InitializationLedger(this, initializationAuthority)
+    fun localProfileId() = initialization.profileId()
+    override fun readInitialization(profileId: ProfileId) = initialization.readInitialization(profileId)
+    override fun commitInitialization(command: InitializationCommand) = initialization.commitInitialization(command)
     private val repair = RepairLedger(this)
     override fun readRepairState(target: OwnedVehicleId) = repair.readState(target)
     override fun repairSettlement(requestId: RequestId) = repair.settlement(requestId)
@@ -83,7 +88,8 @@ class SqliteGameChangeStore(
             "SELECT 1 FROM gacha_requests WHERE request_id=?",
             "SELECT 1 FROM delivery_requests WHERE request_id=?",
             "SELECT 1 FROM material_requests WHERE request_id=?",
-            "SELECT 1 FROM repair_requests WHERE request_id=?")
+            "SELECT 1 FROM repair_requests WHERE request_id=?",
+            "SELECT 1 FROM initialization_requests WHERE request_id=?")
         return queries.any { sql -> db.rawQuery(sql, arrayOf(id.value)).use { it.moveToFirst() } }
     }
 
@@ -94,7 +100,7 @@ class SqliteGameChangeStore(
         if (domain == RequestDomain.DELIVERY && change.kind != TransactionKind.DELIVERY ||
             domain == RequestDomain.DRIVING && change.kind != TransactionKind.DRIVING)
             return failure(ContractError.INVALID_INPUT)
-        for (table in listOf("visits", "gacha_requests", "delivery_requests", "material_requests", "repair_requests")) {
+        for (table in listOf("visits", "gacha_requests", "delivery_requests", "material_requests", "repair_requests", "initialization_requests")) {
             val key = if (table == "visits") "id" else "request_id"
             if (db.rawQuery("SELECT 1 FROM $table WHERE $key=?", arrayOf(id)).use { it.moveToFirst() })
                 return failure(ContractError.STATE_CONFLICT)
@@ -137,7 +143,7 @@ class SqliteGameChangeStore(
         val vehicle = when (val write = change.vehicle) {
             null -> null
             is VehicleWrite.Add -> {
-                val capacity = GachaLedger.capacityIfConfigured(db)
+                val capacity = GachaLedger.capacityIfConfigured(db) ?: InitializationLedger.capacityIfInitialized(db)
                 if (capacity != null && readVehicles(db).count { it.lifecycle == VehicleLifecycle.OWNED } >= capacity)
                     return failure(ContractError.CAPACITY_EXCEEDED)
                 if (findVehicle(db, write.vehicle.ownedVehicleId) != null) return failure(ContractError.STATE_CONFLICT)
@@ -280,7 +286,7 @@ internal enum class LedgerFailureReason { SQLITE, CORRUPT, UNSUPPORTED_SCHEMA, S
 private class LedgerStorageException(val reason: LedgerFailureReason) : SQLiteException(reason.name)
 
 private class LedgerHelper(context: Context, name: String, private val source: InputSource, private val initialGachaProgress: GachaProgress?) : SQLiteOpenHelper(
-    context, name, null, 7,
+    context, name, null, 8,
     // Android 기본 핸들러의 손상 DB 삭제를 막고 원본을 보존한다.
     DatabaseErrorHandler { throw LedgerStorageException(LedgerFailureReason.CORRUPT) },
 ) {
@@ -299,13 +305,15 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         DrivingLedger.createTables(db)
         MaterialLedger.createTables(db)
         RepairLedger.createTables(db)
+        InitializationLedger.createTables(db)
+        InitializationLedger.onNewDatabase(db, source)
         initialGachaProgress?.let { GachaLedger.insertInitialProgress(db, it) }
     }
     private fun createDiscoveries(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE discoveries (vehicle_id TEXT NOT NULL, rarity TEXT NOT NULL, PRIMARY KEY(vehicle_id, rarity))")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion !in 1..6 || newVersion != 7) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
+        if (oldVersion !in 1..7 || newVersion != 8) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
         verifySource(db)
         // 기존 원장과 개체 JSON은 그대로 보존한다.
         if (oldVersion == 1) RentalLedger.createTables(db)
@@ -316,7 +324,9 @@ private class LedgerHelper(context: Context, name: String, private val source: I
             DrivingLedger.createTables(db)
         }
         if (oldVersion < 6) MaterialLedger.createTables(db)
-        RepairLedger.createTables(db)
+        if (oldVersion < 7) RepairLedger.createTables(db)
+        InitializationLedger.createTables(db)
+        InitializationLedger.onExistingDatabase(db, source)
     }
     override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
