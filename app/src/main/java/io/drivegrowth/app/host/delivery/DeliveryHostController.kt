@@ -1,0 +1,175 @@
+package io.drivegrowth.app.host.delivery
+
+import io.drivegrowth.app.host.GameIdentity
+import io.drivegrowth.app.ui.delivery.*
+import io.drivegrowth.core.contract.*
+import java.util.concurrent.Executor
+
+/** 공개 메서드/표시는 UI thread, source는 직렬 worker에서 호출한다. */
+class DeliveryHostController(private val source: DeliveryHostSource, private val worker: Executor, private val main: Executor) {
+    private var render: ((DeliveryFrame, Boolean) -> Unit)? = null
+    private var complete: ((DeliveryRequest, DeliveryFrame) -> Unit)? = null
+    @Volatile private var allowed = false
+    @Volatile private var released = false
+    @Volatile private var epoch = 0L
+    private var runningEpoch = 0L
+    private var busy = false
+    private var version = 0L
+    private var frame = DeliveryFrame(0, DeliveryScreen.Loading)
+    @Volatile private var identity: GameIdentity? = null
+    @Volatile private var original: DeliveryHostOperation? = null
+    @Volatile private var confirmed = false
+    private var request: DeliveryRequest? = null
+    var state: DeliveryHostRead? = null
+        private set
+
+    fun attach(render: (DeliveryFrame, Boolean) -> Unit, complete: (DeliveryRequest, DeliveryFrame) -> Unit) {
+        detach(); this.render = render; this.complete = complete
+        render(frame, false)
+    }
+    fun detach() { setControlsEnabled(false); render = null; complete = null }
+    fun release() { released = true; allowed = false; epoch++; render = null; complete = null }
+    fun setControlsEnabled(value: Boolean) {
+        if (released || value == allowed) return
+        allowed = value
+        if (!value) epoch++
+        render?.invoke(frame, value && !busy)
+        if (value && request != null && !busy) refresh()
+    }
+    fun refresh() = launch(::recover)
+    private fun recover(): ContractResult<DeliveryHostRead> =
+        when (val read = source.read()) {
+            is ContractResult.Failure -> read
+            is ContractResult.Success -> {
+                val current = read.value
+                when {
+                    !inCurrentWork() -> ContractResult.Failure(ContractError.UX_RESTRICTED)
+                    !bind(current.identity) -> ContractResult.Failure(ContractError.STATE_CONFLICT)
+                    original != null && current.pending != original -> ContractResult.Failure(ContractError.STORAGE_FAILURE)
+                    current.pending == null -> read
+                    else -> {
+                        if (!inCurrentWork()) ContractResult.Failure(ContractError.UX_RESTRICTED)
+                        else {
+                            original = current.pending
+                            source.execute(current.identity, current.pending).also { if (it is ContractResult.Success) confirmed = true }
+                        }
+                    }
+                }
+            }
+        }
+    val canCancelUnstarted: Boolean get() = original != null && !confirmed && frame.screen is DeliveryScreen.Failure
+    fun cancelUnstarted() {
+        val command = original ?: return
+        if (confirmed) return
+        launch { when (val canceled = source.cancelUnstarted(identity!!, command)) {
+            is ContractResult.Failure -> canceled
+            is ContractResult.Success -> { original = null; confirmed = false; recover() }
+        } }
+    }
+    fun acknowledge() {
+        val command = original ?: return
+        if (!confirmed) return
+        launch { when (val finished = source.finish(identity!!, command)) {
+            is ContractResult.Failure -> finished
+            is ContractResult.Success -> { original = null; confirmed = false; recover() }
+        } }
+    }
+    fun onRequest(value: DeliveryRequest) {
+        if (released || busy || identity == null) return
+        val input = DeliveryInteraction(DeliveryInteractionState(frame = frame))
+        input.render(frame, true)
+        if (value.frameVersion != frame.version || !input.canRequest(value.command)) return
+        if (!allowed) {
+            show(DeliveryScreen.Failure(message(ContractError.UX_RESTRICTED), true), value)
+            return
+        }
+        // UI 전체 입력은 기존 Interaction의 snapshot 경계를 재사용한다.
+        request = DeliveryInteraction(DeliveryInteractionState(pending = value)).pending!!
+        val command = request!!.command
+        if (command == DeliveryCommand.Refresh) { refresh(); return }
+        launch {
+            val profile = identity!!
+            val previous = original
+            if (previous != null) {
+                if (!confirmed) return@launch ContractResult.Failure(ContractError.STATE_CONFLICT)
+                when (val finished = source.finish(profile, previous)) {
+                    is ContractResult.Failure -> return@launch finished
+                    is ContractResult.Success -> { original = null; confirmed = false }
+                }
+            }
+            if (!inCurrentWork()) return@launch ContractResult.Failure(ContractError.UX_RESTRICTED)
+            when (val prepared = source.prepare(profile, command)) {
+                is ContractResult.Failure -> prepared
+                is ContractResult.Success -> {
+                    val operation = prepared.value.operation
+                    if (operation == null) ContractResult.Success(DeliveryHostRead(profile, prepared.value.screen, state?.held.orEmpty(), navigation = prepared.value.navigation))
+                    else {
+                        if (!inCurrentWork()) ContractResult.Failure(ContractError.UX_RESTRICTED)
+                        else {
+                            original = operation
+                            source.execute(profile, operation).also { if (it is ContractResult.Success) confirmed = true }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    /** 기존 View의 실제 render 성공 뒤 같은 frame을 한 번 확인한다. 생성만 한 후보는 기록하지 않는다. */
+    fun acknowledgeDisplayed(frameVersion: Long) {
+        val current = state ?: return
+        val proposal = current.displayedProposal ?: return
+        if (frameVersion != frame.version || frame.screen !is DeliveryScreen.Offers) return
+        launch { when (val saved = source.displayed(current.identity, proposal)) {
+            is ContractResult.Failure -> saved
+            is ContractResult.Success -> ContractResult.Success(current.copy(displayedProposal = null))
+        } }
+    }
+    private fun bind(value: GameIdentity): Boolean {
+        val current = identity
+        if (current == null) identity = value
+        return current == null || current == value
+    }
+    private fun valid() = !released && allowed
+    private fun inCurrentWork() = valid() && epoch == runningEpoch
+    private fun launch(action: () -> ContractResult<DeliveryHostRead>) {
+        if (!valid() || busy) return
+        val token = epoch
+        busy = true
+        show(DeliveryScreen.Loading)
+        worker.execute {
+            runningEpoch = token
+            val result = if (!valid() || epoch != token) null else try { action() }
+                catch (_: SecurityException) { ContractResult.Failure(ContractError.PERMISSION_DENIED) }
+                catch (_: RuntimeException) { ContractResult.Failure(ContractError.STORAGE_FAILURE) }
+            main.execute {
+                busy = false
+                if (released) return@execute
+                if (epoch != token || result == null) {
+                    // 옛 gate 세대의 응답은 표시하지 않고, 재허용 상태라면 원장에서 새로 읽는다.
+                    if (allowed) refresh()
+                    return@execute
+                }
+                when (result) {
+                    is ContractResult.Failure -> show(DeliveryScreen.Failure(message(result.error), true), request)
+                    is ContractResult.Success -> if (!bind(result.value.identity))
+                        show(DeliveryScreen.Failure("다른 프로필의 응답을 사용할 수 없어요.", true), request)
+                    else { state = result.value; show(result.value.screen, request) }
+                }
+                request = null
+            }
+        }
+    }
+    private fun show(screen: DeliveryScreen, response: DeliveryRequest? = null) {
+        frame = DeliveryFrame(++version, screen)
+        if (response != null) complete?.invoke(response, frame)
+        render?.invoke(frame, allowed && !busy)
+    }
+    private fun message(error: ContractError) = when (error) {
+        ContractError.INSUFFICIENT_FUNDS -> "게임머니가 부족해요. 원래 의뢰와 결제 상태를 확인해 주세요."
+        ContractError.CAPACITY_EXCEEDED -> "진행 중인 의뢰나 차고 공간을 확인해 주세요."
+        ContractError.UX_RESTRICTED -> "주차 후 조작이 허용되면 다시 확인해 주세요."
+        ContractError.DATA_UNAVAILABLE -> "탁송에 필요한 정보를 확인할 수 없어요. 원래 요청은 유지돼요."
+        ContractError.STATE_CONFLICT -> "확인한 조건이 달라졌어요. 원래 요청의 결과를 다시 확인해 주세요."
+        else -> "탁송 결과를 확인하지 못했어요. 보관한 원래 요청으로 다시 확인해 주세요."
+    }
+}
