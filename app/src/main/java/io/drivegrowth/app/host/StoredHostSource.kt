@@ -41,6 +41,17 @@ internal class StoredHostSource(context: Context, private val databaseName: Stri
         }
     }
 
+    /** 같은 factory/profile/source의 실제 6지표만 읽는다. 시연 provider와 미공급 근거는 주입하지 않는다. */
+    fun readRanking() = readRanking(EpochMillis(System.currentTimeMillis()))
+    internal fun readRanking(asOf: EpochMillis): ContractResult<io.drivegrowth.app.host.ranking.RankingSnapshot> = try {
+        val loaded = (AssetGameContent(context.assets).load() as? ContentLoad.Loaded)?.snapshot
+        if (loaded == null) ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+        else withStore { store, source ->
+            // 출발 당시 zone/검증된 Quest 원인이 없으면 RankingReadSource의 Missing 경계를 유지한다.
+            io.drivegrowth.app.data.RankingReadSource(store, source, loaded).read(asOf)
+        }
+    } catch (error: RuntimeException) { failure("ranking-read", error) }
+
     fun markViewed(id: SettlementId): ContractResult<Unit> = try {
         withStore { store, _ -> store.markViewed(id) }
     } catch (error: RuntimeException) {

@@ -1,6 +1,14 @@
 package io.drivegrowth.app
 
 import android.app.Activity
+import android.widget.ScrollView
+import io.drivegrowth.app.ui.delivery.*
+import io.drivegrowth.app.host.delivery.DeliveryHostReceipt
+import io.drivegrowth.core.delivery.DeliveryOutcome
+import io.drivegrowth.core.delivery.HoldOutcome
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
@@ -16,7 +24,10 @@ import io.drivegrowth.app.host.garage.GarageCommandHost
 import io.drivegrowth.app.host.garage.GarageCommandState
 import io.drivegrowth.app.host.garage.GarageCommandView
 import io.drivegrowth.app.host.garage.GarageActionAvailability
-import io.drivegrowth.app.host.shop.ShopHostMapper
+import io.drivegrowth.app.host.shop.ShopExpansionHostController
+import io.drivegrowth.app.host.shop.ShopExpansionAccess
+import io.drivegrowth.app.host.shop.SessionShopExpansionSource
+import io.drivegrowth.app.ui.shop.ShopScreenState
 import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.app.ui.shop.ShopEvent
 import io.drivegrowth.app.ui.shop.ShopMode
@@ -29,6 +40,11 @@ import io.drivegrowth.app.host.HostPage
 import io.drivegrowth.app.host.HostQueryController
 import io.drivegrowth.app.host.HostQueryState
 import io.drivegrowth.app.host.onboarding.OnboardingStateBundle
+import io.drivegrowth.app.host.ranking.RankingState
+import io.drivegrowth.app.host.ranking.RankingMetric
+import io.drivegrowth.app.ui.ranking.RankingView
+import io.drivegrowth.app.ui.ranking.RankingMode
+import io.drivegrowth.app.ui.ranking.RankingUiState
 import io.drivegrowth.app.host.HostSession
 import io.drivegrowth.app.host.ResultsHostMapper
 import io.drivegrowth.app.host.ResultsStateBundle
@@ -46,6 +62,7 @@ import io.drivegrowth.app.ui.garage.GarageView
 import io.drivegrowth.app.vehicle.ForegroundInteraction
 import io.drivegrowth.app.vehicle.VehicleInput
 import io.drivegrowth.core.contract.ContractError
+import io.drivegrowth.core.contract.InputSource
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.contract.Observation
@@ -58,6 +75,7 @@ class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private val interaction = ForegroundInteraction()
     private var input: VehicleInput? = null
+    private var drivingStatus: String? = null
     private var navigation = HostNavigation()
     private var screen: HostQueryState = HostQueryState.Restricted
     private lateinit var management: GarageCommandHost
@@ -65,19 +83,38 @@ class MainActivity : Activity() {
     private var managementState: GarageCommandState = GarageCommandState.Idle
     private var recoveredManagement = false
     private var managementVisible = false
-    private val shopMapper = ShopHostMapper()
+    private lateinit var expansionSource: SessionShopExpansionSource
+    private lateinit var expansionHost: ShopExpansionHostController
+    private lateinit var expansionAccess: ShopExpansionAccess
+    private var expansionState: ShopScreenState = ShopScreenState.Loading
+    private var pendingPage: HostPage? = null
+    private var pendingRouteGeneration = 0L
+    private var pendingRouteFailed = false
+    private var pendingRouteEnabled = false
     private lateinit var shop: ShopView
+    private lateinit var progression: io.drivegrowth.app.ui.progress.ProgressView
+    private var progressionFrame: io.drivegrowth.app.host.progression.ProgressionFrame? = null
+    private var lastProgressionScreen: io.drivegrowth.app.ui.progress.ProgressScreenState? = null
+    private var lastProgressionAccess: Boolean? = null
+    private var progressionRestoreFailed = false
+    private lateinit var ranking: RankingView
+    private var rankingState: RankingState = RankingState.Restricted
+    private lateinit var delivery: DeliveryView
+    private var deliveryAccessEnabled = false
+    private var deliveryReceipt: DeliveryHostReceipt? = null
+    private lateinit var deliveryBody: LinearLayout
+    private var deliveryFrame = DeliveryFrame(0, DeliveryScreen.Loading)
     private lateinit var gacha: GachaView
-    private var shopRevision = 0
     private var navigationGeneration = 0L
     private val destinations = listOf(HostPage.HOME to "가게", HostPage.GARAGE to "보유 차량", HostPage.COLLECTION to "도감",
-        HostPage.GACHA to "가챠", HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내")
+        HostPage.GACHA to "가챠", HostPage.PROGRESSION to "퀘스트·진행", HostPage.DELIVERY to "탁송", HostPage.RANKING to "기록·랭킹", HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내")
     private val mapper = GarageHostMapper()
     private val resultsMapper = ResultsHostMapper()
     private lateinit var results: ResultsView
     private lateinit var onboarding: OnboardingView
     private var onboardingState: OnboardingScreenState = OnboardingScreenState.Loading
     private var routedNewProfile: String? = null
+    private var automaticIntroAllowed = true
     private lateinit var queries: HostQueryController
     private lateinit var session: HostSession
     private lateinit var style: GarageStyle
@@ -106,15 +143,51 @@ class MainActivity : Activity() {
         val shopMode = ShopMode.entries.firstOrNull { it.name == savedInstanceState?.getString("shopMode") } ?: ShopMode.OVERALL
         shop.restoreUiState(ShopUiState(mode = shopMode, sceneScrollY = savedInstanceState?.getInt("shopSceneY", 0) ?: 0,
             controlsScrollY = savedInstanceState?.getInt("shopControlsY", 0) ?: 0))
+        ranking = RankingView(this) {
+            if (allowed() && navigation.page == HostPage.RANKING) session.ranking.refresh()
+            else { updateAccess(); ranking.render(RankingState.Restricted, false) }
+        }
+        ranking.restoreUiState(RankingUiState(
+            RankingMode.entries.firstOrNull { it.name == savedInstanceState?.getString("rankingMode") } ?: RankingMode.MY_RECORD,
+            RankingMetric.entries.firstOrNull { it.name == savedInstanceState?.getString("rankingMetric") } ?: RankingMetric.SHOP_LEVEL,
+            (savedInstanceState?.getInt("rankingY", 0) ?: 0).coerceAtLeast(0)))
         onboarding = OnboardingView(this, ::onOnboardingEvent)
         routedNewProfile = savedInstanceState?.getString("onboardingRoutedProfile")
+        automaticIntroAllowed = if (savedInstanceState?.containsKey("onboardingAutoEntryAllowed") == true)
+            savedInstanceState.getBoolean("onboardingAutoEntryAllowed") else savedInstanceState == null && lastNonConfigurationInstance == null
         val deliveryHandler = handler
         session = lastNonConfigurationInstance as? HostSession ?: HostSession(applicationContext, { deliveryHandler.post(it) },
             ResultsStateBundle.decode(savedInstanceState?.getBundle("results")),
             OnboardingStateBundle.decode(savedInstanceState?.getBundle("onboardingHost")))
+        progression = io.drivegrowth.app.ui.progress.ProgressView(this) { event ->
+            if (allowed() && navigation.page == HostPage.PROGRESSION) session.progression.handle(event) else updateAccess()
+        }
+        if (lastNonConfigurationInstance == null) {
+            when (val decoded = io.drivegrowth.app.host.progression.ProgressionUiStateBundle.decode(savedInstanceState?.getBundle("progression"))) {
+                is ContractResult.Success -> session.progressionUi = decoded.value
+                is ContractResult.Failure -> progressionRestoreFailed = true
+            }
+        }
+        progression.restoreUiState(session.progressionUi)
+        deliveryFrame = session.deliveryUi.frame ?: DeliveryFrame(0, DeliveryScreen.Loading)
+        delivery = DeliveryView(this, { request ->
+            session.deliveryUi = delivery.saveUiState()
+            session.delivery.onRequest(request)
+        }, session.deliveryUi)
+        deliveryBody = style.column()
         gacha = GachaView(this, ::onGachaEvent, session.gacha.uiState)
         results.restoreUiState(session.results.uiState)
         queries = session.queries
+        expansionSource = SessionShopExpansionSource(applicationContext, session.games)
+        expansionHost = ShopExpansionHostController(expansionSource, session::expansionWorker,
+            { handler.post(it) }, { state, _ ->
+                expansionState = state
+                if (state is ShopScreenState.Content && shop.uiState.pending != null)
+                    shop.restoreUiState(shop.uiState.copy(pending = null, selection = null, message = "최신 저장 상태를 표시합니다."))
+                if (::body.isInitialized) render()
+            }, shop::complete, shop::completeRetry, committed = { if (allowed()) queries.refresh() },
+            initialRevision = shop.uiState.latestRevision ?: Revision(0))
+        expansionAccess = ShopExpansionAccess(expansionHost)
         management = GarageCommandHost(applicationContext, { handler.post(it) }, session.games) { state ->
             val prior = managementState
             managementState = state
@@ -158,10 +231,8 @@ class MainActivity : Activity() {
             }
             onboarding.restoreSelection(session.onboarding.uiState.selected)
             val profile = session.onboarding.uiState.identity?.profileId?.value
-            if (state is OnboardingScreenState.Intro && profile != null && routedNewProfile != profile) {
-                routedNewProfile = profile
-                navigation.page = HostPage.ONBOARDING
-            }
+            if (state is OnboardingScreenState.Intro)
+                routedNewProfile = navigation.acceptInitialIntro(profile, routedNewProfile, automaticIntroAllowed)
             render()
         }, {
             // Completed의 이동 입력 잠금은 새 View에서 초기화하고 저장 결과를 다시 공급한다.
@@ -174,9 +245,21 @@ class MainActivity : Activity() {
             session.onboarding.refresh()
         if (navigation.page == HostPage.GACHA) session.gacha.refresh()
         })
+        session.delivery.attach({ frame, enabled ->
+            deliveryFrame = frame
+            val receipt = session.delivery.state?.receipt
+            if (receipt != null && receipt != deliveryReceipt) { deliveryReceipt = receipt; queries.refresh() }
+            delivery.render(frame, enabled && allowed() && navigation.page == HostPage.DELIVERY)
+            session.deliveryUi = delivery.saveUiState()
+            if (::chrome.isInitialized) render()
+        }, { request, frame ->
+            delivery.complete(request, frame)
+            session.deliveryUi = delivery.saveUiState()
+        })
+        session.deliveryNavigation.changed = { if (active && allowed() && navigation.page == HostPage.DELIVERY) render() }
         queries.attach {
             screen = it
-            if (it is HostQueryState.Content) shopRevision = Math.addExact(shopRevision, 1)
+            if (it is HostQueryState.Content) refreshPendingRoute()
             render()
             if (it is HostQueryState.Content || it is HostQueryState.Failure) {
                 session.results.completeQuery()
@@ -206,13 +289,50 @@ class MainActivity : Activity() {
         setVisible(true)
         if (active) return
         active = true
+        session.driving.start { result ->
+            val status = when (result) {
+                is ContractResult.Failure -> {
+                    android.util.Log.w("DriveGrowthDriving", "recording_failure code=${result.error}")
+                    "주행 기록을 확인하지 못했어요. 원래 기록은 다시 연결할 때 확인합니다."
+                }
+                is ContractResult.Success -> {
+                    if (result.value.committed.isNotEmpty()) {
+                        queries.refresh()
+                        session.progression.refresh()
+                        session.ranking.refresh()
+                    }
+                    if (result.value.waiting != null) "주행 기록의 정산 근거를 확인하고 있어요."
+                    else "수신한 주행 관측을 기록하고 있어요."
+                }
+            }
+            if (drivingStatus != status) { drivingStatus = status; if (::chrome.isInitialized) render() }
+        }
+        session.progression.attach { frame ->
+            progressionFrame = frame
+            if (frame.retryComplete) progression.completeRetry()
+            if (frame.resolved.isNotEmpty()) {
+                progression.completePendingRecovery(frame.resolved)
+                if (allowed()) queries.refresh()
+            }
+            renderProgression()
+            session.progressionUi = progression.uiState
+        }
+        session.progression.restoreUiState(progression.uiState)
+        session.ranking.attach { rankingState = it; ranking.render(it, allowed() && navigation.page == HostPage.RANKING) }
         if (results.uiState != session.results.uiState) results.restoreUiState(session.results.uiState)
         session.results.attach { id, result ->
             updateAccess()
             results.completeMarkViewed(id, result)
         }
         try {
-            input = VehicleInput(this, { if (active) { interaction.accept(it); updateAccess() } }, {}).also { it.start() }
+            input = VehicleInput(this, { observation ->
+                val zone = session.drivingCalendar.take(observation)
+                if (active) {
+                    session.driving.accept(io.drivegrowth.app.host.driving.DrivingFrame(observation, zone))
+                    interaction.accept(observation)
+                    updateAccess()
+                }
+            }, {}, session.drivingCalendar).also { it.start() }
         } catch (_: LinkageError) {
             updateAccess()
         }
@@ -225,7 +345,17 @@ class MainActivity : Activity() {
     }
 
     private fun stopObserving() {
+        active = false // 새 UI/관측 입구를 먼저 닫고 SDK queue를 중단한다.
+        input?.stop()
+        input = null
+        session.driving.stop() // 같은 serial worker 뒤에 실제 중단 시각과 receiver 경계를 보존한다.
+        session.progressionUi = progression.uiState
+        session.progression.setControlsEnabled(false)
+        session.progression.detach()
+        lastProgressionAccess = null
+        progression.render(io.drivegrowth.app.ui.progress.ProgressScreenState.Loading, false)
         session.results.remember(results.uiState)
+        session.ranking.detach()
         session.results.detach()
         active = false
         handler.removeCallbacks(watchdog)
@@ -236,6 +366,15 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        session.progressionUi = progression.uiState
+        session.progression.detach()
+        session.deliveryUi = delivery.saveUiState()
+        session.delivery.detach()
+        session.deliveryNavigation.changed = null
+        delivery.release()
+        pendingRouteGeneration++
+        session.ranking.detach()
+        expansionHost.release()
         management.release()
         queries.detach()
         session.gacha.remember(gacha.uiState)
@@ -250,10 +389,16 @@ class MainActivity : Activity() {
     override fun onRetainNonConfigurationInstance(): Any = session
 
     override fun onSaveInstanceState(outState: Bundle) {
+        session.progressionUi = progression.uiState
+        outState.putBundle("progression", io.drivegrowth.app.host.progression.ProgressionUiStateBundle.encode(progression.uiState))
         session.results.remember(results.uiState)
         outState.putBundle("results", ResultsStateBundle.encode(session.results.uiState))
         outState.putBundle("onboardingHost", OnboardingStateBundle.encode(session.onboarding.uiState))
         outState.putString("onboardingRoutedProfile", routedNewProfile)
+        outState.putBoolean("onboardingAutoEntryAllowed", automaticIntroAllowed)
+        outState.putString("rankingMode", ranking.uiState.mode.name)
+        outState.putString("rankingMetric", ranking.uiState.metric.name)
+        outState.putInt("rankingY", ranking.uiState.scrollY)
         outState.putString("shopMode", shop.uiState.mode.name)
         outState.putInt("shopSceneY", shop.uiState.sceneScrollY)
         outState.putInt("shopControlsY", shop.uiState.controlsScrollY)
@@ -274,16 +419,33 @@ class MainActivity : Activity() {
     private fun updateAccess() {
         val enabled = allowed()
         queries.setControlsEnabled(enabled)
+        session.progression.setControlsEnabled(enabled && navigation.page == HostPage.PROGRESSION)
+        renderProgression()
+        val deliveryEnabled = enabled && navigation.page == HostPage.DELIVERY
+        val deliveryGained = deliveryEnabled && !deliveryAccessEnabled
+        deliveryAccessEnabled = deliveryEnabled
+        session.deliveryNavigation.setControlsEnabled(deliveryEnabled)
+        session.delivery.setControlsEnabled(deliveryEnabled)
+        if (deliveryGained) session.delivery.refresh()
         session.gacha.setControlsEnabled(enabled && navigation.page == HostPage.GACHA)
+        session.ranking.setControlsEnabled(enabled && navigation.page == HostPage.RANKING)
         session.onboarding.setControlsEnabled(enabled)
+        expansionAccess.setControlsEnabled(enabled && navigation.page == HostPage.HOME)
         management.controller.setControlsEnabled(enabled)
+        val routeGained = enabled && !pendingRouteEnabled
+        pendingRouteEnabled = enabled
+        if (routeGained) refreshPendingRoute()
         if (enabled && !recoveredManagement) { recoveredManagement = true; management.controller.recover() }
     }
 
     private fun refresh() {
         if (!allowed()) { updateAccess(); return }
         session.onboarding.refresh()
-        if (navigation.page == HostPage.GACHA) session.gacha.refresh()
+        if (navigation.page == HostPage.PROGRESSION) session.progression.refresh()
+        else if (navigation.page == HostPage.DELIVERY) { session.deliveryNavigation.refresh(); session.delivery.refresh() }
+        else if (navigation.page == HostPage.HOME) expansionHost.load()
+        else if (navigation.page == HostPage.GACHA) session.gacha.refresh()
+        else if (navigation.page == HostPage.RANKING) session.ranking.refresh()
         else if (screen != HostQueryState.Loading) queries.refresh()
     }
 
@@ -299,12 +461,22 @@ class MainActivity : Activity() {
             is HostQueryState.Failure -> CollectionScreenState.Error("조회 실패 (${current.error})")
             else -> CollectionScreenState.Loading
         }
+        ranking.render(rankingState, enabled && navigation.page == HostPage.RANKING)
         managementView.render(managementState, enabled)
-        shop.render(shopMapper.map(screen, Revision(shopRevision)), enabled)
+        val shopState = when (val current = expansionState) {
+            is ShopScreenState.Content -> current.copy(name = current.name + when (expansionSource.identity?.source) {
+                InputSource.SIMULATION -> " · 모의 원장"
+                InputSource.VEHICLE -> " · 차량 원장"
+                null -> " · 출처 확인 필요"
+            })
+            else -> current
+        }
+        shop.render(shopState, enabled)
         garage.render(garageState, enabled)
         collection.render(collectionState, enabled)
         results.render(resultsMapper.map(screen), enabled)
         onboarding.render(onboardingState, enabled)
+        renderDelivery(enabled && navigation.page == HostPage.DELIVERY)
         chrome.removeAllViews()
         if (!enabled) {
             showBody(style.text("주차 후 조작이 허용되면 이용할 수 있습니다."))
@@ -329,6 +501,27 @@ class MainActivity : Activity() {
         links.addView(destination, LinearLayout.LayoutParams(0, style.dp(56), 1f))
         links.addView(style.button("새로고침") { if (token == navigationGeneration) refresh() })
         chrome.addView(links)
+        drivingStatus?.let { chrome.addView(style.text(it)) }
+        if (navigation.page == HostPage.HOME && expansionState is ShopScreenState.Failure)
+            chrome.addView(style.button("보관한 미실행 확장 요청 취소") { expansionHost.cancelSaved() })
+        if (navigation.page == HostPage.PROGRESSION) {
+            if (progressionRestoreFailed) chrome.addView(style.text("화면 상태를 복원하지 못해 저장 기록을 다시 확인합니다."))
+            chrome.addView(style.button("미시작 퀘스트 청구 취소 확인") { if (allowed()) session.progression.cancelSaved() })
+        }
+        if (pendingRouteFailed)
+            chrome.addView(style.button("보관 요청 종류를 다시 확인") { refreshPendingRoute() })
+        pendingPage?.takeIf { it != navigation.page }?.let { target ->
+            chrome.addView(style.button(when (target) {
+                HostPage.GACHA -> "보관한 가챠 요청 확인"
+                HostPage.GARAGE -> "보관한 차량 관리 요청 확인"
+                HostPage.DELIVERY -> "보관한 탁송 요청 확인"
+                HostPage.PROGRESSION -> "보관한 퀘스트 청구 확인"
+                else -> "보관한 가게 확장 요청 확인"
+            }) {
+                select(target)
+                if (target == HostPage.GARAGE) { managementVisible = true; management.controller.recover() }
+            })
+        }
         if (navigation.page == HostPage.GACHA && session.gacha.failed)
             chrome.addView(style.button("보관한 미실행 가챠 요청 취소") { session.gacha.cancelUnstarted() })
         navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE && !managementVisible }?.let {
@@ -343,7 +536,93 @@ class MainActivity : Activity() {
             HostPage.ONBOARDING -> showBody(onboarding)
             HostPage.HOME -> showBody(shop)
             HostPage.GACHA -> showBody(gacha)
+            HostPage.DELIVERY -> {
+                showBody(deliveryBody)
+                val shown = deliveryFrame.version
+                delivery.post {
+                    if (active && allowed() && navigation.page == HostPage.DELIVERY && delivery.isShown &&
+                        deliveryFrame.version == shown) session.delivery.acknowledgeDisplayed(shown)
+                }
+            }
+
+            HostPage.RANKING -> showBody(ranking)
+            HostPage.PROGRESSION -> { renderProgression(); showBody(progression) }
         }
+    }
+
+    private fun renderProgression() {
+        if (!::progression.isInitialized) return
+        val frame = progressionFrame
+        val state = frame?.screen ?: io.drivegrowth.app.ui.progress.ProgressScreenState.Loading
+        val access = allowed() && navigation.page == HostPage.PROGRESSION && frame?.controlsEnabled == true
+        if (state == lastProgressionScreen && access == lastProgressionAccess) return
+        lastProgressionScreen = state
+        lastProgressionAccess = access
+        progression.render(state, access)
+    }
+
+    private fun renderDelivery(enabled: Boolean) {
+        delivery.render(deliveryFrame, enabled)
+        session.deliveryUi = delivery.saveUiState()
+        deliveryBody.removeAllViews()
+        val details = style.column()
+        if (enabled) {
+            val raw = session.deliveryNavigation.snapshot
+            val destination = raw?.destination as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
+            val distance = raw?.remainingEstimatedMeters as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
+            details.addView(style.text("내비에서 목적지를 먼저 설정한 뒤 여기서 조회하고 확인해 주세요."))
+            details.addView(style.button("내비 목적지 다시 조회") { session.deliveryNavigation.refresh() })
+            if (destination != null && distance != null && destination.stamp == distance.stamp) {
+                details.addView(style.text("내비 반환 목적지: ${destination.value.name ?: "이름 없음"} · ${destination.value.address ?: "주소 없음"}"))
+                details.addView(style.text("남은 예상거리 ${distance.value}m · 수신 UTC ${destination.stamp.receivedAtMillis}ms"))
+                details.addView(style.text("남은 예상거리는 실제 이동거리·도착 증거와 별개예요."))
+                details.addView(style.button("이 목적지와 남은 예상거리 확인") {
+                    when (session.deliveryNavigation.confirm()) {
+                        is ContractResult.Success -> session.delivery.refresh()
+                        is ContractResult.Failure -> { session.deliveryNavigation.refresh(); render() }
+                    }
+                })
+            }
+            details.addView(style.text("실제 이동거리와 도착 상관 근거는 확인 대기예요. 프로필만으로 실차 주행을 확정하지 않아요."))
+            val state = session.delivery.state
+            val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
+                ?.associate { it.vehicleId to it.displayName }.orEmpty()
+            val date = DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"))
+            for (held in state?.held.orEmpty()) {
+                val name = names[held.vehicle.vehicleId] ?: "차량 정보 확인 중"
+                details.addView(style.text("임시 보관 · $name · ${style.rarity(held.vehicle.rarity)} · 낸 금액 ${held.price.units}"))
+                details.addView(style.text("보관 기한 ${date.format(Instant.ofEpochMilli(held.deadline.value))} (한국시간)"))
+            }
+            if (state?.held?.isNotEmpty() == true)
+                details.addView(style.button("보관 차량 처리 조건 다시 확인") { session.delivery.refresh() })
+            state?.receipt?.let { receipt ->
+                val message = when (receipt) {
+                    is DeliveryHostReceipt.Selected -> "의뢰 선택이 확정됐어요."
+                    is DeliveryHostReceipt.Changed -> "목적지 변경이 확정됐어요."
+                    is DeliveryHostReceipt.Abandoned -> "의뢰 포기가 확정됐어요."
+                    is DeliveryHostReceipt.Arrived -> when (receipt.value.outcome) {
+                        is DeliveryOutcome.AwaitingEvidence -> "도착 근거를 확인하고 있어요."
+                        is DeliveryOutcome.IncomeCompleted -> "수익 탁송 보상이 확정됐어요."
+                        is DeliveryOutcome.VehicleDelivered -> "구매 차량 지급이 확정됐어요."
+                        is DeliveryOutcome.VehicleHeld -> "구매 차량을 임시 보관했어요."
+                        is DeliveryOutcome.IncomeExpired -> "도착 기한이 지나 의뢰가 종료됐어요."
+                        is DeliveryOutcome.PurchaseRefunded -> "미도착 의뢰의 구매 대금 환급이 확정됐어요."
+                    }
+                    is DeliveryHostReceipt.Held -> when (receipt.value.outcome) {
+                        is HoldOutcome.StillHeld -> "차량을 계속 보관하고 있어요."
+                        is HoldOutcome.Claimed -> "보관 차량 수령이 확정됐어요."
+                        is HoldOutcome.Refunded -> "보관 만료 환급이 확정됐어요."
+                    }
+                }
+                details.addView(style.text(message))
+                details.addView(style.button("처리 결과 확인하고 새로 조회") { session.delivery.acknowledge() })
+            }
+            if (session.delivery.canCancelUnstarted == true)
+                details.addView(style.button("미실행 요청 취소 확인") { session.delivery.cancelUnstarted() })
+        }
+        if (details.childCount > 0) deliveryBody.addView(ScrollView(this).apply { addView(details) },
+            LinearLayout.LayoutParams(-1, style.dp(144)))
+        deliveryBody.addView(delivery, LinearLayout.LayoutParams(-1, 0, 1f))
     }
 
     private fun showBody(view: View) {
@@ -354,17 +633,37 @@ class MainActivity : Activity() {
 
     private fun select(page: HostPage) {
         if (!allowed()) { updateAccess(); return }
+        automaticIntroAllowed = false
         navigation.page = page
         navigation.returnPage = HostPage.HOME
         updateAccess()
         render()
     }
 
+    private fun refreshPendingRoute() {
+        if (!allowed()) return
+        val generation = ++pendingRouteGeneration
+        session.pendingRoute { result ->
+            if (!isDestroyed && generation == pendingRouteGeneration && allowed()) {
+                when (result) {
+                    is ContractResult.Failure -> pendingRouteFailed = true
+                    is ContractResult.Success -> { pendingRouteFailed = false; pendingPage = result.value }
+                }
+                if (::body.isInitialized) render()
+            }
+        }
+    }
+
     private fun onShopEvent(event: ShopEvent) {
-        if (!allowed()) { updateAccess(); return }
+        if (!allowed()) {
+            updateAccess()
+            if (event is ShopEvent.Submit) shop.complete(event.request, ContractResult.Failure(ContractError.UX_RESTRICTED))
+            else shop.completeRetry()
+            return
+        }
         when (event) {
-            ShopEvent.Retry -> refresh()
-            is ShopEvent.Submit -> shop.complete(event.request, ContractResult.Failure(ContractError.DATA_UNAVAILABLE))
+            ShopEvent.Retry -> if (!expansionHost.load()) shop.completeRetry()
+            is ShopEvent.Submit -> expansionHost.submit(event.request)
         }
     }
 
@@ -470,6 +769,7 @@ class MainActivity : Activity() {
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
+        automaticIntroAllowed = false
         if (allowed()) {
             if (navigation.page == HostPage.GARAGE && managementVisible && managementState != GarageCommandState.Idle) {
                 if (managementState is GarageCommandState.Confirmed) management.controller.acknowledge()
@@ -478,6 +778,9 @@ class MainActivity : Activity() {
             }
             if (navigation.page == HostPage.HOME && shop.handleBack()) return
             if (navigation.page == HostPage.GACHA && gacha.handleBack()) return
+            if (navigation.page == HostPage.DELIVERY && delivery.handleBack()) return
+            if (navigation.page == HostPage.RANKING && ranking.handleBack()) return
+            if (navigation.page == HostPage.PROGRESSION && progression.handleBack()) return
             if (navigation.pendingGarageRequest != null) { cancelPreparation(); return }
             if (navigation.page == HostPage.GARAGE && garage.closeDetail()) return
             if (navigation.page == HostPage.RESULTS && results.closeDetail()) return

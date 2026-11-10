@@ -1559,6 +1559,15 @@ checkpoint 모듈/시험5파일·helper/factory·연결4파일은627과 동일�
 최신 main168 정상 통합에서 변경 앱23파일이81과 바이트동일하고 이미 main의 수리guard·Runtime·AppHost를 보존했다. 정확 게시head CI는 연결 PR에서 확인하며 새 게시head 장치재실행으로 쓰지 않는다. 명시 SIMULATION/격리SQLite/DB재개방이고 제품 livefactory/save·execute·finish 소비·전체UI/명령·프로세스/전원·실차/전체 #50/#51/#52/#56/#121/#122 완료는 아니다. #44 Expand 후보도 별도다.
 
 
+### 랭킹 모듈·Android JSON 오류 분리 수정 검증 — 2026-11-10
+
+b35c0bf의독립코드APPROVE와실제원본13중12PASS/1FAIL을별도보존한다. rewarded=1.5의Cursor.integer가던진Android checkedJSONException이RuntimeException catch를벗어나outerFailure가된P2다. 원58407d173ae4d5135404243db4b5c8d0d4a66d3e는명시import/catch만추가하고DB/숫자/정책/기존기대값을바꾸지않았다.
+
+A는같은원본2파일SHA/기대무변경·새APK/설치pullSHA일치로ReadSource9+View4=13PASS1.851초를확인했다. 원래실패method의주간Failure/다른지표와마지막DB파일bytes불변assertion까지도달·통과했다. 추가Android격리SQLite2PASS0.354초는RENTAL-only명시fixture의weeklyFailure/나머지5보존,기본정의의주행command손상에서누적+주간Failure/나머지4보존·DBbytes불변이다. 새실제15·실패/오류/생략0이며과거b35독립1PASS/작성자JVM197·Lint와합산하지않는다.
+
+491추적파일584동일·저자clean·외부overlay/기대변경0,appbf1d9da4/test605afd5d설치pullSHA일치. API34 ARM64/user10 14:51:22~14:55:52KST단독구간·자기2패키지제거/잔여시험없음·제품APK/6데이터·권한/차량/창/설정/전경등19보존PASS·반환을회수했다. 게시담당adb0. 원문/status/XML·원본SHA/보존근거는 /private/tmp/drive-ranking-local-demo-20261110/fix/independent-device-review/에보존했다.
+
+최신main169/170과정상통합한소유12파일의584동일성과로컬검사는인계자료/연결PR에고정한다. MainActivity실제진입·실제SDK출발지역/Questhook·온라인/타인순위는미검증이다. 고정KST/Quest원인은명시fixture이며실제6지표전체완료로표시하지않는다. 이전b35실패를소급변경하지않는다.
 ### 제품 첫 실행·가챠·공통 factory 소비 독립 검증 — 2026-11-10
 
 원cab5670738beac214588ae5184095877fbef54ad는 기존 Garage/C274/E81 공급을 포함한다. C의906 scoped 독립검토·JVM27PASS(가챠18+기존외부3+추가6), 문구 enum 제거cab의1PASS·작성자core412/app258은 각 원head 근거로 보존하고 합산하지 않는다. Garage 소유15의 코드24PASS/실제7PASS(1.460초), C 소유7의 독립17PASS/실제11PASS(1.237초)는 동일 소스 범위로 재사용하며 cab에서 새 실행한 수로 세지 않는다.
@@ -1570,3 +1579,65 @@ A의 정확cab529추적파일 원문/정식 기대 무변경·새APK 설치pullS
 원본6구간14:23:28~14:24:50KST/native14:25:51~14:34:26KST, API34 ARM64/user10. 원본 app a2f53772/testbcad69ba/nativeapp90b3bce3의 설치pullSHA 일치·두 구간19보존PASS·자기패키지/권한/잔여시험 정리·슬롯반환을 회수했다. 관측문구/스크롤/목적화면 이름을 바로잡은 외부harness 실패는 보존하고 지급/추첨 횟수·저장 기대를 바꾸지 않았다. 게시담당은 native 결과와 차고PNG를 직접 확인했으며 OEM 영역과 임시앱 화면을 구분했다. 조율자adb0이다.
 
 근거는 /private/tmp/drive-gacha-live-host-20261110/independent-review/ 및 independent-device-review/의 REPORT/summary·device/native 원문/DB사본/PNG/hash·보존자료다. 최신 main169/170 정상 통합에서 변경 앱/빌드34파일이cab와 동일하고 기존Runtime/수리guard/helper를 보존한다. 로컬 통합검사·정확head/CI는 연결 PR 또는 인계자료에서 확인하며 이 기기결과를 새 게시head 재실행으로 표시하지 않는다. 첫 선물 runtime·전체 가게/확장·Quest/Delivery·실제D전이/센서장애·전원·실차/전체 이슈 완료는 별도다.
+
+
+### 랭킹 모듈·Android JSON 오류 분리 수정 검증 — 2026-11-10
+
+b35c0bf의독립코드APPROVE와실제원본13중12PASS/1FAIL을별도보존한다. rewarded=1.5의Cursor.integer가던진Android checkedJSONException이RuntimeException catch를벗어나outerFailure가된P2다. 원58407d173ae4d5135404243db4b5c8d0d4a66d3e는명시import/catch만추가하고DB/숫자/정책/기존기대값을바꾸지않았다.
+
+A는같은원본2파일SHA/기대무변경·새APK/설치pullSHA일치로ReadSource9+View4=13PASS1.851초를확인했다. 원래실패method의주간Failure/다른지표와마지막DB파일bytes불변assertion까지도달·통과했다. 추가Android격리SQLite2PASS0.354초는RENTAL-only명시fixture의weeklyFailure/나머지5보존,기본정의의주행command손상에서누적+주간Failure/나머지4보존·DBbytes불변이다. 새실제15·실패/오류/생략0이며과거b35독립1PASS/작성자JVM197·Lint와합산하지않는다.
+
+491추적파일584동일·저자clean·외부overlay/기대변경0,appbf1d9da4/test605afd5d설치pullSHA일치. API34 ARM64/user10 14:51:22~14:55:52KST단독구간·자기2패키지제거/잔여시험없음·제품APK/6데이터·권한/차량/창/설정/전경등19보존PASS·반환을회수했다. 게시담당adb0. 원문/status/XML·원본SHA/보존근거는 /private/tmp/drive-ranking-local-demo-20261110/fix/independent-device-review/에보존했다.
+
+후속main173(4e100fb)과정상통합해소유12파일584동일·기존실제firstflow Main/HostSession/helper보존을확인했다. 새조합은랭킹JVM15PASS/계측Kotlin컴파일BUILD SUCCESSFUL26초·저장소21/29/413/diffPASS다. 이전e652의APK/Lint성공은그head범위로구분하며새원격정확headCI는메인이확인한다. MainActivity실제진입·실제SDK출발지역/Questhook·온라인/타인순위는미검증이다. 고정KST/Quest원인은명시fixture이며실제6지표전체완료로표시하지않는다. 이전b35실패를소급변경하지않는다.
+
+
+### 완료 고객 집계·확장 소비의 실제 SQLite 검증 — 2026-11-10
+
+정확원542649ae35d0d799a09281dae2b3502213ff3a95의2파일에독립코드APPROVE/필수0과A실제CompletedExpansionLedgerTest13PASS(3.130초·실패/오류/생략0)를회수했다. 명시SIMULATION DB의실제assign/account/settle/finishReturn/receipt를사용하며방문3/미정산은완료0·무차감거절,완료2→3/초과4·9→10/24→25의기존동의임계/비용/용량,동일settle replay미가산·무료/사고완료근거를검증했다. 누락/손상/공유/고아정산의실패/행보존·대문자타도메인정상·확장commit실패rollback/같은ID재시도·현재조건손상뒤원래purchase replay/DB재개방도확인했다. 행assertion을전체파일bytes시험으로과장하지않는다.
+
+480추적파일/정식기대무변경·새APK appf414a98b/test76f07193설치pullSHA일치, API34 ARM64/user10 13:47:45~13:47:51KST구간·자기2패키지/잔여시험정리·19제품보존/반환을회수했다. 작성자core412/app182·D/Garage/E69·다른시험과합산하지않는다. 원문/status/XML·소스/hash·보존자료 /private/tmp/drive44-completed-expansion-20261110/independent-device-review/. 조율자adb0.
+
+최종후보는최신main174(7f5c598)과정상통합하며원정식시험파일과완료count/expand delta를유지하고기존Runtime Pending의parkedSince/엄격조회만추가로보존했다. 새조합Runtime17+랭킹15=32JVM PASS·계측Kotlin컴파일16초·저장소21/29/414/diffPASS를확인했다. 이전b5e6의APK/Lint는그head범위로구분하고새정확head원격CI는root가확인한다. 원542에서Runtime혼합장치13을실행한것으로쓰지않으며새로컬Runtime표적/컴파일근거·정확head/CI는인계자료/연결PR을따른다. helper/schema·shop방문수/보험/buy를바꾸지않는다. 실제정의/제품미리보기·선택터치/Activity·프로세스/전원·실차/전체 #44는후속이다.
+
+
+### core·저장 4이슈 완료와 후속 연결 — 2026-11-10
+
+PR #169 실제 초기화/첫 선물·공용 저장 공급, #173 같은 factory의 초기화/가챠/차량 관리 소비를 기준으로 환석의 위임을 받은 메인 조율이 원래 top 완료조건을 직접 대조했다. [#47 가챠](https://github.com/Yaho03/drive-growth/issues/47) 7/7, [#48 강화](https://github.com/Yaho03/drive-growth/issues/48) 7/7, [#49 수리·처분](https://github.com/Yaho03/drive-growth/issues/49) 6/6, [#50 초기화·첫 선물](https://github.com/Yaho03/drive-growth/issues/50) 6/6을 확인하고 completed로 닫았다. 기존 assignee를 유지했으며 AI 보조 검토를 별도 사람 승인으로 표시하지 않았다. 과거 본문·실행/실패/수정 기록은 원문 그대로 보존했다. 새 시험 실행이나 다른 결과를 합산한 완료 판정이 아니다.
+
+#48의 동시판매 경계는 원자적인 현재 lifecycle/revision 재검사와 관련 실제 경쟁 시험을 함께 근거로 판정했으며 별도 동시판매 장치 시험을 새로 실행했다고 쓰지 않는다. #49의 core/SQLite 복구와 개별 native 행동, #50의 SQLite 선물 지급과 native 첫 차량 지급을 구분한다. 원조건과 해당 근거는 각 이슈의 완료 체크·조율 댓글을 따른다.
+
+닫힌 네 이슈의 명령/저장을 다시 공급 대기로 두지 않는다. #52의 남은 관리·발견/화면 조건, #56의 튜토리얼 실제 주행전환/복귀, #28 기능 간 통합은 기존 완료조건대로 계속 추적한다. 전체 앱·제출·실차 완료를 뜻하지 않는다. PR #174 랭킹 모듈은 main7f5c598, PR #175 완료 고객 집계는 main3bbc05f에 일반 머지됐고 #175 머지 뒤 CI42773737173 성공을 읽기 조회로 확인했다. 실제 랭킹 진입·시설/꾸미기·Quest/탁송 등 새 연결은 각각의 열린 이슈와 별도 후보에서 관리한다.
+
+### 중앙 시험 정의·실제 확장 Main 통합 — 2026-11-10
+
+기준 main `3bbc05f9` 위에 E `dec8b40`→`f3a7a00`→`26c1e7b`, B `9b50d1b`→`aef5a11`의 기능 커밋만 순서대로 정상 통합했다. 변경 소스·시험 26파일은 B의 정확 검증본 `aef5a11`과 모두 동일하며 통합 과정의 추가 소스 수정·기대값 변경은 없다. 구형 main 트리 덮어쓰기를 하지 않고 #173의 같은 factory 첫 실행/가챠/Garage, #174 랭킹 읽기 모듈, #175 완료 고객 조회를 보존했다. schema/helper·신규 Quest/Driving 생산자·랭킹 Main 진입은 포함하지 않았다. 상세 파일 해시와 최종 head는 연결 PR의 인계 자료를 따른다.
+
+기존 독립 근거는 각각의 범위로 재사용한다. E `26c1e7b`의 코드·구조 검토 표적 JVM23 및 실제 SQLite 확장15·중앙 asset1, B `9b50d1b`의 실제 SQLite15+asset1+session binding2는 해당 원본에서의 결과다. 9b50의 동일 접근 상태 반복 렌더 P2는 원래 JVM2·native1 실패 근거를 보존하고 `aef5a11`에서 같은 JVM2·native 안정성1 통과로 해소했다. A의 aef 기기 검증은 실제 SDK gate, 신규 첫차1000→유료 가챠500, Back/재진입, Activity 재생성, 자기 패키지 속도 권한 거부/복원, 프로세스 재시작 후 같은 저장 행 보존을 확인했다. 실제 완료 고객0/3의 잠김 미리보기는 무차감이며 **native 확장 성공 구매는 실행하지 않았다**. 이를 SQLite 확장 성공 검증과 합쳐 native 구매 성공으로 표시하지 않는다. A는 제품/환경19개 보존 확인·자기 패키지 정리·장치 반환을 기록했다.
+
+최신 main과의 이 조합에서 코어412·앱321 단위 시험이 실패/오류/생략0으로 통과했고 앱 APK·시험 APK 빌드와 Lint(오류0·경고23)가 성공했다. 전체 명령은 2분1초에 종료했으며 저장소 필수21·문서29·링크415 및 diff 검사도 통과했다. 원래 시험 기대값을 바꾸지 않았고 정확 head와 원격 CI는 연결 PR에서 확인한다. 새 기기 실행·실차·실제 D 전환·전원 검증은 수행하지 않았으며 기존 원본 실행을 이 조합의 신규 실행 수로 합산하지 않는다. 시설 구매/배치·실제 자동 영업 driver·Quest/Driving 사건 생산자·전체 앱 통합과 #44/#28 전체 완료는 후속이다. AI 보조 검토이며 별도 사람 승인 확보로 기록하지 않는다.
+
+
+### Quest·Delivery schema12 통합 후보 — 2026-11-10
+
+정확 E b8972b563ffb0c0d6a7e969097f4cd172fff1941의 A 독립 API34 ARM64 격리 SQLite 검증은 Quest54/54(8.197초)·Delivery17/17(4.555초), 실패/오류/생략0이다. Quest25+통합12+checkpoint15+성장 후조건2, Delivery 원래15+Hold 독립2의 범위다. 이전63/399의 실패·진단, 같은 D 원래RED2→수정GREEN2와 행 단언을 보존한다. fixture 두 파일은 public lazy upgrade 경로/정확schema12·필수표/열과 기존 행/tracking/profile 보존을 검사하며 기대값을 완화하지 않았다. 원본 제품399와 b897의 차이는 정식 시험2파일이다. 이 원본 결과를 새 main 조합의 신규 실행으로 합산하지 않는다.
+
+main177 기준 후보는 E 기능8커밋만 적용하고 기존 Runtime Pending.parkedSince/엄격 조회를 유지했다. 별도 Driving13·Progress/Delivery Main·랭킹 진입은 포함하지 않았다. 소비 호환은 미연결 Quest/Delivery 보관 명령을 명시 STATE_CONFLICT로 전달하고 원문 보존을 회귀 검사한다. 새 조합의 코어420·앱328 시험이 실패/오류/생략0으로 통과했고 APK·시험 APK 빌드와 Lint(오류0·경고23)가 성공했다. 80개 task를 실행해2분19초에 종료했고 저장소 필수21·문서29·링크424 및 diff 검사를 통과했다. 정확 head·원본 동일성·소비 호환 patch는 연결 PR 인계에 기록한다. 이 조합의 새 기기 실행/제품DB 이전·Main UI/프로세스·SDK 도착/주행·실차는 미검증이다. AI 보조 검토이며 별도 사람 승인 미확보, 원격CI/게시/머지는 root 담당이다.
+
+
+### 관측 주행 schema13 통합 후보 — 2026-11-10
+
+E 정확 `0681fbfed4d7faa76fc557a50a001abd97512ed0`은 F 독립 재검토 `APPROVE_SCOPED_CODE_AND_A_SQLITE23_GREEN`·새 필수지적0이며 A가 실제 API34 ARM64 격리 SQLite 정식20+독립3=23개를4.237초에 통과했다. 입력은 명시 SIMULATION 관측이다. 원본bbbc의 독립RED3와 이전정식20/fixture실패를 보존했고 같은 원문·기대값의 독립3이 전체 row 단언까지 GREEN임을 확인했다. 고아 marker/state/provenance 경계와 raw NaN trip canonical 동일성 수정이 범위이며 A의 환경19개 보존·자기패키지 정리/장치반환 기록은 원본 근거다. F JVM witness/코드 검토를 Android23 실행 수에 합산하지 않는다.
+
+최신main178 위에 recorder import21cb·codec8a548·저장bbbc·수정0681의 기능 커밋만 통합했다. 변경24소스/시험은 E0681과 모두 동일하고 D recorder7파일도 그대로다. Garage의 이미 존재하는 foreign 분기 순서 충돌은 main 코드를 유지했고 schema13 정식 fixture는 A가 검증한 최종 원문을 보존했다. Main/HostSession B52e·제품UI·랭킹은 포함하지 않는다. 새 main 조합에서 core420·app344 시험이 실패/오류/생략0으로 통과했고 APK·시험 APK·Lint(오류0·경고23)가 성공했다. 80개 task를 실행해2분4초에 완료했으며 저장소21/29/428·diff 검사도 통과했다. 정확head·원본동일성은 연결 PR 인계를 따른다.
+
+이 통합본의 새 기기 실행은0이다. 원본 schema12 Quest54/Delivery17과 Driving23을 새 schema13 전체장치회귀로 합산하지 않는다. 실제 SDK D/속도/도착·Main receiver/calendar·onStop/프로세스·FGS/전원·실차·정책 허용과 전체39/28 완료는 후속이다. 과거42조건 대조의 root 적용4체크와45부분판정은 유지한다. AI검토를 사람승인으로 표시하지 않고 root가 원격CI/게시·머지를 담당한다.
+
+
+### B 제품 연결 고정본의 게시 준비 — 2026-11-10
+
+main179가 B5c9514d5의 조상임을 확인하고 새 후보에서 정상 merge했다. 최초 전체 트리가 B고정본과 동일했고, 추가 문서 뒤에도 app/src·core·Gradle은 고정본과 동일하다. main 대비67파일(제품/시험·설정64, 기존B문서3)의 출처를 고정했고 기존 app/data·core·RentalLedger는 main과 동일하다. 새 제품 논리나 fixture 수정은 하지 않았다.
+
+B 본인검증은 af48의 결정적 Intro회귀 RED3/6→같은6GREEN, 표적16·core420/app458·APK/시험APK/Lint0오류27경고다. 검증af48과5c의 app/core/Gradle 동일성을 대조했고 원본APK두개의SHA도 B보고와 일치했다. 이 게시 준비에서 전체Gradle을 반복하지 않았다. 새 저장소·링크/diff 검사와 최종head는 인계에 기록한다.
+
+Progress의 기존 Native8fc 첫플레이1과 fixture수정dac의SQLite13, 랭킹원3d BackFAIL과1a5 cold-wrapperPASS, Driving0681 A23은 각각 정확원본의 독립 근거다. 과거랭킹FAIL 원인을 새 Intro race 하나로 확정하지 않는다. **A의 정확5c 원본 cold-wrapper1회는13.006초에 PASS**이며 원래 method/wrapper·gate/HOME/wait·최종원장 기대값을 유지하고 최종suite출력을 회수했다. 새baseline24의 SDKgate 허용 뒤6지표·Demo/주간선택·재생성·Back2/HOME/ShopView·잔액/차량 불변을 확인했고19/19보존·장치반환을 기록했다. 이번 Android에서는 Intro가 첫 Ranking 선택보다 먼저 도착했다. 상충 순서를 강제한 Android RED→GREEN으로 쓰지 않으며 그 결정적 순서는 B JVM6의3RED→6GREEN 근거와 분리한다. 좌표터치/CCP·새 NativeProgress/Driving/도착·과거3dFAIL의 단일원인 해소는 미검증이다. D는 최소 Intro delta를 독립 검토해 JVM30개 통과·추가 필수 지적0으로 수용했고, A의 소스646파일·설치 APK·최종suite 출력을 대조했다. AI 검토와 별도 사람 승인은 구분한다. A의 원본5c 실행은 이 문서 준비의 신규 기기 실행으로 합산하지 않는다. 실제 SDK/내비도착 상관·권한·gate·프로세스/전원·실차·자동영업/시설·새경제원점정책은 각 실제검증 범위를 확인해야 한다.
