@@ -1568,3 +1568,14 @@ A는같은원본2파일SHA/기대무변경·새APK/설치pullSHA일치로ReadSou
 491추적파일584동일·저자clean·외부overlay/기대변경0,appbf1d9da4/test605afd5d설치pullSHA일치. API34 ARM64/user10 14:51:22~14:55:52KST단독구간·자기2패키지제거/잔여시험없음·제품APK/6데이터·권한/차량/창/설정/전경등19보존PASS·반환을회수했다. 게시담당adb0. 원문/status/XML·원본SHA/보존근거는 /private/tmp/drive-ranking-local-demo-20261110/fix/independent-device-review/에보존했다.
 
 최신main169/170과정상통합한소유12파일의584동일성과로컬검사는인계자료/연결PR에고정한다. MainActivity실제진입·실제SDK출발지역/Questhook·온라인/타인순위는미검증이다. 고정KST/Quest원인은명시fixture이며실제6지표전체완료로표시하지않는다. 이전b35실패를소급변경하지않는다.
+### 제품 첫 실행·가챠·공통 factory 소비 독립 검증 — 2026-11-10
+
+원cab5670738beac214588ae5184095877fbef54ad는 기존 Garage/C274/E81 공급을 포함한다. C의906 scoped 독립검토·JVM27PASS(가챠18+기존외부3+추가6), 문구 enum 제거cab의1PASS·작성자core412/app258은 각 원head 근거로 보존하고 합산하지 않는다. Garage 소유15의 코드24PASS/실제7PASS(1.460초), C 소유7의 독립17PASS/실제11PASS(1.237초)는 동일 소스 범위로 재사용하며 cab에서 새 실행한 수로 세지 않는다.
+
+A의 정확cab529추적파일 원문/정식 기대 무변경·새APK 설치pullSHA 일치와 실제 정식 GachaLiveCheckpointSqliteTest6PASS(2.180초)를 회수했다. 별도 checkpoint DELETE RAISE(IGNORE)1PASS(0.457초)는 STORAGE_FAILURE/원명령 유지·재개 후 동일 결과/잔액500·차량2 보존·trigger 제거 뒤 finish 성공을 확인했다. 같은 MainActivity 재생성1PASS(9.128초)는 다른 instance/retained session·첫 제한 뒤 새 SDK gate·DB 전체행 보존이다. 이8메서드와 아래 native 경로는 구분한다.
+
+별도 fresh package의 실제 SDK gate/터치로 첫 차 캐스퍼 확인→source VEHICLE/잔액1000/차량1/공간3/초기화1건/무료권0, 유료500 1회 추첨→캐스퍼 일렉트릭 고급/취득액500/잔액500/보유2/가챠1건→실제 차고2/3을 확인했다. 랜덤 결과는 사후 관측이며 새ID로 재추첨하지 않았다. 확정 뒤 own package force-stop/component 재실행의 PID변경과 동일profile/지갑/개체/지급1·추첨1·전체행 보존을 확인했다. 실제 launcher icon·지급 중 process kill·실차/전원 시험은 아니다. 원본6의 무료권은 명시SIMULATION fixture이며 native 무료권0에서 무료 추첨/실제 첫 영업 선물을 실행하지 않았다.
+
+원본6구간14:23:28~14:24:50KST/native14:25:51~14:34:26KST, API34 ARM64/user10. 원본 app a2f53772/testbcad69ba/nativeapp90b3bce3의 설치pullSHA 일치·두 구간19보존PASS·자기패키지/권한/잔여시험 정리·슬롯반환을 회수했다. 관측문구/스크롤/목적화면 이름을 바로잡은 외부harness 실패는 보존하고 지급/추첨 횟수·저장 기대를 바꾸지 않았다. 게시담당은 native 결과와 차고PNG를 직접 확인했으며 OEM 영역과 임시앱 화면을 구분했다. 조율자adb0이다.
+
+근거는 /private/tmp/drive-gacha-live-host-20261110/independent-review/ 및 independent-device-review/의 REPORT/summary·device/native 원문/DB사본/PNG/hash·보존자료다. 최신 main169/170 정상 통합에서 변경 앱/빌드34파일이cab와 동일하고 기존Runtime/수리guard/helper를 보존한다. 로컬 통합검사·정확head/CI는 연결 PR 또는 인계자료에서 확인하며 이 기기결과를 새 게시head 재실행으로 표시하지 않는다. 첫 선물 runtime·전체 가게/확장·Quest/Delivery·실제D전이/센서장애·전원·실차/전체 이슈 완료는 별도다.

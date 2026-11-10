@@ -103,7 +103,7 @@ class QuestStoreIntegrationTest: InstrumentationTestCase() {
     }
     fun testV10MigrationFailurePreservesVersionAndWholeFile() {
         store.close();raw{it.version=10};val file=context.getDatabasePath(name);val before=file.readBytes();store=open()
-        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.balance());store.close();assertTrue(before.contentEquals(file.readBytes()));raw{assertEquals(10,it.version);it.version=12};store=open()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.balance());store.close();assertTrue(before.contentEquals(file.readBytes()));raw{assertEquals(10,it.version);it.version=13};store=open()
     }
     fun testQuestNamespaceReservedFromNewGenericAndCheckpointCommands() {
         val change=GameChange(RequestId("quest/claim/wrong-owner"),TransactionKind.GARAGE,source,definition.rules,MoneyChange(MoneyDirection.CREDIT,GameMoney(1)))

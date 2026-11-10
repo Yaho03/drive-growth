@@ -129,8 +129,16 @@ class QuestLedgerTest:InstrumentationTestCase() {
   assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),ledger.read(p,Observation.Available(EpochMillis(now))));supplied=null;assertEquals(1,state().count)
  }
 
- fun testInvalidStoredPeriodZoneReturnsFailureAndPreservesRows(){ok(record());val c=command();ok(ledger.claim(c));raw{it.execSQL("UPDATE quest_claims SET command=replace(command,'Asia/Seoul','unknown/zone')")};val before=rows()
-  assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),ledger.claim(c));assertEquals(before,rows())
+ fun testInvalidStoredPeriodZoneReturnsFailureAndPreservesRows(){ok(record());val c=command();ok(ledger.claim(c))
+  raw{db->
+   fun stored()=db.rawQuery("SELECT command FROM quest_claims WHERE request_id=?",arrayOf(c.requestId.value)).use{assertTrue(it.moveToFirst());it.getString(0)}
+   val original=stored();val changed=org.json.JSONObject(original)
+   changed.getJSONObject("definition").put("zone","unknown/zone");changed.getJSONObject("period").put("zone","unknown/zone")
+   db.execSQL("UPDATE quest_claims SET command=? WHERE request_id=?",arrayOf(changed.toString(),c.requestId.value))
+   val actual=stored();assertFalse(original==actual)
+   val damaged=org.json.JSONObject(actual);assertEquals("unknown/zone",damaged.getJSONObject("definition").getString("zone"));assertEquals("unknown/zone",damaged.getJSONObject("period").getString("zone"))
+  }
+  val before=rows();assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),ledger.claim(c));assertEquals(before,rows())
  }
 
  fun testForeignLegacyRequestWithSamePrefixIsConflictNotQuestReceipt(){ok(record());val change=GameChange(RequestId("quest/claim/legacy-general"),TransactionKind.GARAGE,source,v,MoneyChange(MoneyDirection.CREDIT,GameMoney(1)));// 신규 quest/ 예약 이전의 GENERAL 정산을 원문 그대로 보존한 legacy fixture다.
