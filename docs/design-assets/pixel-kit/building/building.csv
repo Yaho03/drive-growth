@@ -1,0 +1,3 @@
+sprite,left,top,width,height,sign_bl_x,sign_bl_y,sign_br_x,sign_br_y,sign_tr_x,sign_tr_y,sign_tl_x,sign_tl_y
+main_lv1,339,101,196,129,356,137,409,163,409,155,356,129
+main_lv2,339,101,260,161,356,137,425,171,425,161,356,127
