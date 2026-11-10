@@ -285,8 +285,10 @@ class MainActivity : Activity() {
             if (it is HostQueryState.Content) refreshPendingRoute()
             render()
             if (it is HostQueryState.Content || it is HostQueryState.Failure) {
-                session.results.completeQuery()
-                results.completeRetry()
+                if (!session.results.hasHistorySource) {
+                    session.results.completeQuery()
+                    results.completeRetry()
+                }
                 shop.completeRetry()
             }
         }
@@ -346,6 +348,10 @@ class MainActivity : Activity() {
         session.results.attach { id, result ->
             updateAccess()
             results.completeMarkViewed(id, result)
+        }
+        session.results.attachHistory { state ->
+            if (state !is io.drivegrowth.app.ui.results.ResultsScreenState.Loading) results.completeRetry()
+            if (::chrome.isInitialized) render()
         }
         try {
             input = VehicleInput(this, { observation ->
@@ -442,6 +448,7 @@ class MainActivity : Activity() {
 
     private fun updateAccess() {
         val enabled = allowed()
+        session.results.setControlsEnabled(enabled && navigation.page == HostPage.RESULTS)
         queries.setControlsEnabled(enabled)
         session.progression.setControlsEnabled(enabled && navigation.page == HostPage.PROGRESSION)
         renderProgression()
@@ -466,7 +473,8 @@ class MainActivity : Activity() {
     private fun refresh() {
         if (!allowed()) { updateAccess(); return }
         session.onboarding.refresh()
-        if (navigation.page == HostPage.PROGRESSION) session.progression.refresh()
+        if (navigation.page == HostPage.RESULTS) { session.results.remember(results.uiState); session.results.refreshHistory() }
+        else if (navigation.page == HostPage.PROGRESSION) session.progression.refresh()
         else if (navigation.page == HostPage.DELIVERY) { session.deliveryNavigation.refresh(); session.delivery.refresh() }
         else if (navigation.page == HostPage.HOME) { session.facility.refresh(); expansionHost.load() }
         else if (navigation.page == HostPage.GACHA) session.gacha.refresh()
@@ -510,7 +518,7 @@ class MainActivity : Activity() {
         facilityControls.render(facility, enabled && navigation.page == HostPage.HOME, names)
         garage.render(garageState, enabled)
         collection.render(collectionState, enabled)
-        results.render(resultsMapper.map(screen), enabled)
+        results.render(if (session.results.hasHistorySource) session.results.historyState else resultsMapper.map(screen), enabled)
         onboarding.render(onboardingState, enabled)
         renderDelivery(enabled && navigation.page == HostPage.DELIVERY)
         chrome.removeAllViews()
@@ -770,7 +778,7 @@ class MainActivity : Activity() {
     }
 
     private fun onResultsEvent(event: ResultsEvent) {
-        if (!allowed()) {
+        if (!allowed() || navigation.page != HostPage.RESULTS) {
             updateAccess()
             // View가 callback 전에 만든 Pending은 실제 제출 상태로 되돌린다.
             results.restoreUiState(session.results.uiState)
