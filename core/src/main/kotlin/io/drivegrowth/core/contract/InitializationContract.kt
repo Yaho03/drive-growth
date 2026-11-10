@@ -82,7 +82,8 @@ sealed interface InitializationPreparation {
 }
 
 /**
- * 구현은 후속이다. 같은 프로필의 원래 요청/전체 명령 재생을 현재 규칙/상태 검사보다 먼저 한다.
+ * testFixtures의 같은 메모리 원장 참조가 제공된다. 실제 SQLite/NEW 근거 발급은 후속이다.
+ * 같은 프로필의 원래 요청/전체 명령 재생을 현재 규칙/상태 검사보다 먼저 한다.
  * NEW 근거 revision과 원장 ID를 같은 잠금/DB에서 다시 검사하고 재화·차량·공간·마커·원래 결과를 한 번에 확정한다.
  * 원장은 한 프로필에 귀속하고 다른 프로필 요청을 거절한다. 다른 종류의 기존 요청 ID도 재사용하지 않는다.
  * 다른 요청 종류/내용은 STATE_CONFLICT, UNKNOWN/미복구 기존 프로필은 DATA_UNAVAILABLE·무지급이다.
