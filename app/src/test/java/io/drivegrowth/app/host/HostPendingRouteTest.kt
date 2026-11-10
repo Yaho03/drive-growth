@@ -30,4 +30,13 @@ class HostPendingRouteTest {
         assertEquals(vehicle,command.award.vehicle)
     }
 
+    @Test fun deliveryRoutesToItsOwnPageAndGaragePreservesForeignCommand(){
+        val command=HostCheckpointCommand.Delivery(ContentVersion("content"),InputSource.VEHICLE,
+            io.drivegrowth.app.data.DeliveryCheckpointOperation.Abandon(
+                io.drivegrowth.core.delivery.DeliveryChangeRules(RuleVersion("delivery-rule"),10),RequestId("chosen")))
+        assertEquals(HostPage.DELIVERY,pendingHostPage(command))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),restoreGaragePending(command))
+        assertEquals(RequestId("chosen"),command.operation.requestId)
+    }
+
 }
