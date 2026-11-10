@@ -6,6 +6,10 @@ import org.json.JSONObject
 
 /** 기존 원장 codec를 재사용한다. 가챠 private encoder와 일반 Update의 읽기만 이 경계에서 보완한다. */
 internal object HostCheckpointJson {
+    /** 우발적인 유효 값/단계 변경도 검출한다. DB에 대한 공격자 인증 수단은 아니다. */
+    fun digest(payload: String, phase: Int): String = java.security.MessageDigest.getInstance("SHA-256")
+        .digest((phase.toString() + "\n" + payload).toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it.toInt() and 255) }
     fun encode(profile: ProfileId, command: HostCheckpointCommand): String {
         val kind: String
         val value: JSONObject

@@ -12,7 +12,7 @@ import org.json.JSONException
 class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
     companion object {
         internal fun createTables(db: SQLiteDatabase) {
-            db.execSQL("CREATE TABLE host_command_checkpoint (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL, phase INTEGER NOT NULL CHECK(phase IN (0,1)))")
+            db.execSQL("CREATE TABLE host_command_checkpoint (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL, phase INTEGER NOT NULL CHECK(phase IN (0,1)), digest TEXT NOT NULL)")
         }
     }
 
@@ -35,7 +35,7 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
         }
         if (decoded != (profileId to command)) return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
         if (store.requestUnavailable(db, command.requestId)) return@atomic conflict()
-        db.execSQL("INSERT INTO host_command_checkpoint VALUES(1,?,0)", arrayOf(encoded))
+        db.execSQL("INSERT INTO host_command_checkpoint VALUES(1,?,0,?)", arrayOf(encoded,HostCheckpointJson.digest(encoded,0)))
         ContractResult.Success(HostCommandCheckpoint(profileId, command, HostCheckpointPhase.SAVED))
     }
 
@@ -47,7 +47,7 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
         when (val checked = profile(profileId)) { is ContractResult.Failure -> return@atomic checked; else -> Unit }
         val prior = read(db, profileId) ?: return@atomic ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         if (prior.command != command) return@atomic conflict()
-        db.execSQL("UPDATE host_command_checkpoint SET phase=1 WHERE id=1")
+        db.execSQL("UPDATE host_command_checkpoint SET phase=1,digest=? WHERE id=1",arrayOf(HostCheckpointJson.digest(HostCheckpointJson.encode(profileId,command),1)))
         // nested 실패는 바깥 STARTED 쓰기도 rollback한다. 성공이면 원장과 표시가 함께 남는다.
         commit(command)
     }
@@ -81,11 +81,13 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
     }
 
     private fun read(db: SQLiteDatabase, profile: ProfileId): HostCommandCheckpoint? =
-        db.rawQuery("SELECT payload,phase FROM host_command_checkpoint WHERE id=1", null).use { row ->
+        db.rawQuery("SELECT payload,phase,digest FROM host_command_checkpoint WHERE id=1", null).use { row ->
             if (!row.moveToFirst()) return@use null
+            val phaseNumber = row.integer(1,0,1).toInt()
+            if (row.text(2) != HostCheckpointJson.digest(row.text(0),phaseNumber)) throw JSONException("checkpoint digest 불일치")
             val (owner, command) = HostCheckpointJson.decode(row.text(0))
             if (owner != profile || command.origin != store.source) throw JSONException("checkpoint 프로필/출처 불일치")
-            val phase = if (row.integer(1,0,1) == 0L) HostCheckpointPhase.SAVED else HostCheckpointPhase.STARTED
+            val phase = if (phaseNumber == 0) HostCheckpointPhase.SAVED else HostCheckpointPhase.STARTED
             HostCommandCheckpoint(owner, command, phase)
         }
 
