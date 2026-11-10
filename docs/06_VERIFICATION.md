@@ -1435,3 +1435,41 @@ TDD는 capability1 assertion실패, 최소 stub12개 중11실패를 확인한 �
 초기화 게시 조율은 수정된 전체 공급 b0c1288을 기준으로 독립 정식15+원래 회귀9=24개 PASS·원본 기대값/소스 동일성을 회수했다. 최초 fa69의 P2와 red/green은 위 당시 기록으로 보존한다. 선물78cd12d와 통합88bb671은 이번 초기화 공급에 포함하지 않으며 이후 선물 자체 delta·최종 통합 검증으로 별도 처리한다. 최신 mainf1e0b45의 #151 wrapper/현재 위임 문서를 보존했다. NEW 근거는 명시 시험 입력이며 제품 issuer/legacy 복구·SQLite·제품 UI/프로세스/실차 완료가 아니다.
 
 초기화 게시 담당의 최신 mainf1e0b45 조합에서는 InitializationStore15·FirstGrantProfile9=24개와 앱 단위시험 소비 컴파일이 실패/오류/생략0으로 성공했다. 이는 독립 정식15+외부9의24개와 다른 조합이며 합산하지 않는다. 전체 초기화 소유3파일은 b0c1288과 바이트 동일하며 InitializationContract 추가는 제공 상태 KDoc 정정뿐이다. 새 장치·SQLite·제품 프로세스 검증을 실행하지 않았다.
+
+
+
+### #122 재료 강화 SQLite 로컬 구현·본인 검증 — 2026-11-09
+
+main38b3b51의 #147 계약/메모리 참조·#148 VehicleUpgrade.prepareMaterial 소비를 기준으로 별도 app/122-material-sqlite 브랜치에서 구현했다. SqliteGameChangeStore의 MaterialChangeStore capability와 명시 버전 공급, 같은 DB 거래의 RentalLedger live 활동 조회, 두 개체/비용/공용 정산/최초 전체 결과를 연결했다. 스키마6 준비는 material_requests만 추가하며 지원 v1~v5 이전에서 기존 payload를 고치거나 프로필/무료권을 생성하지 않는다. 현재 구현/검증은 로컬이고 원격 PR·CI·main 공급 완료가 아니다.
+
+| 직접 실행 | 실제 결과 |
+|---|---|
+| core 단위 + 앱 단위 | core354·앱175개 실패/오류/생략0. 최종 확인에서는 변경 없는 시험을 Gradle UP-TO-DATE로 유지 |
+| APK/시험APK 조립·lint | ./gradlew --offline에 외부 build 디렉터리용 init script를 사용. 최종 BUILD SUCCESSFUL(8초). 기존 경고는 유지하며 SDK/실차 성공으로 쓰지 않음 |
+| API37/ARM64 SQLite 전체 회귀 | 재료22 + 기존124(탁송 선택28·도착/주행22·변경19·가챠11·실제 콘텐츠 가챠4·대여14·공용 원장26) =146개 실패/오류0, 5.822초 |
+| 최종 재료 표적 | 원시 잔액·Long.MAX_VALUE 비용을 추가한24개 실패/오류0, 1.823초. 앞의22개와 중복 합산하지 않으며 기존124개와 합쳐148개 고유 시험을 확인 |
+
+정상 assets 계획의 무과금은 money=null, 대상 레벨2/진행50 + 고급 재료150은 레벨4/진행0, 재료의 성장/취득/희귀도는 보존하고 CONSUMED로 바꾼다. 양수 비용/Long.MAX_VALUE는 계약 경계 시험이며 새 제품 강화 요금이 아니다. 성장·처분/버전 공급 중단 뒤 최초 결과 재생, 같은 ID 다른 전체 입력 충돌, 일반 원장/가챠/대여 방문/무금액 탁송 선택 ID 양방향 방어, 두 DB 연결의 같은 명령/같은 재료/대여 배정 경쟁, 둘째 차량 쓰기 실패·COMMIT 직전 실패의 전체 롤백과 재시도를 확인했다. 대여 배정 후 revision을 현재값으로 맞춰도 양쪽 역할의 RENTED/RETURNING/NEEDS_REPAIR만으로 거절되는지 별도 확인했다.
+
+원명령·원상태·역할별 결과·공용 정산 누락/오연결·소수/문자열/지수/범위 초과 금액·잔액 손상은 STORAGE_FAILURE와 DB 파일 바이트/잔액/개체 보존으로 확인했다. v1/v5 fixture와 기존 v2/v3/v4 회귀의 이전·재개방, v4의 중간 생성 뒤 실패 롤백·v5 이전 실패의 원본 보존을 확인했다. 이들은 옛 writer의 표 구조를 재구성한 시험이며 옛 APK 최초 쓰기·제품 DB 이전 성공 근거가 아니다.
+
+초기 시험 차량이 INITIAL_GRANT의 희귀도/취득액 제약 및 새 Add의 revision0 계약과 맞지 않아 각22개가 준비 단계에서 실패한 이력을 보존했다. fixture를 고친 뒤21/22가 통과했고, 남은1개는 대여 배정으로 올라간 revision을 제거된 대여 행과 함께 되돌렸다고 가정한 시험의 잘못이었다. 현재 revision을 반영하고 live 활동 검사를 강화한 뒤146개/최종 재료24개가 통과했다. 중간 시험 import 누락 컴파일 오류도 수정했으며 제품 회귀 red→green 근거로 세지 않는다.
+
+기존 제품 기기가 아닌 Medium_Phone_API_37.0의 읽기 전용·무스냅샷 전용 emulator-5580을 사용했다. JDK17/SDK35이며 Pleos API34·실차 결과로 표시하지 않는다. 실제 제품 권위 공급/UI 명령 영속 복원·프로세스/전원 시험은 미수행이고 수리/초기화/선물 commit·#122 전체 종료는 후속이다. 원문 로그는 /private/tmp/122-material-final-build.log, /private/tmp/122-material-device-full.log, /private/tmp/122-material-device-final-target.log에 보존했다.
+
+### #122 재료 SQLite 게시 전 최신 main 통합 — 2026-11-09
+
+사용자의 커밋·푸시·Draft PR 게시 지시에 따라 main e1dc5c8을 통합했다. 충돌은 06의 추가 기록뿐이며 main 원문과 위 재료 기록을 모두 보존했다. 기존 재료 제품/정식시험·공용 저장 소스는 로컬 구현0c5dc2f와 동일하다. main의 #150 수리 명령·#152 가격1000/콘텐츠 버전 변경은 공급 그대로 유지했으며 실제 수리 commit은 이 재료 PR 범위가 아니다.
+
+통합 후 core357·앱175개 실패/오류/생략0, APK/시험APK·lint·저장소/diff 검사 통과(BUILD SUCCESSFUL10초). 새 콘텐츠에서 MaterialLedgerTest24 + GachaPullSqliteTest4 = API37 SQLite28개 실패/오류0, 34.994초를 직접 실행했다. 원문은 /private/tmp/122-material-main-build.log와 /private/tmp/122-material-publish-device.log에 보존했다. 기존124개 전체를 이 main 조합에서 다시 실행한 것으로 표시하지 않으며 앞선146개/최종24개 근거와 구분한다. 원격 head/CI는 PR 게시 후 확인하고 Draft·미머지로 공유한다.
+
+
+### #156 재료 SQLite P2 수정·독립 장치 검증
+
+원head dc9687d의 독립 정식39개 성공과 별도로, 자기 material 이력 누락 회귀는 API34에서 기대 STORAGE_FAILURE 대신 STATE_CONFLICT로1개 실패했고 정상 타기능 ID 비교1개는 통과했다(2개/1PASS·1FAIL·오류0·0.362초). 오류 assertion 전 손상 DB 바이트 불변은 통과했으며 잔액/개체 별도 값 비교나 새로운 중복 지급/제품 DB 손실 재현은 아니다. 이 당시 실패를 보존한다.
+
+수정068ce4a1은 전용 이력 조회 실패 뒤 남은 공용 정산의 material-v1 종류를 확인해 누락 자기 이력을 STORAGE_FAILURE로 구분한다. 독립 검토는 소스198개·원래 회귀 SHA/기대값 무변경을 확인하고 코드 APPROVE·필수0을 회수했다. 같은 고정 회귀와 정식Material25를 Pleos API34/ARM64/사용자10 격리환경에서 단1회 실행해26개 전부 통과(실패/오류/생략0·runner529.861초)를 확인했다. 정상타기능 ID·두 snapshot 재개방/재생·원자 실패/지원 구조 이전도 포함한다. 기존39·RED2·작성자 API37/148과 합산하지 않는다.
+
+설치 후 pull APK SHA가 빌드본과 두패키지 모두 일치했다. 자기 material156green2패키지를 제거하고 제품APK793e1db8·정확6파일·권한·설정·기존 전면 상태/관측 가능한 주차0 보존과 슬롯 반환을 확인했다. 기어 직접 조회는 user-build 제한으로 불가해 측정 성공으로 기록하지 않았다. AVD/서버/5580 변경은 없다.
+
+게시 담당은 최신 main과 양쪽06 기록을 정상 통합하고 수정2파일·앱 전체 tree가 검토068ce4a1과 동일함을 확인했다. 이전 장치26개를 새 게시 head 실행으로 쓰지 않으며 새 정확 head CI와 원리뷰 해결·main 공급은 [PR #156](https://github.com/Yaho03/drive-growth/pull/156)을 따른다. schema6은 material_requests 추가와 지원 v1~v5 정합 구조 fixture 이전 범위이고 옛 APK 최초 쓰기/제품DB 이전·실제 강화 UI·durable 명령/프로세스/실차와 다른 SQLite 명령은 별도다.
