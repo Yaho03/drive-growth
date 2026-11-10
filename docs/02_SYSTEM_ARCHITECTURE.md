@@ -552,7 +552,7 @@ PR #127은 가챠 검토용 커밋 `08eb3c4`를 기반으로 `core.contract.Mate
 | 묶음 | 이번에 실행·제공하는 범위 | 실제 저장·제품 연결에서 남은 범위 |
 |---|---|---|
 | 재료 강화 | `InMemoryGameChangeStore : MaterialChangeStore`, `MaterialFixtureConfiguration`의 명시 출처/버전/활동과 기존 지갑·차량·모니터를 공유. 같은 전체 명령은 당시 두 개체/잔액/거래를 먼저 재생하고 legacy/gacha/material의 요청 ID 충돌을 양방향 거절 | #122 재료 SQLite의 두 개체·요청·최초 결과 원자 저장은 PR #156으로 제공. #48 제품 UI·명령 영속 복원은 후속 |
-| 수리 | 기존 `InMemoryGameChangeStore : RepairChangeStore`의 `readRepairState/commitRepair/repairSettlement`, 같은 원장의 잠금·지갑·개체·요청 ID와 재료 활동 공유. 명시 `RepairFixtureConfiguration`으로 활동·확정 사고·견적을 공급 | 실제 SQLite commit, RentalLedger의 live 활동·사고/VehicleCare 견적 공급, #49 제품 명령 연결 |
+| 수리 | 기존 `InMemoryGameChangeStore : RepairChangeStore`의 `readRepairState/commitRepair/repairSettlement`, 같은 원장의 잠금·지갑·개체·요청 ID와 재료 활동 공유. 명시 `RepairFixtureConfiguration`으로 활동·확정 사고·견적을 공급 | #122 수리 SQLite commit과 RentalLedger 활동/확정사고·VehicleCare 견적은 아래 경계로 제공. 실제 제품 repairContent 공급·#49 UI/명령 영속 복원은 후속 |
 | 초기화 | 기존 `InMemoryGameChangeStore : InitializationChangeStore`의 readInitialization/commitInitialization, 명시 프로필 상태·마커 fixture, 같은 원장 재화·첫 차·공간·마커·원래 결과 원자 확정/재생. 기존 FirstGrant 전용 어댑터 소비 | 실제 NEW 근거 발급·legacy 복구·SQLite 원자 저장, #151 소비 래퍼는 main 제공이며 #50/#56 제품 연결은 후속 |
 | 첫 영업 선물 | 기존 `InMemoryGameChangeStore : FirstRentalGiftStore`, 명시 구성과 같은 가챠 progress·모니터에서 무료권/마커/최초 전체 결과 원자 확정·재생, 요청 ID 양방향 충돌·가챠 무료권 소비와 경쟁 | 실제 RentalLedger/live 완료 근거·같은 프로필 권위·SQLite commit, #50 제품 지급/프로세스 |
 
@@ -620,3 +620,14 @@ SqliteGameChangeStore는 MaterialChangeStore.readMaterialState/commitMaterial을
 재료 SQLite의 자기 material-v1 공용 정산이 남고 material_requests 행만 누락된 경우는 정상 타 기능 ID 충돌과 구분해 STORAGE_FAILURE로 거절한다. 누락 snapshot을 현재 개체에서 재구성하지 않으며 원본을 보존한다. 정상 같은 명령의 최초 전체 결과 재생·다른 입력/다른 기능 ID의 STATE_CONFLICT는 유지한다.
 
 휴식 원장의 head 쓰기도 같은 거래의 필수 확정이다. rest_head의 singleton 행1 삽입 결과를 검사하고 무삽입/실패는 STORAGE_FAILURE로 전달해 로그·head·allocator를 함께 rollback한다. 정상 seq gap을 손상으로 거절하지 않으며 연결/머리 정보의 누락 검증·같은 요청 재생·실패 재시도는 유지한다.
+
+
+### #122 수리 SQLite 확정 경계
+
+2026-11-10, 별도 로컬 head `272b62dc2777c6a391e8939cf9a321e5f847e025`에서 기존 SqliteGameChangeStore가 RepairChangeStore의 readRepairState/commitRepair/repairSettlement를 구현한다. 선행 PR156 dc9687의 schema6와 MaterialLedger 이력 누락 수정068ce4a를 정상 통합한 기준이며 수정/호환 최종3c473dd의 독립 코드34개 및 실제 SQLite30개를 확인했다. 정확 게시 head/CI/main 공급은 연결 PR을 따른다.
+
+명시 repairContent 공급자는 검증된 GameContentSnapshot을 반환한다. 조회 중 상태를 변경하지 않으며 같은 콘텐츠/규칙 버전과 차종 가격을 공급한다. 없으면 DATA_UNAVAILABLE, 명시 실패는 그대로 전달한다. 같은 SQLite 거래에서 현재 개체·잔액·RentalLedger 활동/확정 사고 누계와 실제 VehicleCare 견적을 대조한다. NEEDS_REPAIR 활동도 확정 사고 영업에 연결돼야 하며 누락을 IDLE/0으로 보정하지 않는다.
+
+전체 RepairCommand와 지급 전 RepairState 및 당시 전체 RepairSettlement를 repair_requests에 보존한다. 공용 settlements/지갑/차량/대여 테이블을 재사용하며 비용 차감·revision+1·NEEDS_REPAIR→IDLE·두 종류의 정산 기록을 한 거래로 확정한다. 사고 이력·영업 쉬기·희귀도·레벨/진행량·취득 정보는 보존한다. 비용0은 money=null이다. 원래 전체 결과를 현재 콘텐츠/활동보다 먼저 검증·재생하며 다른 전체 입력/도메인 ID는 충돌, 한쪽 이력 누락·손상은 STORAGE_FAILURE다. 원래 결과를 현재 값으로 재구성하지 않는다.
+
+스키마7은 repair_requests만 추가하고 지원 v1~v6의 기존 표/행을 보존한다. 실제 원격 머지 순서에서 번호를 다시 확인한다. 기존 구조 fixture의 schema7 준비 보완은 최종3c473dd의 시험 호환 커밋으로 실제 반영했으며 독립 실제 장치에서 수리23개·호환 표적7개로 이전/실패 rollback·다중 연결/재개방을 확인했다. 정합 구조 fixture이며 실제 옛 APK 제품 DB 이전·프로세스/실차 성공은 아니다. 초기화/첫 선물의 SQLite와 제품 관리 UI/프로세스 연결·전체 #122/#49는 후속이다.

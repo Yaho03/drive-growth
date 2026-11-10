@@ -1498,3 +1498,14 @@ main38b3b51의 #147 계약/메모리 참조·#148 VehicleUpgrade.prepareMaterial
 별도 검증 C가 같은466추적파일/정식9원문·APK pull SHA를 확인하고 Pleos API34/ARM64/user10의 격리 호스트에서 정식9PASS(2.295초), 실제 부착 큰/좁은창 matrix2PASS(10.848초), 시작1레벨3칸→첫확장2레벨5칸 비교2PASS(1.616초)를 실행했다. raw per-test status가 원문이며 XML은 그 원문으로 구성해 재집계했다. 큰앱702×438px=936×584dp, 좁은floating decor480dp/자식앱336×414px=448×552dp다. 채택40프레임(appcrop40/full40 PNG80·metadata40)으로 전경/관리·긴문구·간판원문·공간/시설·모드/스크롤/Pending 복원·미리보기 잔액/외형 불변·제한 내용 제거를 대조해 scoped Native PASS·차단결함 재현0을 확인했다. 최초 외부host의window-local crop 오류는 별도 보존·판정 제외 후 화면좌표로 보완해 재캡처했고 제품 원문은 바꾸지 않았다.
 
 자기shopscenec 두패키지 제거·활성instrumentation0·제품APK/정확6데이터/권한·창/설정 등18보존checks 전부true·C최종lease반환을 회수했다. 이후 장치는 메인이 별도 배정하며 게시 담당은 adb를 실행하지 않았다. 원본 근거는 /private/tmp/drive-shop-final-design-20261109/independent-code-review/ 및 independent-device-review/에 보존한다. 최신 게시 조합의8파일이3dc와 같은지 확인하며 정확 head CI는 연결 PR에서 확인한다. 실제 제품HOME/MainActivity/store·실제 거래/프로세스·물리 터치 좌표·font/night 대안·다른 디스플레이/전원·실차와 #52/#55 전체 완료는 남는다. 고정 입력1/3·2/5/시설은 실제 구매 결과가 아니다.
+
+
+### #122 수리 SQLite 독립 코드·실제 장치 검증 — 2026-11-10
+
+구현272b62d와 호환시험 별도3c473dd의 기존SqliteGameChangeStore/RepairLedger 소유4파일·migration fixture4파일을 공급한다. 독립 코드 APPROVE·필수0, 실제 순수/메모리/capability34PASS(48초)를 확인했다. 작성자core374/app176·APK/Lint0오류20경고는 별도 본인근거다. 작성자의 AArch64 C1 Lint JVM crash 이력과 실행옵션 TieredStopAtLevel1 재시도 성공을 보존하며 프로젝트 설정 변경/제품 assertion 실패로 분류하지 않는다.
+
+독립 검증 A는 최종3c의466추적파일 무변경·정식 기대값 무변경을 확인하고 정확3c의 app/test APK를17초에 재조립했다. 앱62af636e/시험762ce611 SHA는 설치후pull본과 일치했다. API34/ARM64/user10 격리 환경에서 RepairLedgerTest23개를 단1회 실행해23PASS·실패/오류/생략0(7.614초), 영향받은 Gacha v3·Rental v1/v2·Delivery v4/실패·Material v5/실패v4 migration 표적7개를 각각1회 실행해7PASS를 확인했다. 새 실제장치총30개이며 기존34/374/176과 합산하지 않는다. raw instrumentation이 원문이고 XML은 그 원문으로 구성했다.
+
+실제assets 게임차종가1000과 명시 SIMULATION 영업 fixture의 prepare→공용SQLite수리→재개방/최초결과재생에서 비용55/잔액945·IDLE/revision2·사고/영업쉬기·성장/희귀도/취득정보를 확인했다. 비용0/Long.MAX 잔액·권위/상태/revision/견적 경계·한쪽 이력 누락/원시숫자 손상·commit/활동쓰기 실패 전체rollback·같은ID/다른종류ID·두연결수리/판매경쟁을 확인했다. material-first 일부는 raw예약행 fixture이며 실제 재료→수리 전체제품흐름으로 확대하지 않는다. v1..v6 정합구조6가지/15개손상변형은 내부반복으로 별도시험수에 더하지 않으며 모든경쟁스케줄/옛APK제품DB이전을 입증하지 않는다.
+
+자기repairsqlitea app/test제거·활성instrumentation없음·제품APK793e1db8/6데이터/권한·창/설정 등18보존checks 전부PASS·슬롯반환/noFurtherAdb를 회수했다. 다른5580/AVD/서버reset/차량신호쓰기는 없으며 새기어P검증으로 기록하지 않는다. 원본근거는 /private/tmp/drive122-repair-sqlite-20261109/independent-review/ 및 independent-device-review/에 보존한다. 실제 제품repairContent/UI·프로세스/전원/실차·초기화/선물SQLite 및 #49/#122 전체완료는 별도다. schema6재료 다음schema7수리 순서를 유지하고 최신main 정상통합/정확head CI는 연결PR에 기록한다.
