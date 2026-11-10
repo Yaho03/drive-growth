@@ -1522,6 +1522,17 @@ main38b3b51의 #147 계약/메모리 참조·#148 VehicleUpgrade.prepareMaterial
 자기repairfixa2패키지제거·활성instrumentation/자기process없음·제품APK/6데이터/권한/차량·창/설정등19보존checksPASS·해당구간종료를회수했다. A의다음checkpoint는메인배정의별도구간이며조율자adb0이다. 근거 /private/tmp/drive122-repair-account-fix-evidence/independent-review/의REPORT/summary/원문·관측·sourceidentity/설치hash·보존자료. 수정2파일의51e동일성·최신main정상통합/새정확head CI후후속공급하며최신게시head의새장치재실행으로표시하지않는다. 실제수리UI/프로세스·전원/실차/전체49·122완료와초기화/AppHost의별도P2는남는다.
 
 
+### RentalRuntime 독립 코드·실제 SQLite 공급 근거 — 2026-11-10
+
+원head eb096165(baseb11f225)의 소유8파일은 고정 전체 방문→기존RentalLedger assign, 검증 구간→account/settle/finishReturn, 기존 parked_since의 엄격한 정수 조회와 worker/main·stop/늦은응답 처리를 연결한다. 새 고객/요금/지갑·원장·helper/schema·Activity는 만들지 않았다. 별도 C 코드APPROVE/필수0·app23(작성17+외부6)/core13PASS(19초), 작성자core398/app192·APK/Lint0오류20경고는 구분하고 합산하지 않는다.
+
+A는 exact473추적파일/정식9원문SHA 무변경을 확인하고 외부경계1개만 추가한 격리APK를34초에 새조립했다. 잘못된 최초cwd/init 경로는 Gradle구성전 실패로 별도보존한 뒤 경로만 바로잡았다. 새앱48b9ded7/시험6fce33b2의 설치후pullSHA가 빌드와 일치했다. API34/ARM64/user10의 정식9PASS(1.159초)+외부1PASS(0.233초)=새실제10개·실패/오류/생략0을 확인했다. assign/account/settle/return·DB재개방/원래방문재생·연속주차기준·관측공백무계상·정산실패재시도·원시소수거절·두연결경쟁·반환후사고/최초완료원인·미정반올림실패를 검증했다. 외부1은 권한누락 motion 무계상→유효1시간→RETURNING→반납/반복Missing/원래방문재생의 잔액1120/정산1회·실제rentalId/settlementId/source유지와타source거절이다.
+
+이는 고정clock/NPC·요금/SIMULATION과같은SQLite의시험이다. 권한누락은Missing(PERMISSION_DENIED) 입력이며 실제Android권한revoke가아니다. 재개방은DB재개방이고프로세스/전원시험·모든경쟁스케줄·실제고객/실차/SDK/선물지급이아니다. 제품NPC·20종별정의/verifiedclock·전체motioncoverage·같은profile factory/durable원래방문·MainActivity연결은남는다. 원문 rawinstrumentation이근거이고 XML은원문에서집계했다. 자기rentalruntimea2패키지정리·제품APK793e1db8/6데이터/권한·창/설정등19보존checksPASS·해당구간종료를회수했다. 다음장치queue는root배정이며조율자adb0이다.
+
+근거 /private/tmp/drive-rental-runtime-20261110/independent-review/ 및 independent-device-review/의 REPORT/summary/source·device에보존했다. 최신main정상통합에서 소유8파일바이트동일성과RentalLedger.Pending 조회delta만유지하고 helper/schema/진행중E소스를변경하지않는다. 실제10개는eb096실행이며새게시head장치재실행이아니다. 정확headCI/원격공급은연결PR에서확인하고 #41~43/#51/#54 및전체기능을닫지않는다. 수리/초기화/AppHost의미해결P2도이성공으로해결처리하지않는다.
+
+
 ### 제품 HOME·가챠 조회와 표시 세대 수정의 독립 검증 — 2026-11-10
 
 AppHost 원6e8f672는 mainf1e0b45와Shop3dc를정상통합해 HOME ShopView·화면선택/Back·저장조회와GachaBrowseHost를연결했다. 원제품범위의독립코드CLEAR/직접JVM20(정식16+외부4,48초)·작성자core383/app190과빌드/Lint는별도근거다. 정식ResultsHostActivityTest101의Spinner준비전대기P2를64963fd에서제품/gate/원래정산기대완화없이수정하고소스컴파일25초·delta검토APPROVE를확인했다.
