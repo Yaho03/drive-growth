@@ -706,3 +706,12 @@ B 원본 `aef5a11`의 Main HOME은 같은 `HostSession.games` factory·단일 wo
 E b8972b56의 기능 커밋만 main177 위에 통합한 후보는 schema12다. Quest 정의/기간·실제 원인 이벤트·최초 수령/원래 요청 조회와 typed Quest 명령을 기존 같은 DB/profile/source 원장에 연결한다. 확정 결과 열람·실제 차량 성장·대여 완료의 원자 이벤트 hook을 공급하며 현재 값을 과거 진행으로 합성하지 않는다. Delivery 선택/변경/포기/도착/Hold 전체 원명령과 당시 중앙 trial 규칙을 저장·재생한다. STARTED/정산의 실제 쓰기와 Hold 생성/해소의 후조건을 확인하고 실패 시 같은 거래를 롤백한다. 삭제/INSERT 무시 회귀와 손상 zone 검증을 포함한다.
 
 E 변경31파일 중30개는 b897과 동일하며 RentalLedger는 최신 main의 Pending.parkedSince·엄격 정수 조회만 추가 보존했다. 중앙 trial·helper/data에 새로운 제품 논리를 추가하지 않았다. 현 앱 소비 호환은 Garage adapter의 Quest/Delivery 명령·결과를 STATE_CONFLICT로 거절하고, 보관 경로 조회도 두 명령을 명시 실패로 반환해 UI의 재확인 상태로 전달한다. null은 실제 빈 checkpoint에만 사용하며 명령을 지우거나 다른 페이지 명령으로 실행/취소하지 않는다. Driving schema13·제품 Progress/Delivery Main·랭킹 진입은 포함하지 않는다. 제품 연결과 공식 SDK/기기 범위는 별도다.
+
+
+### 관측 주행 schema13 저장 공급 — 2026-11-10
+
+D의 고정 관측 recorder7파일과 E `0681fbfe`의 저장 공급을 main178 위에 통합했다. `ObservedDrivingReducer`는 명시 정책·receiver token·clock/calendar와 출처 있는 VehicleObservation을 받아 확인된 구간·공백·출발·봉인 outbox를 구분한다. `SessionObservedDrivingSource`의 journal 포트는 같은 GameSessionFactory/profile/source의 기존 store.atomic을 사용한다. Main/HostSession에서 실제 VehicleInput을 연결하는 B52e 변경은 포함하지 않는다.
+
+schema13은 marker·전체 상태 revision CAS·원출발 provenance를 같은 DB에 보존한다. 기능은 worker의 `activateObservedDriving(profileId)`로 명시 활성화하며 조회가 새 프로필/재화·빈 상태를 만들지 않는다. raw 비유한 관측은 gap의 double bits로 보존하고 canonical 원문으로 전체 동일성을 비교한다. 같은 거래에서 save→기존 DrivingLedger 정산→최초 결과 검증→provenance 저장/재조회→outbox ack를 처리한다. 실패·손상·출처 혼합·필수 쓰기 무갱신은 실패로 전달하고 원래 결과 재생은 현재 상태보다 우선한다. marker 없이 이력이 남은 고아 상태를 미활성으로 숨기지 않는다.
+
+출발 당시 UTC/zone/rules와 원정산을 보존하고 현재 zone/날짜로 legacy 기록을 재해석하지 않는다. 금액은 기존 중앙 TrialDefinition의 drivingIncomeRules와 DrivingLedger를 재사용하며 일500km·출발한 날 기준을 바꾸지 않는다. 휴식 효과·미관측 구간을 합성하지 않는다. main178의 foreign 명령 STATE_CONFLICT·빈 checkpoint만 null인 조회와 RentalLedger Pending.parkedSince/엄격 조회를 보존했다. 실제 신호 수신·제품 수명 연결·플랫폼/정책 허용은 이 저장 공급의 완료와 별도다.

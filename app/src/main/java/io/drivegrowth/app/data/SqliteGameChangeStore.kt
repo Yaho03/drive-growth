@@ -48,6 +48,12 @@ class SqliteGameChangeStore(
 
     val delivery = DeliveryLedger(this)
     val driving = DrivingLedger(this)
+    val observedDriving = SqliteObservedDrivingJournal()
+    fun activateObservedDriving(profileId:ProfileId) = atomic { db -> observedDriving.activate(db,io.drivegrowth.app.host.GameIdentity(profileId,source)) }
+    fun observedDrivingReceipt(driveId:String):ContractResult<io.drivegrowth.app.host.driving.ObservedDrivingReceipt?> = atomic { db ->
+        val p=when(val r=localProfileId()){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
+        observedDriving.committed(db,io.drivegrowth.app.host.GameIdentity(p,source),driveId)
+    }
     val rental = RentalLedger(this)
     private val initialization = InitializationLedger(this, initializationAuthority)
     fun localProfileId() = initialization.profileId()
@@ -325,7 +331,7 @@ internal enum class LedgerFailureReason { SQLITE, CORRUPT, UNSUPPORTED_SCHEMA, S
 private class LedgerStorageException(val reason: LedgerFailureReason) : SQLiteException(reason.name)
 
 private class LedgerHelper(context: Context, name: String, private val source: InputSource, private val initialGachaProgress: GachaProgress?) : SQLiteOpenHelper(
-    context, name, null, 12,
+    context, name, null, 13,
     // Android 기본 핸들러의 손상 DB 삭제를 막고 원본을 보존한다.
     DatabaseErrorHandler { throw LedgerStorageException(LedgerFailureReason.CORRUPT) },
 ) {
@@ -351,13 +357,14 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         QuestLedger.createTables(db)
         beginQuestTracking(db, true)
         DeliveryCheckpointStorage.addColumns(db)
+        SqliteObservedDrivingJournal.createTables(db)
         initialGachaProgress?.let { GachaLedger.insertInitialProgress(db, it) }
     }
     private fun createDiscoveries(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE discoveries (vehicle_id TEXT NOT NULL, rarity TEXT NOT NULL, PRIMARY KEY(vehicle_id, rarity))")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion !in 1..11 || newVersion != 12) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
+        if (oldVersion !in 1..12 || newVersion != 13) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
         verifySource(db)
         // 기존 원장과 개체 JSON은 그대로 보존한다.
         if (oldVersion == 1) RentalLedger.createTables(db)
@@ -379,7 +386,8 @@ private class LedgerHelper(context: Context, name: String, private val source: I
             QuestLedger.createTables(db)
             beginQuestTracking(db, false)
         }
-        DeliveryCheckpointStorage.addColumns(db)
+        if(oldVersion<12) DeliveryCheckpointStorage.addColumns(db)
+        SqliteObservedDrivingJournal.createTables(db)
     }
     /** 이 버전은 세 실제 사건 hook과 함께 공급한다. onCreate 재진입 없이 이미 발급한 profile을 전달한다. */
     private fun beginQuestTracking(db: SQLiteDatabase, fresh: Boolean) {

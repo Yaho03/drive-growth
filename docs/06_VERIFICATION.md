@@ -1614,3 +1614,12 @@ PR #169 실제 초기화/첫 선물·공용 저장 공급, #173 같은 factory�
 정확 E b8972b563ffb0c0d6a7e969097f4cd172fff1941의 A 독립 API34 ARM64 격리 SQLite 검증은 Quest54/54(8.197초)·Delivery17/17(4.555초), 실패/오류/생략0이다. Quest25+통합12+checkpoint15+성장 후조건2, Delivery 원래15+Hold 독립2의 범위다. 이전63/399의 실패·진단, 같은 D 원래RED2→수정GREEN2와 행 단언을 보존한다. fixture 두 파일은 public lazy upgrade 경로/정확schema12·필수표/열과 기존 행/tracking/profile 보존을 검사하며 기대값을 완화하지 않았다. 원본 제품399와 b897의 차이는 정식 시험2파일이다. 이 원본 결과를 새 main 조합의 신규 실행으로 합산하지 않는다.
 
 main177 기준 후보는 E 기능8커밋만 적용하고 기존 Runtime Pending.parkedSince/엄격 조회를 유지했다. 별도 Driving13·Progress/Delivery Main·랭킹 진입은 포함하지 않았다. 소비 호환은 미연결 Quest/Delivery 보관 명령을 명시 STATE_CONFLICT로 전달하고 원문 보존을 회귀 검사한다. 새 조합의 코어420·앱328 시험이 실패/오류/생략0으로 통과했고 APK·시험 APK 빌드와 Lint(오류0·경고23)가 성공했다. 80개 task를 실행해2분19초에 종료했고 저장소 필수21·문서29·링크424 및 diff 검사를 통과했다. 정확 head·원본 동일성·소비 호환 patch는 연결 PR 인계에 기록한다. 이 조합의 새 기기 실행/제품DB 이전·Main UI/프로세스·SDK 도착/주행·실차는 미검증이다. AI 보조 검토이며 별도 사람 승인 미확보, 원격CI/게시/머지는 root 담당이다.
+
+
+### 관측 주행 schema13 통합 후보 — 2026-11-10
+
+E 정확 `0681fbfed4d7faa76fc557a50a001abd97512ed0`은 F 독립 재검토 `APPROVE_SCOPED_CODE_AND_A_SQLITE23_GREEN`·새 필수지적0이며 A가 실제 API34 ARM64 격리 SQLite 정식20+독립3=23개를4.237초에 통과했다. 입력은 명시 SIMULATION 관측이다. 원본bbbc의 독립RED3와 이전정식20/fixture실패를 보존했고 같은 원문·기대값의 독립3이 전체 row 단언까지 GREEN임을 확인했다. 고아 marker/state/provenance 경계와 raw NaN trip canonical 동일성 수정이 범위이며 A의 환경19개 보존·자기패키지 정리/장치반환 기록은 원본 근거다. F JVM witness/코드 검토를 Android23 실행 수에 합산하지 않는다.
+
+최신main178 위에 recorder import21cb·codec8a548·저장bbbc·수정0681의 기능 커밋만 통합했다. 변경24소스/시험은 E0681과 모두 동일하고 D recorder7파일도 그대로다. Garage의 이미 존재하는 foreign 분기 순서 충돌은 main 코드를 유지했고 schema13 정식 fixture는 A가 검증한 최종 원문을 보존했다. Main/HostSession B52e·제품UI·랭킹은 포함하지 않는다. 새 main 조합에서 core420·app344 시험이 실패/오류/생략0으로 통과했고 APK·시험 APK·Lint(오류0·경고23)가 성공했다. 80개 task를 실행해2분4초에 완료했으며 저장소21/29/428·diff 검사도 통과했다. 정확head·원본동일성은 연결 PR 인계를 따른다.
+
+이 통합본의 새 기기 실행은0이다. 원본 schema12 Quest54/Delivery17과 Driving23을 새 schema13 전체장치회귀로 합산하지 않는다. 실제 SDK D/속도/도착·Main receiver/calendar·onStop/프로세스·FGS/전원·실차·정책 허용과 전체39/28 완료는 후속이다. 과거42조건 대조의 root 적용4체크와45부분판정은 유지한다. AI검토를 사람승인으로 표시하지 않고 root가 원격CI/게시·머지를 담당한다.
