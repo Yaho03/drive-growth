@@ -175,6 +175,29 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         LEFT JOIN settlements s ON s.request_id=r.settlement_request
         WHERE r.settlement_request IS NOT NULL"""
 
+    /** 방문/보험 기준과 구분한 확정 대여 건수. 조회는 지급/열람/활동을 바꾸지 않는다. */
+    fun completedRentalCount(): ContractResult<Int> = store.atomic { db ->
+        ContractResult.Success(completedRentalCount(db))
+    }
+
+    private fun completedRentalCount(db: SQLiteDatabase): Int {
+        val rentals = HashSet<RequestId>()
+        val receipts = HashSet<SettlementId>()
+        db.rawQuery(completedSelect, null).use { rows ->
+            while (rows.moveToNext()) {
+                val completed = decodeCompleted(rows)
+                if (!rentals.add(completed.rentalId) || !receipts.add(completed.receipt.settlement.settlementId))
+                    throw SQLiteException("완료 대여 정산 중복")
+            }
+        }
+        // 공용 정산만 남은 대여를 정상 완료나 단순 미완료로 보정하지 않는다.
+        db.rawQuery("""SELECT 1 FROM settlements s LEFT JOIN rentals r ON r.settlement_request=s.request_id
+            WHERE substr(s.request_id,1,14)='rental/settle/' AND r.id IS NULL LIMIT 1""", null).use {
+            if (it.moveToFirst()) throw SQLiteException("대여 없는 완료 정산")
+        }
+        return rentals.size
+    }
+
     private fun countSettledAccidents(db: SQLiteDatabase, ownedVehicleId: OwnedVehicleId): Int =
         db.rawQuery("$completedSelect AND r.owned_id=?", arrayOf(ownedVehicleId.value)).use { rows ->
             var count = 0
@@ -299,7 +322,8 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
 
     fun expand(id: RequestId, offer: ShopExpansion) = purchase(id, offer.ruleVersion, offer.price,
         listOf("expand", offer.fromLevel, offer.currentCapacity, offer.nextCapacity, offer.requiredCustomers, offer.trial)) { db, state, balance ->
-        offer.preview(state.progress, state.capacity, balance).also {
+        val completed = completedRentalCount(db)
+        offer.preview(state.progress.copy(servedCustomers = completed), state.capacity, balance).also {
             if (it is ContractResult.Success) db.execSQL("UPDATE shop SET level=?,capacity=? WHERE id=1",
                 arrayOf(offer.fromLevel + 1, offer.nextCapacity))
         }
