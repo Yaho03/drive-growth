@@ -1731,7 +1731,7 @@ A최종앱76150b8ac71c73e8ec00264f6876f33f62e9939dfbec754cee12a1d31302e639·시�
 
 ### Rest 6a4 세 수정의 main188 통합 검토 대기 — 2026-11-10
 
-정확6a4d820645cbd58c05959d7dd8a48f73746a5972를main188 c6c345d1866569cb3156229ba363312d1778fede 위에정상통합했다. 소스충돌/추가수정0이며변경41파일전부6a4와바이트동일하다. Main/HostSession/PendingRoute/factory/VehicleInput·Location6·시설12·Results14를보존했다. marker생산API는그대로이며시험fixture만schema16으로갱신했다. RankingReadSource의공통Rest주행reader소비는원본의의도된변경이고기존Provenance hook/typedFailure catch는보존했다. core/Gradle/Manifest불변·B0dd미포함이다. **새6a4 SQLite46과최종독립검토는미완료이며승인·완료·merge-ready를주장하지않는다.**
+정확6a4d820645cbd58c05959d7dd8a48f73746a5972를main188 c6c345d1866569cb3156229ba363312d1778fede 위에정상통합했다. 소스충돌/추가수정0이며변경41파일전부6a4와바이트동일하다. Main/HostSession/PendingRoute/factory/VehicleInput·Location6·시설12·Results14를보존했다. marker생산API는그대로이며시험fixture만schema16으로갱신했다. RankingReadSource의공통Rest주행reader소비는원본의의도된변경이고기존Provenance hook/typedFailure catch는보존했다. core/Gradle/Manifest불변·B0dd미포함이다. **이main188 로컬후보당시에는새SQLite결과대기였다. 후속c28의실제47통과는아래별도조합으로기록하며, #190이후Main조합·최종독립회수전까지머지보류다.**
 
 원830의A실제Journal18+Ledger18=36PASS와C JVM16·별도receiver-overlap1FAIL을구분한다. 동일boot의서로다른receiver가0..1000/500..1500의겹친물리시간을입력하면Success/2000ms소모를반환한C/E원반례가있었고,9db는boot별물리cursor·원문검증을보완했다. 원830공개원문손상반례2의실제RED는A가실행하지않았으며실행한것으로바꾸지않는다. 정확9db의A Journal23+Ledger18=41PASS/정상footer는그원본범위로보존하고후속C1/D4실패를합산해소급변경하지않는다.
 
@@ -1741,10 +1741,25 @@ D SQL4는정확9db+원D시험의실제3PASS/1FAIL·오류·생략0/2.980초다. 
 
 D의UTC A→B→A반례는물리elapsed중첩과별개다. 같은boot/domain A로돌아올때과거A의UTC cursor가소실돼원plan이Success(3Uses/2000ms소모)를반환했다. E는원D3를그대로보존해기존10+원D3=13중1RED를재현했고,수정뒤정상복귀/새boot/다른drive경계3을추가한16GREEN을확인했다. D의정확dfdc UTC수정독립16PASS/필수0은그UTC delta만수용한것이며가격식/SQL day/metadata·전체Rest최종승인이아니다.
 
-최종6a4는UTC cursor·신규ack뒤day정확후조건·활성Rest근거뒤관측모듈전체소실의세수정을포함한다. E원본698파일을manifestSHA와대조했고clean·8개후속fix파일·원시험SHA를확인했다. E본인앱569/APK/Lint0/27은원source검사다. 준비된E46은Journal23+Ledger18+D SQL4+C metadata1의고유46이며원본문/기대값을유지했다. E준비앱6b56430e898af72fde47c4f820284b3e93a7aced2fca7d84136fe8423b336e03·시험88c5135b82702bd8f9425fda0a916e9f3b705cf2c39630f64c1db91472e4f38b는파일hash만확인했고설치/실행SHA라고쓰지않는다. 새D4/C1의수정후행단언과원회귀의A46 GREEN은아직수신하지않았다.
+최종6a4는UTC cursor·신규ack뒤day정확후조건·활성Rest근거뒤관측모듈전체소실의세수정을포함한다. E원본698파일을manifestSHA와대조했고clean·8개후속fix파일·원시험SHA를확인했다. E본인앱569/APK/Lint0/27은원source검사다. 준비된E46은Journal23+Ledger18+D SQL4+C metadata1의고유46이며원본문/기대값을유지했다. E준비앱6b56430e898af72fde47c4f820284b3e93a7aced2fca7d84136fe8423b336e03·시험88c5135b82702bd8f9425fda0a916e9f3b705cf2c39630f64c1db91472e4f38b는파일hash만확인했고설치/실행SHA라고쓰지않는다. 이46준비쌍자체의실제실행은주장하지않는다. 후속제품동일c28+F1의A47은아래에구분한다.
 
 F복수departure1은정확9db+별도F시험의명시compact SIMULATION 조합으로7.967초PASS/정상footer·carry/두departure/단일입금/재생/rollback을확인한별도근거다. C1/day실패를해결한시험이아니며그F1을E46의source/APK/계획에넣거나46쌍을덮지않았다. 원830/9db·C/D/A실패/성공및새46준비자료는 /private/tmp/drive-rest-domain-utc-fix-20261110/REPORT.md와관련원본independent-review/device-review에분리보존했다.
 
-새main188조합은앱593 실패/오류/생략0,제품/시험APK·Lint오류0/경고27,78tasks/2분19초에성공했다. RestTimeline/동일D clock16은이593에포함되며별도합산하지않는다. core420은동일core/commonbuild입력의이전근거/이번재실행0이다. 저장소21/29/453·diff/소스동일성검사도통과했다. 이는로컬JVM/컴파일/APK/Lint결과이며새SQLite46/금융후조건통과나최종독립승인을대신하지않는다. mainCI42823800132는root인계시실행중으로만기록한다. 담당새기기/ADB/원격/canonical수정0이며실제B producer/Main/boot·domain/장소권위·SDK/프로세스·전원·실차·제품UI·전체#40/#39/#51/#57/#28/#122는미완료로유지한다.
+새main188조합은앱593 실패/오류/생략0,제품/시험APK·Lint오류0/경고27,78tasks/2분19초에성공했다. RestTimeline/동일D clock16은이593에포함되며별도합산하지않는다. core420은동일core/commonbuild입력의이전근거/이번재실행0이다. 저장소21/29/453·diff/소스동일성검사도통과했다. 이는로컬JVM/컴파일/APK/Lint결과이며후속c28의A47과구분하고최종독립승인을대신하지않는다. mainCI42823800132는root인계시실행중으로만기록한다. 담당새기기/ADB/원격/canonical수정0이며실제B producer/Main/boot·domain/장소권위·SDK/프로세스·전원·실차·제품UI·전체#40/#39/#51/#57/#28/#122는미완료로유지한다.
 
-후속 C는 정확6a4의 metadata·공개 읽기 코드 범위에서 새 필수 지적0을 보고했고, 공개 결과 소비 호환 JVM8을 별도 실행했다. 이는 새 SQLite guard 실행이 아니다. D도 정확6a4의 SQL day 수정 코드를 수용했으며 원 SQL4의 동일 SHA와 ack 이후·commit 이전의 정확 day 대조/rollback 및 과거 결과 선재생을 확인했다. 두 부분 코드 수용은 A의 수정 후 SQLite GREEN이나 전체 Rest 최종 승인이 아니다. D 보고의 후속47은 원 E46에 F 추가1을 더하는 별도 시험 조합이며, 원 E46 source/APK/계획을 교체하지 않는다. 실제 실행 결과와 후행 단언 도달 여부는 아직 수신하지 않았다.
+후속 C는 정확6a4의 metadata·공개 읽기 코드 범위에서 새 필수 지적0을 보고했고, 공개 결과 소비 호환 JVM8을 별도 실행했다. 이는 새 SQLite guard 실행이 아니다. D도 정확6a4의 SQL day 수정 코드를 수용했으며 원 SQL4의 동일 SHA와 ack 이후·commit 이전의 정확 day 대조/rollback 및 과거 결과 선재생을 확인했다. 두 부분 코드 수용은 A의 수정 후 SQLite GREEN이나 전체 Rest 최종 승인이 아니다. D 보고의 후속47은 원 E46에 F 추가1을 더하는 별도 시험 조합이며, 원 E46 source/APK/계획을 교체하지 않는다. 후속 A47의 실제 실행 결과와 후행 단언 도달은 다음 절에서 회수했다. C/D의 최종 근거 회수는 메인이 별도로 진행한다.
+
+
+### Rest c28 시험 전용 후속의 실제 SQLite47 회수 — 2026-11-10
+
+정확 `c28fc5eab368b8420f2cba908eb971225f39f081`은 제품부모6a4의698파일과바이트동일하며F원문 `RestDrivingMultiDepartureIndependentTest.kt` 1파일만추가한699파일조합이다. F파일SHA171a7d0155b95b7b93b93b1d04dbf51966ce34af66e539de26e3c2f1e7b70673·다섯정식시험원문/fixture/기대값이이전실행과같다. 기존main188 후보521f562를보존한후속브랜치에서이시험1만정상통합했고생산소스변경0이다. 이는#190의새Main을아직포함하지않은준비단계다.
+
+A가Journal23/Ledger18/D SQL4/Cmetadata1/F복수departure1의고유47개를같은새쌍으로각첫실행해모두통과했다. 실패/오류/생략0·메서드terminal0·다섯그룹정상OK footer/INSTRUMENTATION_CODE -1·재실행0이다. 그룹시간은D4 2.970초/C1 1.063초/Journal23 10.537초/Ledger18 2.386초/F1 5.648초다. 원9db의C1FAIL/D3PASS1FAIL과과거F1PASS·원41·UTC JVM16을이47에합산하지않는다.
+
+D원문day반례는이제STORAGE_FAILURE와후행12표rollback단언까지통과했다. C원문은DELETE각1행뒤receipt/current/zone모두STORAGE_FAILURE와후행12표행동일단언까지통과했다. 해당선택12표는account/settlements/driving_days/driving_drives/observed_driving_state/observed_driving_receipts/rest_module/rest_contexts/rest_departures/rest_driving_receipts/rest_log/rest_head이며전체DB모든표/파일바이트불변으로확대하지않는다. 손상metadata를복구한것이아니며tearDown뒤별도DB조회근거도만들지않는다. 원9db의첫단언실패/후행미도달은위과거기록으로보존한다.
+
+F원문1은원carry1500ms/seed7원에서두departure anchor1/3·stop1/2를보관했다. 두번째DEPART INSERT만IGNORE한경우12표전체rollback,제거뒤동일명령의단일금융62원/boost3500ms/잔여500ms/최종잔액69·main정산1개를확인했다. 재개방/정의Failure뒤원main/seed전체결과와옛revision departure재생·추가정의조회0·행동일까지통과했다. 명시축소SIMULATION 1000ms운전/1000ms주차/2000ms기간·150%/1000perKm/cap500000m이며제품1h/5m/20m·장소/단가정책을바꾸지않았다.
+
+격리restutcmultie쌍의앱80bf65e48da9dd5eb6743a04daab97904e64bdee700d90fbdd5fe71e2a94ad37·시험36977065ba4f7e1ba5c7b214593fb5b6fda884fffa4e4a62bcc8ad3ac98039e2는metadata/준비파일/실제설치pull SHA가같았다. 원E46의restutcfixe쌍/계획은그대로보존했고이번설치대상이아니다. A새빌드0이며작성자c28 APK준비1분5초/62tasks와부모569/Lint0/27/core420을새실행으로바꾸지않는다. 이로컬통합담당도기존main188 앱593검사이후Gradle/장치/ADB새실행0이다.
+
+A단독슬롯은API34ARM64/user10에서22:38:37~22:40:00KST였다.19/19제품/환경보존·자기2패키지/프로세스/계측/추가forward0·반환/released/noFurtherAdb를회수했다. 제품데이터초기화·권한/기어/속도/GPS/창설정변경0이며실제기어D를새로요청/수신하지않았다. 실제SDK/place/Main/제품UI·프로세스/전원·실차는이저장시험의결과가아니다. 원문/source699·설치hash/XML/footer/반환은 /private/tmp/drive-rest-domain-utc-multi-regression-20261110/independent-device-review/에보존한다. 최종C/D회수와#190후Main부모포함·정확head조합검증/CI는게시담당의후속이며전체이슈완료를표시하지않는다.

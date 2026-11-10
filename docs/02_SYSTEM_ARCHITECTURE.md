@@ -787,10 +787,10 @@ source=VEHICLE/Available은SDK원시출처/형식가용성이며실차·센서cl
 
 ### Rest schema16 원자 저장·세 수정의 검토 후보 — 2026-11-10
 
-이절은정확6a4d820의main188통합검토후보다. 새6a4 SQLite46과최종독립검토는아직미완료이며승인·완료·merge-ready로표시하지않는다. 원830은관측원문/segment별boot·clock-domain·장소관측sidecar와여러pending departure를같은helper에보존하고schema16·중앙TrialDefinition v4를준비했다. 원정수거리/출발일·일500km·기존1h/5m/20m/150%와선택된chronological-prefix-rational-v1을보존하며원drive금액을한번내린다. base입금뒤별도bonus CREDIT를만들거나원drive를조각정산으로나누지않는다.
+이절은정확6a4d820의main188통합검토후보다. 원E46 source/APK/계획은고정보존하며제품6a동일+F원문1의c28 조합은A실제SQLite47을통과했다. 최종독립회수와#190후최신Main조합검증은남아있으며전체승인·완료·merge-ready로표시하지않는다. 원830은관측원문/segment별boot·clock-domain·장소관측sidecar와여러pending departure를같은helper에보존하고schema16·중앙TrialDefinition v4를준비했다. 원정수거리/출발일·일500km·기존1h/5m/20m/150%와선택된chronological-prefix-rational-v1을보존하며원drive금액을한번내린다. base입금뒤별도bonus CREDIT를만들거나원drive를조각정산으로나누지않는다.
 
 명시Rest활성화는실제profile/source·기존observed module과진행중trip/outbox조건을검증한다. 기존metadata가남은legacy를현재boot/proof로채택하지않는다. phase1은원관측save와context/actualdeparture준비를보관할뿐지급/확정Rest갱신이아니다. phase2는원순서plan·소모/새departure·단일금융/day·원결과/provenance/ack를같은거래로처리하고기존원결과재생이현재정의/상태보다우선한다. confirmed core와effective pending projection을구분한다. 기존v1 RestHostSource가이새typed writer를구현했다고표시하지않고B0dd의실제producer/Main연결은포함하지않았다.
 
-9db는동일boot의물리elapsed/raw중복과공개원문검증을보완한원본이다. 후속6a4의세수정은(1)물리cursor와별개로(boot,domain)UTC cursor를보존해A→B→A복귀의UTC퇴행을거절,(2)신규ack뒤실제day가paid.day와정확히맞지않으면전체rollback,(3)활성Rest근거뒤observed marker/state/receipts전체소실을진짜미활성부재로숨기지않는것이다. 새금액/기본clock/단계성공을합성하지않고과거정상원결과재생을현재day로거절하지않는다. 이수정의SQLite후행단언통과는아직확인전이다.
+9db는동일boot의물리elapsed/raw중복과공개원문검증을보완한원본이다. 후속6a4의세수정은(1)물리cursor와별개로(boot,domain)UTC cursor를보존해A→B→A복귀의UTC퇴행을거절,(2)신규ack뒤실제day가paid.day와정확히맞지않으면전체rollback,(3)활성Rest근거뒤observed marker/state/receipts전체소실을진짜미활성부재로숨기지않는것이다. 새금액/기본clock/단계성공을합성하지않고과거정상원결과재생을현재day로거절하지않는다. 후속A의c28실행에서C metadata/공개읽기와D day의후행12표행보존/rollback단언까지통과했다.
 
-정상통합41파일은6a4원문과같고Main/HostSession·Location6·시설12·Results14·marker의생산API를보존했다. RankingReadSource는공통DrivingRecordReader로Rest가격원결과를읽는의도된변경이며기존Provenance hook/typedFailure catch·원출발지역검사는유지한다. marker시험은schema16fixture만원본대로갱신했다. 실제boot/domain/장소·정책권위/B opt-in·UI/SDK·프로세스/전원·실차는별도다. 원830/9db의성공과C/D/A실패·미도달을 [06](06_VERIFICATION.md#rest-6a4-세-수정의-main188-통합-검토-대기--2026-11-10)에서분리하며F복수departure1은E46와다른조합으로보존한다.
+정상통합41파일은6a4원문과같고Main/HostSession·Location6·시설12·Results14·marker의생산API를보존했다. RankingReadSource는공통DrivingRecordReader로Rest가격원결과를읽는의도된변경이며기존Provenance hook/typedFailure catch·원출발지역검사는유지한다. marker시험은schema16fixture만원본대로갱신했다. 실제boot/domain/장소·정책권위/B opt-in·UI/SDK·프로세스/전원·실차는별도다. 원830/9db의성공과C/D/A실패·미도달을 [06](06_VERIFICATION.md#rest-6a4-세-수정의-main188-통합-검토-대기--2026-11-10)에서분리하며F복수departure1은제품불변의후속c28에시험파일로만통합했으며원E46쌍과별도조합으로보존한다.
