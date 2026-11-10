@@ -1509,3 +1509,64 @@ main38b3b51의 #147 계약/메모리 참조·#148 VehicleUpgrade.prepareMaterial
 실제assets 게임차종가1000과 명시 SIMULATION 영업 fixture의 prepare→공용SQLite수리→재개방/최초결과재생에서 비용55/잔액945·IDLE/revision2·사고/영업쉬기·성장/희귀도/취득정보를 확인했다. 비용0/Long.MAX 잔액·권위/상태/revision/견적 경계·한쪽 이력 누락/원시숫자 손상·commit/활동쓰기 실패 전체rollback·같은ID/다른종류ID·두연결수리/판매경쟁을 확인했다. material-first 일부는 raw예약행 fixture이며 실제 재료→수리 전체제품흐름으로 확대하지 않는다. v1..v6 정합구조6가지/15개손상변형은 내부반복으로 별도시험수에 더하지 않으며 모든경쟁스케줄/옛APK제품DB이전을 입증하지 않는다.
 
 자기repairsqlitea app/test제거·활성instrumentation없음·제품APK793e1db8/6데이터/권한·창/설정 등18보존checks 전부PASS·슬롯반환/noFurtherAdb를 회수했다. 다른5580/AVD/서버reset/차량신호쓰기는 없으며 새기어P검증으로 기록하지 않는다. 원본근거는 /private/tmp/drive122-repair-sqlite-20261109/independent-review/ 및 independent-device-review/에 보존한다. 실제 제품repairContent/UI·프로세스/전원/실차·초기화/선물SQLite 및 #49/#122 전체완료는 별도다. schema6재료 다음schema7수리 순서를 유지하고 최신main 정상통합/정확head CI는 연결PR에 기록한다.
+
+
+### #162 머지 후 수리 계좌 무갱신 P2·후속 수정 — 2026-11-10
+
+기존3c의 수리23+호환7=30PASS와 일반merge67379487을 당시 근거로 보존한다. 추가 대기 요청/실제 재현은 머지 뒤 도착했다. API34/ARM64/user10의 외부1개가1실행/1assertion실패·오류0으로, account BEFORE UPDATE RAISE(IGNORE)에서 Success·DB잔액1000 vs반환945·revision2/IDLE·공용/수리기록삽입을 관측했다. PR162 추가검토5836490714와49/121/122에필수수정을연결하고122원자성체크를재개했다. 제품DB손실/실차피해재현이아니다.
+
+후속51e0fb7은 account db.update 영향행1검사만추가하고 아니면SQLiteException으로 기존atomic STORAGE_FAILURE/rollback을재사용한다. 제품2줄추가/1줄삭제이며공용helper/다른Ledger·정책을바꾸지않았다. 원A독립소스SHA79a0aed3...가고정원문과바이트동일·기대완화0,정식23도원래3c와동일하다. 독립 archive468파일은정확51e와같고새빌드/설치pullSHA도일치했다(앱45e326ec/시험aaf4bab3).
+
+같은독립1개0.323초PASS: Failure(STORAGE_FAILURE), 실제잔액1000/수리receipt없음/NEEDS_REPAIR, account·vehicles·rentals·settlements·repair_requests5표전후전체행동일을 확인했다. 트리거주입후실행의5표/상태보존이지준비과정포함전체파일bytes불변주장이아니다. 정식수리23개도6.984초23PASS·오류/실패/생략0으로재실행해새실제24개다. 기존30/호환7·작성자core374/app176과합산하지않는다. 작성자APK/시험APK/Lint와독립새빌드1분16초도구분한다.
+
+자기repairfixa2패키지제거·활성instrumentation/자기process없음·제품APK/6데이터/권한/차량·창/설정등19보존checksPASS·해당구간종료를회수했다. A의다음checkpoint는메인배정의별도구간이며조율자adb0이다. 근거 /private/tmp/drive122-repair-account-fix-evidence/independent-review/의REPORT/summary/원문·관측·sourceidentity/설치hash·보존자료. 수정2파일의51e동일성·최신main정상통합/새정확head CI후후속공급하며최신게시head의새장치재실행으로표시하지않는다. 실제수리UI/프로세스·전원/실차/전체49·122완료와초기화/AppHost의별도P2는남는다.
+
+
+### RentalRuntime 독립 코드·실제 SQLite 공급 근거 — 2026-11-10
+
+원head eb096165(baseb11f225)의 소유8파일은 고정 전체 방문→기존RentalLedger assign, 검증 구간→account/settle/finishReturn, 기존 parked_since의 엄격한 정수 조회와 worker/main·stop/늦은응답 처리를 연결한다. 새 고객/요금/지갑·원장·helper/schema·Activity는 만들지 않았다. 별도 C 코드APPROVE/필수0·app23(작성17+외부6)/core13PASS(19초), 작성자core398/app192·APK/Lint0오류20경고는 구분하고 합산하지 않는다.
+
+A는 exact473추적파일/정식9원문SHA 무변경을 확인하고 외부경계1개만 추가한 격리APK를34초에 새조립했다. 잘못된 최초cwd/init 경로는 Gradle구성전 실패로 별도보존한 뒤 경로만 바로잡았다. 새앱48b9ded7/시험6fce33b2의 설치후pullSHA가 빌드와 일치했다. API34/ARM64/user10의 정식9PASS(1.159초)+외부1PASS(0.233초)=새실제10개·실패/오류/생략0을 확인했다. assign/account/settle/return·DB재개방/원래방문재생·연속주차기준·관측공백무계상·정산실패재시도·원시소수거절·두연결경쟁·반환후사고/최초완료원인·미정반올림실패를 검증했다. 외부1은 권한누락 motion 무계상→유효1시간→RETURNING→반납/반복Missing/원래방문재생의 잔액1120/정산1회·실제rentalId/settlementId/source유지와타source거절이다.
+
+이는 고정clock/NPC·요금/SIMULATION과같은SQLite의시험이다. 권한누락은Missing(PERMISSION_DENIED) 입력이며 실제Android권한revoke가아니다. 재개방은DB재개방이고프로세스/전원시험·모든경쟁스케줄·실제고객/실차/SDK/선물지급이아니다. 제품NPC·20종별정의/verifiedclock·전체motioncoverage·같은profile factory/durable원래방문·MainActivity연결은남는다. 원문 rawinstrumentation이근거이고 XML은원문에서집계했다. 자기rentalruntimea2패키지정리·제품APK793e1db8/6데이터/권한·창/설정등19보존checksPASS·해당구간종료를회수했다. 다음장치queue는root배정이며조율자adb0이다.
+
+근거 /private/tmp/drive-rental-runtime-20261110/independent-review/ 및 independent-device-review/의 REPORT/summary/source·device에보존했다. 최신main정상통합에서 소유8파일바이트동일성과RentalLedger.Pending 조회delta만유지하고 helper/schema/진행중E소스를변경하지않는다. 실제10개는eb096실행이며새게시head장치재실행이아니다. 정확headCI/원격공급은연결PR에서확인하고 #41~43/#51/#54 및전체기능을닫지않는다. 수리/초기화/AppHost의미해결P2도이성공으로해결처리하지않는다.
+
+
+### 제품 HOME·가챠 조회와 표시 세대 수정의 독립 검증 — 2026-11-10
+
+AppHost 원6e8f672는 mainf1e0b45와Shop3dc를정상통합해 HOME ShopView·화면선택/Back·저장조회와GachaBrowseHost를연결했다. 원제품범위의독립코드CLEAR/직접JVM20(정식16+외부4,48초)·작성자core383/app190과빌드/Lint는별도근거다. 정식ResultsHostActivityTest101의Spinner준비전대기P2를64963fd에서제품/gate/원래정산기대완화없이수정하고소스컴파일25초·delta검토APPROVE를확인했다.
+
+A의정확649473추적소스/새빌드·설치pullSHA일치(앱09f8b854/시험9ca4014f), 원정식ShopHost1/ResultsHost1/Navigation1/ShopView9=12PASS를회수했다. 최초자기CAR_SPEED권한거부의gate준비실패/자기process종료이력은보존하고자기권한만부여후재실행했다. 제품권한변경0이다. 별도네이티브Spinner경로에서가챠Loading15초잔류와실제host→GachaInteraction외부1FAIL/오류0을확인했다. 같은generation의Loading수락뒤Missing이거절된P2로12PASS와분리해반려했고raw/캡처를보존했다.
+
+수정360c42ca는GachaBrowseHost/단위시험2파일만바꾸고작업무효화/표시generation을분리했다. MainActivity/차량입력/gate/Manifest와정식Android4파일은649와동일하다. 같은외부시험SHAaf8c01b24603bc2ac5d3f0a0b44f74051430a25a8b60cc1d88750665bc72bb7c/기대무변경의JVM1GREEN을확인했다(Loading1수락→Missing2수락). 새473archive/새빌드40초·설치pullSHA(앱f8dda2cd/시험2913a0a7)일치후 실제SDK재관측으로활성화된Spinner를native좌표로선택해가챠terminal Missing·뒤로가게·최상위Task숨김·복귀첫제한후새gate HOME을확인했다. 이전12개를360에서새로반복했다고쓰거나native경로를instrumentation개수로세지않는다.
+
+새계측A는 APPROVE_SCOPED_GACHA_FRAME_FIX_DEVICE·필수0을반환했고제품/6데이터·권한/차량·창/설정/전경등19보존checks/자기2패키지정리·해당구간종료를확인했다. 최초정리에서원전경Task가PAUSED였던649이력과기존DrivingView→지도task포커스만원복한뒤19/19일치한자료도보존한다. 새Activity/기어/속도/제품DB·AVD/서버reset은없다. 독립확인후게시담당은실제terminal/HOME PNG도직접열어OEM영역과앱영역을구분했다.
+
+원근거 /private/tmp/drive-app-host-integration-20261110/independent-review/ 및 independent-device-review/, display-frame-fix/independent-review/의REPORT/summary/원문·PNG·설치/보존자료에보존한다. 조회대상은시험출처의실제SQLite이고공급없는권위는Missing, 거래/영속전체명령미연결이면Draw/시설/초기화는Unsupported/Unavailable이다. 실제추첨/초기지급/관리·시설거래·제품NPC/clock·프로세스/전원·실차/새SDK D시험과전체51/52/54/55/56완료는남는다. 최종디자인은팀WIP/임시Views이며새미술작업이아니다. 게시head의소유10파일360동일성/최신main정상통합·CI는연결PR에서확인한다.
+
+
+### 초기화·첫 선물·checkpoint SQLite 통합81 독립 검증 — 2026-11-10
+
+원81bbaf30a2f5fd3d968abc66fa6404d1585af33d/schema10의 공통 helper/factory·초기화/첫 선물·typed checkpoint를 부분 공급한다. 독립 APPROVE_SCOPED_COMBINED81_SQLITE_SUPPLY·잔여 필수0을 회수했다. 이전627의 초기화 공백 고아정산/선물 전체요청 INSERT IGNORE 두 P2와 당시27/30/33PASS는 보존한다. 627→81 제품 수정은 trimStart 모양 판별과 선물 NEW 확정 끝 recorded==result 재조회 각1줄이며 원래 결과 우선 재생은 유지한다.
+
+같은 원 RED 소스 SHA Gift c77f9f64.../Init dc8097cf...·기대 무변경으로 두 개를 한 실행에서2PASS(0.414초), 초기화16+공개4+쓰기경계9=29PASS(4.426초), 선물25+공개9=34PASS(15.068초), 실제 helper checkpoint4PASS(1.006초)를 확인했다. 새 실제 실행 메서드 총69·실패/오류/생략0이며 겹친 fixture가 있어 독립 커버리지69개로 세지 않는다. Gift STORAGE_FAILURE/진행rev0/무료권0·관련8표 원래행 동일, Init read/Add 실패/차량3 보존·원래행/파일 bytes 동일과 정상 공백 legacy 배열 반례를 확인했다.
+
+checkpoint 모듈/시험5파일·helper/factory·연결4파일은627과 동일하다. 정식20+올바른 digest 독립3=627 실제23PASS를 해당 범위로 재사용했고81에서27전체 신규실행으로 표시하지 않는다. 실제 helper4는81에서 새 실행해 onCreate/save/execute/재개방/replay/finish와 v8/v9→10 프로필/진행/재화/개체/receipt 보존·실패 원본 보존을 확인했다. 기존 정식 원시변조20의 일부는 decoder 전에 digest에서 거절될 수 있다. 작성자core412/app186·이전 head/다른 기기 결과와 합산하지 않는다.
+
+독립493추적파일 전부81 동일·저자clean·정식 기대완화0, 새빌드35초 app e0e93e20/test41731414의 설치후 pull SHA 일치를 회수했다. API34 ARM64/user10의 단독 구간13:36:08~13:37:51 KST, 자기 combined81a 두패키지 정리/잔여시험없음·제품APK/6파일·권한/차량/창/설정/전경 등19보존PASS·슬롯반환을 확인했다. 게시 담당 adb0이다. 원문/메서드status/XML·설치hash/소스동일성과보존근거는 /private/tmp/drive122-first-gift-write-fix-evidence/independent-review/에 보존했다. 이전 whitespace 보고서도 이 같은 실행을 참조하며 중복 합산하지 않는다.
+
+최신 main168 정상 통합에서 변경 앱23파일이81과 바이트동일하고 이미 main의 수리guard·Runtime·AppHost를 보존했다. 정확 게시head CI는 연결 PR에서 확인하며 새 게시head 장치재실행으로 쓰지 않는다. 명시 SIMULATION/격리SQLite/DB재개방이고 제품 livefactory/save·execute·finish 소비·전체UI/명령·프로세스/전원·실차/전체 #50/#51/#52/#56/#121/#122 완료는 아니다. #44 Expand 후보도 별도다.
+
+
+### 제품 첫 실행·가챠·공통 factory 소비 독립 검증 — 2026-11-10
+
+원cab5670738beac214588ae5184095877fbef54ad는 기존 Garage/C274/E81 공급을 포함한다. C의906 scoped 독립검토·JVM27PASS(가챠18+기존외부3+추가6), 문구 enum 제거cab의1PASS·작성자core412/app258은 각 원head 근거로 보존하고 합산하지 않는다. Garage 소유15의 코드24PASS/실제7PASS(1.460초), C 소유7의 독립17PASS/실제11PASS(1.237초)는 동일 소스 범위로 재사용하며 cab에서 새 실행한 수로 세지 않는다.
+
+A의 정확cab529추적파일 원문/정식 기대 무변경·새APK 설치pullSHA 일치와 실제 정식 GachaLiveCheckpointSqliteTest6PASS(2.180초)를 회수했다. 별도 checkpoint DELETE RAISE(IGNORE)1PASS(0.457초)는 STORAGE_FAILURE/원명령 유지·재개 후 동일 결과/잔액500·차량2 보존·trigger 제거 뒤 finish 성공을 확인했다. 같은 MainActivity 재생성1PASS(9.128초)는 다른 instance/retained session·첫 제한 뒤 새 SDK gate·DB 전체행 보존이다. 이8메서드와 아래 native 경로는 구분한다.
+
+별도 fresh package의 실제 SDK gate/터치로 첫 차 캐스퍼 확인→source VEHICLE/잔액1000/차량1/공간3/초기화1건/무료권0, 유료500 1회 추첨→캐스퍼 일렉트릭 고급/취득액500/잔액500/보유2/가챠1건→실제 차고2/3을 확인했다. 랜덤 결과는 사후 관측이며 새ID로 재추첨하지 않았다. 확정 뒤 own package force-stop/component 재실행의 PID변경과 동일profile/지갑/개체/지급1·추첨1·전체행 보존을 확인했다. 실제 launcher icon·지급 중 process kill·실차/전원 시험은 아니다. 원본6의 무료권은 명시SIMULATION fixture이며 native 무료권0에서 무료 추첨/실제 첫 영업 선물을 실행하지 않았다.
+
+원본6구간14:23:28~14:24:50KST/native14:25:51~14:34:26KST, API34 ARM64/user10. 원본 app a2f53772/testbcad69ba/nativeapp90b3bce3의 설치pullSHA 일치·두 구간19보존PASS·자기패키지/권한/잔여시험 정리·슬롯반환을 회수했다. 관측문구/스크롤/목적화면 이름을 바로잡은 외부harness 실패는 보존하고 지급/추첨 횟수·저장 기대를 바꾸지 않았다. 게시담당은 native 결과와 차고PNG를 직접 확인했으며 OEM 영역과 임시앱 화면을 구분했다. 조율자adb0이다.
+
+근거는 /private/tmp/drive-gacha-live-host-20261110/independent-review/ 및 independent-device-review/의 REPORT/summary·device/native 원문/DB사본/PNG/hash·보존자료다. 최신 main169/170 정상 통합에서 변경 앱/빌드34파일이cab와 동일하고 기존Runtime/수리guard/helper를 보존한다. 로컬 통합검사·정확head/CI는 연결 PR 또는 인계자료에서 확인하며 이 기기결과를 새 게시head 재실행으로 표시하지 않는다. 첫 선물 runtime·전체 가게/확장·Quest/Delivery·실제D전이/센서장애·전원·실차/전체 이슈 완료는 별도다.
