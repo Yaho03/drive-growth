@@ -8,8 +8,17 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.View
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
+import android.widget.Spinner
+import android.widget.ArrayAdapter
+import android.widget.AdapterView
 import android.widget.LinearLayout
+import io.drivegrowth.app.host.shop.ShopHostMapper
+import io.drivegrowth.app.ui.shop.ShopView
+import io.drivegrowth.app.ui.shop.ShopEvent
+import io.drivegrowth.app.ui.shop.ShopMode
+import io.drivegrowth.app.ui.shop.ShopUiState
+import io.drivegrowth.app.ui.gacha.GachaView
+import io.drivegrowth.app.ui.gacha.GachaEvent
 import io.drivegrowth.app.host.GarageHostMapper
 import io.drivegrowth.app.host.HostNavigation
 import io.drivegrowth.app.host.HostPage
@@ -46,6 +55,13 @@ class MainActivity : Activity() {
     private var input: VehicleInput? = null
     private var navigation = HostNavigation()
     private var screen: HostQueryState = HostQueryState.Restricted
+    private val shopMapper = ShopHostMapper()
+    private lateinit var shop: ShopView
+    private lateinit var gacha: GachaView
+    private var shopRevision = 0
+    private var navigationGeneration = 0L
+    private val destinations = listOf(HostPage.HOME to "가게", HostPage.GARAGE to "보유 차량", HostPage.COLLECTION to "도감",
+        HostPage.GACHA to "가챠", HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내")
     private val mapper = GarageHostMapper()
     private val resultsMapper = ResultsHostMapper()
     private lateinit var results: ResultsView
@@ -75,6 +91,11 @@ class MainActivity : Activity() {
         garage = GarageView(this, ::onGarageEvent).also { it.restoreSelection(navigation.selectedVehicleId) }
         collection = CollectionView(this, ::refresh)
         results = ResultsView(this, ::onResultsEvent)
+        shop = ShopView(this, ::onShopEvent)
+        val shopMode = ShopMode.entries.firstOrNull { it.name == savedInstanceState?.getString("shopMode") } ?: ShopMode.OVERALL
+        shop.restoreUiState(ShopUiState(mode = shopMode, sceneScrollY = savedInstanceState?.getInt("shopSceneY", 0) ?: 0,
+            controlsScrollY = savedInstanceState?.getInt("shopControlsY", 0) ?: 0))
+        gacha = GachaView(this, ::onGachaEvent)
         onboarding = OnboardingView(this, ::onOnboardingEvent)
         onboarding.restoreSelection(savedInstanceState?.getString("onboardingSelection")?.let(::VehicleId))
         pendingOnboardingId = savedInstanceState?.getString("onboardingPending")?.let(::VehicleId)
@@ -89,12 +110,19 @@ class MainActivity : Activity() {
         panel.addView(chrome)
         panel.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(panel)
+        session.gacha.attach { frame, enabled ->
+            gacha.render(frame, enabled && allowed())
+            if (frame.screen != io.drivegrowth.app.ui.gacha.GachaScreen.Loading)
+                gacha.uiState.reloadToken?.let(gacha::completeReload)
+        }
         queries.attach {
             screen = it
+            if (it is HostQueryState.Content) shopRevision = Math.addExact(shopRevision, 1)
             render()
             if (it is HostQueryState.Content || it is HostQueryState.Failure) {
                 session.results.completeQuery()
                 results.completeRetry()
+                shop.completeRetry()
             }
         }
         if (savedInstanceState == null) {
@@ -150,6 +178,8 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         queries.detach()
+        session.gacha.detach()
+        gacha.release()
         session.results.detach()
         if (!isChangingConfigurations) session.release()
         super.onDestroy()
@@ -162,6 +192,10 @@ class MainActivity : Activity() {
         outState.putBundle("results", ResultsStateBundle.encode(session.results.uiState))
         outState.putString("onboardingSelection", onboarding.selectedVehicleId?.value)
         outState.putString("onboardingPending", (onboarding.pendingVehicleId ?: pendingOnboardingId)?.value)
+        outState.putString("shopMode", shop.uiState.mode.name)
+        outState.putInt("shopSceneY", shop.uiState.sceneScrollY)
+        outState.putInt("shopControlsY", shop.uiState.controlsScrollY)
+        outState.putString("returnPage", navigation.returnPage.name)
         outState.putString("page", navigation.page.name)
         outState.putString("selectedVehicle", navigation.selectedVehicleId?.value)
         navigation.pendingGarageRequest?.let {
@@ -176,11 +210,15 @@ class MainActivity : Activity() {
         interaction.state(SystemClock.elapsedRealtime()) == Observation.Available(VehicleInteraction.ALLOWED)
 
     private fun updateAccess() {
-        queries.setControlsEnabled(allowed())
+        val enabled = allowed()
+        queries.setControlsEnabled(enabled)
+        session.gacha.setControlsEnabled(enabled && navigation.page == HostPage.GACHA)
     }
 
     private fun refresh() {
-        if (allowed() && screen != HostQueryState.Loading) queries.refresh() else updateAccess()
+        if (!allowed()) { updateAccess(); return }
+        if (navigation.page == HostPage.GACHA) session.gacha.refresh()
+        else if (screen != HostQueryState.Loading) queries.refresh()
     }
 
     private fun render() {
@@ -195,6 +233,7 @@ class MainActivity : Activity() {
             is HostQueryState.Failure -> CollectionScreenState.Error("조회 실패 (${current.error})")
             else -> CollectionScreenState.Loading
         }
+        shop.render(shopMapper.map(screen, Revision(shopRevision)), enabled)
         garage.render(garageState, enabled)
         collection.render(collectionState, enabled)
         results.render(resultsMapper.map(screen), enabled)
@@ -204,13 +243,25 @@ class MainActivity : Activity() {
             showBody(style.text("주차 후 조작이 허용되면 이용할 수 있습니다."))
             return
         }
+        val token = ++navigationGeneration
         val links = style.row()
-        links.addView(style.button("뒤로") { onBackPressed() })
-        listOf(HostPage.HOME to "가게", HostPage.GARAGE to "보유 차량", HostPage.COLLECTION to "도감",
-            HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내").forEach { (page, label) ->
-            links.addView(style.button(label, primary = navigation.page == page) { select(page) })
+        links.addView(style.button("뒤로") { if (token == navigationGeneration) onBackPressed() })
+        val destination = Spinner(this).apply {
+            tag = "host:destination"
+            contentDescription = "화면 선택"
+            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, destinations.map { it.second })
+            setSelection(destinations.indexOfFirst { it.first == navigation.page }.coerceAtLeast(0))
+            onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    val target = destinations.getOrNull(position)?.first ?: return
+                    if (token == navigationGeneration && target != navigation.page) select(target)
+                }
+            }
         }
-        chrome.addView(HorizontalScrollView(this).apply { addView(links) })
+        links.addView(destination, LinearLayout.LayoutParams(0, style.dp(56), 1f))
+        links.addView(style.button("새로고침") { if (token == navigationGeneration) refresh() })
+        chrome.addView(links)
         navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE }?.let {
             chrome.addView(style.text("관리 명령이 연결되지 않아 실행할 수 없어요. 이 요청은 실행되지 않았어요."))
             chrome.addView(style.button("준비 요청 닫기") { cancelPreparation() })
@@ -220,30 +271,8 @@ class MainActivity : Activity() {
             HostPage.COLLECTION -> showBody(collection)
             HostPage.RESULTS -> showBody(results)
             HostPage.ONBOARDING -> showBody(onboarding)
-            else -> {
-                val page = style.column().apply { setPadding(style.dp(24), style.dp(16), style.dp(24), style.dp(16)) }
-                when (val current = screen) {
-                    HostQueryState.Restricted -> page.addView(style.text("주차 후 조작이 허용되면 이용할 수 있습니다."))
-                    HostQueryState.Loading -> page.addView(style.text("콘텐츠를 불러오는 중입니다."))
-                    is HostQueryState.Failure -> {
-                        page.addView(style.text("콘텐츠 또는 저장 데이터를 읽지 못했습니다. (${current.error})"))
-                        page.addView(style.button("다시 시도", onClick = ::refresh))
-                    }
-                    is HostQueryState.Content -> {
-                        val data = current.snapshot
-                        when (navigation.page) {
-                            HostPage.HOME -> {
-                                page.addView(style.text("드라이브 키우기", 32, bold = true))
-                                page.addView(style.text("모의 원장 · ${data.content.catalog.contentVersion.value}"))
-                                page.addView(style.text("잔액 ${data.balance.units} · 보유 차량 ${data.ownedVehicles.size}대"))
-                            }
-                            else -> Unit
-                        }
-                        page.addView(style.button("새로고침", onClick = ::refresh))
-                    }
-                }
-                showBody(style.scroll(page))
-            }
+            HostPage.HOME -> showBody(shop)
+            HostPage.GACHA -> showBody(gacha)
         }
     }
 
@@ -256,7 +285,39 @@ class MainActivity : Activity() {
     private fun select(page: HostPage) {
         if (!allowed()) { updateAccess(); return }
         navigation.page = page
+        navigation.returnPage = HostPage.HOME
+        updateAccess()
         render()
+    }
+
+    private fun onShopEvent(event: ShopEvent) {
+        if (!allowed()) { updateAccess(); return }
+        when (event) {
+            ShopEvent.Retry -> refresh()
+            is ShopEvent.Submit -> shop.complete(event.request, ContractResult.Failure(ContractError.DATA_UNAVAILABLE))
+        }
+    }
+
+    private fun onGachaEvent(event: GachaEvent) {
+        if (!allowed()) {
+            updateAccess()
+            when (event) {
+                is GachaEvent.Reload -> gacha.completeReload(event.token)
+                is GachaEvent.Draw -> gacha.complete(event.request, ContractResult.Failure(ContractError.UX_RESTRICTED))
+                is GachaEvent.OpenGarage -> gacha.completeGarageNavigation(event.request)
+            }
+            return
+        }
+        when (event) {
+            is GachaEvent.Reload -> session.gacha.refresh()
+            is GachaEvent.Draw -> gacha.complete(event.request, ContractResult.Failure(ContractError.DATA_UNAVAILABLE))
+            is GachaEvent.OpenGarage -> {
+                navigation.openAward(event.request.ownedVehicleId)
+                garage.restoreSelection(navigation.selectedVehicleId)
+                gacha.completeGarageNavigation(event.request)
+                updateAccess(); render()
+            }
+        }
     }
 
     private fun onResultsEvent(event: ResultsEvent) {
@@ -326,17 +387,21 @@ class MainActivity : Activity() {
         val revision = saved?.getInt("pendingRevision", -1) ?: -1
         val pending = if (id != null && action != null && revision >= 0)
             GarageEvent.RequestAction(id, Revision(revision), action) else null
-        return HostNavigation(page, selected, pending)
+        val returnPage = HostPage.entries.firstOrNull { it.name == saved?.getString("returnPage") }
+            ?.takeIf { it == HostPage.GACHA } ?: HostPage.HOME
+        return HostNavigation(page, selected, pending, returnPage)
     }
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
         if (allowed()) {
+            if (navigation.page == HostPage.HOME && shop.handleBack()) return
+            if (navigation.page == HostPage.GACHA && gacha.handleBack()) return
             if (navigation.pendingGarageRequest != null) { cancelPreparation(); return }
             if (navigation.page == HostPage.GARAGE && garage.closeDetail()) return
             if (navigation.page == HostPage.RESULTS && results.closeDetail()) return
             if (navigation.page == HostPage.ONBOARDING && onboarding.handleBack()) return
-            if (!navigation.back()) { render(); return }
+            if (!navigation.back()) { updateAccess(); render(); return }
         }
         // 다중 창에서 Task를 뒤로 보내도 RESUMED·표시가 유지되는 경우를 함께 처리한다.
         stopObserving()

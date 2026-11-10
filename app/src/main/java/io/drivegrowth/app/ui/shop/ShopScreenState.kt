@@ -86,6 +86,8 @@ data class ShopUiState(
     val latestRevision: Revision? = null,
     val message: String? = null,
     val retryPending: Boolean = false,
+    val sceneScrollY: Int = 0,
+    val controlsScrollY: Int = 0,
 )
 sealed interface ShopEvent {
     data class Submit(val request: ShopRequest) : ShopEvent
@@ -129,7 +131,7 @@ class ShopInteraction(
         val shown = state as? ShopScreenState.Content
         if (shown != null && latest != null && shown.revision.value < latest.value) state = ShopScreenState.Loading
     }
-    fun mode(value: ShopMode) { if (controlsEnabled) uiState = uiState.copy(mode = value) }
+    fun mode(value: ShopMode) { if (controlsEnabled && uiState.pending == null) uiState = uiState.copy(mode = value) }
     private fun options(c: ShopScreenState.Content) = listOfNotNull(c.expansion) + c.facilities.map { it.option } + c.decorations
     private fun current(selection: ShopSelection): ShopOption? {
         val c = state as? ShopScreenState.Content ?: return null
