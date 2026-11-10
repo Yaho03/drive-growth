@@ -834,3 +834,14 @@ main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결
 `PleosAreaDefinition`은 외부 검증자가 공급한 경계·출처/사용 조건·버전을 담으며 형식 검사가 장소 권위를 보증하지 않는다. 공식 SDK1.1.3의 공개 영역 이벤트는 alertId·transition을 제공한다. 발생시각·초기 inside·현재 inside는 제공된 것으로 간주하지 않는다. callback 수신 elapsed/UTC는 수신 사실이며 `RestAreaProof`의 현재 장소·발생 시각으로 승격하지 않는다. 원 위치 timestamp/confidence도 신선도나 정확도(m)로 환산하지 않는다.
 
 소비자는 close/start 전 또는 cleanup 성공과 관계없는 finally에서 캐시를 무효화해야 한다. close는 마지막 Missing 전달을 보장하지 않고 새 start의 Missing도 비동기다. 제품 영역 정의는 아직0개이며 공공 215좌표점·공식 sample의 시험 반경으로 제품 경계를 만들지 않는다. 유효한 현재 장소·시각 권위가 없으면 휴식 장소는 Missing이다. Main 등록·권한 동의·실제 SDK 영역/Rest 지급은 별도 연결·검증 범위다. 근거는 [공식 릴리즈 노트](https://document.pleos.ai/docs/pleos-only/release-note/sdk-release-note)와 [공식 샘플](https://github.com/Pleos-Playground/pleos-sample-fusedlocation-app)의1.1.3 공개 API 및 실제 AAR 대조다.
+
+
+### 가게 꾸미기 schema17 원자 저장과 복구
+
+`SqliteGameChangeStore.decorations`는 앞의 `core.decoration` 계약을 같은 helper·공통 잔액·전역 요청 ID와 연결한다. schema17은 `decoration_module`과 `decoration_requests`를 추가하며 지원 구버전 이전 시 미활성 marker만 보존한다. `activate(profileId)`의 명시 호출 전에는 소유·선택을 만들지 않는다. 소실·손상된 marker/이력은 빈 상태로 복구하지 않으며, 기존 표시용 외형을 과거 소유로 추정하지 않는다.
+
+`state`는 실제 현재 공통 잔액·가게 레벨과 저장된 꾸미기 revision/소유/선택을 반환한다. `settlement(command)`와 `commit(command)`는 전체 원명령과 최초 결과를 먼저 대조한다. 양수 구매만 기존 FACILITY/DEBIT 정산을 사용하고 무료 구매·소유품 적용은 금융 정산 없는 typed 결과를 보존한다. preview는 순수 계산이며 activate/save/commit을 대신 호출하지 않는다.
+
+차감·소유/선택/revision·당시 정의·원결과·host STARTED를 같은 거래에서 확정한다. `HostCheckpointCommand.Decoration`의 save→execute→finish를 기존 checkpoint에 연결하고, 같은 거래에서 실제 SAVED→STARTED를 확인한 경우만 내부 신규 확정 경로를 쓴다. 원결과 없는 기존 STARTED는 공개 commit/execute 모두 DATA_UNAVAILABLE로 보존하며 현재 정의 조회·새 차감·소유 쓰기를 하지 않는다. 원결과가 있으면 현재 정의가 없어도 당시 결과를 재생한다. 다른 기능의 slot은 실행·취소·교체하지 않는다.
+
+전체 이력의 revision 연속성·원명령/정의/상태·공통 원정산을 대조한다. 금융 원문의 balance/at 소수가 공통 객체 변환 중 절삭돼도 꾸미기 경계의 canonical 원문 비교에서 STORAGE_FAILURE로 거절한다. 실패는 기존 atomic 경계에서 전체 rollback하며 무료 결과에 가짜 0원 정산을 만들지 않는다. Main/Shop UI 등록·실제 preview/확정·화면 재생성은 별도 소비 작업이며 #55 전체 완료로 처리하지 않는다. 실행 범위는 [검증 문서](06_VERIFICATION.md#가게-꾸미기-schema17-저장-공급-검증)를 따른다.

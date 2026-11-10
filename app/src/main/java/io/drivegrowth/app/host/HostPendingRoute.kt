@@ -12,6 +12,7 @@ internal fun pendingHostPage(command: HostCheckpointCommand?, facilityPageAvaila
     is HostCheckpointCommand.Expand -> ContractResult.Success(HostPage.HOME)
     is HostCheckpointCommand.Delivery -> ContractResult.Success(HostPage.DELIVERY)
     is HostCheckpointCommand.Quest -> ContractResult.Success(HostPage.PROGRESSION)
+    is HostCheckpointCommand.Decoration -> ContractResult.Failure(ContractError.STATE_CONFLICT)
     is HostCheckpointCommand.FacilityPurchase, is HostCheckpointCommand.VehicleResting ->
         if (facilityPageAvailable) ContractResult.Success(HostPage.HOME) else ContractResult.Failure(ContractError.STATE_CONFLICT)
 }

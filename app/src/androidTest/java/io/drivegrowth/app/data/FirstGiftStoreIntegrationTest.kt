@@ -58,7 +58,7 @@ class FirstGiftStoreIntegrationTest : InstrumentationTestCase() {
         val first=initialized();complete(first.grant.changedVehicle!!);val p=profile();val c=prepared();val receipts=ok(store.listUnviewedSettlements())
         store.close();raw{db->db.execSQL("DROP TABLE first_gift_requests");db.execSQL("DROP TABLE first_gift_markers");listOf("quest_events","quest_claims","quest_tracking").forEach{db.execSQL("DROP TABLE $it")};db.execSQL("DROP TABLE host_command_checkpoint");stripDeliveryCheckpointFixture(db);db.version=8};store=open()
         assertEquals(p,profile());assertEquals(receipts,ok(store.listUnviewedSettlements()));assertEquals(GachaProgress(Revision(0),0,0),ok(store.readGachaState()).progress)
-        assertEquals(GachaProgress(Revision(1),0,1),ok(store.commitFirstRentalGift(c)).progress);store.close();raw{assertEquals(16,it.version)};store=open()
+        assertEquals(GachaProgress(Revision(1),0,1),ok(store.commitFirstRentalGift(c)).progress);store.close();raw{assertEquals(17,it.version)};store=open()
     }
     fun testOriginalGiftReplaysBeforeCurrentContentAndMissingProgress() {
         val first=initialized();complete(first.grant.changedVehicle!!);val c=prepared();val r=ok(store.commitFirstRentalGift(c));val p=profile()

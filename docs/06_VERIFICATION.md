@@ -1853,3 +1853,22 @@ D 본인 검증은 위치46개·전체core420/app546·APK/Lint 오류0/경고27�
 실제 SDK 영역·제품 장소 권위·Main/소비자 연결·원격 해제 완료 ACK·Rest 지급·프로세스/전원·실차는 미검증이다. 이 변경은 SDK 버전·Gradle/Manifest·data/core·Main/HostSession·게임 규칙을 바꾸지 않는다. close/start 캐시 무효화와 발생시각/현재inside Missing의 기존 한계를 유지한다. 원문 실패/수정·독립 근거는 로컬 `/private/tmp/drive-location-area-exception-fix-d-20261111/`와 `/private/tmp/drive-location-area-rereview-f-20261111/`에 보존했다.
 
 최신 main192 조합의 root 검사는 앱634개·실패/오류/생략0, 제품APK·Lint 오류0/경고27로2분27초에 성공했다(53개 작업 모두 실행). 기존 core444는 입력이 같아 #192의 근거를 재사용하며 이번 신규 실행으로 세지 않는다. source7은 작성자/F 독립 사본과 바이트 동일하고 Main/HostSession·기존data/core/Manifest/Gradle을 보존했다. 새 결합본의 실제 장치 실행은0이다.
+
+
+## 가게 꾸미기 schema17 저장 공급 검증
+
+최신 결합의 기준 main은 SDK 영역 공급 PR #193의 `df3e6d5a51ce2b754ed004f8c19b8bbb8da867b3`이다. E의 고정 GREEN 원본은 부모 `c72c225e0c868dcaa8838250d73f6b2ee5348ef1` + full patch SHA-256 `0831efc81f88571071a2c942f68022fb7f7e8aa557b8a91d934a7b427938995e`로 식별한다. root는 이미 main에 있는 core4파일을 복제하지 않고 E 소유24파일만 적용했으며, 해당24와 core4의 SHA가 원본 manifest와 모두 같음을 확인했다. Main/HostSession·최종 디자인은 이 공급에서 변경하지 않는다.
+
+| 확인 출처 | 실제 결과와 범위 |
+|---|---|
+| A 수정 전 실제 RED | 같은 시험 APK의 금융 원문1·UNKNOWN STARTED 무료/유료2가 정상 JUnit 실패3·오류0. 금융 balance 첫 단언 뒤 at/후행 구간과 UNKNOWN 실패 뒤 후행 단언은 미도달로 보존 |
+| E 최소 수정 | 원본729파일 중 제품3파일만 후속 변경. 공통 금융 원문 canonical 대조, 공개 UNKNOWN STARTED 신규 확정 거절, 같은 거래의 정상 SAVED→STARTED만 내부 실행. 원27 시험·기대값·시험 APK 동일 |
+| A 수정 후 실제 SQLite | money1 + UNKNOWN2 + 원24, 고유27개 모두 통과·실패/오류/생략0. 각각0.324초·0.432초·6.734초. balance/at 두 loop와 조회/재생 실패·5표 불변, 정의 조회0·전체 사용자표 불변·잔액1000·STARTED 보존의 후행 단언까지 확인 |
+| F 독립 검토 | 고정729파일·726동일/제품3변경·기존 공개 ABI·A 원문/설치 해시/후행 단언 대조, 필수 수정0. JVM pending 경로8개 직접 통과·Android 원시험 컴파일. F의 SQLite 직접 실행은0 |
+| root 최신 main 결합 | 앱 단위635개, 실패/오류/생략0. APK·시험 APK 빌드·Lint 성공, 오류0/경고27. 2분34초·78작업 모두 실행. core444는 동일 core의 PR #192 근거를 재사용하며 새 실행으로 세지 않음 |
+
+A의 실제 설치 앱 SHA-256은 `6ffac6e4fa0bae025c806c547b559c0d2d43b603e8e18cdc9b0b9101a2947c6d`, 동일 RED/GREEN 시험 APK는 `10e2f4c329ee313eddf8b8ca0ad304963c840e9e9a98f4640d71658c48fcd0d5`다. 설치 후 pull 해시를 대조했고 2026-11-11 00:43:37~00:44:52 KST에 격리 패키지만 사용했다. 제품·설정19/19 보존, 자체 패키지/DB 정리·장치 반환을 확인했다. root/F는 이 공급에서 adb를 사용하지 않았다.
+
+원24에는 무료 typed 결과/유료 공통 차감·원요청 재생·정의 미지원 복구·foreign slot/전역 ID·두 연결 한 승자·필수 쓰기 무삽입/늦은 손상 rollback·schema16 이전/실패 보존·schema17 누락표 거절이 포함된다. 별도 optional86은 실행하지 않았다. 새 결합본의 실제 기기 실행은0이며 원본27과 동일 APK로 표현하지 않는다. 실제 Main/Shop 미리보기·구매/적용·gate/Activity/프로세스·전체 기능/실차·#55/#28 완료는 남아 있다. 최종 아트 #189는 기능 구현 이후 적용한다.
+
+로컬 원본 근거는 `/private/tmp/drive-decoration-read-fix-20261110/green/independent-device-review/`, F 검토는 `/private/tmp/drive-decoration-delta-review-f-20261111/`, 최신 결합 로그는 `/private/tmp/drive-decoration-storage-root-validation-20261111.log`에 보존한다. `JAVA_HOME`·`ANDROID_HOME`과 기존 cache를 환경 변수로 지정했고 Gradle `--offline --no-daemon --max-workers=1`, 명령 한정 JVM `-Xmx2048m -XX:TieredStopAtLevel=1 -XX:-UseOnStackReplacement -XX:ReservedCodeCacheSize=512m`, Kotlin in-process를 사용했다. 개인 경로 설정·키·APK·로그는 커밋하지 않는다. 저장소/링크·diff 검사와 원격 게시 결과는 PR에서 실제 확인 후 연결한다.

@@ -8,6 +8,7 @@ import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteDatabaseCorruptException
 import android.database.sqlite.SQLiteOpenHelper
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.decoration.*
 import io.drivegrowth.core.quest.QuestDefinitions
 import io.drivegrowth.core.content.GameContentSnapshot
 import io.drivegrowth.core.garage.CollectionKey
@@ -36,6 +37,9 @@ class SqliteGameChangeStore(
     private val helper = LedgerHelper(context.applicationContext, databaseName, source, initialGachaProgress)
     /** 실제 중앙 asset 공급. 모듈 내부 시험은 실패 supplier를 주입하며 기존 clock 생성자 계약은 유지한다. */
     internal var trialDefinitions:TrialDefinitionSource = AssetTrialDefinitionProvider(context.applicationContext.assets)
+
+    /** 버전 있는 F 공통 정의 공급. 실패를 무료/기본 품목으로 보정하지 않는다. */
+    internal var decorationDefinitions:()->ContractResult<DecorationDefinitions> = {ContractResult.Success(trialDecorationDefinitions())}
 
     /** 디스크 쓰기 후 COMMIT 이전의 실패를 재현하기 위한 모듈 내부 시험 지점. */
     internal var beforeCommit: (() -> Unit)? = null
@@ -66,6 +70,7 @@ class SqliteGameChangeStore(
     fun localProfileId() = initialization.profileId()
     val quests = QuestLedger(this, ::localProfileId) { questDefinitions?.invoke() ?: ContractResult.Failure(ContractError.DATA_UNAVAILABLE) }
     val hostCommands = HostCommandCheckpointLedger(this)
+    val decorations = SqliteDecorationLedger(this)
     override fun readInitialization(profileId: ProfileId) = initialization.readInitialization(profileId)
     override fun commitInitialization(command: InitializationCommand) = initialization.commitInitialization(command)
     private val firstGift = FirstRentalGiftLedger(this, { initialization.profileId() }, { id ->
@@ -116,6 +121,7 @@ class SqliteGameChangeStore(
             "SELECT 1 FROM settlements WHERE request_id=?",
             "SELECT 1 FROM visits WHERE id=?",
             "SELECT 1 FROM facility_command_results WHERE request_id=?",
+            "SELECT 1 FROM decoration_requests WHERE request_id=?",
             "SELECT 1 FROM rest_departures WHERE request_id=?",
             "SELECT 1 FROM rest_log WHERE kind='CONSUME' AND key=?",
             "SELECT 1 FROM gacha_requests WHERE request_id=?",
@@ -136,7 +142,7 @@ class SqliteGameChangeStore(
         if (domain == RequestDomain.DELIVERY && change.kind != TransactionKind.DELIVERY ||
             domain == RequestDomain.DRIVING && change.kind != TransactionKind.DRIVING)
             return failure(ContractError.INVALID_INPUT)
-        for (table in listOf("visits", "facility_command_results", "rest_departures", "gacha_requests", "delivery_requests", "material_requests", "repair_requests", "initialization_requests", "first_gift_requests", "first_gift_markers", "quest_claims")) {
+        for (table in listOf("visits", "facility_command_results", "decoration_requests", "rest_departures", "gacha_requests", "delivery_requests", "material_requests", "repair_requests", "initialization_requests", "first_gift_requests", "first_gift_markers", "quest_claims")) {
             val key = if (table == "visits") "id" else "request_id"
             if (db.rawQuery("SELECT 1 FROM $table WHERE $key=?", arrayOf(id)).use { it.moveToFirst() })
                 return failure(ContractError.STATE_CONFLICT)
@@ -343,7 +349,7 @@ internal enum class LedgerFailureReason { SQLITE, CORRUPT, UNSUPPORTED_SCHEMA, S
 private class LedgerStorageException(val reason: LedgerFailureReason) : SQLiteException(reason.name)
 
 private class LedgerHelper(context: Context, name: String, private val source: InputSource, private val initialGachaProgress: GachaProgress?) : SQLiteOpenHelper(
-    context, name, null, 16,
+    context, name, null, 17,
     // Android 기본 핸들러의 손상 DB 삭제를 막고 원본을 보존한다.
     DatabaseErrorHandler { throw LedgerStorageException(LedgerFailureReason.CORRUPT) },
 ) {
@@ -373,13 +379,14 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         RentalProductStorage.createTables(db)
         FacilityCheckpointStorage.createTables(db)
         RestAtomicStorage.createTables(db)
+        DecorationStorage.createTables(db, source)
         initialGachaProgress?.let { GachaLedger.insertInitialProgress(db, it) }
     }
     private fun createDiscoveries(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE discoveries (vehicle_id TEXT NOT NULL, rarity TEXT NOT NULL, PRIMARY KEY(vehicle_id, rarity))")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion !in 1..15 || newVersion != 16) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
+        if (oldVersion !in 1..16 || newVersion != 17) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
         verifySource(db)
         // 기존 원장과 개체 JSON은 그대로 보존한다.
         if (oldVersion == 1) RentalLedger.createTables(db)
@@ -405,7 +412,8 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         if(oldVersion<13)SqliteObservedDrivingJournal.createTables(db)
         if(oldVersion<14)RentalProductStorage.createTables(db)
         if(oldVersion<15)FacilityCheckpointStorage.createTables(db)
-        RestAtomicStorage.createTables(db)
+        if(oldVersion<16)RestAtomicStorage.createTables(db)
+        DecorationStorage.createTables(db, source)
     }
     /** 이 버전은 세 실제 사건 hook과 함께 공급한다. onCreate 재진입 없이 이미 발급한 profile을 전달한다. */
     private fun beginQuestTracking(db: SQLiteDatabase, fresh: Boolean) {

@@ -164,12 +164,12 @@ class RentalProductJournalTest:InstrumentationTestCase() {
     fun testSchema13UpgradeKeepsOriginalVisitAndDoesNotActivateDriver() {
         val p=prepare();add(p.visit.request.desired);ok(journal().save(p));val assigned=ok(journal().execute(p));ok(journal().finish(p));val old=rows(listOf("account","vehicles","rentals","settlements"));store.close()
         raw{stripRentalProductFixture(it);it.version=13};store=SqliteGameChangeStore(context,source,name);ok(store.localProfileId());assertEquals(old,rows(listOf("account","vehicles","rentals","settlements")));assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),journal().pending(identity))
-        assertEquals(assigned,ok(store.rental.assign(p.visit.request,p.visit.catalog,p.visit.categories,p.visit.hourlyRates,p.visit.terms)));raw{assertEquals(16,it.version)}
+        assertEquals(assigned,ok(store.rental.assign(p.visit.request,p.visit.catalog,p.visit.categories,p.visit.hourlyRates,p.visit.terms)));raw{assertEquals(17,it.version)}
     }
     fun testFailedSchema13UpgradePreservesOriginalWholeFileAndVersion() {
         prepare();store.close();raw{it.version=13};val file=context.getDatabasePath(name);val before=file.readBytes();store=SqliteGameChangeStore(context,source,name)
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.balance());store.close();assertTrue(before.contentEquals(file.readBytes()))
-        raw{assertEquals(13,it.version);it.version=16};store=SqliteGameChangeStore(context,source,name)
+        raw{assertEquals(13,it.version);it.version=17};store=SqliteGameChangeStore(context,source,name)
     }
 
     // 독립 검토: 원 visits가 driver의 과거 활성화를 입증하면 metadata 전체소실도 NEW가 아니다.
