@@ -1592,6 +1592,14 @@ A는같은원본2파일SHA/기대무변경·새APK/설치pullSHA일치로ReadSou
 최종후보는최신main174(7f5c598)과정상통합하며원정식시험파일과완료count/expand delta를유지하고기존Runtime Pending의parkedSince/엄격조회만추가로보존했다. 새조합Runtime17+랭킹15=32JVM PASS·계측Kotlin컴파일16초·저장소21/29/414/diffPASS를확인했다. 이전b5e6의APK/Lint는그head범위로구분하고새정확head원격CI는root가확인한다. 원542에서Runtime혼합장치13을실행한것으로쓰지않으며새로컬Runtime표적/컴파일근거·정확head/CI는인계자료/연결PR을따른다. helper/schema·shop방문수/보험/buy를바꾸지않는다. 실제정의/제품미리보기·선택터치/Activity·프로세스/전원·실차/전체 #44는후속이다.
 
 
+### core·저장 4이슈 완료와 후속 연결 — 2026-11-10
+
+PR #169 실제 초기화/첫 선물·공용 저장 공급, #173 같은 factory의 초기화/가챠/차량 관리 소비를 기준으로 환석의 위임을 받은 메인 조율이 원래 top 완료조건을 직접 대조했다. [#47 가챠](https://github.com/Yaho03/drive-growth/issues/47) 7/7, [#48 강화](https://github.com/Yaho03/drive-growth/issues/48) 7/7, [#49 수리·처분](https://github.com/Yaho03/drive-growth/issues/49) 6/6, [#50 초기화·첫 선물](https://github.com/Yaho03/drive-growth/issues/50) 6/6을 확인하고 completed로 닫았다. 기존 assignee를 유지했으며 AI 보조 검토를 별도 사람 승인으로 표시하지 않았다. 과거 본문·실행/실패/수정 기록은 원문 그대로 보존했다. 새 시험 실행이나 다른 결과를 합산한 완료 판정이 아니다.
+
+#48의 동시판매 경계는 원자적인 현재 lifecycle/revision 재검사와 관련 실제 경쟁 시험을 함께 근거로 판정했으며 별도 동시판매 장치 시험을 새로 실행했다고 쓰지 않는다. #49의 core/SQLite 복구와 개별 native 행동, #50의 SQLite 선물 지급과 native 첫 차량 지급을 구분한다. 원조건과 해당 근거는 각 이슈의 완료 체크·조율 댓글을 따른다.
+
+닫힌 네 이슈의 명령/저장을 다시 공급 대기로 두지 않는다. #52의 남은 관리·발견/화면 조건, #56의 튜토리얼 실제 주행전환/복귀, #28 기능 간 통합은 기존 완료조건대로 계속 추적한다. 전체 앱·제출·실차 완료를 뜻하지 않는다. PR #174 랭킹 모듈은 main7f5c598, PR #175 완료 고객 집계는 main3bbc05f에 일반 머지됐고 #175 머지 뒤 CI42773737173 성공을 읽기 조회로 확인했다. 실제 랭킹 진입·시설/꾸미기·Quest/탁송 등 새 연결은 각각의 열린 이슈와 별도 후보에서 관리한다.
+
 ### 중앙 시험 정의·실제 확장 Main 통합 — 2026-11-10
 
 기준 main `3bbc05f9` 위에 E `dec8b40`→`f3a7a00`→`26c1e7b`, B `9b50d1b`→`aef5a11`의 기능 커밋만 순서대로 정상 통합했다. 변경 소스·시험 26파일은 B의 정확 검증본 `aef5a11`과 모두 동일하며 통합 과정의 추가 소스 수정·기대값 변경은 없다. 구형 main 트리 덮어쓰기를 하지 않고 #173의 같은 factory 첫 실행/가챠/Garage, #174 랭킹 읽기 모듈, #175 완료 고객 조회를 보존했다. schema/helper·신규 Quest/Driving 생산자·랭킹 Main 진입은 포함하지 않았다. 상세 파일 해시와 최종 head는 연결 PR의 인계 자료를 따른다.
