@@ -63,6 +63,7 @@ class MainActivity : Activity() {
     private lateinit var managementView: GarageCommandView
     private var managementState: GarageCommandState = GarageCommandState.Idle
     private var recoveredManagement = false
+    private var managementVisible = false
     private val shopMapper = ShopHostMapper()
     private lateinit var shop: ShopView
     private lateinit var gacha: GachaView
@@ -115,9 +116,13 @@ class MainActivity : Activity() {
         management = GarageCommandHost(applicationContext, { handler.post(it) }) { state ->
             val prior = managementState
             managementState = state
+            if (state == GarageCommandState.Idle) managementVisible = false
+            if (state is GarageCommandState.Review || state is GarageCommandState.Running || state is GarageCommandState.Confirmed)
+                managementVisible = true
             if ((state is GarageCommandState.Confirmed || state is GarageCommandState.Rejected) && allowed()) queries.refresh()
             if (state == GarageCommandState.Idle && prior is GarageCommandState.Confirmed) {
                 navigation.pendingGarageRequest = null
+                managementVisible = false
                 garage.completeRequest()
             }
             if (::body.isInitialized) render()
@@ -286,13 +291,13 @@ class MainActivity : Activity() {
         links.addView(destination, LinearLayout.LayoutParams(0, style.dp(56), 1f))
         links.addView(style.button("새로고침") { if (token == navigationGeneration) refresh() })
         chrome.addView(links)
-        navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE && managementState == GarageCommandState.Idle }?.let {
+        navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE && !managementVisible }?.let {
             chrome.addView(style.text("이전 관리 준비 요청입니다. 최신 상태와 비용을 다시 확인해 주세요."))
-            chrome.addView(style.button("관리 조건 다시 조회") { management.controller.open(it) })
+            chrome.addView(style.button("관리 조건 다시 조회") { managementVisible = true; management.controller.open(it) })
             chrome.addView(style.button("준비 요청 닫기") { cancelPreparation() })
         }
         when (navigation.page) {
-            HostPage.GARAGE -> showBody(if (managementState == GarageCommandState.Idle) garage else managementView)
+            HostPage.GARAGE -> showBody(if (managementVisible) managementView else garage)
             HostPage.COLLECTION -> showBody(collection)
             HostPage.RESULTS -> showBody(results)
             HostPage.ONBOARDING -> showBody(onboarding)
@@ -392,6 +397,7 @@ class MainActivity : Activity() {
                     return
                 }
                 navigation.pendingGarageRequest = event
+                managementVisible = true
                 management.controller.open(event)
                 render()
             }
@@ -402,6 +408,7 @@ class MainActivity : Activity() {
         if (!allowed()) { updateAccess(); return }
         if (managementState != GarageCommandState.Idle && !management.controller.cancel()) return
         navigation.pendingGarageRequest = null
+        managementVisible = false
         garage.completeRequest()
         render()
     }
@@ -422,7 +429,7 @@ class MainActivity : Activity() {
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
         if (allowed()) {
-            if (navigation.page == HostPage.GARAGE && managementState != GarageCommandState.Idle) {
+            if (navigation.page == HostPage.GARAGE && managementVisible && managementState != GarageCommandState.Idle) {
                 if (managementState is GarageCommandState.Confirmed) management.controller.acknowledge()
                 else cancelPreparation()
                 return

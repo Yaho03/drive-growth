@@ -21,7 +21,8 @@ class GarageCommandControllerTest {
     private class Journal : GarageCommandJournal {
         var saved:GaragePending?=null;var failure:ContractError?=null
         var cancelResult:ContractResult<Unit> = ContractResult.Failure(ContractError.STATE_CONFLICT)
-        override fun load()=ContractResult.Success(saved)
+        var loadFailure:ContractError?=null
+        override fun load():ContractResult<GaragePending?> = loadFailure?.let{ContractResult.Failure(it)} ?: ContractResult.Success(saved)
         override fun save(pending:GaragePending):ContractResult<Unit> { failure?.let{return ContractResult.Failure(it)};saved=pending;return ContractResult.Success(Unit) }
         override fun clear(pending:GaragePending):ContractResult<Unit> {saved=null;return ContractResult.Success(Unit)}
         override fun cancelUnstarted(pending:GaragePending):ContractResult<Unit> {if(cancelResult is ContractResult.Success)saved=null;return cancelResult}
@@ -96,5 +97,14 @@ class GarageCommandControllerTest {
         host.setControlsEnabled(true);host.open(event);host.confirm();assertTrue(host.cancel())
         host.open(event.copy(action=VehicleAction.SELL))
         assertEquals(pending,(host.state as GarageCommandState.Review).pending);assertEquals(1,source.prepares)
+    }
+    @Test fun missingProfileOrCheckpointReadFailureIsNotAnEmptySuccessfulJournal() {
+        val source=Source();val journal=Journal();val direct=Executor{it.run()}
+        val host=GarageCommandController(source,journal,direct,direct){}
+        journal.loadFailure=ContractError.DATA_UNAVAILABLE
+        host.setControlsEnabled(true);host.recover()
+        assertEquals(ContractError.DATA_UNAVAILABLE,(host.state as GarageCommandState.Failure).error)
+        host.open(event);assertEquals(ContractError.DATA_UNAVAILABLE,(host.state as GarageCommandState.Failure).error)
+        assertEquals(0,source.prepares);assertTrue(source.commits.isEmpty())
     }
 }

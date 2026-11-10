@@ -10,7 +10,7 @@ sealed interface GarageCommandState {
     data object Idle : GarageCommandState
     data object Loading : GarageCommandState
     data class Materials(val value: GaragePreparation.Materials) : GarageCommandState
-    data class Review(val pending: GaragePending, val canConfirm: Boolean) : GarageCommandState
+    data class Review(val pending: GaragePending, val canConfirm: Boolean, val recovering: Boolean = false) : GarageCommandState
     data class Running(val pending: GaragePending) : GarageCommandState
     data class Confirmed(val pending: GaragePending, val receipt: GarageReceipt) : GarageCommandState
     data class Rejected(val error: ContractError) : GarageCommandState
@@ -44,8 +44,8 @@ class GarageCommandController(
                 if (released || serial != generation) return@execute
                 busy = false
                 when (result) {
-                    is ContractResult.Success -> { persisted = result.value != null; show(result.value?.let { GarageCommandState.Review(it, true) } ?: GarageCommandState.Idle) }
-                    is ContractResult.Failure -> if (result.error != ContractError.DATA_UNAVAILABLE) show(GarageCommandState.Failure(result.error))
+                    is ContractResult.Success -> { persisted = result.value != null; show(result.value?.let { GarageCommandState.Review(it, true, recovering = true) } ?: GarageCommandState.Idle) }
+                    is ContractResult.Failure -> show(GarageCommandState.Failure(result.error))
                 }
             }
         }
@@ -57,7 +57,7 @@ class GarageCommandController(
         worker.execute {
             val saved = safely { journal.load() }
             val result = if (!allowed) ContractResult.Failure(ContractError.UX_RESTRICTED)
-                else if (saved is ContractResult.Failure && saved.error != ContractError.DATA_UNAVAILABLE) saved
+                else if (saved is ContractResult.Failure) saved
                 else if (saved is ContractResult.Success && saved.value != null) ContractResult.Success(GaragePreparation.Ready(saved.value!!))
                 else safely { source.prepare(request, nextId(), material) }
             main.execute {
@@ -67,7 +67,7 @@ class GarageCommandController(
                     is ContractResult.Failure -> show(GarageCommandState.Failure(result.error))
                     is ContractResult.Success -> when (val prepared = result.value) {
                         is GaragePreparation.Materials -> show(GarageCommandState.Materials(prepared))
-                        is GaragePreparation.Ready -> show(GarageCommandState.Review(prepared.pending, saved is ContractResult.Success))
+                        is GaragePreparation.Ready -> show(GarageCommandState.Review(prepared.pending, saved is ContractResult.Success, recovering = persisted))
                     }
                 }
             }

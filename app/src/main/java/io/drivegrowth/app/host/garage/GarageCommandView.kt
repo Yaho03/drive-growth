@@ -23,12 +23,12 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
         }
         fun pending(p: GaragePending) {
             content.addView(text(p.name ?: p.request.id.value, 26, bold = true))
-            p.vehicle?.let { content.addView(text("현재 Lv.${it.level} · 진행 ${it.levelProgressPercent}% · 실제 취득액 ${it.acquisitionCost.units} 게임머니")) }
-            content.addView(text(p.balance?.let { "조회 잔액 ${it.units} 게임머니" } ?: "당시 잔액은 원래 정산으로 확인합니다"))
+            p.vehicle?.let { content.addView(text("조회 당시 Lv.${it.level} · 진행 ${it.levelProgressPercent}% · 실제 취득액 ${it.acquisitionCost.units} 게임머니")) }
+            content.addView(text(p.balance?.let { "조회 잔액 ${it.units} 게임머니" } ?: "실행 결과에서 당시 잔액을 확인합니다"))
             when(val command = p.command) {
                 is GarageCommand.Single -> {
                     val write = command.value.vehicle as VehicleWrite.Update
-                    content.addView(text("확정 후 ${when(write.lifecycle) { VehicleLifecycle.OWNED -> "보유"; VehicleLifecycle.SOLD -> "판매"; VehicleLifecycle.SCRAPPED -> "폐차"; VehicleLifecycle.CONSUMED -> "재료 소비" }} · Lv.${write.level} · 진행 ${write.levelProgressPercent}%"))
+                    content.addView(text("명령에 저장된 변경 · ${when(write.lifecycle) { VehicleLifecycle.OWNED -> "보유"; VehicleLifecycle.SOLD -> "판매"; VehicleLifecycle.SCRAPPED -> "폐차"; VehicleLifecycle.CONSUMED -> "재료 소비" }} · Lv.${write.level} · 진행 ${write.levelProgressPercent}%"))
                     content.addView(text(command.value.money?.let {
                         "${if(it.direction == MoneyDirection.DEBIT) "차감" else "지급"} ${it.amount.units} 게임머니"
                     } ?: "게임머니 변경 없음"))
@@ -58,19 +58,19 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
             }
             is GarageCommandState.Review -> {
                 pending(state.pending)
-                content.addView(text("아직 실행하지 않았습니다. 확인하면 보관한 이 명령만 확정합니다"))
+                content.addView(text(if(state.recovering) "보관한 요청입니다. 미실행이면 표시된 원래 명령을 처리하고, 이미 실행됐으면 당시 결과를 확인합니다" else "아직 실행하지 않았습니다. 확인하면 보관한 이 명령만 확정합니다"))
                 if(!state.canConfirm) content.addView(text("차량 관리는 준비 중입니다. 지금은 비용과 조건만 확인할 수 있습니다"))
-                action("확정", state.canConfirm, confirm); action("취소 / 화면 닫기", callback = cancel)
+                action(if(state.recovering) "보관 요청 처리 · 결과 확인" else "확정", state.canConfirm, confirm); action("취소 / 화면 닫기", callback = cancel)
             }
             is GarageCommandState.Running -> { pending(state.pending); content.addView(text("같은 요청을 보존해 처리 중입니다")) }
             is GarageCommandState.Confirmed -> {
-                pending(state.pending); content.addView(text("저장소의 확정 결과를 받았습니다. 최신 차고 상태를 다시 조회합니다"))
+                pending(state.pending); content.addView(text("이 요청의 확정 결과를 확인했습니다. 현재 차고와 잔액은 다시 조회합니다"))
                 val balance = when(val receipt = state.receipt) {
                     is GarageReceipt.Single -> receipt.value.balance
                     is GarageReceipt.Material -> receipt.value.balance
                     is GarageReceipt.Repair -> receipt.value.balance
                 }
-                content.addView(text("확정 잔액 ${balance.units} 게임머니"))
+                content.addView(text("당시 확정 잔액 ${balance.units} 게임머니"))
                 content.addView(text("정산이 확정되었습니다")); action("결과 확인", callback = done)
             }
             is GarageCommandState.Rejected -> {

@@ -4,10 +4,11 @@ import android.content.Context
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
-/** 명령/DB 작업은 전용 worker. F의 같은 DB adapter 공급 전에는 preview만 가능하다. */
+/** 명령/DB 작업은 전용 worker이며 같은 F adapter의 저장·실행·해소를 함께 사용한다. */
 class GarageCommandHost(context: Context, main: Executor, onState: (GarageCommandState) -> Unit) {
     private val worker = Executors.newSingleThreadExecutor()
-    val controller = GarageCommandController(StoredGarageCommandSource(context), UnavailableGarageCommandJournal, worker, main,
+    private val services = CheckpointGarageCommandAdapter(context)
+    val controller = GarageCommandController(services, services, worker, main,
         onState = onState)
     fun release() { controller.release(); worker.shutdown() }
 }

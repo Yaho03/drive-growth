@@ -35,8 +35,3 @@ interface GarageCommandJournal {
     fun clear(pending: GaragePending): ContractResult<Unit>
     fun cancelUnstarted(pending: GaragePending): ContractResult<Unit> = ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
 }
-object UnavailableGarageCommandJournal : GarageCommandJournal {
-    override fun load() = ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
-    override fun save(pending: GaragePending) = ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
-    override fun clear(pending: GaragePending) = ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
-}
