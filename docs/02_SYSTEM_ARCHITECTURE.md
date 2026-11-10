@@ -537,11 +537,11 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 PR #127은 가챠 검토용 커밋 `08eb3c4`를 기반으로 `core.contract.MaterialContract`의 타입과 순수 검증을 먼저 제공했다. 당시에는 저장 참조 구현을 추가하지 않고 중단했다. 2026-11-09 사용자 재개 지시로 아래 「재료 강화 메모리 참조와 추가 계약」까지 확장했으며, 기존 성장 산식·SQLite·UI는 변경하지 않았다.
 
 - `MaterialCommand`는 requestId/source/contentVersion/ruleVersion과 이름 있는 `target`·`material`의 기존 `VehicleWrite.Update`, 기본값 없는 `cost: GameMoney`를 보존한다. 역할·ID·revision·성장/lifecycle·비용·버전 모두 전체 입력 동일성에 포함된다. 비용0은 명시적 무과금이며 MoneyChange는 만들지 않는다. 현재 MaterialPlan 소비는 비용0을 명시하고, 양수 금액 시험값을 새 제품 강화 비용으로 채택하지 않는다.
-- `MaterialState`는 저장 측 출처/두 버전·실제 잔액과 역할별 현재 OwnedVehicle/VehicleActivity다. 활동 조회 실패는 state 생성 전에 ContractResult.Failure로 전달하며 IDLE·잔액0으로 보정하지 않는다. `readMaterialState(targetId, materialId)`는 이 상태의 조회 계약이며 아래 메모리 참조에서 실행한다. 제품 SQLite 조회는 후속이다.
+- `MaterialState`는 저장 측 출처/두 버전·실제 잔액과 역할별 현재 OwnedVehicle/VehicleActivity다. 활동 조회 실패는 state 생성 전에 ContractResult.Failure로 전달하며 IDLE·잔액0으로 보정하지 않는다. `readMaterialState(targetId, materialId)`는 이 상태의 조회 계약이며 아래 메모리 참조에서 실행한다. 제품 SQLite 조회 구현은 아래 「#122 재료 강화 SQLite 확정 경계」에 제공하며 실제 제품 UI 소비는 후속이다.
 - `prepareMaterialChange(command, current)`는 같은 개체 중복·역할 lifecycle·출처/버전·ID/현재 OWNED·양쪽 revision/증가 범위·같은 차종·IDLE·최대 레벨 대상·대상 성장의 단조 증가·재료 성장값 보존·잔액을 검사한다. 예정 두 개체는 권위 개체의 copy로 만들어 희귀도·차종·취득 출처/기준액을 각각 보존하고 revision을 각각1 올린다. 20레벨 재료는 허용한다. 결과 `MaterialPreparedChange`는 예정 snapshot·잔액·양수 비용일 때만 DEBIT를 담으며, 성공은 **저장·예약·경쟁 해결을 뜻하지 않는다.**
 - 이 함수는 100/150/250/400% 성장 산식이나 비용 정책을 재계산/확정하지 않는다. 기존 `VehicleUpgrade.planMaterial → MaterialCommand → prepareMaterialChange` 소비 예제로 연결하며 정확한 성장량은 VehicleCare의 기존 계산 책임이다. 저장 시에는 검증된 규칙/계산 결과와 현재 상태를 같은 확정 경계에서 대조해야 한다.
 - `MaterialSettlement`는 원래 command와 공통 SettlementId·Transaction·잔액·확정 시각, nullable이 아닌 **target/material 두 snapshot**을 보존한다. 후속 decoder는 거래의 requestId/종류/출처/규칙/금액 및 두 역할 ID/revision·결과 연결을 검증한다. 기존 nullable changedVehicle 하나에 두 역할을 숨기지 않는다.
-- `commitMaterial(command)`는 동일 요청/전체 내용의 최초 결과 재생을 현재 검증보다 먼저 하고, 다른 내용/legacy/가챠 ID 재사용은 STATE_CONFLICT여야 한다. 새 명령은 같은 잠금/DB에서 최신 상태를 다시 읽고 두 개체·비용·요청/정산을 전부 확정하거나 전부 거절한다. 아래 메모리 참조는 이 순서·원자 확정·실패 주입·재생을 실행하며, 실제 SQLite/프로세스 경계 검증은 후속이다. 두 번의 GameChange 커밋으로 우회하지 않는다.
+- `commitMaterial(command)`는 동일 요청/전체 내용의 최초 결과 재생을 현재 검증보다 먼저 하고, 다른 내용/legacy/가챠 ID 재사용은 STATE_CONFLICT여야 한다. 새 명령은 같은 잠금/DB에서 최신 상태를 다시 읽고 두 개체·비용·요청/정산을 전부 확정하거나 전부 거절한다. 아래 메모리 참조는 이 순서·원자 확정·실패 주입·재생을 실행하며, 실제 SQLite 확정·재개방은 아래 #122 재료 부분에서 검증하고 제품 프로세스 경계는 후속이다. 두 번의 GameChange 커밋으로 우회하지 않는다.
 
 현재 순수 검증 오류는 잘못된 역할/동일 개체/차종/성장·보존/증가 범위·출처가 INVALID_INPUT, 버전/revision/활동 충돌은 STATE_CONFLICT, 대상 누락·처분은 DATA_UNAVAILABLE, 비용 부족은 INSUFFICIENT_FUNDS다. 실패 주입과 현재 상태 변화 후 과거 두 snapshot 재생은 메모리 참조에서 검증하며, 실제 STORAGE_FAILURE·SQLite 재개방은 저장 구현 후속이다. 이 부분 인계로 #121/#122/#48을 완료 처리하지 않는다.
 
@@ -551,7 +551,7 @@ PR #127은 가챠 검토용 커밋 `08eb3c4`를 기반으로 `core.contract.Mate
 
 | 묶음 | 이번에 실행·제공하는 범위 | 실제 저장·제품 연결에서 남은 범위 |
 |---|---|---|
-| 재료 강화 | `InMemoryGameChangeStore : MaterialChangeStore`, `MaterialFixtureConfiguration`의 명시 출처/버전/활동과 기존 지갑·차량·모니터를 공유. 같은 전체 명령은 당시 두 개체/잔액/거래를 먼저 재생하고 legacy/gacha/material의 요청 ID 충돌을 양방향 거절 | #122의 SQLite 다중 개체·요청·최초 결과 원자 저장, #48의 실제 저장 소비 |
+| 재료 강화 | `InMemoryGameChangeStore : MaterialChangeStore`, `MaterialFixtureConfiguration`의 명시 출처/버전/활동과 기존 지갑·차량·모니터를 공유. 같은 전체 명령은 당시 두 개체/잔액/거래를 먼저 재생하고 legacy/gacha/material의 요청 ID 충돌을 양방향 거절 | #122 재료 SQLite의 두 개체·요청·최초 결과 원자 저장은 PR #156으로 제공. #48 제품 UI·명령 영속 복원은 후속 |
 | 수리 | 기존 `InMemoryGameChangeStore : RepairChangeStore`의 `readRepairState/commitRepair/repairSettlement`, 같은 원장의 잠금·지갑·개체·요청 ID와 재료 활동 공유. 명시 `RepairFixtureConfiguration`으로 활동·확정 사고·견적을 공급 | 실제 SQLite commit, RentalLedger의 live 활동·사고/VehicleCare 견적 공급, #49 제품 명령 연결 |
 | 초기화 | 기존 `InMemoryGameChangeStore : InitializationChangeStore`의 readInitialization/commitInitialization, 명시 프로필 상태·마커 fixture, 같은 원장 재화·첫 차·공간·마커·원래 결과 원자 확정/재생. 기존 FirstGrant 전용 어댑터 소비 | 실제 NEW 근거 발급·legacy 복구·SQLite 원자 저장, #151 소비 래퍼는 main 제공이며 #50/#56 제품 연결은 후속 |
 | 첫 영업 선물 | `FirstRentalGiftStore`, 전체 명령/원래 결과, 순수 prepare·소비 fixture | 실제 메모리/SQLite commit·가챠 무료권 소비와 경쟁, #50 제품 지급 |
@@ -582,7 +582,7 @@ PR #127은 가챠 검토용 커밋 `08eb3c4`를 기반으로 `core.contract.Mate
 
 ### #122 탁송·기본 주행 저장 통합
 
-정원의 #128/#131/#134/#135/#137 Ledger·계산 코드를 기존 DB에 연결한다. `store.delivery`, `store.driving`가 제품 호출 입구이며 새 DB와 지원 v1~v4 이전에서 탁송/주행 표를 생성한다. 통합 스키마는5다. 기존 렌털·발견·가챠 표는 해당 버전에 이미 있으면 재생성하지 않는다.
+정원의 #128/#131/#134/#135/#137 Ledger·계산 코드를 기존 DB에 연결한다. `store.delivery`, `store.driving`가 제품 호출 입구이며 새 DB와 지원 v1~v4 이전에서 탁송/주행 표를 생성한다. 이 탁송/주행 통합에서 도입한 스키마는5이며 현재 재료 스키마6·이전은 아래 재료 SQLite 절을 따른다. 기존 렌털·발견·가챠 표는 해당 버전에 이미 있으면 재생성하지 않는다.
 
 공용 `record`는 직접 호출에도 출처를 검사하고, 탁송·주행 내부 확정은 각각 DELIVERY/DRIVING 종류를 요구한다. `delivery/`와 `drive/` 요청 ID는 해당 내부 Ledger용으로 예약해 일반 거래·렌털·가챠·탁송 선택이 선점하지 못하게 한다. 수익 선택의 원래 요청 ID는 `delivery_requests`로 점유하므로 금액이 없어도 다른 기능에서 재사용할 수 없다. 내부 거래가 기존 정산을 만나면 기능 이력 없이 성공으로 재생하지 않고 충돌로 반환한다. 과거 요청 재생은 각 Ledger가 보존한 명령/결과 이력을 먼저 검사한다.
 
@@ -614,3 +614,5 @@ SqliteGameChangeStore는 MaterialChangeStore.readMaterialState/commitMaterial을
 확정 순서는 기존 재료 요청/최초 결과의 무결성 검증·동일 명령 재생 → 공용 요청 ID 충돌 검사 → 최신 버전/revision/활동/잔액 검증 → 두 차량·비용·공용 정산·최초 전체 결과 저장이다. 서로 다른 요청이 같은 재료를 소비하거나 배정/처분과 경쟁하면 같은 DB 거래의 현재 조건으로 판정한다. 단일 GameChange 두 건으로 나누지 않는다. 공용 settlements에는 동일 거래의 메타데이터를 연결하고, material_requests에는 전체 명령·검증 당시 상태·역할별 두 snapshot을 포함한 최초 MaterialSettlement를 저장한다. 두 역할을 현재 차량이나 nullable 단일 changedVehicle에서 재구성하지 않는다. 비용0은 money=null이며 가짜0원 결제를 만들지 않는다. 기존 가챠/대여 방문/무금액 탁송 선택과 요청 ID 공간을 공유한다.
 
 스키마6은 material_requests만 추가하며 지원 v1~v5의 기존 표/행/정산·렌털·발견·가챠·탁송/주행 이력을 보존한다. 이전 중 실패는 SQLiteOpenHelper 거래로 롤백하고 원본을 보존한다. 스키마5 공급이 main에 반영된 뒤 준비한 버전이며 향후 PR 머지 순서가 달라지면 재확인한다. 최초 결과 재생은 현재 버전 공급/활동/성장/처분과 독립적이며 원래 상태+명령의 순수 검증 결과, 공용 정산의 ID/출처/종류/규칙/금액/잔액/시각 및 두 역할을 대조한다. JSON 정수·금액/차량은 공용 LedgerJson decoder를 재사용해 소수/문자열/지수/범위 초과를 보정하지 않고 STORAGE_FAILURE로 반환한다. 수리/초기화/선물 실제 commit·제품 UI/권위 공급·프로세스/실차 연결과 #122 전체 완료는 별도 후속이다.
+
+재료 SQLite의 자기 material-v1 공용 정산이 남고 material_requests 행만 누락된 경우는 정상 타 기능 ID 충돌과 구분해 STORAGE_FAILURE로 거절한다. 누락 snapshot을 현재 개체에서 재구성하지 않으며 원본을 보존한다. 정상 같은 명령의 최초 전체 결과 재생·다른 입력/다른 기능 ID의 STATE_CONFLICT는 유지한다.
