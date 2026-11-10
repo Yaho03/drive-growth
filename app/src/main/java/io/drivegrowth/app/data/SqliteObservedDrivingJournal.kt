@@ -82,7 +82,10 @@ class SqliteObservedDrivingJournal:ObservedDrivingJournal {
             return conflict() // 기존 LocalDate-only 정산에 현재 출발 metadata를 붙이지 않는다.
         if(next.trip!=null && before.trip?.id!=next.trip.id && DrivingRecordReader(identity.source).readDrive(db,next.trip.id)!=null)return conflict()
         val removed=before.outbox.filter{old->next.outbox.none{it.id==old.id}}
-        for(trip in removed)if((committed(db,identity,trip.id) as? ContractResult.Success)?.value?.trip!=trip)return conflict()
+        for(trip in removed)when(val original=committed(db,identity,trip.id)) {
+            is ContractResult.Failure->return original
+            is ContractResult.Success->{val receipt=original.value;if(receipt==null||!sameTrip(receipt.trip,trip))return conflict()}
+        }
         for(old in before.outbox)next.outbox.firstOrNull{it.id==old.id}?.let{if(!sameTrip(it,old))return conflict()}
         val raw=ObservedDrivingJson.state(next).toString()
         if(db.update("observed_driving_state",values(next,raw),"profile=? AND revision=?",arrayOf(identity.profileId.value,expectedRevision.toString()))!=1)throw SQLiteException("관측 CAS 무갱신")
@@ -98,12 +101,18 @@ class SqliteObservedDrivingJournal:ObservedDrivingJournal {
         validateReceipt(db,identity,receipt)
         val raw=ObservedDrivingJson.receipt(receipt).toString()
         insert(db,"observed_driving_receipts",ContentValues().apply{put("drive_id",receipt.trip.id);put("profile",identity.profileId.value);put("source",identity.source.name);put("payload",raw);put("digest",ObservedDrivingJson.digest(raw))})
-        if((committed(db,identity,receipt.trip.id) as? ContractResult.Success)?.value!=receipt)throw SQLiteException("관측 원출발 provenance 쓰기 누락")
+        when(val confirmed=committed(db,identity,receipt.trip.id)) {
+            is ContractResult.Failure->return confirmed
+            is ContractResult.Success->{val actual=confirmed.value;if(actual==null||ObservedDrivingJson.receipt(actual).toString()!=raw)throw SQLiteException("관측 원출발 provenance 실제 원문 불일치")}
+        }
         return ContractResult.Success(Unit)
     }
     override fun committed(db:SQLiteDatabase,identity:GameIdentity,driveId:String):ContractResult<ObservedDrivingReceipt?> {
         if(!identity(db,identity))return invalid()
-        if(!marker(db,identity))return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+        if(!marker(db,identity)) {
+            if(db.rawQuery("SELECT 1 FROM observed_driving_state UNION ALL SELECT 1 FROM observed_driving_receipts",null).use{it.moveToFirst()})throw SQLiteException("관측 marker 없는 저장 이력")
+            return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+        }
         val result=db.rawQuery("SELECT profile,source,payload,digest FROM observed_driving_receipts WHERE drive_id=?",arrayOf(driveId)).use {
             if(!it.moveToFirst())return@use null
             val raw=it.text(2);val receipt=ObservedDrivingJson.receipt(JSONObject(raw))
