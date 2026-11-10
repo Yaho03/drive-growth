@@ -199,6 +199,9 @@ class SqliteGameChangeStore(
         db.execSQL("UPDATE account SET balance = ? WHERE id = 1", arrayOf(balance.units))
         if (vehicle != null) writeVehicle(db, vehicle, change.vehicle is VehicleWrite.Add)
         insertSettlement(db, change.requestId, command, result)
+        if(beforeGrowth!=null && vehicle!=null && vehicle.level>beforeGrowth.level &&
+            (findVehicle(db,vehicle.ownedVehicleId)!=vehicle || readBalance(db)!=result.balance))
+            throw SQLiteException("성장 실제 개체/재화 쓰기 불일치")
         val event = quests.onVehicleChanged(db, beforeGrowth, vehicle, result)
         if (event is ContractResult.Failure) return event
         return ContractResult.Success(result)
