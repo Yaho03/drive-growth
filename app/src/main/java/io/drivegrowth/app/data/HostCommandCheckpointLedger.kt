@@ -96,7 +96,44 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
         is HostCheckpointCommand.Garage -> wrap(store.commitGameChange(command.value)) { HostCheckpointResult.Garage(it) }
         is HostCheckpointCommand.Material -> wrap(store.commitMaterial(command.value)) { HostCheckpointResult.Material(it) }
         is HostCheckpointCommand.Repair -> wrap(store.commitRepair(command.value)) { HostCheckpointResult.Repair(it) }
-        is HostCheckpointCommand.Expand -> wrap(store.rental.expand(command.requestId,command.offer)) { HostCheckpointResult.Expand(it) }
+        is HostCheckpointCommand.Expand -> wrap(commitExpand(command)) { HostCheckpointResult.Expand(it) }
+    }
+    /** 확장 기존 입구를 재사용하되 새 확정의 필수 쓰기와 원래 전체 receipt 연결을 확인한다. */
+    private fun commitExpand(command:HostCheckpointCommand.Expand):ContractResult<Settlement> = store.atomic { db ->
+        val profileId=when(val r=store.localProfileId()){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
+        val checkpoint=read(db,profileId)
+        if(checkpoint?.command!=command || checkpoint.phase!=HostCheckpointPhase.STARTED)
+            throw SQLiteException("확장 실행 표시의 실제 쓰기 불일치")
+        val recorded=db.rawQuery("SELECT 1 FROM settlements WHERE request_id=?",arrayOf(command.requestId.value)).use{it.moveToFirst()}
+        if(!recorded) expansionValues(db) // 잘못된 현재 숫자를 getLong/getInt로 정상값에 보정하지 않는다.
+        val receipt=when(val r=store.rental.expand(command.requestId,command.offer)) {
+            is ContractResult.Failure->return@atomic r
+            is ContractResult.Success->r.value
+        }
+        if(receipt.transaction.requestId!=command.requestId || receipt.transaction.source!=command.source ||
+            receipt.transaction.kind!=TransactionKind.FACILITY || receipt.transaction.ruleVersion!=command.offer.ruleVersion ||
+            receipt.transaction.money!=MoneyChange(MoneyDirection.DEBIT,command.offer.price) || receipt.changedVehicle!=null)
+            throw SQLiteException("확장 원명령/정산 연결 불일치")
+        db.rawQuery("SELECT settlement_id,result FROM settlements WHERE request_id=?",arrayOf(command.requestId.value)).use {
+            if(!it.moveToFirst() || it.text(0)!=receipt.settlementId.value || it.text(1)!=LedgerJson.settlement(receipt).toString())
+                throw SQLiteException("확장 공용 정산 원문 불일치")
+        }
+        if(!recorded) {
+            val actual=expansionValues(db)
+            if(actual.first!=receipt.balance.units || actual.second!=command.offer.fromLevel+1 || actual.third!=command.offer.nextCapacity)
+                throw SQLiteException("확장 실제 재화/단계/공간 쓰기 불일치")
+        }
+        ContractResult.Success(receipt)
+    }
+    private fun expansionValues(db:SQLiteDatabase):Triple<Long,Int,Int> {
+        val balance=db.rawQuery("SELECT balance FROM account WHERE id=1",null).use {
+            if(!it.moveToFirst())throw SQLiteException("확장 계정 누락")
+            it.integer(0,0,Long.MAX_VALUE)
+        }
+        return db.rawQuery("SELECT level,capacity FROM shop WHERE id=1",null).use {
+            if(!it.moveToFirst())throw SQLiteException("확장 가게 누락")
+            Triple(balance,it.integer(0,1,Int.MAX_VALUE.toLong()).toInt(),it.integer(1,1,Int.MAX_VALUE.toLong()).toInt())
+        }
     }
     private inline fun <A> wrap(result: ContractResult<A>, convert: (A) -> HostCheckpointResult): ContractResult<HostCheckpointResult> =
         when (result) { is ContractResult.Failure -> result; is ContractResult.Success -> ContractResult.Success(convert(result.value)) }

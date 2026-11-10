@@ -138,4 +138,46 @@ class ShopExpansionLiveSourceTest : InstrumentationTestCase() {
         raw{it.execSQL("DROP TRIGGER ignore_expand_finish")}
         assertEquals(result,ok(source().execute(command)));assertEquals(result,ok(source().finish(command)));assertEquals(GameMoney(500),ok(store.balance()))
     }
+    private fun ignoredExpansionWrite(table:String) {
+        repeat(3){complete(it)};val adapter=source();val snapshot=ok(adapter.read());val command=ok(adapter.prepare(snapshot,request(snapshot)))
+        raw{it.execSQL("CREATE TRIGGER ignore_expansion BEFORE UPDATE ON $table BEGIN SELECT RAISE(IGNORE); END")}
+        val before=rows();assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),adapter.execute(command));assertEquals(before,rows())
+        raw{it.execSQL("DROP TRIGGER ignore_expansion")}
+        assertEquals(GameMoney(500),ok(adapter.execute(command)).balance);ok(adapter.finish(command))
+    }
+    fun testIgnoredAccountUpdateRollsBackWholeExpansion() = ignoredExpansionWrite("account")
+    fun testIgnoredShopUpdateRollsBackWholeExpansion() = ignoredExpansionWrite("shop")
+    fun testIgnoredStartedMarkerDoesNotExecuteExpansion() = ignoredExpansionWrite("host_command_checkpoint")
+    fun testOriginalExpansionReplayIgnoresNewBalanceAndRejectsCorruptReceipt() {
+        repeat(3){complete(it)};val adapter=source();val snapshot=ok(adapter.read());val command=ok(adapter.prepare(snapshot,request(snapshot)))
+        val original=ok(adapter.execute(command))
+        ok(store.commitGameChange(GameChange(RequestId("after-expand-spend"),TransactionKind.GARAGE,origin,content.ruleVersion,
+            MoneyChange(MoneyDirection.DEBIT,GameMoney(100)))))
+        assertEquals(original,ok(adapter.execute(command)));assertEquals(GameMoney(400),ok(store.balance()))
+        raw{db->db.rawQuery("SELECT result FROM settlements WHERE request_id=?",arrayOf(command.requestId.value)).use{r->
+            assertTrue(r.moveToFirst());val changed=JSONObject(r.getString(0)).apply{getJSONObject("money").put("amount",1)}
+            db.execSQL("UPDATE settlements SET result=? WHERE request_id=?",arrayOf(changed.toString(),command.requestId.value))
+        }}
+        val before=rows();assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),adapter.execute(command))
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),adapter.finish(command));assertEquals(before,rows())
+    }
+    fun testMalformedCurrentMoneyAndShopAreNotClampedToNormal() {
+        repeat(3){complete(it)};val adapter=source();val snapshot=ok(adapter.read());val command=ok(adapter.prepare(snapshot,request(snapshot)))
+        for((bad,restore) in listOf("UPDATE account SET balance=1000.5" to "UPDATE account SET balance=1000",
+            "UPDATE shop SET level=1.5" to "UPDATE shop SET level=1", "UPDATE shop SET capacity=3.5" to "UPDATE shop SET capacity=3")) {
+            raw{it.execSQL(bad)};val before=rows()
+            assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),adapter.read())
+            assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),adapter.execute(command));assertEquals(before,rows())
+            raw{it.execSQL(restore)}
+        }
+        assertEquals(GameMoney(500),ok(adapter.execute(command)).balance);ok(adapter.finish(command))
+    }
+    fun testIgnoredDurableSaveDoesNotPrepareOrExecute() {
+        repeat(3){complete(it)};val adapter=source();val snapshot=ok(adapter.read());val req=request(snapshot)
+        raw{it.execSQL("CREATE TRIGGER ignore_expand_save BEFORE INSERT ON host_command_checkpoint BEGIN SELECT RAISE(IGNORE); END")}
+        val before=rows();assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),adapter.prepare(snapshot,req))
+        assertEquals(before,rows());assertNull(ok(adapter.pending()))
+        raw{it.execSQL("DROP TRIGGER ignore_expand_save")}
+        val c=ok(adapter.prepare(snapshot,req));assertEquals(GameMoney(500),ok(adapter.execute(c)).balance);ok(adapter.finish(c))
+    }
 }
