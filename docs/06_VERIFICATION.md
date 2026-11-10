@@ -1590,3 +1590,12 @@ A는같은원본2파일SHA/기대무변경·새APK/설치pullSHA일치로ReadSou
 480추적파일/정식기대무변경·새APK appf414a98b/test76f07193설치pullSHA일치, API34 ARM64/user10 13:47:45~13:47:51KST구간·자기2패키지/잔여시험정리·19제품보존/반환을회수했다. 작성자core412/app182·D/Garage/E69·다른시험과합산하지않는다. 원문/status/XML·소스/hash·보존자료 /private/tmp/drive44-completed-expansion-20261110/independent-device-review/. 조율자adb0.
 
 최종후보는최신main174(7f5c598)과정상통합하며원정식시험파일과완료count/expand delta를유지하고기존Runtime Pending의parkedSince/엄격조회만추가로보존했다. 새조합Runtime17+랭킹15=32JVM PASS·계측Kotlin컴파일16초·저장소21/29/414/diffPASS를확인했다. 이전b5e6의APK/Lint는그head범위로구분하고새정확head원격CI는root가확인한다. 원542에서Runtime혼합장치13을실행한것으로쓰지않으며새로컬Runtime표적/컴파일근거·정확head/CI는인계자료/연결PR을따른다. helper/schema·shop방문수/보험/buy를바꾸지않는다. 실제정의/제품미리보기·선택터치/Activity·프로세스/전원·실차/전체 #44는후속이다.
+
+
+### 중앙 시험 정의·실제 확장 Main 통합 — 2026-11-10
+
+기준 main `3bbc05f9` 위에 E `dec8b40`→`f3a7a00`→`26c1e7b`, B `9b50d1b`→`aef5a11`의 기능 커밋만 순서대로 정상 통합했다. 변경 소스·시험 26파일은 B의 정확 검증본 `aef5a11`과 모두 동일하며 통합 과정의 추가 소스 수정·기대값 변경은 없다. 구형 main 트리 덮어쓰기를 하지 않고 #173의 같은 factory 첫 실행/가챠/Garage, #174 랭킹 읽기 모듈, #175 완료 고객 조회를 보존했다. schema/helper·신규 Quest/Driving 생산자·랭킹 Main 진입은 포함하지 않았다. 상세 파일 해시와 최종 head는 연결 PR의 인계 자료를 따른다.
+
+기존 독립 근거는 각각의 범위로 재사용한다. E `26c1e7b`의 코드·구조 검토 표적 JVM23 및 실제 SQLite 확장15·중앙 asset1, B `9b50d1b`의 실제 SQLite15+asset1+session binding2는 해당 원본에서의 결과다. 9b50의 동일 접근 상태 반복 렌더 P2는 원래 JVM2·native1 실패 근거를 보존하고 `aef5a11`에서 같은 JVM2·native 안정성1 통과로 해소했다. A의 aef 기기 검증은 실제 SDK gate, 신규 첫차1000→유료 가챠500, Back/재진입, Activity 재생성, 자기 패키지 속도 권한 거부/복원, 프로세스 재시작 후 같은 저장 행 보존을 확인했다. 실제 완료 고객0/3의 잠김 미리보기는 무차감이며 **native 확장 성공 구매는 실행하지 않았다**. 이를 SQLite 확장 성공 검증과 합쳐 native 구매 성공으로 표시하지 않는다. A는 제품/환경19개 보존 확인·자기 패키지 정리·장치 반환을 기록했다.
+
+최신 main과의 이 조합에서 코어412·앱321 단위 시험이 실패/오류/생략0으로 통과했고 앱 APK·시험 APK 빌드와 Lint(오류0·경고23)가 성공했다. 전체 명령은 2분1초에 종료했으며 저장소 필수21·문서29·링크415 및 diff 검사도 통과했다. 원래 시험 기대값을 바꾸지 않았고 정확 head와 원격 CI는 연결 PR에서 확인한다. 새 기기 실행·실차·실제 D 전환·전원 검증은 수행하지 않았으며 기존 원본 실행을 이 조합의 신규 실행 수로 합산하지 않는다. 시설 구매/배치·실제 자동 영업 driver·Quest/Driving 사건 생산자·전체 앱 통합과 #44/#28 전체 완료는 후속이다. AI 보조 검토이며 별도 사람 승인 확보로 기록하지 않는다.

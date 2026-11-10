@@ -647,7 +647,7 @@ RentalRuntime는 UI 진입과 worker 저장 실행을 분리하고 한 작업만
 
 ### #51 실제 가게 HOME·탐색과 가챠 조회 연결
 
-2026-11-10 호스트 연결: `MainActivity`의 HOME은 `ShopView`이며 `ShopHostMapper`가 기존 `StoredHostSource`의 순차 `HostSnapshot`을 표시한다. 잔액/개체 ID/이름·활동·양수 capacity는 실제 공급 결과만 쓰며 누락 활동은 미확인, 가게 레벨·시설·확장/꾸미기 명령은 공급 전까지 미지원이다. appearance의 간판·색은 고정 표시 스타일이며 저장 꾸미기 상태가 아니다. Shop revision은 표시 세대이고 DB/거래 revision이 아니다. 실제 초기화/승인 견적을 대신하지 않는다.
+2026-11-10 최초 HOME 연결은 `ShopHostMapper`의 순차 `HostSnapshot` 표시였다. 같은 날 아래 중앙 시험 정의·실제 확장 호스트 연결에서 HOME 조회·확장 소비 경로를 교체했다. appearance의 간판·색은 고정 표시 스타일이며 저장 꾸미기 상태가 아니다. Shop revision은 표시 세대이고 DB/거래 revision이 아니며 실제 저장 revision 검증을 대신하지 않는다.
 
 HostSession의 같은 worker에서 `StoredGachaHostSource`→기존 `GachaStoreHostSource.read`를 연결한다. 현재 권위 부재는 DATA_UNAVAILABLE, 다른 조회 실패는 원래 오류다. 전체 요청/명령의 durable checkpoint/load가 미제공이라 실제 제안이 있어도 UNSUPPORTED로 표시해 Draw를 활성화하지 않는다. 메모리 checkpoint 성공으로 영속 보존을 가장하지 않으며 prepare/commit은 이 조회 호스트가 호출하지 않는다. 아래 제품 세션 연결은 실제 NEW/SQLite 공급을 소비하며 legacy/불명은 Onboarding Unavailable을 유지한다. 필요한 입출력은 기존 #121/#122의 저장 연결 범위다.
 
@@ -660,7 +660,7 @@ HostSession의 같은 worker에서 `StoredGachaHostSource`→기존 `GachaStoreH
 
 초기화는 같은 원장의 재화/첫 개체/공간/프로필 마커·전체 결과를, 선물은 실제 첫 완료 영업 rentalId/settlementId/source와 연결한 무료권1/진행 revision·마커/공용 정산·전체 결과를 함께 확정한다. 같은 전체 명령의 최초 결과는 현재 권위/후보/성장/처분·진행보다 먼저 재생한다. 손상/한쪽 누락은 STORAGE_FAILURE이며 0/정상 미지급으로 보정하지 않는다. 초기화 고아 정산 검사는 공백 JSON에도 적용하고, 선물 NEW 확정 끝의 전체 결과 재조회가 실패하면 같은 거래를 rollback한다. 초기화 이후 일반 Add도 공용 공간을 검사한다. 원래 수리 계좌 guard와 RentalRuntime은 유지한다.
 
-worker 전용 `hostCommands`는 Gacha/단일 Garage GameChange/Material/Repair 네 core 명령의 원래 typed 내용과 프로필·출처를 저장한다. save→execute→finish, 시작 load·원래 STARTED 복구, 명시 cancelUnstarted(SAVED)를 구분한다. checkpoint 자체는 완료 거래의 requestId 점유 목록에 넣지 않아 자기 실행을 막지 않으며 기존 완료 이력 namespace는 유지한다. 기존 decoder·원자 거래와 엄격 숫자 검증을 재사용한다.
+worker 전용 `hostCommands`는 Gacha/단일 Garage GameChange/Material/Repair 및 아래 Expand 명령의 원래 typed 내용과 프로필·출처를 저장한다. save→execute→finish, 시작 load·원래 STARTED 복구, 명시 cancelUnstarted(SAVED)를 구분한다. checkpoint 자체는 완료 거래의 requestId 점유 목록에 넣지 않아 자기 실행을 막지 않으며 기존 완료 이력 namespace는 유지한다. 기존 decoder·원자 거래와 엄격 숫자 검증을 재사용한다.
 
 이는 전체 GachaRequest/UI/attemptId/Bundle의 영속 codec이나 제품 프로세스 복원 구현이 아니다. 실제 동일profile/source factory·비동기 호스트 소비·첫 선물 runtime·NPC/clock/coverage·제품 Activity/프로세스·전원/실차는 후속이다. #44의 신규 Expand 후보는 이 네 명령 공급에 포함하지 않는다. 정확 게시 head/CI는 연결 PR, 실제69 메서드실행과 checkpoint23 재사용 범위는 [검증 문서](06_VERIFICATION.md#초기화첫-선물checkpoint-sqlite-통합81-독립-검증--2026-11-10)를 따른다.
 
@@ -690,3 +690,12 @@ departureZone hook은실제출발당시지역근거를요구한다. 기존LocalD
 expand는 기존 purchase atomic 안에서만 완료수를 preview의 servedCustomers에 공급하고 단계/공간/차감을 함께확정한다. 원래 동일 전체요청 replay를 현재조건보다먼저 유지한다. shop().servedCustomers의 방문수·보험/buy 의미는바꾸지않으며 제품미리보기는별도completedRentalCount를소비해야한다. 현재원래정산이검증되면무료/사고영업도완료이며현개체/잔액으로과거완료를추정하지않는다.
 
 최신main Runtime Pending의 parkedSince/엄격정수조회를정상통합해보존했다. helper/schema/새원장은변경하지않았다. 이부분은버전있는실제확장정의·시설비용/효과·제품source/UI·영속Expand명령모두를제공하지않으며동의된시험값은 [PRD](01_PRD.md#기존-동의된-대여확장-시험값)를따른다.
+
+
+### 중앙 시험 정의와 실제 확장 호스트 연결 — 2026-11-10
+
+E 원본 `26c1e7b`의 `trial-definitions.csv`와 `TrialDefinition`은 기존 PRD의 동의된 대여·확장 시험값을 버전 있는 한 정의로 공급한다. 확장 비용·용량·확정 완료 고객 조건, 차종별 대여 요금·시설·연료·Quest 숫자 입력을 구분하며 신규 Quest 사건/진행/수령·실제 자동 영업 생산자를 구현한 것은 아니다. 정의 누락·버전/등록 ID 불일치는 실패로 유지하고 정상 기본값을 만들지 않는다.
+
+B 원본 `aef5a11`의 Main HOME은 같은 `HostSession.games` factory·단일 worker를 쓰는 `SessionShopExpansionSource`와 `ShopExpansionHostController`를 연결한다. 미리보기는 실제 완료 고객 수를 읽고, 확인 시 최신 저장 조건과 정의를 재검증한다. typed Expand 원명령은 기존 같은 DB/profile checkpoint의 SAVED→STARTED→원래 결과 확인·finish로 처리한다. 실행 전 명시 취소와 결과 불명 복구를 구분하고 현재 입력으로 명령을 다시 만들지 않는다. 기존 가챠/차량 관리 명령과 보관 슬롯을 공유하며 다른 종류의 명령은 해당 화면으로 안내한다. Garage adapter도 Expand를 자기 명령으로 해석하지 않는다.
+
+허용 상태의 실제 전이만 확장 호스트에 전달하며 동일 상태의 250ms 반복 전달은 재렌더하지 않는다. 제한·화면 이탈·Activity 해제 뒤 오래된 응답은 적용하지 않고, 재진입 시 같은 저장 원명령을 복구한다. 시설 구매·배치·꾸미기, 자동 영업 driver, 신규 Quest/Driving 생산자, 랭킹 Main 진입은 이 통합에 포함하지 않는다. 기존 #173·#174·#175 소스와 저장 공급은 유지한다. 실행 및 미검증 범위는 [06](06_VERIFICATION.md#중앙-시험-정의실제-확장-main-통합--2026-11-10)을 따른다.
