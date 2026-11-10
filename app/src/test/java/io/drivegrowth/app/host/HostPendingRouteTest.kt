@@ -50,4 +50,15 @@ class HostPendingRouteTest {
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),restoreGaragePending(command))
     }
 
+    @Test fun unprovidedFacilityAndRestingPagesPreserveForeignCommandsAsFailure(){
+        val commands=listOf(
+            HostCheckpointCommand.FacilityPurchase(RequestId("buy"),InputSource.SIMULATION,ContentVersion("v3"),
+                io.drivegrowth.core.rental.FacilityOffer(io.drivegrowth.core.rental.Facility.FUEL_STATION,RuleVersion("r"),true,GameMoney(100))),
+            HostCheckpointCommand.VehicleResting(RequestId("rest"),InputSource.SIMULATION,
+                io.drivegrowth.core.garage.VehicleRef(OwnedVehicleId("car"),Revision(0)),false,true))
+        for(command in commands){
+            assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),pendingHostPage(command))
+            assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),restoreGaragePending(command))
+        }
+    }
 }
