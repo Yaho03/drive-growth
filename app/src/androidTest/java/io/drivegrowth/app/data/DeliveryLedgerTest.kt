@@ -62,6 +62,7 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
             db.execSQL("INSERT INTO discoveries VALUES ('hyundai_casper','RARE')")
             db.execSQL("INSERT INTO gacha_progress VALUES (1,2,3,4)")
+            stripRentalProductFixture(db)
             deliveryTables.forEach { db.execSQL("DROP TABLE $it") }
             db.version = 4
         }
@@ -96,6 +97,7 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
         store.close()
         val file = context.getDatabasePath(name)
         SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            stripRentalProductFixture(db)
             deliveryTables.forEach { db.execSQL("DROP TABLE $it") }
             commands.zip(saved).forEach { (c, result) ->
                 db.execSQL("INSERT INTO settlements VALUES (?,?,?,?,0)", arrayOf(c.requestId.value,
@@ -132,7 +134,7 @@ class DeliveryLedgerTest : InstrumentationTestCase() {
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.balance())
         store.close()
         assertTrue(before.contentEquals(file.readBytes()))
-        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db -> db.version = 13 }
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db -> db.version=15 }
         store = open()
     }
 

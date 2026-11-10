@@ -53,6 +53,7 @@
 | Quest·Delivery schema12 저장 공급 | 실제 원인 기반 Quest 진행/단일 수령·원명령 저널과 Delivery 전체 명령·Hold 쓰기 검증을 기존 저장소에 연결. 원본 b897의 격리 SQLite Quest54·Delivery17 통과. 이후 Driving13은 #179, 같은 factory의 제품 Main/Progress·Delivery 소비는 #181에서 연결했다. typed 실패·foreign 원명령 보존을 유지하며 전체 기능/정책 검증은 별도다. [계약](docs/02_SYSTEM_ARCHITECTURE.md#questdelivery-schema12-저장-공급--2026-11-10)·[검증 범위](docs/06_VERIFICATION.md#questdelivery-schema12-통합-후보--2026-11-10) 참조 |
 | 경제 시험값 동의 회수 | [기존 동의된 대여·확장 기준](docs/01_PRD.md#기존-동의된-대여확장-시험값)만 회수. 대여 기준/확장 조건·비용/용량은 중앙 TrialDefinition으로 공급하되 시험값 동의와 검증 범위를 구분. b-economy 전체표를 채택하지 않음 |
 | 랭킹 1차 범위 | [PRD 사용자 결정](docs/01_PRD.md#1차-랭킹-범위)으로 실제 내 기록 6개 지표와 분리된 시연용 랭킹을 포함. 누적 수익·주간 보상 반영 거리·과거 보유 도감 칸의 집계 기준도 확정. 같은 원장 조회·독립 RankingView/합성시연 모듈과 Android JSON 분리 수정은 실제 원본13+추가2로 검증. MainActivity 탐색·명시 Demo·Back/복원은 #181로 연결했다. 실제 출발지역/Quest 청구 근거의 조회 API는 공급됐지만 랭킹 readRanking의 두 hook은 미연결이어서 #58 전체 완료는 보류한다. 온라인은 향후 범위이며 1차 완료 게이트에서 제외한다 |
+| Rental·시설 schema15 저장 공급 | 중앙 시험 정의 v3, 고정 방문·요금·사고·커서와 종료 영업 원점을 같은 DB에 저장한다. 시설 구매는 원래 정산, 영업 쉬기는 비금융 원결과를 재생한다. 원 f99 Rental32·시설14와 요청 ID 반례 RED1→수정 d8 시설15 GREEN을 구분한다. 실제 Main 경제 이탈 driver·시설 화면·제품 DB 이전·Rest·SDK/전원 검증은 남아 있다. [검증 범위](docs/06_VERIFICATION.md#rental시설-schema15-정상-통합-후보--2026-11-10) 참조 |
 | 렌터카 runtime 부분 공급 | 기존 RentalLedger의 고정 방문·확인 구간·원래 주차 기준/최초 완료 조회 연결. 독립 코드app23/core13·SIMULATION 동일SQLite10개 통과. 실제 NPC/제품 정의·clock/coverage·durable 방문/factory/Activity·프로세스/실차는 후속 |
 | 렌터카 게임·추가 기능 | 상세 구현 이슈로 진행. 정책·수치·일부 동작은 결정 대기 |
 | 최종 APK·시연·실차 | 제출 산출물 미준비, 실차 미검증 |

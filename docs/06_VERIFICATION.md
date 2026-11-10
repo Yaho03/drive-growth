@@ -1641,3 +1641,16 @@ main179가 B5c9514d5의 조상임을 확인하고 새 후보에서 정상 merge�
 B 본인검증은 af48의 결정적 Intro회귀 RED3/6→같은6GREEN, 표적16·core420/app458·APK/시험APK/Lint0오류27경고다. 검증af48과5c의 app/core/Gradle 동일성을 대조했고 원본APK두개의SHA도 B보고와 일치했다. 이 게시 준비에서 전체Gradle을 반복하지 않았다. 새 저장소·링크/diff 검사와 최종head는 인계에 기록한다.
 
 Progress의 기존 Native8fc 첫플레이1과 fixture수정dac의SQLite13, 랭킹원3d BackFAIL과1a5 cold-wrapperPASS, Driving0681 A23은 각각 정확원본의 독립 근거다. 과거랭킹FAIL 원인을 새 Intro race 하나로 확정하지 않는다. **A의 정확5c 원본 cold-wrapper1회는13.006초에 PASS**이며 원래 method/wrapper·gate/HOME/wait·최종원장 기대값을 유지하고 최종suite출력을 회수했다. 새baseline24의 SDKgate 허용 뒤6지표·Demo/주간선택·재생성·Back2/HOME/ShopView·잔액/차량 불변을 확인했고19/19보존·장치반환을 기록했다. 이번 Android에서는 Intro가 첫 Ranking 선택보다 먼저 도착했다. 상충 순서를 강제한 Android RED→GREEN으로 쓰지 않으며 그 결정적 순서는 B JVM6의3RED→6GREEN 근거와 분리한다. 좌표터치/CCP·새 NativeProgress/Driving/도착·과거3dFAIL의 단일원인 해소는 미검증이다. D는 최소 Intro delta를 독립 검토해 JVM30개 통과·추가 필수 지적0으로 수용했고, A의 소스646파일·설치 APK·최종suite 출력을 대조했다. AI 검토와 별도 사람 승인은 구분한다. A의 원본5c 실행은 이 문서 준비의 신규 기기 실행으로 합산하지 않는다. 실제 SDK/내비도착 상관·권한·gate·프로세스/전원·실차·자동영업/시설·새경제원점정책은 각 실제검증 범위를 확인해야 한다.
+
+
+### Rental·시설 schema15 정상 통합 후보 — 2026-11-10
+
+원본 f99에서 A가 격리 SQLite Rental 시험 32개(8.263초)와 시설 시험 14개(2.867초)를 각각 통과했고, 환경 보존 19개 항목을 확인했다. 이후 F의 독립 반례는 완료된 비금융 쉬기 요청 ID가 일반 금전 명령으로 재사용되는 실패 1개를 재현했다. 반환값 검증에서 실패해 당시 후행 행 보존 assertion은 실행되지 않았으며, 그 결과를 정상 14개 성공으로 덮지 않는다.
+
+정확 d8 수정본은 공용 record의 `facility_command_results` 소유 ID 검사를 추가했다. A가 원래 14개와 동일한 독립 반례 1개, 총 15개를 3.042초에 통과했다. 같은 ID에 `STATE_CONFLICT`가 반환되고 후행 전체 행 보존 assertion까지 통과했으며, 새 기준 환경의 19개 보존 항목과 장치 반환을 확인했다. F는 원문 소스·설치 APK·시험 결과를 대조해 이 공급 범위에 필수 수정 0개로 수용했다. 별도 사람 승인을 뜻하지 않는다.
+
+E 결합본 `0e5532993f4a18f7955226b9814bf9394a6b2e00`은 f99에 최소 수정 2파일만 정상 통합했다. 원 Rental32 파일은 바뀌지 않았고 결합본의 앱 단위 332개·APK/시험 APK·Lint 오류 0/경고 22 검사는 별도 근거다. 이 결합본에서 Rental32 장치 시험을 다시 실행했다고 표시하지 않는다.
+
+main182와 E 결합본의 정상 통합에는 충돌이 없었다. E 소유 28파일은 원문과 같고 MainActivity·HostSession·VehicleInput은 main182와 동일하다. 추가 호환은 아직 미연결인 시설/쉬기 pending에 명시적 `STATE_CONFLICT`를 반환하는 경로와 회귀 1개뿐이다. 새 조합 코어 420개·앱 463개는 실패·오류·생략 0, 앱/시험 APK와 Lint 오류 0·경고 27, 저장소·링크 및 diff 검사를 통과했다. root도 E28 원문·공통 호스트 보존과 경로 표적 6개를 직접 확인했다. 첫 표적 재실행은 비어 있는 별도 Gradle 캐시의 offline 의존성 미해결로 실패했고, 기존 캐시에서 같은 검사가 성공했다. 이 환경 실패를 코드 결함이나 검사 성공으로 바꾸지 않는다.
+
+새 통합 조합의 장치 실행은 0이다. 제품 DB/옛 APK migration, 실제 Main 경제 이탈 driver·구성 변경 분류, 시설 화면·Rest 연결, SDK·FGS·프로세스/전원·실차는 별도 미완료다. 확정 정책의 저장 공급과 실제 앱 수명 검증을 구분한다. 최종 head·원격 검사·main 반영은 해당 PR에서 확인한다.
