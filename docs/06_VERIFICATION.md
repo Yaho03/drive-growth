@@ -1622,4 +1622,4 @@ E 정확 `0681fbfed4d7faa76fc557a50a001abd97512ed0`은 F 독립 재검토 `APPRO
 
 최신main178 위에 recorder import21cb·codec8a548·저장bbbc·수정0681의 기능 커밋만 통합했다. 변경24소스/시험은 E0681과 모두 동일하고 D recorder7파일도 그대로다. Garage의 이미 존재하는 foreign 분기 순서 충돌은 main 코드를 유지했고 schema13 정식 fixture는 A가 검증한 최종 원문을 보존했다. Main/HostSession B52e·제품UI·랭킹은 포함하지 않는다. 새 main 조합에서 core420·app344 시험이 실패/오류/생략0으로 통과했고 APK·시험 APK·Lint(오류0·경고23)가 성공했다. 80개 task를 실행해2분4초에 완료했으며 저장소21/29/428·diff 검사도 통과했다. 정확head·원본동일성은 연결 PR 인계를 따른다.
 
-이 후보의 새 기기 실행은0이다. 원본 schema12 Quest54/Delivery17과 Driving23을 새 schema13 전체장치회귀로 합산하지 않는다. 실제 SDK D/속도/도착·Main receiver/calendar·onStop/프로세스·FGS/전원·실차·정책 허용과 전체39/28 완료는 후속이다. 과거42조건 대조의 root 적용4체크와45부분판정은 유지한다. AI검토를 사람승인으로 표시하지 않고 root가 원격CI/게시·머지를 담당한다.
+이 통합본의 새 기기 실행은0이다. 원본 schema12 Quest54/Delivery17과 Driving23을 새 schema13 전체장치회귀로 합산하지 않는다. 실제 SDK D/속도/도착·Main receiver/calendar·onStop/프로세스·FGS/전원·실차·정책 허용과 전체39/28 완료는 후속이다. 과거42조건 대조의 root 적용4체크와45부분판정은 유지한다. AI검토를 사람승인으로 표시하지 않고 root가 원격CI/게시·머지를 담당한다.

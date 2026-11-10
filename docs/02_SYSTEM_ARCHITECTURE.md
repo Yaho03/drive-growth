@@ -710,7 +710,7 @@ E 변경31파일 중30개는 b897과 동일하며 RentalLedger는 최신 main의
 
 ### 관측 주행 schema13 저장 공급 — 2026-11-10
 
-D의 고정 관측 recorder7파일과 E `0681fbfe`의 저장 공급을 main178 위에 통합한 후속 후보다. `ObservedDrivingReducer`는 명시 정책·receiver token·clock/calendar와 출처 있는 VehicleObservation을 받아 확인된 구간·공백·출발·봉인 outbox를 구분한다. `SessionObservedDrivingSource`의 journal 포트는 같은 GameSessionFactory/profile/source의 기존 store.atomic을 사용한다. Main/HostSession에서 실제 VehicleInput을 연결하는 B52e 변경은 포함하지 않는다.
+D의 고정 관측 recorder7파일과 E `0681fbfe`의 저장 공급을 main178 위에 통합했다. `ObservedDrivingReducer`는 명시 정책·receiver token·clock/calendar와 출처 있는 VehicleObservation을 받아 확인된 구간·공백·출발·봉인 outbox를 구분한다. `SessionObservedDrivingSource`의 journal 포트는 같은 GameSessionFactory/profile/source의 기존 store.atomic을 사용한다. Main/HostSession에서 실제 VehicleInput을 연결하는 B52e 변경은 포함하지 않는다.
 
 schema13은 marker·전체 상태 revision CAS·원출발 provenance를 같은 DB에 보존한다. 기능은 worker의 `activateObservedDriving(profileId)`로 명시 활성화하며 조회가 새 프로필/재화·빈 상태를 만들지 않는다. raw 비유한 관측은 gap의 double bits로 보존하고 canonical 원문으로 전체 동일성을 비교한다. 같은 거래에서 save→기존 DrivingLedger 정산→최초 결과 검증→provenance 저장/재조회→outbox ack를 처리한다. 실패·손상·출처 혼합·필수 쓰기 무갱신은 실패로 전달하고 원래 결과 재생은 현재 상태보다 우선한다. marker 없이 이력이 남은 고아 상태를 미활성으로 숨기지 않는다.
 
