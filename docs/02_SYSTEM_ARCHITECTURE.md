@@ -673,7 +673,7 @@ worker 전용 `hostCommands`는 Gacha/단일 Garage GameChange/Material/Repair �
 
 실제0/Empty/Missing/Failure를구분한다. Android checked JSONException은지표경계의STORAGE_FAILURE로변환하고숫자를절삭하거나DB를수리하지않는다. 누적/주간이같은주행원장을검증하면그손상에서두지표가실패할수있으며모든손상에서다른5정상이라고보장하지않는다.
 
-departureZone hook은실제출발당시지역근거를요구한다. 기존LocalDate만있는기록을현재zone/정산시각/고정KST로바꾸지않고불명/다른지역은주간Missing이다. questCauses hook은같은DB의검증된원래Quest지급요청ID만공급한다. 미분류입금이있는데hook이없으면누적Missing이며잔액/미열람목록으로대체하지않는다. 실제생산자/영속근거는 #39/#45/#58/#122에서연결하고 MainActivity hook은별도다.
+departureZone hook은실제출발당시지역근거를요구한다. 기존LocalDate만있는기록을현재zone/정산시각/고정KST로바꾸지않고불명/다른지역은주간Missing이다. questCauses hook은같은DB의검증된원래Quest지급요청ID만공급한다. 미분류입금이있는데hook이없으면누적Missing이며잔액/미열람목록으로대체하지않는다. 실제생산자/영속근거는 #39/#45/#58/#122를 따른다. 후속 공개 조회 hook의 현재 연결은 아래 「랭킹 공개 원인 조회 연결」을 따른다.
 ### 제품 세션·첫 실행·가챠·차량 관리의 공통 저장 소비 — 2026-11-10
 
 원cab567은 C274의 GameSessionFactory/온보딩7파일과 Garage 공급을 포함한다. MainActivity/HostSession/StoredHostSource·가챠·차량 관리가 동일 factory/profile/source/store를 소비한다. 기존 DB 모드를 보존하고 두 모드 파일 공존/잘못된 source·손상·사라진 기존 DB를 새 프로필로 바꾸지 않는다. NEW는 실제 helper 근거를 소비하고 초기화/선물 상태를 누락 보정하지 않는다. UI Bundle은 선택/요청 식별만 저장하며 NEW 근거·완료를 만들지 않는다.
@@ -689,7 +689,7 @@ GachaLiveHost→CheckpointGachaSource는 기존 GachaPull/공용 hostCommands의
 
 실제0/Empty/Missing/Failure를구분한다. Android checked JSONException은지표경계의STORAGE_FAILURE로변환하고숫자를절삭하거나DB를수리하지않는다. 누적/주간이같은주행원장을검증하면그손상에서두지표가실패할수있으며모든손상에서다른5정상이라고보장하지않는다.
 
-departureZone hook은실제출발당시지역근거를요구한다. 기존LocalDate만있는기록을현재zone/정산시각/고정KST로바꾸지않고불명/다른지역은주간Missing이다. questCauses hook은같은DB의검증된원래Quest지급요청ID만공급한다. 미분류입금이있는데hook이없으면누적Missing이며잔액/미열람목록으로대체하지않는다. 실제생산자/영속근거는 #39/#45/#58/#122에서연결하고 MainActivity hook은별도다.
+departureZone hook은실제출발당시지역근거를요구한다. 기존LocalDate만있는기록을현재zone/정산시각/고정KST로바꾸지않고불명/다른지역은주간Missing이다. questCauses hook은같은DB의검증된원래Quest지급요청ID만공급한다. 미분류입금이있는데hook이없으면누적Missing이며잔액/미열람목록으로대체하지않는다. 실제생산자/영속근거는 #39/#45/#58/#122를 따른다. 후속 공개 조회 hook의 현재 연결은 아래 「랭킹 공개 원인 조회 연결」을 따른다.
 
 
 ### 확장 조건의 확정 완료 고객 조회 — 2026-11-10
@@ -740,3 +740,10 @@ NEW Intro 자동 진입은 아직 명시 탐색하지 않은 HOME에서만 허�
 main182 위에 E0e553299의 중앙trial v3·Rental 저장14·Facility typed 저장15·확정 경제원점 정책을 정상 통합한 후보다. 기존 같은DB/profile/source에서 원방문/동결입력·구간/커서·원정산을 보존하며, 물리주행종료 기반과 실제 앱 이탈 경제원점의 basis를 구분한다. 실제 이탈인지/구성변경인지 판단하는 B 제품 수명 코드는 포함하지 않는다. 재접속/재이탈로 경제원점을 재시작하지 않고 unknown legacy를 현재 시각/P로 보정하지 않는다. 실제P/휴식·미관측gap을 합성하지 않는다.
 
 FacilityPurchase와 VehicleResting은 공용typed checkpoint를 쓰며 구매는 실제Settlement, 쉬기는 비금융원명령/전후설정을 보존한다. 원결과 재생은 현재정의/상태보다 우선하며, 완료된 쉬기ID도 generic금전명령이 재사용할 수 없다. f99의 독립ID반례RED와 d8/0e55 후속수정을 구분한다. 새원장/지갑을 만들지 않았다. 실제미연결 두명령은 현재pending 경로에서 STATE_CONFLICT로 표시하고 원문을 보존하며 다른페이지/빈슬롯/성공으로 숨기지 않는다. 기존 Main/HostSession·SDK/Navi·schema13 원문·parkedSince는 유지한다. F 코드승인·A exact d8 시설15와 새조합 자동검사는 서로 구분하며 root의 최종 검토/정확CI 전 게시가능으로 단정하지 않는다.
+
+
+### 랭킹 공개 원인 조회 연결 — 2026-11-10
+
+B 정확 e9007ea의 읽기 연결은 StoredHostSource.readRanking에서 같은 GameSessionFactory/store의 localProfileId·QuestLedger.claimedRequestIds·observedDrivingReceipt를 기존 RankingReadSource snapshot 안에서 소비한다. 공개 조회가 실제 profile/source·원명령/원정산·원출발 zone의 무결성을 검증한다. 현재 zone·고정 KST·요청 ID 접두사로 과거 원인을 생성하지 않는다. 원profile 조회 실패는 Failure로 유지하고 미활성 legacy journal·없는 원영수증만 Missing으로 구분한다. 손상·권한 등 typed 오류는 의존 지표의 Failure로 전달하며 누락을 정상0으로 바꾸지 않는다.
+
+기존 집계 API/SQL/JSON·경제 계산과 같은 factory를 유지한다. helper/schema·쓰기 경로·지갑·새 DB는 추가하지 않는다. schema15 PR #183의 정확 후보 e3f3a8a 위에 정상 통합했고 랭킹 소유5파일은 e9007ea와 동일하다. PR #183의 원격 게시와 main 머지는 구분한다. 공개 SIMULATION 저장→조회 검증과 실제 SDK/Native 탐색의 구분은 [06 실행 근거](06_VERIFICATION.md#랭킹-공개-원인-조회-연결-검증--2026-11-10)를 따른다.
