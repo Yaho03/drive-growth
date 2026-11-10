@@ -311,7 +311,7 @@ class MaterialLedgerTest : InstrumentationTestCase() {
     fun testV5MigrationPreservesAllExistingTablesAndReplaysLegacyThenMaterial() {
         val c = command(); val cars = history(); val receipts = ok(store.listUnviewedSettlements())
         sql("INSERT INTO discoveries VALUES ('hyundai_casper','RARE')", "INSERT INTO gacha_progress VALUES(1,2,3,4)")
-        store.close(); raw { db -> db.execSQL("DROP TABLE material_requests"); db.execSQL("DROP TABLE repair_requests"); db.version = 5 }
+        store.close(); raw { db -> db.execSQL("DROP TABLE material_requests"); db.execSQL("DROP TABLE repair_requests"); db.execSQL("DROP TABLE initialization_requests"); db.execSQL("DROP TABLE initialization_profile"); db.version = 5 }
         store = open(); assertEquals(cars,history()); assertEquals(receipts,ok(store.listUnviewedSettlements()))
         assertEquals(GameMoney(1000),balance()); assertEquals(setOf(CollectionKey(target.vehicleId,Rarity.RARE)),ok(store.discoveredVehicles()))
         assertEquals(3,ok(store.rental.shop()).capacity)
@@ -326,7 +326,7 @@ class MaterialLedgerTest : InstrumentationTestCase() {
         store.close();raw { db -> db.version=5 } // 기존 표와의 충돌로 이전 실패를 주입한다.
         val file=context.getDatabasePath(name);val before=file.readBytes();store=open()
         assertEquals(failed(ContractError.STORAGE_FAILURE),store.balance());store.close()
-        assertTrue(before.contentEquals(file.readBytes()));raw { it.version=6 };store=open()
+        assertTrue(before.contentEquals(file.readBytes()));raw { it.version=8 };store=open()
     }
 
     fun testIncomeSelectionAndEmptyVisitReserveIdsBeforeMaterialAndViceVersa() {
@@ -383,7 +383,7 @@ class MaterialLedgerTest : InstrumentationTestCase() {
         raw { db ->
             assertEquals(4,db.version)
             db.rawQuery("SELECT name FROM sqlite_master WHERE name='delivery_active'",null).use { assertFalse(it.moveToFirst()) }
-            db.execSQL("DROP TABLE material_requests"); db.execSQL("DROP TABLE repair_requests")
+            db.execSQL("DROP TABLE material_requests"); db.execSQL("DROP TABLE repair_requests"); db.execSQL("DROP TABLE initialization_requests"); db.execSQL("DROP TABLE initialization_profile")
         }
         store=open();ok(store.commitMaterial(command()))
     }
