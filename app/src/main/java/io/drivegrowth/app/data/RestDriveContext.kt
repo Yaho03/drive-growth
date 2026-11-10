@@ -40,15 +40,17 @@ data class RestTimelinePlan(val before:RestBonusState,val after:RestBonusState,v
 internal object RestTimeline {
  /** 보존된 원 context 순서가 물리 시간 커서다. receiver 변경으로 같은 boot의 구간을 재사용하지 않는다. */
  fun clockOrder(contexts:List<RestDriveContext>):Boolean {
-  val ends=mutableMapOf<String,Pair<String,VehicleObservation>>()
+  val ends=mutableMapOf<String,VehicleObservation>()
+  val utcEnds=mutableMapOf<RestClockDomain,Long>()
   fun point(clock:RestClockDomain,o:VehicleObservation):Boolean {
    val previous=ends[clock.bootId]
    if(previous!=null) {
-    val old=previous.second
+    val old=previous
     if(o.receivedElapsedMs<old.receivedElapsedMs||(o.receivedElapsedMs==old.receivedElapsedMs&&o!=old))return false
-    if(previous.first==clock.domain&&o.receivedAt.value<old.receivedAt.value)return false
    }
-   ends[clock.bootId]=clock.domain to o;return true
+   val utc=utcEnds[clock]
+   if(utc!=null&&o.receivedAt.value<utc)return false
+   ends[clock.bootId]=o;utcEnds[clock]=o.receivedAt.value;return true
   }
   for(c in contexts) {
    if(!point(c.departureClock,c.trip.departure))return false

@@ -87,5 +87,22 @@ class RestTimelineTest {
   val a=ok(RestTimeline.plan(first,emptyList(),RestBonusState(2000,8),RestActiveGrant(8,old)))
   val b=ok(RestTimeline.plan(next,emptyList(),a.after,a.activeGrant));assertEquals(RestBonusState(0,8),b.after)
  }
+ @Test fun returningToAReceiverWithNondecreasingUtcRemainsValid(){
+  val c=ctx(listOf(span(0,1000),span(2000,3000),span(4000,5000))).let{it.copy(segments=it.segments.mapIndexed{i,e->if(i==1)e.copy(clockDomain="receiver-2")else e})}
+  val p=ok(RestTimeline.plan(c,emptyList(),RestBonusState(2000,8),RestActiveGrant(8,old)))
+  assertEquals(2000L,p.boostedMs);assertEquals(RestBonusState(0,8),p.after);assertEquals(3,p.operations.size)
+ }
+ @Test fun sameReceiverNameInAnotherBootHasItsOwnUtcOrigin(){
+  val a=span(0,1000);val b=span(0,1000).let{it.copy(bootId="next-boot",from=it.from.copy(receivedAt=EpochMillis(90000)),to=it.to.copy(receivedAt=EpochMillis(91000)))}
+  val p=ok(RestTimeline.plan(ctx(listOf(a,b)),emptyList(),RestBonusState(2000,8),RestActiveGrant(8,old)))
+  assertEquals(2000L,p.boostedMs);assertEquals(RestBonusState(0,8),p.after)
+ }
+ @Test fun returningDomainKeepsItsUtcCursorAcrossOriginalDriveContexts(){
+  val a=ctx(listOf(span(0,1000)))
+  val b=ctx(listOf(span(2000,3000))).let{it.copy(trip=it.trip.copy(id="second-drive"),departureClock=RestClockDomain("receiver-2","boot"),segments=it.segments.map{e->e.copy(clockDomain="receiver-2")})}
+  val s=span(4000,5000).let{it.copy(from=it.from.copy(receivedAt=EpochMillis(90000)),to=it.to.copy(receivedAt=EpochMillis(91000)))}
+  val c=ctx(listOf(s)).let{it.copy(trip=it.trip.copy(id="third-drive"))}
+  assertFalse(RestTimeline.clockOrder(listOf(a,b,c)))
+ }
 
 }
