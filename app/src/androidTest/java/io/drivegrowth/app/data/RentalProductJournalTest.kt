@@ -171,4 +171,32 @@ class RentalProductJournalTest:InstrumentationTestCase() {
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.balance());store.close();assertTrue(before.contentEquals(file.readBytes()))
         raw{assertEquals(13,it.version);it.version=15};store=SqliteGameChangeStore(context,source,name)
     }
+
+    // 독립 검토: 원 visits가 driver의 과거 활성화를 입증하면 metadata 전체소실도 NEW가 아니다.
+    fun testIndependentOriginalVisitPreventsReactivationAfterAllDriverMetadataLost() {
+        val p=prepare();ok(journal().save(p));ok(journal().execute(p));ok(journal().finish(p))
+        raw { db->db.execSQL("DELETE FROM rental_product_state");db.execSQL("DELETE FROM rental_product_inactive");db.execSQL("DELETE FROM rental_product_marker") }
+        now=at(3600000);val before=rows()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),journal().activate(identity))
+        assertEquals(before,rows())
+    }
+    fun testIndependentIgnoredInactiveCreditCannotCompleteWindow() {
+        directRental();val marker=RequestId("independent-ignore-money");ok(journal().beginInactive(identity,marker,now))
+        val interval=RentalInactiveInterval(marker,now,now,at(7*3600000));now=interval.to
+        raw{it.execSQL("CREATE TRIGGER ignore_rental_credit BEFORE UPDATE ON account WHEN NEW.balance!=OLD.balance BEGIN SELECT RAISE(IGNORE); END")}
+        val economic=listOf("account","rentals","vehicles","settlements","quest_events");val before=rows(economic)
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),journal().advanceInactive(identity,interval))
+        assertEquals(before,rows(economic));assertEquals(interval,ok(journal().pendingInactive(identity)))
+    }
+    fun testIndependentOriginalAssignmentRejectsChangedFrozenRounding() {
+        val p=prepare();add(p.visit.request.desired);ok(journal().save(p));ok(journal().execute(p))
+        raw{it.execSQL("UPDATE rentals SET rounding='UP' WHERE id=?",arrayOf(p.visit.request.id.value))};val before=rows()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),journal().execute(p));assertEquals(before,rows())
+    }
+    fun testIndependentOriginalAssignmentRejectsChangedFrozenCustomer() {
+        val p=prepare();add(p.visit.request.desired);ok(journal().save(p));ok(journal().execute(p))
+        raw{it.execSQL("UPDATE rentals SET regular_customer=1-regular_customer WHERE id=?",arrayOf(p.visit.request.id.value))};val before=rows()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),journal().execute(p));assertEquals(before,rows())
+    }
+
 }
