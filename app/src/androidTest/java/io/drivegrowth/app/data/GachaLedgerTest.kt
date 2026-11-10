@@ -142,7 +142,7 @@ class GachaLedgerTest : InstrumentationTestCase() {
         store.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
             for (table in listOf("delivery_lists", "delivery_requests", "delivery_active", "delivery_routes",
-                "delivery_outcomes", "delivery_held", "delivery_changes", "driving_days", "driving_drives", "delivery_route_history", "delivery_hold_outcomes", "material_requests", "repair_requests", "initialization_requests", "initialization_profile"))
+                "delivery_outcomes", "delivery_held", "delivery_changes", "driving_days", "driving_drives", "delivery_route_history", "delivery_hold_outcomes", "material_requests", "repair_requests", "initialization_requests", "initialization_profile", "first_gift_requests", "first_gift_markers"))
                 it.execSQL("DROP TABLE $table")
             it.execSQL("DROP TABLE gacha_progress")
             it.execSQL("DROP TABLE gacha_requests")

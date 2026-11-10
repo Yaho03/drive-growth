@@ -40,7 +40,7 @@ class FirstRentalGiftLedgerTest : InstrumentationTestCase() {
         super.setUp();name="first-gift-"+System.nanoTime()+".db"
         content=(AssetGameContent(context.assets).load() as ContentLoad.Loaded).snapshot;contentResult=ContractResult.Success(content);permission=ContractResult.Success(Unit)
         store=open();gift=module(store)
-        ok(store.atomic{db->FirstRentalGiftLedger.createTables(db);ContractResult.Success(Unit)})
+        // 선물 표 생성은 실제 공용 helper/schema9가 담당한다.
         ok(store.commitGameChange(GameChange(RequestId("seed"),TransactionKind.GARAGE,source,content.ruleVersion,
             MoneyChange(MoneyDirection.CREDIT,GameMoney(25)),VehicleWrite.Add(car))))
         val terms=RentalTerms(content.ruleVersion,SimulatedCustomer(30,36),99,EpochMillis(0),15,GameMoney(0),RoundingMode.DOWN)
