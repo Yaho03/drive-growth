@@ -20,7 +20,7 @@ class NavigationDestinationConfirmation(private val fresh: (NavigationStamp) -> 
         if (!value) { snapshot = null; selection = null; identity = null }
     }
     @Synchronized fun bind(value: GameIdentity) {
-        if (identity != value) { selection = null; identity = value }
+        if (identity != value) { snapshot = null; selection = null; identity = value }
     }
     @Synchronized fun accept(value: NavigationSnapshot) { if (enabled) snapshot = value }
     @Synchronized fun selected(value: GameIdentity): DeliveryDestinationSelection? = selection?.takeIf { enabled && identity == value && it.identity == value }
