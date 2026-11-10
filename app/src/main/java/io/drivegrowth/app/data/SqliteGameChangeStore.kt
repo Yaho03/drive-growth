@@ -129,7 +129,7 @@ class SqliteGameChangeStore(
         if (domain == RequestDomain.DELIVERY && change.kind != TransactionKind.DELIVERY ||
             domain == RequestDomain.DRIVING && change.kind != TransactionKind.DRIVING)
             return failure(ContractError.INVALID_INPUT)
-        for (table in listOf("visits", "gacha_requests", "delivery_requests", "material_requests", "repair_requests", "initialization_requests", "first_gift_requests", "first_gift_markers", "quest_claims")) {
+        for (table in listOf("visits", "facility_command_results", "gacha_requests", "delivery_requests", "material_requests", "repair_requests", "initialization_requests", "first_gift_requests", "first_gift_markers", "quest_claims")) {
             val key = if (table == "visits") "id" else "request_id"
             if (db.rawQuery("SELECT 1 FROM $table WHERE $key=?", arrayOf(id)).use { it.moveToFirst() })
                 return failure(ContractError.STATE_CONFLICT)
