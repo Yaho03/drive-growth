@@ -1,6 +1,7 @@
 package io.drivegrowth.app.host.garage
 
 import android.content.Context
+import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.data.AssetGameContent
 import io.drivegrowth.app.data.MaterialVersions
 import io.drivegrowth.app.data.SqliteGameChangeStore
@@ -61,7 +62,7 @@ class GarageStoreCommandSource(private val content: GameContentSnapshot, private
 }
 
 /** 실제 assets와 기존 같은 원장. 모든 호출은 host worker에서 수행한다. */
-class StoredGarageCommandSource(context: Context, private val databaseName: String? = null) : GarageCommandSource {
+class StoredGarageCommandSource(context: Context, private val databaseName: String? = null, private val sessions: GameSessionFactory? = null) : GarageCommandSource {
     private val context = context.applicationContext
     private fun content(): ContractResult<GameContentSnapshot> = when (val load = AssetGameContent(context.assets).load()) {
         is ContentLoad.Loaded -> ContractResult.Success(load.snapshot)
@@ -73,6 +74,14 @@ class StoredGarageCommandSource(context: Context, private val databaseName: Stri
         else SqliteGameChangeStore(context, InputSource.SIMULATION, databaseName, materialVersions = versions, repairContent = ::content)
     }
     override fun prepare(request: GarageEvent.RequestAction, id: RequestId, material: VehicleRef?): ContractResult<GaragePreparation> = guarded {
+        val factory = sessions
+        if (factory != null) return@guarded when (val opened = factory.open()) {
+            is ContractResult.Failure -> opened
+            is ContractResult.Success -> opened.value.use { game -> when (val loaded = game.content) {
+                is ContractResult.Failure -> loaded
+                is ContractResult.Success -> GarageStoreCommandSource(loaded.value, SqliteGarageLedger(game.store)).prepare(request, id, material)
+            } }
+        }
         when(val loaded = content()) {
             is ContractResult.Failure -> loaded
             is ContractResult.Success -> open().use { GarageStoreCommandSource(loaded.value, SqliteGarageLedger(it)).prepare(request, id, material) }
@@ -80,11 +89,17 @@ class StoredGarageCommandSource(context: Context, private val databaseName: Stri
     }
     // 재생 전에 현재 콘텐츠 성공을 요구하지 않는다. 필요한 권위 callback은 저장소가 신규 확정 때만 읽는다.
     override fun commit(command: GarageCommand): ContractResult<GarageReceipt> = guarded {
-        open().use { store -> when(command) {
-            is GarageCommand.Single -> store.commitGameChange(command.value).map { GarageReceipt.Single(it) }
-            is GarageCommand.Material -> store.commitMaterial(command.value).map { GarageReceipt.Material(it) }
-            is GarageCommand.Repair -> store.commitRepair(command.value).map { GarageReceipt.Repair(it) }
-        } }
+        val factory = sessions
+        if (factory == null) open().use { commitStored(it, command) }
+        else when (val opened = factory.open()) {
+            is ContractResult.Failure -> opened
+            is ContractResult.Success -> opened.value.use { commitStored(it.store, command) }
+        }
+    }
+    private fun commitStored(store: SqliteGameChangeStore, command: GarageCommand): ContractResult<GarageReceipt> = when (command) {
+        is GarageCommand.Single -> store.commitGameChange(command.value).map { GarageReceipt.Single(it) }
+        is GarageCommand.Material -> store.commitMaterial(command.value).map { GarageReceipt.Material(it) }
+        is GarageCommand.Repair -> store.commitRepair(command.value).map { GarageReceipt.Repair(it) }
     }
 }
 private class SqliteGarageLedger(private val store: SqliteGameChangeStore) : GarageCommandLedger,

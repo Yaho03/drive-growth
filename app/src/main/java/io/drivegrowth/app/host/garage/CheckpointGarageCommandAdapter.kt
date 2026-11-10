@@ -1,6 +1,7 @@
 package io.drivegrowth.app.host.garage
 
 import android.content.Context
+import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.data.*
 import io.drivegrowth.app.ui.garage.GarageEvent
 import io.drivegrowth.core.content.ContentLoad
@@ -8,9 +9,9 @@ import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.progression.VehicleAction
 
 /** F의 같은 DB checkpoint를 source/journal 양쪽으로 사용한다. 저장 형식/프로필/표를 만들지 않는다. */
-class CheckpointGarageCommandAdapter(context: Context, private val databaseName: String? = null) : GarageCommandSource, GarageCommandJournal {
+class CheckpointGarageCommandAdapter(context: Context, private val databaseName: String? = null, private val sessions: GameSessionFactory? = null) : GarageCommandSource, GarageCommandJournal {
     private val context = context.applicationContext
-    private val plans = StoredGarageCommandSource(this.context, databaseName)
+    private val plans = StoredGarageCommandSource(this.context, databaseName, sessions)
     private fun content() = when(val loaded = AssetGameContent(context.assets).load()) {
         is ContentLoad.Loaded -> ContractResult.Success(loaded.snapshot)
         else -> ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
@@ -21,9 +22,15 @@ class CheckpointGarageCommandAdapter(context: Context, private val databaseName:
         else SqliteGameChangeStore(context,InputSource.SIMULATION,databaseName,materialVersions=versions,repairContent=::content)
     }
     private fun <T> withLedger(action:(HostCommandCheckpointLedger,ProfileId)->ContractResult<T>):ContractResult<T> = try {
-        open().use { store -> when(val profile=store.localProfileId()) {
+        val factory = sessions
+        if (factory != null) {
+            when (val opened = factory.open()) {
+                is ContractResult.Failure -> opened
+                is ContractResult.Success -> opened.value.use { game -> action(game.store.hostCommands, game.identity.profileId) }
+            }
+        } else open().use { store -> when(val profile=store.localProfileId()) {
             is ContractResult.Failure -> profile
-            is ContractResult.Success -> action(HostCommandCheckpointLedger(store),profile.value)
+            is ContractResult.Success -> action(store.hostCommands,profile.value)
         } }
     } catch (_:SecurityException) {ContractResult.Failure(ContractError.PERMISSION_DENIED)}
       catch (_:RuntimeException) {ContractResult.Failure(ContractError.STORAGE_FAILURE)}

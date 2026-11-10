@@ -33,6 +33,7 @@ class GachaHostController(
     private var confirmed = false
     private var frame = GachaFrame(saved.generation, GachaScreen.Missing("가챠 상태를 확인해 주세요.", true))
 
+    val isBusy: Boolean get() = busy
     fun snapshot(): GachaHostState = saved.frozen()
     fun setControlsEnabled(enabled: Boolean) { if (!released) { allowed = enabled; render(frame, allowed) } }
     fun release() { released = true; allowed = false; sequence++ }
