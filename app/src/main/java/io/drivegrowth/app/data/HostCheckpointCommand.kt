@@ -26,7 +26,7 @@ sealed interface HostCheckpointResult {
 }
 
 internal fun HostCheckpointCommand.validFor(source: InputSource): Boolean {
-    if (origin != source || requestId.value.startsWith("delivery/") || requestId.value.startsWith("drive/")) return false
+    if (origin != source || requestId.value.startsWith("delivery/") || requestId.value.startsWith("drive/") || requestId.value.startsWith("quest/")) return false
     return when (this) {
         is HostCheckpointCommand.Garage -> value.kind == TransactionKind.GARAGE &&
             (value.vehicle as? VehicleWrite.Update)?.lifecycle in setOf(VehicleLifecycle.OWNED, VehicleLifecycle.SOLD, VehicleLifecycle.SCRAPPED)

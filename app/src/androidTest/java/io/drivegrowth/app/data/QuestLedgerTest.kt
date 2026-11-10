@@ -8,11 +8,11 @@ import java.time.*
 import java.util.concurrent.Executors
 import java.util.concurrent.CountDownLatch
 
-/** 모듈 격리 시험: 표/프로필 입력은 명시 fixture다. E 실제 helper/profile/hooks 연결 검증이 아니다. */
+/** 기존25개 모듈 경계 시험. E schema11 helper의 실제 프로필을 쓰고 시험 사건 준비만 명시한다. */
 @Suppress("DEPRECATION")
 class QuestLedgerTest:InstrumentationTestCase() {
  private val context get()=instrumentation.targetContext
- private val p=ProfileId("quest-module-profile");private val source=InputSource.SIMULATION
+ private var issuedProfile:ProfileId?=null;private val p get()=requireNotNull(issuedProfile);private val source=InputSource.SIMULATION
  private var now=Instant.parse("2026-11-10T03:00:00Z").toEpochMilli()
  private lateinit var name:String;private lateinit var store:SqliteGameChangeStore;private lateinit var ledger:QuestLedger
  private lateinit var receipt:Settlement
@@ -22,10 +22,11 @@ class QuestLedgerTest:InstrumentationTestCase() {
  private fun open()=SqliteGameChangeStore(context,source,name,clock={now})
  private fun module(s:SqliteGameChangeStore)=QuestLedger(s,{ContractResult.Success(p)},{supplied?:ContractResult.Success(definitions())})
  private fun <T> ok(r:ContractResult<T>):T {assertTrue(r.toString(),r is ContractResult.Success);return(r as ContractResult.Success).value}
- override fun setUp(){super.setUp();name="quest-module-${System.nanoTime()}.db";store=open();ledger=module(store)
+ override fun setUp(){super.setUp();name="quest-module-${System.nanoTime()}.db";store=open();issuedProfile=ok(store.localProfileId());ledger=module(store)
   receipt=ok(store.commitGameChange(GameChange(RequestId("fixture-result"),TransactionKind.GARAGE,source,v,MoneyChange(MoneyDirection.CREDIT,GameMoney(100)))))
   ok(store.markViewed(receipt.settlementId))
-  raw{db->db.beginTransaction();try{QuestLedger.createTables(db);ok(QuestLedger.startTracking(db,p,source,EpochMillis(now),true));db.setTransactionSuccessful()}finally{db.endTransaction()}}
+  // 초기 열람 hook 사건은 이 모듈의 명시 record 경계를 시험하기 위해 fixture에서만 제거한다.
+  raw{it.execSQL("DELETE FROM quest_events")}
  }
  override fun tearDown(){store.close();context.deleteDatabase(name);super.tearDown()}
  private fun raw(f:(SQLiteDatabase)->Unit)=SQLiteDatabase.openDatabase(context.getDatabasePath(name).path,null,SQLiteDatabase.OPEN_READWRITE).use(f)
@@ -132,7 +133,8 @@ class QuestLedgerTest:InstrumentationTestCase() {
   assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),ledger.claim(c));assertEquals(before,rows())
  }
 
- fun testForeignLegacyRequestWithSamePrefixIsConflictNotQuestReceipt(){ok(record());val change=GameChange(RequestId("quest/claim/legacy-general"),TransactionKind.GARAGE,source,v,MoneyChange(MoneyDirection.CREDIT,GameMoney(1)));val foreign=ok(store.commitGameChange(change));val c=command().copy(requestId=change.requestId);val before=rows()
+ fun testForeignLegacyRequestWithSamePrefixIsConflictNotQuestReceipt(){ok(record());val change=GameChange(RequestId("quest/claim/legacy-general"),TransactionKind.GARAGE,source,v,MoneyChange(MoneyDirection.CREDIT,GameMoney(1)));// 신규 quest/ 예약 이전의 GENERAL 정산을 원문 그대로 보존한 legacy fixture다.
+  val foreign=ok(store.atomic{db->val value=Settlement(SettlementId("legacy-quest-settlement"),Transaction(TransactionId("legacy-quest-transaction"),change.requestId,change.kind,change.source,change.ruleVersion,change.money),GameMoney(101),null,EpochMillis(now));store.insertSettlement(db,change.requestId,LedgerJson.command(change).toString(),value);db.execSQL("UPDATE account SET balance=101 WHERE id=1");ContractResult.Success(value)});val c=command().copy(requestId=change.requestId);val before=rows()
   assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),ledger.claim(c));assertTrue(ok(ledger.claimedRequestIds(p)).isEmpty());assertEquals(foreign,ok(store.commitGameChange(change)));assertEquals(before,rows())
  }
 
