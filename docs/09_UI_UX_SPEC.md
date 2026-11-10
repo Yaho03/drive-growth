@@ -239,12 +239,12 @@ collection.render(mappedCollectionState, controlsEnabled = allowedByCommonShell)
 - `ShopEvent.Submit(ShopRequest)`에는 선택 당시 revision·전체 옵션·거래 requestId·UI attemptId가 들어간다. 호스트는 공통 거래에 같은 requestId와 명령을 전달하고, 같은 요청 객체로 `complete(request, result)`를 호출한다. 실패 뒤 동일 옵션 재시도는 거래 requestId를 유지하고 attemptId만 바꿔 이전 시도의 늦은 응답을 무시한다. 같은 snapshot에서 다른 실패 옵션을 오가도 선택별 requestId를 유지하며 맵을 방어 복사해 uiState 복원에 포함한다. 새 revision을 수락하면 이전 revision의 키만 제거한다. 다른 요청 응답도 무시한다.
 - 미리보기·취소·실패·제한으로 확정 입력을 변경하지 않는다. 성공 응답은 처리 응답 수신으로 표시하고 그 snapshot의 추가 요청을 막는다. 호스트가 저장 확정을 확인한 새 snapshot을 `render`해야 잔액·외형·공간·시설이 바뀐다. 조회 중·제한 중 재표시만으로 Pending을 풀지 않는다. 오래된 선택·가격·허용 변경은 확인을 거절한다.
 - 호스트는 `uiState`를 View 수명 밖에 보관하고 새 View에서 `restoreUiState`한다. 새 View의 첫 render 전·후 어느 순서든 복원 이력보다 낮은 현재 Content는 행동 없는 Loading으로 무효화하고 최신 조회를 기다린다. 복원한 Pending·요청ID·조회 잠금과 현재 gate는 보존하며 이력만으로 성공/취소를 만들지 않는다. 같은 활성 View에 과거 상태를 반복 복원하는 용도는 지원하지 않는다. 복원 자체는 요청·저장·재지급을 하지 않는다. 미리보기의 `handleBack()`을 먼저 적용하고, 처리 중 요청의 부모 탐색은 공통 호스트가 결정한다. 프로세스 종료 후 미완료 요청 복원·실제 저장 재조회는 호스트 연결 때 검증한다.
-- `controlsEnabled=false`이면 게임 내용·버튼을 제거하고 이전 버튼 callback도 gate를 재검사한다. 폭 1000dp 이상은 장면/관리 두 열, 좁은 폭은 단일 세로 스크롤이다. Loading/Empty/Failure/Unsupported와 요청 Pending을 구분한다.
+- `controlsEnabled=false`이면 게임 내용·버튼을 제거하고 이전 버튼 callback도 gate를 재검사한다. 폭 840dp 이상은 전경/관리 두 열(전경 1.8:관리 1), 좁은 폭은 단일 세로 스크롤이다. Loading/Empty/Failure/Unsupported와 요청 Pending을 구분한다.
 
 표시 예제는 `ShopPreviewStates.normal()`·`missing()`이며 시험 잠금·무료 장식·비용·효과를 명시한다. #24 경제 제안 댓글과 환석 동의는 전원 채택이나 콘텐츠 반영 증거로 사용하지 않는다. MainActivity·탐색/gate·실제 #44 구매/확장·꾸미기 영속화는 이번 변경에 연결하지 않았다. #55 전체 완료와 앱 종료 뒤 금액/배치 일치는 실제 연결 및 #28 검증에 남는다.
 
 
-#55 수정본의 실제 격리 View·네이티브 호스트 표적8개와 별도 C 재검토15개의 근거는 [06 수정본 검증](06_VERIFICATION.md#55-수정본-기기-표적독립-재검토-및-게시-근거)을 따른다. UI 상태 객체를 새 View에 복원한 시험이며 제품 Activity/프로세스 영속 복원은 아니다. 실제 CCP 가용폭936dp에서는 두 열 분기(1000dp 이상)를 실행하지 못했으므로 공식 폼팩터 전체 완료로 해석하지 않는다.
+#55 수정본의 실제 격리 View·네이티브 호스트 표적8개와 별도 C 재검토15개의 근거는 [06 수정본 검증](06_VERIFICATION.md#55-수정본-기기-표적독립-재검토-및-게시-근거)을 따른다. UI 상태 객체를 새 View에 복원한 시험이며 제품 Activity/프로세스 영속 복원은 아니다. 당시 CCP 가용폭936dp에서 옛 두 열 분기(1000dp 이상)는 미실행이었다. 아래 후속에서840dp 분기로 바꾸고 실제936dp/448dp 창을 확인했으나 공식 폼팩터 전체 완료는 아니다.
 
 
 #55 새 View의 첫 render/복원 순서 최소 수정은 원코드 `515507c`의 A 코드/구조 검토와 C 신규 View 표적1개·임시 실제 호스트에서 확인했다. [06의 첫 복원 근거](06_VERIFICATION.md#55-첫-복원-수정의-독립-검토장치-근거-회수)를 따르며 같은 활성 View의 과거 상태 반복 복원·제품 호스트/프로세스 저장으로 범위를 넓히지 않는다.
@@ -301,3 +301,10 @@ MainActivity·공통 탐색·gate·공통 모델/fixture·DB·경제 계산·02/
 #52의 가챠 표시 입력은 기존 유한소수 퍼센트와 정확한 원시 가중치 비율을 지원한다. 퍼센트가 있으면 기존 `%` 표시를 유지하고 비율만 있으면 `희귀 · 50/53`, `전설 · 3/53`처럼 직접 표시해 반올림된 값을 정확한 확률로 오인하지 않게 한다. 키·합·부호·표현 간 일치/불변성 계약은 [02의 가챠 호스트·비율 계약](02_SYSTEM_ARCHITECTURE.md#52-가챠-호스트-명령-보존과-정확한-비율-표시)을 따른다. 기존 선택/Pending·새 View 복원과 gate는 유지한다.
 
 GachaHostController는 기존 GachaView 이벤트/응답/GachaFrame을 그대로 소비하는 부분 호스트다. Draw→draw, 보존 명령의 Reload→retry, 새 조회→load를 연결하고 미제출 예약의 명시 해소 키만 resolveFailedRequest로 전달한다. OpenGarage·gate·MainActivity 조립은 기존 담당 범위로 남겼다. 실제 검사/미수행은 [06](06_VERIFICATION.md)을 따르며 이 추가만으로 제품 탐색·프로세스 복원이 연결된 것은 아니다.
+
+
+### #55 가게 전경 2D View 후속
+
+ShopSceneView는 승인된 ShopScreenState.Content만 받아 중립 건물/간판·주차구획·차량·설치 시설을 Native Canvas로 그린다. 전체/차량중심 보기는 같은 공급 상태를 다르게 구성한다. level 공급1→2이상은 표시 외형의 부속동, capacity 공급은 최대12개 전경구획에 반영하며 전체값/공급차량목록은 텍스트로 보존한다. 추가차량/구획은 명시 안내하고 누락공간은 미제공으로 남긴다. 위치는 표시용이며 저장 배치/새 시설 보유나 거래 성공을 만들지 않는다. 실제 차종 외형·로고·캐릭터와 PNG화면 배경은 사용하지 않는다.
+
+기존 요청/비용/Back/gate 계약을 유지한다. pending중 보기전환도 차단하고, 미리보기·callback 성공만으로 확정 전경을 바꾸지 않는다. uiState의 sceneScrollY/controlsScrollY와 기존 mode/selection/pending/requestIds/latestRevision을 같은프로필의새View에 함께복원한다. MainActivity/host/영속codec은 이번 UI작업에 연결하지 않았다.
