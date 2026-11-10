@@ -199,4 +199,45 @@ class RentalProductJournalTest:InstrumentationTestCase() {
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),journal().execute(p));assertEquals(before,rows())
     }
 
+    fun testPolicyDrivingExitStartsAtActualStopWithoutFakeParkingOrPhysicalEnd() {
+        val id=directRental();ok(store.rental.account(id,at(0).epoch,at(3600000).epoch,null));origin=Observation.Missing(MissingReason.NO_DATA)
+        now=at(3600000);val marker=RequestId("policy-driving-exit");ok(journal().beginInactiveWhileDriving(identity,marker,now));val interval=RentalInactiveInterval(marker,now,now,at(5400000));now=interval.to
+        ok(journal().advanceInactive(identity,interval));equalNumber("5400000",weighted(id));assertNull(ok(store.rental.pending()).single().parkedSince)
+        raw{db->db.rawQuery("SELECT payload FROM rental_product_inactive",null).use{assertTrue(it.moveToFirst());val j=JSONObject(it.getString(0));assertEquals("APPLICATION_EXIT_DRIVING",j.getString("basis"));assertFalse(j.getJSONObject("origin").has("clock"));assertEquals(at(3600000),RentalProductJson.clock(j.getJSONObject("origin").getJSONObject("applicationExit")))}}
+    }
+    fun testPolicyReconnectKeepsFirstExitOriginAndDoesNotRestartNormalThirtyMinutes() {
+        val id=directRental();origin=Observation.Missing(MissingReason.NO_DATA);val first=RequestId("policy-first");ok(journal().beginInactiveWhileDriving(identity,first,now));val a=RentalInactiveInterval(first,now,now,at(900000));now=a.to;ok(journal().advanceInactive(identity,a));equalNumber("900000",weighted(id))
+        val second=RequestId("policy-second");ok(journal().beginInactiveWhileDriving(identity,second,now));val b=RentalInactiveInterval(second,now,now,at(3600000));now=b.to;ok(journal().advanceInactive(identity,b));equalNumber("2340000",weighted(id))
+        val before=rows();ok(journal().advanceInactive(identity,b));assertEquals(before,rows());assertNull(ok(store.rental.pending()).single().parkedSince)
+    }
+    fun testPolicyAlreadyParkedKeepsActualDriveEndInsteadOfNewStop() {
+        val id=directRental();ok(store.rental.account(id,at(0).epoch,at(3600000).epoch,at(0).epoch));now=at(3600000);val marker=RequestId("policy-already-parked");ok(journal().beginInactive(identity,marker,now));val interval=RentalInactiveInterval(marker,now,now,at(5400000));now=interval.to;ok(journal().advanceInactive(identity,interval));equalNumber("2880000",weighted(id));assertEquals(at(0).epoch,ok(store.rental.pending()).single().parkedSince)
+    }
+    fun testPolicyEightHourCapUsesRetainedExitEvenForLaterRental() {
+        origin=Observation.Missing(MissingReason.NO_DATA);ok(journal().activate(identity));val first=RequestId("policy-no-rental-yet");ok(journal().beginInactiveWhileDriving(identity,first,now));val firstWindow=RentalInactiveInterval(first,now,now,at(5*3600000));now=firstWindow.to;ok(journal().advanceInactive(identity,firstWindow))
+        val car=add(catalog.vehicles.first().vehicleId);val id=RequestId("policy-later-rental");ok(store.rental.assign(RentalRequest(id,car.vehicleId,6),catalog,definition.categories,definition.rates,RentalTerms(definition.rules,SimulatedCustomer(30,48),99,now.epoch,60,GameMoney(0),RoundingMode.DOWN,false)))
+        val next=RequestId("policy-cap");ok(journal().beginInactiveWhileDriving(identity,next,now));val interval=RentalInactiveInterval(next,now,now,at(9*3600000));now=interval.to;ok(journal().advanceInactive(identity,interval));equalNumber("3240000",weighted(id));assertNull(ok(store.rental.pending()).single().parkedSince)
+    }
+    fun testPolicyOnlyActualNewDrivingEndAllowsFollowingCycleToStartAgain() {
+        val id=directRental();origin=Observation.Missing(MissingReason.NO_DATA);val first=RequestId("policy-cycle-one");ok(journal().beginInactiveWhileDriving(identity,first,now));val a=RentalInactiveInterval(first,now,now,at(1800000));now=a.to;ok(journal().advanceInactive(identity,a))
+        ok(store.rental.account(id,at(1800000).epoch,at(7200000).epoch,null));origin=Observation.Available(at(3600000));now=at(7200000)
+        val second=RequestId("policy-cycle-two");ok(journal().beginInactiveWhileDriving(identity,second,now));val b=RentalInactiveInterval(second,now,now,at(9000000));now=b.to;ok(journal().advanceInactive(identity,b));equalNumber("9000000",weighted(id))
+    }
+    fun testPolicyOldMissingAuthorityIsNotReinterpretedOrBackfilledByNewExitMode() {
+        directRental();origin=Observation.Missing(MissingReason.NO_DATA);val old=RequestId("policy-old-missing");ok(journal().beginInactive(identity,old,now))
+        raw{db->val raw=db.rawQuery("SELECT payload FROM rental_product_inactive",null).use{it.moveToFirst();it.getString(0)};val legacy=JSONObject(raw).apply{remove("basis")}.toString();db.execSQL("UPDATE rental_product_inactive SET payload=?,digest=?",arrayOf(legacy,ObservedDrivingJson.digest(legacy)))}
+        val before=rows();assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),journal().beginInactiveWhileDriving(identity,old,now));assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),journal().beginInactiveWhileDriving(identity,RequestId("new-cannot-repair-old"),now));assertEquals(before,rows())
+        val interval=RentalInactiveInterval(old,now,now,at(1000));now=interval.to;assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),journal().advanceInactive(identity,interval))
+    }
+    fun testPolicyExitDoesNotFillEarlierObservationGapAndBootOrClockMustStillMatch() {
+        directRental();origin=Observation.Missing(MissingReason.NO_DATA);now=at(3600000);val key=RequestId("policy-gap");ok(journal().beginInactiveWhileDriving(identity,key,now));val interval=RentalInactiveInterval(key,now,now,at(5400000));now=interval.to
+        val economic=rows(listOf("account","rentals","vehicles","settlements","quest_events"));assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),journal().advanceInactive(identity,interval));assertEquals(economic,rows(listOf("account","rentals","vehicles","settlements","quest_events")));assertEquals(interval,ok(journal().pendingInactive(identity)))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),journal().advanceInactive(identity,interval.copy(to=interval.to.copy(bootId="other"))))
+    }
+    fun testPolicyExitCreditFailureKeepsOriginalWindowAndRollsBackLikeVerifiedParking() {
+        directRental();origin=Observation.Missing(MissingReason.NO_DATA);val marker=RequestId("policy-credit-ignored");ok(journal().beginInactiveWhileDriving(identity,marker,now));val interval=RentalInactiveInterval(marker,now,now,at(7*3600000));now=interval.to
+        raw{it.execSQL("CREATE TRIGGER ignore_policy_credit BEFORE UPDATE ON account WHEN NEW.balance!=OLD.balance BEGIN SELECT RAISE(IGNORE); END")};val economic=rows(listOf("account","rentals","vehicles","settlements","quest_events"))
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),journal().advanceInactive(identity,interval));assertEquals(economic,rows(listOf("account","rentals","vehicles","settlements","quest_events")));assertEquals(interval,ok(journal().pendingInactive(identity)))
+    }
+
 }
