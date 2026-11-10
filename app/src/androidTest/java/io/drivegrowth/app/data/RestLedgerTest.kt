@@ -26,7 +26,7 @@ class RestLedgerTest : InstrumentationTestCase() {
         super.setUp()
         name = "rest-test-" + System.nanoTime() + ".db"
         store = open()
-        ok(store.atomic { RestLedger.createTables(it); ContractResult.Success(Unit) })
+        ok(store.localProfileId()) // 현재 helper가 실제 같은 DB의 휴식 표를 만든다.
         ledger = RestLedger(store)
     }
 
@@ -288,5 +288,26 @@ class RestLedgerTest : InstrumentationTestCase() {
             assertEquals(1, logCount())
             assertEquals(RestBonusState(20 * minute, 1), state())
         } finally { pool.shutdownNow(); other.close() }
+    }
+
+    fun testNonfinancialConsumeIdCannotBeReusedForGeneralCredit() {
+        val original=ok(ledger.consume(rules,"shared-rest-consume",null,1000));val before=dump()
+        val change=GameChange(RequestId("shared-rest-consume"),TransactionKind.GARAGE,source,rules.ruleVersion,MoneyChange(MoneyDirection.CREDIT,GameMoney(1)))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),store.commitGameChange(change))
+        assertEquals(before,dump());assertEquals(GameMoney(0),ok(store.balance()));assertEquals(original,ok(ledger.consume(rules,"shared-rest-consume",null,1000)))
+    }
+
+    fun testExistingGeneralCreditOwnsIdBeforeNewRestConsume() {
+        val change=GameChange(RequestId("money-first"),TransactionKind.GARAGE,source,rules.ruleVersion,MoneyChange(MoneyDirection.CREDIT,GameMoney(1)))
+        val paid=ok(store.commitGameChange(change));val before=dump()
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),ledger.consume(rules,"money-first",null,1000))
+        assertEquals(before,dump());assertEquals(paid,ok(store.commitGameChange(change)));assertEquals(GameMoney(1),ok(store.balance()))
+    }
+
+    fun testAfterHeadTriggerRemovingNewLogCannotConfirmConsumption() {
+        ok(ledger.depart(rules,stop(1)));val before=dump()
+        sql("CREATE TRIGGER remove_new_rest AFTER INSERT ON rest_head BEGIN DELETE FROM rest_log WHERE seq=NEW.last; END")
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),ledger.consume(rules,"removed-after-head",1,1000))
+        assertEquals(before,dump());assertEquals(RestBonusState(20*minute,1),state())
     }
 }

@@ -74,7 +74,7 @@ class HostCheckpointStoreIntegrationTest : InstrumentationTestCase() {
         assertNull(ok(store.hostCommands.load(profile)))
         val c = command(first.grant.changedVehicle!!)
         ok(store.hostCommands.save(profile, c)); ok(store.hostCommands.execute(profile, c))
-        raw { assertEquals(15, it.version) }
+        raw { assertEquals(16, it.version) }
     }
     fun testV9MigrationPreservesProfileProgressAndOriginalResults() = upgrade(9)
     fun testV8MigrationAddsGiftAndCheckpointWithoutReplacingProfile() = upgrade(8)
@@ -86,7 +86,7 @@ class HostCheckpointStoreIntegrationTest : InstrumentationTestCase() {
         store = open()
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.balance())
         store.close(); assertTrue(before.contentEquals(file.readBytes()))
-        raw { db -> assertEquals(9, db.version); db.version=15 }
+        raw { db -> assertEquals(9, db.version); db.version=16 }
         store = open(); assertEquals(GameMoney(1000), ok(store.balance()))
     }
 }

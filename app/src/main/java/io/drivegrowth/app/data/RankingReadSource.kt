@@ -6,7 +6,6 @@ import io.drivegrowth.app.host.ranking.*
 import io.drivegrowth.core.content.GameContentSnapshot
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.delivery.DeliveryOutcome
-import io.drivegrowth.core.driving.*
 import io.drivegrowth.core.garage.Garage
 import org.json.JSONObject
 import org.json.JSONException
@@ -85,7 +84,7 @@ class RankingReadSource(private val store: SqliteGameChangeStore, private val so
     }
 
     private data class DrivingEvidence(val days:List<RankingDayDistance>,val income:List<RankingIncome>)
-    /** 기존 DrivingIncome 예정 계산과 공용 정산 decoder로 저장된 구간을 읽기만 검증한다. */
+    /** 공통 reader의 원명령/가격/정산 검증을 재사용하고, 일누계 합·고아정산·출발 zone은 별도로 확인한다. */
     private fun driving(db:SQLiteDatabase,receipts:Map<RequestId,Settlement>):DrivingEvidence {
         val days=linkedMapOf<LocalDate,Long>()
         db.rawQuery("SELECT day,source,rewarded FROM driving_days",null).use { rows->while(rows.moveToNext()) {
@@ -94,24 +93,18 @@ class RankingReadSource(private val store: SqliteGameChangeStore, private val so
         }}
         val dayZones=linkedMapOf<LocalDate,Observation<java.time.ZoneId>>()
         val sums=linkedMapOf<LocalDate,Long>();val income=mutableListOf<RankingIncome>();val ownedRequests=mutableSetOf<RequestId>()
-        db.rawQuery("SELECT drive_id,command,recorded,rewarded,amount,day,day_rewarded FROM driving_drives",null).use { rows->while(rows.moveToNext()) {
-            val id=rows.text(0);val raw=rows.text(1);val j=JSONObject(raw)
-            val rules=DrivingIncomeRules(RuleVersion(j.getString("rule")),DeliveryJson.long(j,"cap",1,Long.MAX_VALUE),GameMoney(DeliveryJson.long(j,"perKm",0,Long.MAX_VALUE)))
-            val drive=ConfirmedDrive(j.getString("drive"),DeliveryJson.date(j.getString("day")),ObservedDistance(DeliveryJson.long(j,"meters",0,Long.MAX_VALUE),InputSource.valueOf(j.getString("source"))))
-            val canonical=JSONObject().put("drive",drive.driveId).put("day",drive.departedOn.toString()).put("meters",drive.distance.meters)
-                .put("source",drive.distance.source.name).put("rule",rules.ruleVersion.value).put("cap",rules.dailyCapMeters).put("perKm",rules.incomePerKm.units).toString()
-            val day=DeliveryJson.date(rows.text(5));val rewarded=rows.integer(3,0,Long.MAX_VALUE);val after=rows.integer(6,0,Long.MAX_VALUE)
-            if(id!=drive.driveId || raw!=canonical || day!=drive.departedOn || drive.distance.source!=source || rewarded>after)
-                throw SQLiteException("주행 원명령/상한/출처 불일치")
-            val expected=required(DrivingIncome(rules).settle(DrivingDay(day,after-rewarded),drive))
-            if(expected.recordedMeters!=rows.integer(2,0,Long.MAX_VALUE) || expected.rewardedMeters!=rewarded || expected.amount.units!=rows.integer(4,0,Long.MAX_VALUE) || expected.day.rewardedMeters!=after || (days[day]?:-1)<after)
-                throw SQLiteException("주행 원래 결과 불일치")
+        val reader=DrivingRecordReader(source)
+        db.rawQuery("SELECT drive_id FROM driving_drives",null).use { rows->while(rows.moveToNext()) {
+            val id=rows.text(0)
+            val stored=reader.readDrive(db,id)?:throw SQLiteException("주행 원결과 누락")
+            val commit=stored.commit;val day=commit.day.day;val rewarded=commit.rewardedMeters
+            if((days[day]?:-1)<commit.day.rewardedMeters)throw SQLiteException("주행 누계 불일치")
             val request=RequestId("drive/$id");ownedRequests+=request
-            if(expected.change==null) { if(receipts[request]!=null) throw SQLiteException("0원 주행 정산 불일치") }
+            val recorded=commit.settlement
+            if(recorded==null) { if(receipts[request]!=null)throw SQLiteException("0원 주행 정산 불일치") }
             else {
-                val recorded=readRecordedSettlement(db,expected.change!!) ?: throw SQLiteException("주행 정산 누락")
-                if(receipts[request]!=recorded) throw SQLiteException("주행 공용 정산 불일치")
-                income+=RankingIncome(request,RankingIncomeOrigin.DRIVING,expected.amount,source)
+                if(receipts[request]!=recorded)throw SQLiteException("주행 공용 정산 불일치")
+                income+=RankingIncome(request,RankingIncomeOrigin.DRIVING,commit.amount,source)
             }
             sums[day]=Math.addExact(sums[day]?:0,rewarded)
             val proof=departureZone?.invoke(id)?:Observation.Missing(MissingReason.NO_DATA)
