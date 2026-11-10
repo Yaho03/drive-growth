@@ -96,7 +96,8 @@ class OnboardingHostController(private val source: OnboardingHostSource, private
                         is ContractResult.Success -> {
                             val gift = (loaded.value.gift as? ContractResult.Success)?.value
                             if (!valid(loaded.value) || (expected != null && expected != loaded.value.identity)) return@guarded ContractResult.Failure(ContractError.INVALID_INPUT)
-                            if (active(started) && loaded.value.initialization.status is ProfileInitializationStatus.Existing &&
+                            val initialized = (loaded.value.initialization.status as? ProfileInitializationStatus.Existing)?.original
+                            if (active(started) && initialized?.grant?.changedVehicle != null &&
                                 gift != null && gift.granted == null && gift.firstCompletedRental != null) {
                                 when (val claimed = source.claimGift(loaded.value.identity)) {
                                     is ContractResult.Failure -> ContractResult.Success(loaded.value.copy(gift = claimed))
@@ -130,6 +131,9 @@ class OnboardingHostController(private val source: OnboardingHostSource, private
     private fun active(started: Long) = enabled && !released && generation == started
     private fun valid(value: OnboardingSnapshot): Boolean {
         if (value.identity.profileId != value.initialization.profileId || value.identity.source != value.initialization.source) return false
+        val original = (value.initialization.status as? ProfileInitializationStatus.Existing)?.original
+        if (original != null && (original.command.profileId != value.identity.profileId || original.command.grant.source != value.identity.source ||
+            original.marker.profileId != value.identity.profileId || original.grant.transaction.source != value.identity.source)) return false
         val gift = (value.gift as? ContractResult.Success)?.value
         return gift == null || (gift.profileId == value.identity.profileId && gift.source == value.identity.source)
     }
