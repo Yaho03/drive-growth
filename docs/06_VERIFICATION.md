@@ -1484,6 +1484,13 @@ main38b3b51의 #147 계약/메모리 참조·#148 VehicleUpgrade.prepareMaterial
 설치 후 pull 앱/시험APK SHA가 빌드본과 일치했고 자기 rest143c2패키지 제거·활성instrumentation 없음·제품APK/정확6파일/권한·창/설정 등18개 보존 확인을 마쳤다. C의 전체lease는 이어지는 Shop 순차검증에 유지돼 전체슬롯반환으로 표시하지 않는다. 게시 담당은 수정2파일 바이트 동일성을 유지해 최신main과 기록을 정상 병합했다. 새 게시head의 새장치 실행이나 실제 위치/운전 근거·제품수익·UI/프로세스/전원·실차 성공은 아니다. 최종head/CI·원리뷰 해결·main 공급은 [PR #143](https://github.com/Yaho03/drive-growth/pull/143)을 따른다.
 
 
+### #121 첫 영업 선물 메모리 참조·초기화 통합 독립 검토 — 2026-11-10
+
+선물78cd12d의 기존 독립 코드65PASS·구조60PASS를 별도 과거 근거로 회수했다. 초기화 기존 ID 덮어쓰기 guard b0c1288을 정상 통합한88bb671의 소스466개·선물2파일/초기화2파일/공유fixture 예상 합성본 SHA 동일성을 직접 대조한 독립 검토는 APPROVE·필수0이다. 정식 선물14+가챠21+프로필22+초기화15+원문 초기화 회귀9+새 공유 경계3=84개 PASS(실패/오류/생략0,30분13초). 작성자 전체403개·기존65/60/24와 합산하지 않는다. 새 공유 경계는 초기화→선물→재생, 처분ID 초기화 거절 뒤 선물 보존, 초기화/선물 동시 확정20회(시험1개)다.
+
+이미 초기화는 #159로 main 공급됐으므로 이번 게시에는 선물 자체3파일 delta와 KDoc/문서만 남긴다. 최신 main92dd2a34와 정상 통합해 수정 소스가 독립88bb와 같은지 확인하며 새 정확 게시 head CI는 연결 PR에 기록한다. 당시03/06 과거 기록과 #151 wrapper main 공급을 유지했다. 이는 명시 SIMULATION 완료 근거의 같은 메모리 원장 참조이며, 실제 RentalLedger/live·SQLite/재개방·NEW issuer/legacy 복구·제품 UI/프로세스·SDK/실차 및 #121/#50/#122 전체 완료가 아니다. 원문 근거는 /private/tmp/drive121-init-gift-integration-20261109/independent-review/에 보존했다.
+
+
 ### #55 가게 전경 독립 코드·실제 Native 검증 — 2026-11-10
 
 원head3dc3c8a의 소유8파일에 중립 Native Canvas 전경·전체/차량 중심·공급 공간/설치 시설·840dp 전경우선 배치·scene/controls 스크롤 UI 상태를 추가했다. 기존 v3 4a/4u/4o/4z를 비교했으며 PNG 전체/실차 외형·로고를 제품 자산으로 넣지 않았다. 독립 코드 CLEAR·필수0, JVM26PASS(정식Shop21+외부4+필터에 포함된Onboarding1,18초), 작성자 APK/Lint 오류0·기존경고21/scene경고0·시험APK 조립을 구분한다.
