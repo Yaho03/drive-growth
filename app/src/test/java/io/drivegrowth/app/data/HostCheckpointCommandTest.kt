@@ -37,4 +37,10 @@ class HostCheckpointCommandTest {
         for(command in listOf(material,repair,gacha)){assertTrue(command.validFor(source));assertEquals(id,command.requestId)}
         assertNotEquals(material,repair)
     }
+    @Test fun payloadAndExecutionPhaseAreBothBoundByTheDigest(){
+        assertNotEquals(HostCheckpointJson.digest("original",0),HostCheckpointJson.digest("changed",0))
+        assertNotEquals(HostCheckpointJson.digest("original",0),HostCheckpointJson.digest("original",1))
+        assertEquals(HostCheckpointJson.digest("original",1),HostCheckpointJson.digest("original",1))
+    }
+
 }

@@ -118,7 +118,7 @@ class HostCommandCheckpointLedgerTest : InstrumentationTestCase() {
     fun testConfirmedInsufficientFundsRestoresSavedAndCanBeExplicitlyCancelled(){
         val c=garage().copy(value=garage().value.copy(money=MoneyChange(MoneyDirection.DEBIT,GameMoney(1001))))
         ok(ledger().save(profile,c));assertEquals(fail(ContractError.INSUFFICIENT_FUNDS),ledger().execute(profile,c))
-        assertEquals(fail(ContractError.DATA_UNAVAILABLE),ledger().finish(profile,c));assertEquals(HostCheckpointPhase.SAVED,ok(ledger().load(profile))!!.phase)
+        assertEquals(fail(ContractError.STATE_CONFLICT),ledger().finish(profile,c));assertEquals(HostCheckpointPhase.SAVED,ok(ledger().load(profile))!!.phase)
         ok(ledger().cancelUnstarted(profile,c));ok(ledger().save(profile,garage("new")));assertEquals(GameMoney(1000),ok(store.balance()))
     }
     fun testCommittedForeignRequestCannotCreateNewCheckpoint(){
@@ -135,7 +135,7 @@ class HostCommandCheckpointLedgerTest : InstrumentationTestCase() {
             assertTrue(bad!=original);raw{it.execSQL("UPDATE host_command_checkpoint SET payload=?",arrayOf(bad))};val file=context.getDatabasePath(name);val bytes=file.readBytes();store=open()
             assertEquals(fail(ContractError.STORAGE_FAILURE),ledger().load(profile));assertEquals(fail(ContractError.STORAGE_FAILURE),ledger().save(profile,c));assertEquals(fail(ContractError.STORAGE_FAILURE),ledger().execute(profile,c))
             store.close();assertTrue(bytes.contentEquals(file.readBytes()))
-        };raw{it.execSQL("UPDATE host_command_checkpoint SET payload=?",arrayOf(original))};store=open();assertNotNull(ok(ledger().load(profile)))
+        };raw{it.execSQL("UPDATE host_command_checkpoint SET payload=?,digest=?",arrayOf(original,HostCheckpointJson.digest(original,0)))};store=open();assertNotNull(ok(ledger().load(profile)))
     }
     private fun race(a:()->ContractResult<*>,b:()->ContractResult<*>):List<ContractResult<*>>{
         val pool=Executors.newFixedThreadPool(2);val gate=CountDownLatch(1)
@@ -165,7 +165,7 @@ class HostCommandCheckpointLedgerTest : InstrumentationTestCase() {
 
     fun testPriorStartedWithoutReceiptRemainsRecoveryRequired(){
         val c=garage().copy(value=garage().value.copy(money=MoneyChange(MoneyDirection.DEBIT,GameMoney(1001))))
-        ok(ledger().save(profile,c));ok(store.atomic{it.execSQL("UPDATE host_command_checkpoint SET phase=1");ContractResult.Success(Unit)})
+        ok(ledger().save(profile,c));ok(store.atomic{it.execSQL("UPDATE host_command_checkpoint SET phase=1,digest=?",arrayOf(HostCheckpointJson.digest(HostCheckpointJson.encode(profile,c),1)));ContractResult.Success(Unit)})
         assertEquals(fail(ContractError.INSUFFICIENT_FUNDS),ledger().execute(profile,c))
         assertEquals(HostCheckpointPhase.STARTED,ok(ledger().load(profile))!!.phase)
         assertEquals(fail(ContractError.STATE_CONFLICT),ledger().cancelUnstarted(profile,c));assertEquals(fail(ContractError.DATA_UNAVAILABLE),ledger().finish(profile,c))
@@ -176,6 +176,14 @@ class HostCommandCheckpointLedgerTest : InstrumentationTestCase() {
         assertEquals(fail(ContractError.STORAGE_FAILURE),ledger().load(profile));assertEquals(fail(ContractError.STORAGE_FAILURE),ledger().execute(profile,c))
         assertEquals(GameMoney(1000),ok(store.balance()))
         store.close();raw{db->db.rawQuery("SELECT count(*) FROM host_command_checkpoint",null).use{it.moveToFirst();assertEquals(1,it.getInt(0))}};store=open()
+    }
+
+    fun testValidAmountOrPhaseMutationWithoutDigestIsStorageFailure(){
+        val c=garage();ok(ledger().save(profile,c));store.close()
+        raw{db->db.rawQuery("SELECT payload FROM host_command_checkpoint",null).use{it.moveToFirst();val changed=it.getString(0).replaceFirst("\"amount\":10","\"amount\":11");db.execSQL("UPDATE host_command_checkpoint SET payload=?",arrayOf(changed))}}
+        store=open();assertEquals(fail(ContractError.STORAGE_FAILURE),ledger().load(profile));store.close()
+        raw{it.execSQL("UPDATE host_command_checkpoint SET payload=?,phase=1",arrayOf(HostCheckpointJson.encode(profile,c)))}
+        store=open();assertEquals(fail(ContractError.STORAGE_FAILURE),ledger().load(profile));assertEquals(GameMoney(1000),ok(store.balance()))
     }
 
 }
