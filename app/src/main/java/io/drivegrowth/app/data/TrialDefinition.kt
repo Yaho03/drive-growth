@@ -4,6 +4,8 @@ import io.drivegrowth.app.host.shop.ShopExpansionDefinition
 import io.drivegrowth.app.host.shop.parseShopExpansionDefinition
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.rental.*
+import io.drivegrowth.core.delivery.*
+import io.drivegrowth.core.driving.DrivingIncomeRules
 import java.util.Collections
 
 /** 숫자 입력만 공급한다. Quest 진행/기간/청구 가능 여부를 만들지 않는다. */
@@ -13,6 +15,7 @@ data class TrialQuestNumbers(val goal: Int, val reward: GameMoney) {
 class TrialDefinition internal constructor(
     val expansions: ShopExpansionDefinition, rates: Map<VehicleId,GameMoney>, facilities: Map<Facility,FacilityOffer>,
     val fuelBonusPerRental: GameMoney, quests: Map<String,TrialQuestNumbers>, provenance: Map<String,String>,
+    internal val delivery: TrialDeliveryRules, internal val driving: DrivingIncomeRules,
 ) {
     val version get()=expansions.version
     val rules get()=expansions.rules
@@ -21,6 +24,10 @@ class TrialDefinition internal constructor(
     val facilityOffers: Map<Facility,FacilityOffer> = Collections.unmodifiableMap(LinkedHashMap(facilities))
     val questRewards: Map<String,TrialQuestNumbers> = Collections.unmodifiableMap(LinkedHashMap(quests))
     val provenance: Map<String,String> = Collections.unmodifiableMap(LinkedHashMap(provenance))
+    fun deliveryRules():ContractResult<DeliveryRules> = ContractResult.Success(delivery.proposal)
+    fun deliveryChangeRules():ContractResult<DeliveryChangeRules> = ContractResult.Success(delivery.change)
+    fun deliverySettlementRules():ContractResult<DeliverySettlementRules> = ContractResult.Success(delivery.settlement)
+    fun drivingIncomeRules():ContractResult<DrivingIncomeRules> = ContractResult.Success(driving)
     fun rentalRate(id:VehicleId):ContractResult<GameMoney> = rentalRates[id]?.let { ContractResult.Success(it) }
         ?: ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
     fun questNumbers(id:String):ContractResult<TrialQuestNumbers> = questRewards[id]?.let { ContractResult.Success(it) }
@@ -29,6 +36,7 @@ class TrialDefinition internal constructor(
     fun questNumbersFor(registered:Set<String>):ContractResult<Map<String,TrialQuestNumbers>> =
         if(registered==questRewards.keys)ContractResult.Success(questRewards) else ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
 }
+data class TrialDeliveryRules(val proposal:DeliveryRules,val change:DeliveryChangeRules,val settlement:DeliverySettlementRules)
 fun interface TrialDefinitionSource { fun load():ContractResult<TrialDefinition> }
 
 internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):ContractResult<TrialDefinition> {
@@ -39,7 +47,7 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
             is ContractResult.Failure->return r
             is ContractResult.Success->r.value
         }
-        val names=setOf("rental_rates","facilities","fuel_bonus","quest_rewards","provenance")
+        val names=setOf("rental_rates","facilities","fuel_bonus","quest_rewards","provenance","delivery_bands","delivery_prices","delivery_proposal","delivery_change","delivery_settlement","driving")
         val sections=linkedMapOf<String,MutableList<List<String>>>()
         var current:String?=null
         for(line in lines.drop(marker)) {
@@ -71,7 +79,29 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
         }
         val provenance=records("provenance",listOf("key","value")) {require(it[1].isNotBlank());it[0] to it[1]}
         require(provenance.keys==setOf("authorization","prior_agreement","balance_status","quest_ids"))
-        ContractResult.Success(TrialDefinition(expansion,rates,facilities,GameMoney(number(fuel[0][1])),quests,provenance))
+        fun scalar(name:String,keys:Set<String>):Map<String,String> {
+            val values=records(name,listOf("key","value")){it[0] to it[1]};require(values.keys==keys);return values
+        }
+        fun Map<String,String>.n(key:String)=number(getValue(key))
+        fun Map<String,String>.i(key:String):Int {val v=n(key);require(v<=Int.MAX_VALUE);return v.toInt()}
+        val bands=sections.getValue("delivery_bands");require(bands.size>1&&bands.first()==listOf("max_meters","common","advanced","rare","legend","income_percent"))
+        val bandValues=bands.drop(1).map { row->
+            require(row.size==6)
+            fun i(at:Int):Int {val v=number(row[at]);require(v<=Int.MAX_VALUE);return v.toInt()}
+            DeliveryBand(if(row[0]=="unbounded")null else number(row[0]),Rarity.entries.mapIndexed{index,rarity->rarity to i(index+1)}.toMap(),i(5))
+        }
+        val prices=records("delivery_prices",listOf("rarity","percent")){val v=number(it[1]);require(v<=Int.MAX_VALUE);Rarity.valueOf(it[0]) to v.toInt()}
+        require(prices.keys==Rarity.entries.toSet())
+        val proposal=scalar("delivery_proposal",setOf("income_rate_percent","income_min_meters","income_offer_count","purchase_offer_count","rounding"))
+        val change=scalar("delivery_change",setOf("cancel_fee_percent"))
+        val settle=scalar("delivery_settlement",setOf("arrival_window_ms","hold_window_ms","hold_refund_fee_percent"))
+        val drive=scalar("driving",setOf("daily_cap_meters","income_per_km"));require(drive.n("daily_cap_meters")==500000L)
+        val delivery=TrialDeliveryRules(DeliveryRules(expansion.rules,bandValues,prices,proposal.i("income_rate_percent"),proposal.n("income_min_meters"),
+            proposal.i("income_offer_count"),proposal.i("purchase_offer_count"),DeliveryRounding.valueOf(proposal.getValue("rounding"))),
+            DeliveryChangeRules(expansion.rules,change.i("cancel_fee_percent")),
+            DeliverySettlementRules(expansion.rules,settle.n("arrival_window_ms"),settle.n("hold_window_ms"),settle.i("hold_refund_fee_percent")))
+        ContractResult.Success(TrialDefinition(expansion,rates,facilities,GameMoney(number(fuel[0][1])),quests,provenance,delivery,
+            DrivingIncomeRules(expansion.rules,drive.n("daily_cap_meters"),GameMoney(drive.n("income_per_km")))))
     } catch (_:IllegalArgumentException) { ContractResult.Failure(ContractError.INVALID_INPUT) }
       catch (_:IllegalStateException) { ContractResult.Failure(ContractError.INVALID_INPUT) }
 }
