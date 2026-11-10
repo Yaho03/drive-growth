@@ -51,6 +51,7 @@ class SqliteGameChangeStore(
     val delivery = DeliveryLedger(this)
     val driving = DrivingLedger(this)
     val observedDriving = SqliteObservedDrivingJournal()
+    val restDriving = SqliteRestDrivingJournal(this)
     fun activateObservedDriving(profileId:ProfileId) = atomic { db -> observedDriving.activate(db,io.drivegrowth.app.host.GameIdentity(profileId,source)) }
     fun observedDrivingReceipt(driveId:String):ContractResult<io.drivegrowth.app.host.driving.ObservedDrivingReceipt?> = atomic { db ->
         val p=when(val r=localProfileId()){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
@@ -111,6 +112,8 @@ class SqliteGameChangeStore(
             "SELECT 1 FROM settlements WHERE request_id=?",
             "SELECT 1 FROM visits WHERE id=?",
             "SELECT 1 FROM facility_command_results WHERE request_id=?",
+            "SELECT 1 FROM rest_departures WHERE request_id=?",
+            "SELECT 1 FROM rest_log WHERE kind='CONSUME' AND key=?",
             "SELECT 1 FROM gacha_requests WHERE request_id=?",
             "SELECT 1 FROM delivery_requests WHERE request_id=?",
             "SELECT 1 FROM material_requests WHERE request_id=?",
@@ -129,11 +132,13 @@ class SqliteGameChangeStore(
         if (domain == RequestDomain.DELIVERY && change.kind != TransactionKind.DELIVERY ||
             domain == RequestDomain.DRIVING && change.kind != TransactionKind.DRIVING)
             return failure(ContractError.INVALID_INPUT)
-        for (table in listOf("visits", "facility_command_results", "gacha_requests", "delivery_requests", "material_requests", "repair_requests", "initialization_requests", "first_gift_requests", "first_gift_markers", "quest_claims")) {
+        for (table in listOf("visits", "facility_command_results", "rest_departures", "gacha_requests", "delivery_requests", "material_requests", "repair_requests", "initialization_requests", "first_gift_requests", "first_gift_markers", "quest_claims")) {
             val key = if (table == "visits") "id" else "request_id"
             if (db.rawQuery("SELECT 1 FROM $table WHERE $key=?", arrayOf(id)).use { it.moveToFirst() })
                 return failure(ContractError.STATE_CONFLICT)
         }
+        if(db.rawQuery("SELECT 1 FROM rest_log WHERE kind='CONSUME' AND key=?",arrayOf(id)).use{it.moveToFirst()})
+            return failure(ContractError.STATE_CONFLICT)
         // 기능 소유 이력이 있는 ID는 같은 명령처럼 보여도 GENERAL 재생 대상이 아니다.
         for ((table, expression) in listOf(
             "driving_drives" to "'drive/' || drive_id",
@@ -334,7 +339,7 @@ internal enum class LedgerFailureReason { SQLITE, CORRUPT, UNSUPPORTED_SCHEMA, S
 private class LedgerStorageException(val reason: LedgerFailureReason) : SQLiteException(reason.name)
 
 private class LedgerHelper(context: Context, name: String, private val source: InputSource, private val initialGachaProgress: GachaProgress?) : SQLiteOpenHelper(
-    context, name, null, 15,
+    context, name, null, 16,
     // Android 기본 핸들러의 손상 DB 삭제를 막고 원본을 보존한다.
     DatabaseErrorHandler { throw LedgerStorageException(LedgerFailureReason.CORRUPT) },
 ) {
@@ -363,13 +368,14 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         SqliteObservedDrivingJournal.createTables(db)
         RentalProductStorage.createTables(db)
         FacilityCheckpointStorage.createTables(db)
+        RestAtomicStorage.createTables(db)
         initialGachaProgress?.let { GachaLedger.insertInitialProgress(db, it) }
     }
     private fun createDiscoveries(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE discoveries (vehicle_id TEXT NOT NULL, rarity TEXT NOT NULL, PRIMARY KEY(vehicle_id, rarity))")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion !in 1..14 || newVersion != 15) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
+        if (oldVersion !in 1..15 || newVersion != 16) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
         verifySource(db)
         // 기존 원장과 개체 JSON은 그대로 보존한다.
         if (oldVersion == 1) RentalLedger.createTables(db)
@@ -394,7 +400,8 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         if(oldVersion<12) DeliveryCheckpointStorage.addColumns(db)
         if(oldVersion<13)SqliteObservedDrivingJournal.createTables(db)
         if(oldVersion<14)RentalProductStorage.createTables(db)
-        FacilityCheckpointStorage.createTables(db)
+        if(oldVersion<15)FacilityCheckpointStorage.createTables(db)
+        RestAtomicStorage.createTables(db)
     }
     /** 이 버전은 세 실제 사건 hook과 함께 공급한다. onCreate 재진입 없이 이미 발급한 profile을 전달한다. */
     private fun beginQuestTracking(db: SQLiteDatabase, fresh: Boolean) {
