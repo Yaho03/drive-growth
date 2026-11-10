@@ -23,7 +23,7 @@ internal object RentalProductStorage {
     fun read(db:SQLiteDatabase,id:GameIdentity):ContractResult<RentalProductState> {
         val marker=db.rawQuery("SELECT profile,source FROM rental_product_marker",null).use{if(!it.moveToFirst())false else {if(it.text(0)!=id.profileId.value||it.text(1)!=id.source.name||it.moveToNext())throw SQLiteException("자동영업 marker 출처/프로필 손상");true}}
         if(!marker) {
-            if(db.rawQuery("SELECT 1 FROM rental_product_state UNION ALL SELECT 1 FROM rental_product_inactive",null).use{it.moveToFirst()})throw SQLiteException("자동영업 marker 없는 이력")
+            if(db.rawQuery("SELECT 1 FROM rental_product_state UNION ALL SELECT 1 FROM rental_product_inactive UNION ALL SELECT 1 FROM visits WHERE host_command IS NOT NULL",null).use{it.moveToFirst()})throw SQLiteException("자동영업 marker 없는 이력")
             return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         }
         return db.rawQuery("SELECT profile,revision,payload,digest FROM rental_product_state",null).use {
@@ -56,10 +56,11 @@ internal object RentalProductStorage {
         val expected=RentalVisitCommand.encode(p.visit)
         if(it.text(0)!=expected)throw SQLiteException("자동영업 원래 방문 명령 불일치")
         val assigned=if(it.isNull(1))null else OwnedVehicleId(it.text(1))
-        db.rawQuery("SELECT owned_id,version,start,end,return_end FROM rentals WHERE id=?",arrayOf(p.visit.request.id.value)).use { row->
+        db.rawQuery("SELECT owned_id,version,start,end,return_end,rounding,regular_customer FROM rentals WHERE id=?",arrayOf(p.visit.request.id.value)).use { row->
             val exists=row.moveToFirst()
             if(assigned==null && exists)throw SQLiteException("재방문 결과에 대여 이력 있음")
             if(assigned!=null && (!exists||row.text(0)!=assigned.value||row.text(1)!=p.visit.terms.rules.value||row.integer(2,0,Long.MAX_VALUE)!=p.visit.terms.start.value||row.integer(3,0,Long.MAX_VALUE)!=p.visit.terms.start.value+p.visit.request.hours*3600000L||row.integer(4,0,Long.MAX_VALUE)!=p.visit.terms.start.value+p.visit.request.hours*3600000L+p.visit.terms.returnMinutes*60000L))throw SQLiteException("방문 원래 대여 연결 불일치")
+            if(assigned!=null&&((if(row.isNull(5))null else row.text(5))!=p.visit.terms.rounding?.name||(if(row.isNull(6))null else row.integer(6,0,1)==1L)!=p.visit.terms.regularCustomer))throw SQLiteException("방문 원래 반올림/단골 입력 불일치")
         }
         true to assigned
     }
