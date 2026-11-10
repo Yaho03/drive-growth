@@ -138,3 +138,6 @@ PR이 main에 머지되거나 필요한 결과가 검토·인계되면 담당자
 
 
 2026-11-10 schema12 저장 인계: main177 위에 E b897의 Quest 원인/수령·typed 저널, Delivery 전체 원명령/Hold 후조건과 정식 fixture 수정을 통합했다. 기존 중앙 TrialDefinition을 확장하며 Driving13·Progress/Delivery Main·랭킹 진입은 포함하지 않는다. 현재 앱에 없는 Quest/Delivery 페이지의 보관 명령은 STATE_CONFLICT로 표시하고 원문을 보존한다. 기존 기능으로 실행/취소하지 않는다. E의 helper/data 검증본과 현재 main Runtime 보존 차이, 소비 호환은 [02](02_SYSTEM_ARCHITECTURE.md#questdelivery-schema12-저장-공급--2026-11-10), 실제 SQLite와 새 조합 검사 범위는 [06](06_VERIFICATION.md#questdelivery-schema12-통합-후보--2026-11-10)을 따른다. 기존 배정·assignee·전체 기능 완료 조건은 유지한다.
+
+
+2026-11-10 관측 주행 저장 공급: main178 위에 D 고정 recorder7파일과 E0681의 schema13 codec·같은 DB journal/원출발/Driving 정산을 통합했다. 원본의 고아 이력·raw NaN 동일성 수정/23개 실제 SQLite 근거와 새로운 main 조합 검증을 구분한다. main의 엄격 pending route·parkedSince와 기존 criteria4 결과를 유지한다. B52e Main/HostSession은 미포함이며 실제 receiver/calendar/SDK 관측 연결·정책·전원/프로세스/실차는 기존39/28/80~82의 후속이다. [02](02_SYSTEM_ARCHITECTURE.md#관측-주행-schema13-저장-공급--2026-11-10)·[06](06_VERIFICATION.md#관측-주행-schema13-통합-후보--2026-11-10)에서 공급과 한계를 확인한다.
