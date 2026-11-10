@@ -1656,6 +1656,17 @@ main182와 E 결합본의 정상 통합에는 충돌이 없었다. E 소유 28�
 새 통합 조합의 장치 실행은 0이다. 제품 DB/옛 APK migration, 실제 Main 경제 이탈 driver·구성 변경 분류, 시설 화면·Rest 연결, SDK·FGS·프로세스/전원·실차는 별도 미완료다. 확정 정책의 저장 공급과 실제 앱 수명 검증을 구분한다. 최종 head·원격 검사·main 반영은 해당 PR에서 확인한다.
 
 
+### 랭킹 공개 원인 조회 연결 검증 — 2026-11-10
+
+B 정확 e9007ea00a5b23058e7f660c170557802c9bd288의 소유5파일을 schema15 정확 e3f3a8a 후보 위에 정상 통합했고 모두 원본과 바이트 동일하다. 기존 MainActivity/HostSession/GameSessionFactory·시설 명령의 STATE_CONFLICT·E schema15 저장28파일과 원래 랭킹 시험을 보존했다. helper/schema/새 지갑/새 경제 논리는 변경하지 않았다. B 본인검증 provider8 중7 RED→같은8 GREEN·core420/app466·APK2/Lint0오류27경고는 원본 결과로 보존한다. C 최종 독립 검토는 소유5파일·649추적파일·읽기 API/SQL/JSON/집계 보존을 대조해 필수수정0으로 수용했다. C 직접 JVM28은 랭킹27과 기존 Intro 탐색1이며 추가 독립4를 포함한다. 다른 실행과 합산하지 않는다.
+
+A는 정확 e9007ea의 준비 APK 쌍을 설치해 정식 RankingProvenanceBindingTest9개를4.466초에 통과했다(실패/오류/생략0·최초1회·fixture/기대/소스 변경0). 공개 초기지급→정산 열람→Quest save/execute의 잔액1100/누적수익100·보유1, 공개 SIMULATION recorder가 저장한 원출발 zone/원정산의 주간15m를 확인했다. 다른 zone·미활성 legacy·활성 journal의 원영수증 없음은 Missing, Quest source/관측 digest/foreign profile 손상은 의존 지표 Failure, 미지원schema999는 전체조회 Failure다. 반복 snapshot·전체 사용자 테이블 행·DB SHA 동일과 VEHICLE DB 미생성 단언까지 완료했다. 손상 SQL 뒤 조회의 보존이며 조회가 손상을 수리한 결과가 아니다. Quest 정의 zone은 명시UTC, 관측은 고정 SIMULATION이고 실제 SDK D/P 입력이 아니다.
+
+A의 전체649소스와 원본 시험3파일·설치 pull SHA가 준비 APK/metadata와 일치했다. API34 ARM64/user10의 단독 구간은20:36:18~20:37:09KST이며19/19 제품·환경 보존, 자기2패키지/프로세스 정리와 슬롯 반환을 확인했다. A의 새 빌드는0이며 C도 A9 원문/footer/XML/해시/DB 보존을 별도로 대조했다. 원문·설치/소스 해시·보존 자료는 /private/tmp/drive-ranking-provenance-hooks-20261110/independent-device-review/ 및 independent-review/에 있다. 이 게시 준비에서 ADB 실행은0이다.
+
+새 schema15 조합에서는 core420·app471 시험이 실패/오류/생략0, 제품/시험 APK·Lint(오류0·경고27)가 성공했다.80 tasks를2분4초에 실행했다. 이 조합의 새 장치 실행은0이며 A의 원schema13 실행을 schema15 전체 기기 회귀로 바꾸지 않는다. 과거 읽기 모듈13+추가2·같은factory binding2·5c cold-wrapper1은 각 원본 범위로 유지한다. 실제 SDK 관측·Native 탐색/Back·프로세스/전원·실차·온라인 순위를 새로 시험한 것이 아니다. PR #183은 root가 main1a919af에 머지했다고 인계했으며 mainCI42809815840은 인계 시 진행 중이다. 최종 정확 head/CI/main 반영·#58 종료는 연결 PR/root가 판단한다. #28·#51의 넓은 미완료 조건은 유지한다. AI 보조 검토를 별도 사람 승인으로 표시하지 않는다.
+
+
 ### 전체 정산 이력 모듈 공급 검증 — 2026-11-10
 
 C 원본25c82c2의 전체 이력 reader·Results controller/mapper/Bundle/표시와 수정1ea3e6a를 main183 1a919af 위에 정상 통합했다. 모듈·시험14파일은 정확1ea와 모두 바이트 동일하며 MainActivity/HostSession·공통 factory·helper/schema/writer·E28은 main 그대로다. 옛 activity-hook.patch나 B의 미완료 제품 파일을 복사하지 않았다. README·이슈의 원격 반영은 root 담당이며 이 공급으로 전체 #54/#28을 완료 처리하지 않는다.
