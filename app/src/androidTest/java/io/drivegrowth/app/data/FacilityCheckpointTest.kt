@@ -106,4 +106,12 @@ class FacilityCheckpointTest:InstrumentationTestCase() {
     fun testSchema14UpgradePreservesWholeLedgerAndStartsWithNoNewTypedResults() {
         val before=rows().filterNot{it.startsWith("facility_command_results:")};store.close();raw{it.execSQL("DROP TABLE facility_command_results");it.version=14};store=open();ok(store.localProfileId());assertEquals(before,rows());raw{assertEquals(15,it.version)};assertNull(ok(store.hostCommands.facilityResult(profile,rest())))
     }
+    fun testIndependentCompletedRestingRequestIdCannotBeReusedByGeneralMoneyCommand() {
+        val command=rest("independent-shared-request");execute(command);finish(command);val before=rows()
+        val different=GameChange(command.requestId,TransactionKind.GARAGE,source,definition.rules,
+            MoneyChange(MoneyDirection.CREDIT,GameMoney(1)))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),store.commitGameChange(different))
+        assertEquals(before,rows())
+    }
+
 }
