@@ -1872,3 +1872,22 @@ A의 실제 설치 앱 SHA-256은 `6ffac6e4fa0bae025c806c547b559c0d2d43b603e8e18
 원24에는 무료 typed 결과/유료 공통 차감·원요청 재생·정의 미지원 복구·foreign slot/전역 ID·두 연결 한 승자·필수 쓰기 무삽입/늦은 손상 rollback·schema16 이전/실패 보존·schema17 누락표 거절이 포함된다. 별도 optional86은 실행하지 않았다. 새 결합본의 실제 기기 실행은0이며 원본27과 동일 APK로 표현하지 않는다. 실제 Main/Shop 미리보기·구매/적용·gate/Activity/프로세스·전체 기능/실차·#55/#28 완료는 남아 있다. 최종 아트 #189는 기능 구현 이후 적용한다.
 
 로컬 원본 근거는 `/private/tmp/drive-decoration-read-fix-20261110/green/independent-device-review/`, F 검토는 `/private/tmp/drive-decoration-delta-review-f-20261111/`, 최신 결합 로그는 `/private/tmp/drive-decoration-storage-root-validation-20261111.log`에 보존한다. `JAVA_HOME`·`ANDROID_HOME`과 기존 cache를 환경 변수로 지정했고 Gradle `--offline --no-daemon --max-workers=1`, 명령 한정 JVM `-Xmx2048m -XX:TieredStopAtLevel=1 -XX:-UseOnStackReplacement -XX:ReservedCodeCacheSize=512m`, Kotlin in-process를 사용했다. 개인 경로 설정·키·APK·로그는 커밋하지 않는다. 저장소/링크·diff 검사와 원격 게시 결과는 PR에서 실제 확인 후 연결한다.
+
+
+## 전경 휴식 생산자 원입력 재시도 검증
+
+검토 원본은 부모 `79e5d1458a60439007996bb9571eed230374930f` + source patch SHA-256 `9c376a582ed380a37b7fb6eb4f4abf9d78a1cb106c9afd9c54a779f184b0ae86`의 source723이다. root는 최신 꾸미기17 공급과 결합하며 소유5파일이 원본 SHA와 바이트 동일함을 확인했다. 기존 Main/HostSession/SDK/core/DB·규칙 수치는 변경하지 않았다.
+
+| 출처 | 실행과 한계 |
+|---|---|
+| D 원반례·C 수정 | 원 previous recognition 복원으로 같은 입력 재시도 뒤 출발이 사라지는 R1 세 사례와 source가 다시 reduce해 drive ID를 바꾸는 R2를 원 기대값으로 보존. R1 원본28+추가4를 수정 후 통과 |
+| F 독립 검토 | 원723·ABI/provider=null 본문·단일 슬롯/실패 구분과 직접 JVM32 통과. 제품 필수 수정0. DEVICE_PLAN의 기존3 DB prefix 누락1은 계획만 정정, source/APK/기대값 불변을 대조 |
+| A 실제 수정 전 | 같은 시험 APK의 old source 비교1은 정상 JUnit 실패1·오류0, 1.904초. capture rollback·원 batch drive2·12표 보존 뒤 line98의 같은 exit 재시도가 STATE_CONFLICT. 후행 금융/재생 단언은 미도달 |
+| A 실제 수정 후 | RestSourceRetryTest5 모두 통과(12.217초), provider=null 기존3 모두 통과(0.313초). 원drive2·ID2회·준비 batch provider 재호출 없음·원요청 ID, 금융15·소모100000ms/잔여1100000ms, 새 factory 재개방의 같은 원결과/receipt와12표 불변까지 확인 |
+| root 최신 결합 | 앱667개, 실패/오류/생략0. APK·시험 APK·Lint 성공(오류0/경고27), 2분26초·78작업 모두 실행. 동일 core444는 기존 근거를 재사용하며 새 실행으로 세지 않음 |
+
+A는 다른 frame/receiver/clock/pause와 실제 previous revision의 충돌/원제안 보존, provider 준비 실패 전 만든 ID 유지, capture 성공 뒤 금융 drain 실패에서도 다음 입력 capture와 fault 제거 후 원순서 재생을 확인했다. 이전 RED를 새 성공에 합산하지 않는다. 실제 source/helper/SQLite와 명시 SIMULATION 입력이며 실제 SDK·장소 권위·실차·제품 Main 연결·프로세스 사망 전 미저장 제안 복원은 시험하지 않았다.
+
+계획 정정본 SHA-256은 `74400b30d873aa3e26a4e9a235a0b5b037c97225de0e488b65568f87dc2595b7`이다. 새5의 `rest-source-retry-<source>-<nano>.db`와 기존3의 `driving-source-fixture-<source>-<nano>.db`를 모두 명시하고 이전 계획을 보존했다. 동일 시험 APK는 `07249435f97b1f76f13a5f355753f74c5ab3a925c9b7d2ee81146bd1b37c1c51`, 설치 pull old app은 `8cd900134866021faa2e1d38e3edcf2ac2358727abbe0ea6d329da571f587e8a`, new app은 `030efd3f7a88fd71df7dde3a1a68b9112a8d9a1bca84ef90dd2d3ea1289d609b`다. A 장치 사용은 2026-11-11 01:23:23~01:25:37 KST, 환경/제품19/19 보존·자체 DB/패키지 정리·슬롯 반환을 확인했다. root/F/C는 이 실제 실행에서 adb를 사용하지 않았다.
+
+원본은 `/private/tmp/drive-rest-producer-retry-fix-20261111/independent-device-review/`, F 독립 대조는 `/private/tmp/drive-rest-retry-review-f-20261111/`, root 결합 로그는 `/private/tmp/drive-rest-retry-root-validation-20261111.log`에 보존한다. 최신 main 결합 APK의 실제 장치 실행은0이며 A 원본 쌍과 구분한다. Main의 원입력 보관·명시 등록/활성화·현재 SDK/장소 증거·Rest UI 및 #40/#51/#28 전체는 남는다. #189는 기능 구현 뒤 적용한다.

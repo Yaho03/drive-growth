@@ -470,7 +470,7 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 
 | 구간 | 현재 제공 | 남은 공급과 책임 |
 |---|---|---|
-| 공통 타입·단일 거래 | `core.contract`의 필수 개체 필드·전체 명령/결과·오류와 메모리 참조/소비 fixture, Quest·Delivery·Driving/Rest 입출력, #192 꾸미기 순수 계약까지 main 공급 | [계약 후속 #121](https://github.com/Yaho03/drive-growth/issues/121)의 명령·조회·단위/범위·재생/충돌·미지원·fixture 공급 범위는 충족했다. 이슈 체크/종료는 해당 근거를 대조해 처리하며 실제 저장·제품/장치 완료와 구분한다. 미정 업적·온라인·legacy 복구 정책을 새 계약 완료 게이트로 추가하지 않음 |
+| 공통 타입·단일 거래 | `core.contract`의 필수 개체 필드·전체 명령/결과·오류와 메모리 참조/소비 fixture, Quest·Delivery·Driving/Rest 입출력, #192 꾸미기 순수 계약까지 main 공급 | [계약 후속 #121](https://github.com/Yaho03/drive-growth/issues/121)의 명령·조회·단위/범위·재생/충돌·미지원·fixture 공급 범위는 완료 조건과 근거를 대조해 종료했다. 실제 저장·제품/장치 전체 완료와 구분한다. 미정 업적·온라인·legacy 복구 정책을 새 계약 완료 게이트로 추가하지 않음 |
 | 공용 저장 | 같은 DB의 초기화/선물·typed checkpoint(#169), Quest·Delivery schema12(#178), 관측 Driving13(#179), Rental·시설15(#183), Rest16(#191), 꾸미기17(#194)과 기존 Gacha/Material/Repair·이력 조회를 공급. #173 같은 factory 소비도 제공 | [저장 후속 #122](https://github.com/Yaho03/drive-growth/issues/122)는 새 조합의 요청 ID/원결과·원자 실패·지원 이전/재개방 중 미증명 조건을 확인한다. #194 원 SQL27과 새 결합 앱635의 검증 수준을 구분하며 실제 꾸미기 Main/Shop 소비는 별도다. C 관측 생산자의 원입력 재시도, 실제 장소/SDK·제품 수명·통합/장치 조건은 각 기능·#28·#80~#82에서 별도 확인 |
 | PR #111 | main `094ee59` 반영. #126의 전체 GachaCommand를 보존·재제출하고 저장소의 최초 전체 결과를 소비. 동일 ID·다른 입력과 마지막 칸 경쟁의 이전 두 P1 해결 | 실제 SQLite #136·공용 금액 #139와 콘텐츠→SQLite 시험 #145는 main 제공. #169 무료권/최초 선물 저장과 #173 제품 가챠 소비/확정 뒤 재실행까지 공급해 #47 core·저장은 완료. 남은 화면 조건은 #52 |
 | PR #116 | main `0799eb5` 반영. VehicleHistoryStore와 CompletedRentalSource의 이력/발견·완료 영업/사고 조회 제공. 입력 snapshot·정산 연결·원시 값의 세 지적 해결 | 이력 부재만으로 신규 프로필을 판정하지 않음. 실제 표시 발견 이벤트는 #37/#46/#53 후속. 무료권·다중 강화·초기화 core/저장은 #156/#169/#173으로 공급 |
@@ -845,3 +845,12 @@ main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결
 차감·소유/선택/revision·당시 정의·원결과·host STARTED를 같은 거래에서 확정한다. `HostCheckpointCommand.Decoration`의 save→execute→finish를 기존 checkpoint에 연결하고, 같은 거래에서 실제 SAVED→STARTED를 확인한 경우만 내부 신규 확정 경로를 쓴다. 원결과 없는 기존 STARTED는 공개 commit/execute 모두 DATA_UNAVAILABLE로 보존하며 현재 정의 조회·새 차감·소유 쓰기를 하지 않는다. 원결과가 있으면 현재 정의가 없어도 당시 결과를 재생한다. 다른 기능의 slot은 실행·취소·교체하지 않는다.
 
 전체 이력의 revision 연속성·원명령/정의/상태·공통 원정산을 대조한다. 금융 원문의 balance/at 소수가 공통 객체 변환 중 절삭돼도 꾸미기 경계의 canonical 원문 비교에서 STORAGE_FAILURE로 거절한다. 실패는 기존 atomic 경계에서 전체 rollback하며 무료 결과에 가짜 0원 정산을 만들지 않는다. Main/Shop UI 등록·실제 preview/확정·화면 재생성은 별도 소비 작업이며 #55 전체 완료로 처리하지 않는다. 실행 범위는 [검증 문서](06_VERIFICATION.md#가게-꾸미기-schema17-저장-공급-검증)를 따른다.
+
+
+### 전경 휴식 증거 생산자와 원입력 재시도
+
+`ForegroundRestObservationProducer`는 같은 serial worker에서 당시 receiver·boot/domain·원 차량 관측·장소 Observation을 받아 `RestObservationProvider`의 원 context/출발 batch를 준비한다. DB·지급·SDK 영역 판별을 수행하지 않으며 장소/시각 권위가 부족하면 Missing을 보존한다. 출처·연속성·gap·P/UX·규칙을 기존 검증에 넘기고, 현재 위치로 과거 장소를 보충하지 않는다.
+
+생산자는 같은 previous/next 전체 제안의 재시도에서 계산한 recognition과 batch를 재생한다. `SessionObservedDrivingSource`의 Rest 경로도 최초 reduce 결과·drive ID·전체 입력/실제 previous 원문과 준비된 batch를 단일 메모리 슬롯에 보존한다. capture 실패 뒤 같은 입력은 새 ID/provider batch를 만들지 않는다. 다른 frame·receiver·clock·pause·provider·actual previous/revision은 원 제안을 덮지 않고 STATE_CONFLICT다. capture가 실제 거래로 확정된 뒤 슬롯을 해제하므로 별도 금융 drain 실패가 다음 관측을 옛 제안에 묶지 않는다. 내부 자동 반복·재귀·누적 큐는 없다. provider=null의 기존 저장·지급 본문은 유지한다.
+
+이 경계는 같은 source 인스턴스의 미확정 제안 재시도이며 디스크 큐/프로세스 사망 전 미저장 입력 복원을 새로 보장하지 않는다. 호출자는 실패한 원 frame/clock의 재시도와 수명 종료 순서를 보존해야 한다. 새 producer는 같은 session worker에서 같은 store.atomic 안의 `restDriving.projectionIn(db, identity)`를 먼저 검증하고 `RestAtomicStorage.contexts(db, identity).map { it.value }`의 원 ordinal 순서를 읽어 성공한 전체 목록만 restore한다. contexts 단독·별도 거래 조회·elapsed 재정렬·실패를 빈 목록으로 보정하지 않는다. 실제 Main/HostSession 등록·opt-in·boot/domain/장소 권위 공급·정책·전체 SDK/프로세스 검증은 별도다.
