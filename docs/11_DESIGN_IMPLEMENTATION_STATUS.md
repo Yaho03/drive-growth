@@ -85,7 +85,7 @@
 | 가챠 | [가챠](design-assets/ui-v3/5a-landscape-gacha.png) 시안. `GachaView`·별도 호스트 있음 | 가격·확률·보장 안내를 최신 공급값으로 표시하고 추첨 전 확인·처리 중·차량 결과의 모습을 통일한다. 구 시안의 3,000을 그대로 복사하지 않는다. | 공통 탐색, 실제 권한·명령·저장 및 중단 복원 연결 |
 | 퀘스트·업적 | [퀘스트·업적](design-assets/ui-v3/5c-landscape-quests-achievements.png) 시안. `ProgressView`의 독립 표시 UI 있음 | 진행·잠금·청구 가능·수령·만료를 한눈에 구분하고 목록·상세·보상 확인을 다듬는다. | 실제 정의·진행·보상·저장 결과 공급 |
 | 휴식 | [휴게소](design-assets/ui-v3/4c-rest-stop-open.png)·[보너스 설명](design-assets/ui-v3/4t-rest-bonus-info.png) 시안. 휴식 상태 표시 UI 있음 | 주차 중에 조건·대기·적용·판정 불가를 차분하게 설명하는 카드와 문구를 다듬는다. 운전을 재촉하는 카운트다운·게임 알림을 새로 넣지 않는다. | 실제 휴식 판정·보상 상태 공급. 음성 허용·플랫폼 검증은 별도 기준 확인 |
-| 랭킹 | [랭킹](design-assets/ui-v3/5d-landscape-ranking.png) 시안 있음. 확인한 앱 UI 경로에는 전용 랭킹 View 없음 | 비교 부문·내 순위·동률·빈 목록·조회 실패를 표현할 실제 Android 화면을 제작한다. | 실제 집계·조회 경로와 온라인 범위에 맞는 연결 필요. 시안만으로 온라인 기능 완료로 표시하지 않음 |
+| 랭킹 | [랭킹](design-assets/ui-v3/5d-landscape-ranking.png) 시안 있음. 확인한 앱 UI 경로에는 전용 랭킹 View 없음 | 실제 내 기록과 시연용 예시를 구분하고 지표·기간·누락/빈 목록·조회 실패를 연결한다. 최종 미술 작업은 디자인팀 WIP 기준을 따른다. | [PRD 1차 범위](01_PRD.md#1차-랭킹-범위) 확정, 실제 구현·검증은 미완료. 온라인 사용자 간 순위는 향후 연결 |
 
 코드 확인 위치: [공통 탐색](../app/src/main/java/io/drivegrowth/app/MainActivity.kt), [기능별 UI](../app/src/main/java/io/drivegrowth/app/ui/). 이 표는 비교 기준 커밋의 코드 현황이며 이슈의 현재 담당·ready·종료 상태를 대신하지 않는다.
 
