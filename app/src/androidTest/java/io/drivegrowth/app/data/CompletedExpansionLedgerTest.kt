@@ -68,6 +68,12 @@ class CompletedExpansionLedgerTest : InstrumentationTestCase() {
         assertExpansionFailure(ContractError.STATE_CONFLICT)
         assertEquals(GameMoney(1000),ok(store.balance()))
     }
+    fun testOtherDomainUppercaseRequestIsNotAnOrphanRental() {
+        ok(store.commitGameChange(GameChange(RequestId("RENTAL/SETTLE/ordinary"),TransactionKind.GARAGE,source,rules,
+            MoneyChange(MoneyDirection.CREDIT,GameMoney(0)))))
+        assertEquals(0,ok(store.rental.completedRentalCount()))
+        assertExpansionFailure(ContractError.STATE_CONFLICT)
+    }
     fun testAssignedButUnsettledRentalIsNotCompletedCustomer() {
         assign(0);assign(1);assign(2)
         assertEquals(3,ok(store.rental.shop()).progress.servedCustomers)

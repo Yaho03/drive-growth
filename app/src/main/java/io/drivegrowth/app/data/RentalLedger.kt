@@ -192,7 +192,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         }
         // 공용 정산만 남은 대여를 정상 완료나 단순 미완료로 보정하지 않는다.
         db.rawQuery("""SELECT 1 FROM settlements s LEFT JOIN rentals r ON r.settlement_request=s.request_id
-            WHERE s.request_id LIKE 'rental/settle/%' AND r.id IS NULL LIMIT 1""", null).use {
+            WHERE substr(s.request_id,1,14)='rental/settle/' AND r.id IS NULL LIMIT 1""", null).use {
             if (it.moveToFirst()) throw SQLiteException("대여 없는 완료 정산")
         }
         return rentals.size
