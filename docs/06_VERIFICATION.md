@@ -1632,3 +1632,12 @@ E 정확 `0681fbfed4d7faa76fc557a50a001abd97512ed0`은 F 독립 재검토 `APPRO
 최신main178 위에 recorder import21cb·codec8a548·저장bbbc·수정0681의 기능 커밋만 통합했다. 변경24소스/시험은 E0681과 모두 동일하고 D recorder7파일도 그대로다. Garage의 이미 존재하는 foreign 분기 순서 충돌은 main 코드를 유지했고 schema13 정식 fixture는 A가 검증한 최종 원문을 보존했다. Main/HostSession B52e·제품UI·랭킹은 포함하지 않는다. 새 main 조합에서 core420·app344 시험이 실패/오류/생략0으로 통과했고 APK·시험 APK·Lint(오류0·경고23)가 성공했다. 80개 task를 실행해2분4초에 완료했으며 저장소21/29/428·diff 검사도 통과했다. 정확head·원본동일성은 연결 PR 인계를 따른다.
 
 이 통합본의 새 기기 실행은0이다. 원본 schema12 Quest54/Delivery17과 Driving23을 새 schema13 전체장치회귀로 합산하지 않는다. 실제 SDK D/속도/도착·Main receiver/calendar·onStop/프로세스·FGS/전원·실차·정책 허용과 전체39/28 완료는 후속이다. 과거42조건 대조의 root 적용4체크와45부분판정은 유지한다. AI검토를 사람승인으로 표시하지 않고 root가 원격CI/게시·머지를 담당한다.
+
+
+### B 제품 연결 고정본의 게시 준비 — 2026-11-10
+
+main179가 B5c9514d5의 조상임을 확인하고 새 후보에서 정상 merge했다. 최초 전체 트리가 B고정본과 동일했고, 추가 문서 뒤에도 app/src·core·Gradle은 고정본과 동일하다. main 대비67파일(제품/시험·설정64, 기존B문서3)의 출처를 고정했고 기존 app/data·core·RentalLedger는 main과 동일하다. 새 제품 논리나 fixture 수정은 하지 않았다.
+
+B 본인검증은 af48의 결정적 Intro회귀 RED3/6→같은6GREEN, 표적16·core420/app458·APK/시험APK/Lint0오류27경고다. 검증af48과5c의 app/core/Gradle 동일성을 대조했고 원본APK두개의SHA도 B보고와 일치했다. 이 게시 준비에서 전체Gradle을 반복하지 않았다. 새 저장소·링크/diff 검사와 최종head는 인계에 기록한다.
+
+Progress의 기존 Native8fc 첫플레이1과 fixture수정dac의SQLite13, 랭킹원3d BackFAIL과1a5 cold-wrapperPASS, Driving0681 A23은 각각 정확원본의 독립 근거다. 과거랭킹FAIL 원인을 새 Intro race 하나로 확정하지 않는다. **새5c 실제cold/화면 회귀 결과와 D Intro최소delta 독립검토 결과는 미수신**이며 아직 게시/머지 대기다. 기기실행0인 본 준비를 새통합 장치성공으로 합산하지 않는다. 실제 SDK/내비도착 상관·권한·gate·프로세스/전원·실차·자동영업/시설·새경제원점정책은 각 실제검증 범위를 확인해야 한다.

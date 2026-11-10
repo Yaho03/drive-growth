@@ -722,3 +722,12 @@ D의 고정 관측 recorder7파일과 E `0681fbfe`의 저장 공급을 main178 �
 schema13은 marker·전체 상태 revision CAS·원출발 provenance를 같은 DB에 보존한다. 기능은 worker의 `activateObservedDriving(profileId)`로 명시 활성화하며 조회가 새 프로필/재화·빈 상태를 만들지 않는다. raw 비유한 관측은 gap의 double bits로 보존하고 canonical 원문으로 전체 동일성을 비교한다. 같은 거래에서 save→기존 DrivingLedger 정산→최초 결과 검증→provenance 저장/재조회→outbox ack를 처리한다. 실패·손상·출처 혼합·필수 쓰기 무갱신은 실패로 전달하고 원래 결과 재생은 현재 상태보다 우선한다. marker 없이 이력이 남은 고아 상태를 미활성으로 숨기지 않는다.
 
 출발 당시 UTC/zone/rules와 원정산을 보존하고 현재 zone/날짜로 legacy 기록을 재해석하지 않는다. 금액은 기존 중앙 TrialDefinition의 drivingIncomeRules와 DrivingLedger를 재사용하며 일500km·출발한 날 기준을 바꾸지 않는다. 휴식 효과·미관측 구간을 합성하지 않는다. main178의 foreign 명령 STATE_CONFLICT·빈 checkpoint만 null인 조회와 RentalLedger Pending.parkedSince/엄격 조회를 보존했다. 실제 신호 수신·제품 수명 연결·플랫폼/정책 허용은 이 저장 공급의 완료와 별도다.
+
+
+### 공용 세션의 제품 페이지 연결 후보 — 2026-11-10
+
+B 고정5c9514d5의 후보는 main179의 저장 공급 위에 Delivery·Progress·랭킹 페이지와 실제 내비 어댑터·관측 Driving 전달을 조립한다. 같은 GameSessionFactory/단일 worker와 기존 typed journal을 소비하며 새로운 지갑·data/helper/schema를 만들지 않는다. pending 조회의 ContractResult 실패는 그대로 전달하고, 실제로 연결한 Quest/Delivery만 해당 페이지로 안내한다. null은 보관 명령이 없을 때만 허용하며 다른 기능의 명령을 실행/취소하지 않는다. 기존 parkedSince와 schema13 원문은 유지한다.
+
+NEW Intro 자동 진입은 아직 명시 탐색하지 않은 HOME에서만 허용한다. 늦은 Intro로 명시 탐색/Back의 HOME복귀·복원 페이지를 덮지 않으며 이 UI 기억을 신규 판별/지급 증거로 사용하지 않는다. 기존 안전 gate, SDK UI-thread 큐/worker 경계·timeout/deadline과 원래 성공/실패 의미는 B 고정본 그대로다. NaviHelper3.0.5와 기존 제품 연결에 필요한 NAVI_ROUTE/NAVI_ROUTE_SEARCH 선언을 포함하며 정책 허용/실제 도착의 보장은 아니다.
+
+자동 영업 순수 방문 계획·선저장 포트가 포함되지만 실제 자동 영업 전체·시설/배치·새 종료영업 정책의 구현은 별도다. PR180의 실제 앱 이탈 경제 원점 정책과 Activity 재생성 구분을 코드에 반영한 것으로 표시하지 않는다. D 최소 Intro 검토와 A의 정확5c cold/실제 화면 검증 결과가 미수신이므로 최종 머지 판정은 대기한다.
