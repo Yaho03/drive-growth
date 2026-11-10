@@ -74,6 +74,9 @@ internal class MaterialLedger(private val store: SqliteGameChangeStore) {
         store.insertSettlement(db, command.requestId, encoded, MaterialJson.receipt(result))
         db.execSQL("INSERT INTO material_requests VALUES (?,?,?,?)", arrayOf(command.requestId.value, encoded,
             MaterialJson.state(current).toString(), MaterialJson.result(result).toString()))
+        if(store.findVehicle(db,result.target.ownedVehicleId)!=result.target ||
+            store.findVehicle(db,result.material.ownedVehicleId)!=result.material || store.readBalance(db)!=result.balance)
+            throw android.database.sqlite.SQLiteException("재료 실제 대상/소비/재화 쓰기 불일치")
         val event = store.quests.onVehicleChanged(db, current.target.vehicle, result.target, MaterialJson.receipt(result))
         if (event is ContractResult.Failure) return@atomic event
         ContractResult.Success(result)
