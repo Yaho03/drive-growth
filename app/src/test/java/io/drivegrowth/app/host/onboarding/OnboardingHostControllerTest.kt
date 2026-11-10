@@ -109,6 +109,12 @@ class OnboardingHostControllerTest {
         h.source.snapshot=h.source.snapshot.copy(initialization=newState().copy(status=ProfileInitializationStatus.Existing(first)),gift=ContractResult.Success(completedGiftState().copy(source=InputSource.SIMULATION)))
         h.load();assertEquals(0,h.source.giftClaims);assertTrue(h.frames.last().first is OnboardingScreenState.LoadError)
     }
+    @Test fun mismatchedOriginalProfileIsRejectedBeforeAnyGiftCommit() {
+        val h=Harness();val first=result(newState(),FirstGrant.CANDIDATES.first())
+        val foreign=first.copy(command=first.command.copy(profileId=ProfileId("foreign")))
+        h.source.snapshot=h.source.snapshot.copy(initialization=newState().copy(status=ProfileInitializationStatus.Existing(foreign)),gift=ContractResult.Success(completedGiftState()))
+        h.load();assertEquals(0,h.source.giftClaims);assertTrue(h.frames.last().first is OnboardingScreenState.LoadError)
+    }
     @Test fun originalViewPendingLockCanRetryAfterGateCancelsQueuedCommit() {
         val h=Harness();val input=OnboardingInteraction(h.host::onEvent)
         h.host.attach({state,enabled->assertTrue(input.render(state,enabled));input.restoreSelection(h.host.uiState.selected)},{h.shops++})
