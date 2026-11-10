@@ -1727,3 +1727,29 @@ A최종앱76150b8ac71c73e8ec00264f6876f33f62e9939dfbec754cee12a1d31302e639·시�
 새main187조합앱524는실패/오류/생략0이며위치24가이524에포함된다. 제품/시험APK·Lint0오류27경고는78tasks/2분18초에성공했다. 병합Manifest에서앱min28/target34,명시권한과SDKbinding권한·SDK1.1.3/서비스최소0.5.0metadata를확인했다. core와공통Gradle입력은같아core420은이전실행근거로재사용/이번재실행0이다. 저장소21/29/450·diff검사도통과했다. 이조합의새기기/ADB/원격쓰기0이며A660진단을새제품APK의실제실행으로쓰지않는다.
 
 실제B Main/HostSession의동의·권한dialog·전경수명/캐시무효화·close예외처리,센서clock축/신선도/정확도·장소inside/outside·휴식/주차/출발적격성·Rest지급,실제서비스미지원/강제오류/release실패주입·UI정체·background/프로세스/전원·실차는별도미검증이다. source=VEHICLE/Available을실차/휴식인정으로확대하지않고공공215점의임의반경/영역을만들지않는다. 이미완료한#13기준환경이슈는보존하고#40/#51/#28/#81의부분공급/잔여조건만별도로연결한다. AI검토는사람승인이아니며정확게시head/CI/main반영은root가확인한다.
+
+
+### 제품 영업·시설·정산 호스트 연결 검증 — 2026-11-10
+
+정확 B0dd969f37fd588a7cea60be2694b812de1ad099e의 소유18파일과 main187의 data/core/Gradle/Manifest 보존을 직접 대조했다. 원본 본인검증 core420/app519·APK/시험APK·Lint 오류0/경고27과 마지막 OS clock 계측 추가 뒤 UP-TO-DATE 재확인은 별도 실행으로 합산하지 않는다. stub 시점의 같은 복구8개 중7실패와 구현 뒤8통과도 원본 기록으로 보존한다.
+
+독립 검토는 C의 UI/gate34, D의 시간/원관측20, F의 금융복구23(기존22+독립1)을 각각 실행해 필수 수정0으로 수용했다. 세 그룹에는 겹치는 기존 시험이 있으므로 합산해 새 고유 시험 수로 표시하지 않는다. F가 검토 중 제기한 giftAttempt 실패 표식은 실제 Main/onboarding.refresh 재시도 연결을 대조한 뒤 확정 결함으로 채택하지 않았다.
+
+A는 원본 B의 격리 패키지 io.drivegrowth.verify.rentalproductb에서 아래65개 고유 메서드를 첫 실행에 모두 통과했다. 실패·오류·생략0, 정상 그룹 footer와 후행 단언 도달을 확인했다.
+
+| 그룹 | 결과 | 시간 |
+|---|---|---|
+| 새 실제 HOME cold | 1/1 | 18.484초 |
+| 새 영업 SIMULATION | 2/2 | 3.793초 |
+| 새 실제 OS clock | 1/1 | 0.018초 |
+| 기존 Results | 11/11 | 1.511초 |
+| 기존 Ranking | 9/9 | 3.844초 |
+| 기존 Rental | 41/41 | 10.129초 |
+
+HOME은 기본DB 없는 자기 새 패키지에서 실제 SDK P gate를 거쳐 UI 첫 지급→쉬기ON→재생성/같은원명령→확인→OFF→확인을 수행했다. 잔액1000·동일 캐스퍼/revision0·비금융 결과2/원 초기화 금융 정산1을 확인했다. 위젯 performClick이며 물리 좌표 터치/CCP 검증은 아니다. 영업SIM2는 공개 초기화·source/SQLite journal/runtime·원 대여 재접속 정산·첫 선물 한번 지급·새 factory 복원과 구성 변경의 미확인 구간/잔액 보존을 확인했다. boot/clock/customer/신호는 명시 모의 입력이다. OS clock1의 실제 BOOT_COUNT/UTC/elapsed 읽기는 이 모의 입력과 구분했다.
+
+A source manifest690 항목은 모두 일치했으나 실제 Git 추적 파일691 중 공식 접수양식 DOCX1개가 빠져 있었다. 이를 전체 추적파일 완전 manifest로 표현하지 않으며 A의 전체 SHA에는 포함했다. 앱 SHA81bbefb1ebf7a61b95c2f7803d23130d26b456aa3ca4a108169e82200468ed14와 시험SHA bf94d969f3bae036aacfd76385dc2b3ea839c8bc14cf34109d80bed294fd2686는 설치 후 pull과 같았다. 22:28:51~22:31:33 KST 단독 사용 후 제품/환경19항목 보존, boot24·자기 권한 원복·패키지/계측/forward 정리와 반환을 확인했다. 원문은 /private/tmp/drive-product-main-followup-20261110/independent-device-review/에 보존했다.
+
+HOME 로그의 driver_deferred=DATA_UNAVAILABLE 두 건은 남아 있으며 이번 배정에서 실제 D를 입력/수신하지 않았다. 실제 SDK D→이탈→재접속 영업, 물리 주행 종료·프로세스/전원·실차·최신 Main Results 전체 UI는 별도 미검증이다. 초기 P에서 과거 영업을 만들지 않는 상태와 실제 SDK 영업 성공을 구분한다. Rest·실제 위치/영역 등록·최종 디자인도 포함하지 않는다. 원65를 main188과 합친 새 APK의 장치 성공으로 확대하지 않으며 전체 #41~#44/#43/#51/#28 종료 근거로 사용하지 않는다.
+
+새 main188 조합은 B18파일과 기존 Location6·data/core/Gradle/Manifest를 직접 대조하고 앱543개를 실패·오류·생략0으로 실행했다. 제품/시험APK·Lint 오류0/경고27도 성공했다. 원본 B의 core420은 동일 입력의 실행 근거로 재사용하며 새 core 실행으로 합산하지 않는다. 문서 후속만 추가한 뒤 저장소/링크·diff를 재확인한다. 이 조합의 새 장치 실행은0이며 원본 A65와 구분한다.
