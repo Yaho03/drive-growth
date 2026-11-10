@@ -98,7 +98,14 @@ class ResultsHostActivityTest : InstrumentationTestCase() {
         val before = (source.read() as ContractResult.Success).value
         var current = instrumentation.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
         try {
-            awaitUi(current, "실제 P SDK 관측으로 탐색이 열려야 한다") { texts(current).contains("미확인 정산") }
+            awaitUi(current, "실제 P SDK 관측으로 탐색과 정산 선택 항목이 준비돼야 한다") {
+                val navigation = current.window.decorView.findViewWithTag<Spinner>("host:destination")
+                // 현재 gate를 읽기만 한다. HOME의 미선택 항목 TextView 표시를 요구하지 않는다.
+                val allowed = MainActivity::class.java.getDeclaredMethod("allowed").apply { isAccessible = true }
+                    .invoke(current) as Boolean
+                allowed && navigation != null && navigation.isShown && navigation.isEnabled &&
+                    (0 until navigation.count).any { navigation.getItemAtPosition(it).toString() == "미확인 정산" }
+            }
             ui { destination(current, "미확인 정산") }
             val openTag = "results:open:${stored.settlementId.value}"
             val markTag = "results:mark:${stored.settlementId.value}"
