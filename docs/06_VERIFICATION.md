@@ -1645,6 +1645,12 @@ Progress의 기존 Native8fc 첫플레이1과 fixture수정dac의SQLite13, 랭�
 
 ### Rental·시설 schema15 정상 통합 후보 — 2026-11-10
 
-원f99에서 A의 Rental32PASS8.263초·시설14PASS2.867초와19/19반환을 확인했다. 이후 F 독립 ID 반례1의 실제RED가 드러나 HOLD됐고 그 실패를 정상14PASS로 덮지 않는다. 후속 d8 최소수정과 exact0e55는 공용record의facility_command_results 소유ID 충돌검사를 보완한다. d8의 A 정식14+독립1 전체15PASS3.042초·원문/기대값 동일·같은ID STATE_CONFLICT 및 전체행 보존, F 코드승인/필수0과 E결합본 검증 범위를 구분하며 f99의Rental32가 바뀌거나 새결합에서 재실행된 것으로 쓰지 않는다. 제품DB/옛APK migration·실제Main/SDK/수명/전원/실차는 별도미검증이다.
+원본 f99에서 A가 격리 SQLite Rental 시험 32개(8.263초)와 시설 시험 14개(2.867초)를 각각 통과했고, 환경 보존 19개 항목을 확인했다. 이후 F의 독립 반례는 완료된 비금융 쉬기 요청 ID가 일반 금전 명령으로 재사용되는 실패 1개를 재현했다. 반환값 검증에서 실패해 당시 후행 행 보존 assertion은 실행되지 않았으며, 그 결과를 정상 14개 성공으로 덮지 않는다.
 
-main182와0e55의정상merge는충돌없음. E28파일은정확원본과같고 Main/HostSession/VehicleInput은현재main과동일하다. 추가호환은미연결시설/쉬기typedpending의명시STATE_CONFLICT와관련회귀뿐이며helper/data논리수정0·새UI/RestWIP0이다. 새 main조합 core420/app463 실패·오류·생략0, APK·시험APK·Lint오류0/경고27와저장소21/29/434·diff검사를통과했다. F보고는코드승인/당시device갱신대기이며A후속15근거를별도로확인했다. 최종exacthead검토·원격CI·머지는root가판정하고기기·제품전체완료로확대하지않는다.
+정확 d8 수정본은 공용 record의 `facility_command_results` 소유 ID 검사를 추가했다. A가 원래 14개와 동일한 독립 반례 1개, 총 15개를 3.042초에 통과했다. 같은 ID에 `STATE_CONFLICT`가 반환되고 후행 전체 행 보존 assertion까지 통과했으며, 새 기준 환경의 19개 보존 항목과 장치 반환을 확인했다. F는 원문 소스·설치 APK·시험 결과를 대조해 이 공급 범위에 필수 수정 0개로 수용했다. 별도 사람 승인을 뜻하지 않는다.
+
+E 결합본 `0e5532993f4a18f7955226b9814bf9394a6b2e00`은 f99에 최소 수정 2파일만 정상 통합했다. 원 Rental32 파일은 바뀌지 않았고 결합본의 앱 단위 332개·APK/시험 APK·Lint 오류 0/경고 22 검사는 별도 근거다. 이 결합본에서 Rental32 장치 시험을 다시 실행했다고 표시하지 않는다.
+
+main182와 E 결합본의 정상 통합에는 충돌이 없었다. E 소유 28파일은 원문과 같고 MainActivity·HostSession·VehicleInput은 main182와 동일하다. 추가 호환은 아직 미연결인 시설/쉬기 pending에 명시적 `STATE_CONFLICT`를 반환하는 경로와 회귀 1개뿐이다. 새 조합 코어 420개·앱 463개는 실패·오류·생략 0, 앱/시험 APK와 Lint 오류 0·경고 27, 저장소·링크 및 diff 검사를 통과했다. root도 E28 원문·공통 호스트 보존과 경로 표적 6개를 직접 확인했다. 첫 표적 재실행은 비어 있는 별도 Gradle 캐시의 offline 의존성 미해결로 실패했고, 기존 캐시에서 같은 검사가 성공했다. 이 환경 실패를 코드 결함이나 검사 성공으로 바꾸지 않는다.
+
+새 통합 조합의 장치 실행은 0이다. 제품 DB/옛 APK migration, 실제 Main 경제 이탈 driver·구성 변경 분류, 시설 화면·Rest 연결, SDK·FGS·프로세스/전원·실차는 별도 미완료다. 확정 정책의 저장 공급과 실제 앱 수명 검증을 구분한다. 최종 head·원격 검사·main 반영은 해당 PR에서 확인한다.
