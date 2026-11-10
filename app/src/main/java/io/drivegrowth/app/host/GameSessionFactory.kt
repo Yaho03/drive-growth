@@ -8,6 +8,7 @@ import android.database.sqlite.SQLiteException
 import android.os.Looper
 import io.drivegrowth.app.data.AssetGameContent
 import io.drivegrowth.app.data.InitializationAuthority
+import io.drivegrowth.app.data.MaterialVersions
 import io.drivegrowth.app.data.SqliteGameChangeStore
 import io.drivegrowth.core.content.ContentLoad
 import io.drivegrowth.core.content.GameContentSnapshot
@@ -90,7 +91,13 @@ class GameSessionFactory internal constructor(context: Context, private val data
                             FirstGrant.CANDIDATES.filter { id -> content.value.catalog.vehicles.any { it.vehicleId == id } &&
                                 content.value.vehicles.any { it.vehicleId == id } }.toSet()))
                     }
-                }, firstGiftContent = { content })
+                }, firstGiftContent = { content }, repairContent = { content },
+                materialVersions = {
+                    when (content) {
+                        is ContractResult.Failure -> content
+                        is ContractResult.Success -> ContractResult.Success(MaterialVersions(content.value.catalog.contentVersion, content.value.ruleVersion))
+                    }
+                })
             when (val profile = store.localProfileId()) {
                 is ContractResult.Failure -> { store.close(); profile }
                 is ContractResult.Success -> {

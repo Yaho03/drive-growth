@@ -99,7 +99,11 @@ class OnboardingLiveSqliteTest : InstrumentationTestCase() {
     }
     fun testGachaAuthorityFollowsSameStoredShopLevelAndCapacity(){
         val f=factory();initialize(f)
-        ok(f.open()).use{session->val before=ok(session.store.readGachaState());assertEquals(1,before.authority.shopLevel);assertEquals(3,before.authority.garageCapacity)}
+        ok(f.open()).use{session->val before=ok(session.store.readGachaState());assertEquals(1,before.authority.shopLevel);assertEquals(3,before.authority.garageCapacity)
+            val content=(session.content as ContractResult.Success).value
+            assertEquals(MaterialVersions(content.catalog.contentVersion,content.ruleVersion),ok(session.store.materialVersions!!.invoke()))
+            val repair=ok(session.store.readRepairState(OwnedVehicleId("initial-grant")))
+            assertEquals(content.catalog.contentVersion,repair.contentVersion);assertEquals(content.ruleVersion,repair.ruleVersion)}
         SQLiteDatabase.openDatabase(context.getDatabasePath(names.getValue(InputSource.VEHICLE)).path,null,SQLiteDatabase.OPEN_READWRITE).use{it.execSQL("UPDATE shop SET level=2,capacity=7 WHERE id=1")}
         ok(f.open()).use{session->val state=ok(session.store.readGachaState());val content=(session.content as ContractResult.Success).value
             assertEquals(2,state.authority.shopLevel);assertEquals(7,state.authority.garageCapacity);assertEquals(content.unlockedAt(2).map{it.vehicleId}.toSet(),state.authority.unlockedVehicles)}
