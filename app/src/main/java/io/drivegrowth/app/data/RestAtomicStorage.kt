@@ -44,6 +44,10 @@ internal object RestAtomicStorage {
  fun read(store:SqliteGameChangeStore,db:SQLiteDatabase,id:GameIdentity):ContractResult<RestModuleState> {
   val state=marker(db,id)
   if(state==null)return if(evidenceExists(db))throw SQLiteException("휴식 기능 marker 없는 원이력") else ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+  when(val observed=store.observedDriving.read(db,id)) {
+   is ContractResult.Failure->if(observed.error==ContractError.DATA_UNAVAILABLE)throw SQLiteException("휴식 기능 이후 원관측 모듈 소실") else return observed
+   is ContractResult.Success->Unit
+  }
   val bonus=RestLedger(store).stateIn(db);val head=head(db)
   if(head.first!=state.headSequence||head.second!=state.headCount)throw SQLiteException("휴식 로그/머리 동시 소실 또는 갱신 누락")
   val contexts=contexts(db,id)
