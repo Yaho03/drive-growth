@@ -2,6 +2,9 @@ package io.drivegrowth.app.data
 
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.rental.ShopExpansion
+import io.drivegrowth.core.rental.Facility
+import io.drivegrowth.core.rental.FacilityOffer
+import io.drivegrowth.core.garage.VehicleRef
 import org.json.JSONException
 import org.json.JSONObject
 
@@ -22,6 +25,10 @@ internal object HostCheckpointJson {
             is HostCheckpointCommand.Quest -> {kind="quest";value=QuestJson.command(command.value)}
             is HostCheckpointCommand.Delivery -> { kind="delivery";value=DeliveryCheckpointJson.encode(command) }
             is HostCheckpointCommand.Expand -> { kind = "expand"; value = expand(command) }
+            is HostCheckpointCommand.FacilityPurchase -> {kind="facility";value=JSONObject().put("request",command.requestId.value).put("source",command.source.name).put("definition",command.definitionVersion.value)
+                .put("facility",command.offer.facility.name).put("rules",command.offer.ruleVersion.value).put("trial",command.offer.trial).put("price",command.offer.price.units)}
+            is HostCheckpointCommand.VehicleResting -> {kind="vehicle-resting";value=JSONObject().put("request",command.requestId.value).put("source",command.source.name)
+                .put("vehicle",command.vehicle.ownedVehicleId.value).put("revision",command.vehicle.revision.value).put("expected",command.expected).put("desired",command.desired)}
         }
         return JSONObject().put("type", "host-command-v1").put("profile", profile.value).put("kind", kind)
             .put("request", command.requestId.value).put("source", command.origin.name)
@@ -42,6 +49,10 @@ internal object HostCheckpointJson {
             "quest" -> HostCheckpointCommand.Quest(QuestJson.command(value))
             "delivery" -> DeliveryCheckpointJson.decode(value)
             "expand" -> expand(value)
+            "facility" -> HostCheckpointCommand.FacilityPurchase(RequestId(value.getString("request")),InputSource.valueOf(value.getString("source")),ContentVersion(value.getString("definition")),
+                FacilityOffer(Facility.valueOf(value.getString("facility")),RuleVersion(value.getString("rules")),boolean(value,"trial"),GameMoney(LedgerJson.integer(value,"price",0,Long.MAX_VALUE))))
+            "vehicle-resting" -> HostCheckpointCommand.VehicleResting(RequestId(value.getString("request")),InputSource.valueOf(value.getString("source")),
+                VehicleRef(OwnedVehicleId(value.getString("vehicle")),Revision(int(value,"revision"))),boolean(value,"expected"),boolean(value,"desired"))
             else -> throw JSONException("미지원 checkpoint 명령 종류")
         }
         if ((command is HostCheckpointCommand.Quest && command.value.profileId!=profile) || !command.validFor(command.origin) || encode(profile, command) != text)
@@ -75,6 +86,7 @@ internal object HostCheckpointJson {
             GachaAward(LedgerJson.vehicle(j.getJSONObject("vehicle")), int(j, "next"), j.getBoolean("guaranteed")))
     }
     private fun int(j: JSONObject, key: String, min: Long = 0) = LedgerJson.integer(j, key, min, Int.MAX_VALUE.toLong()).toInt()
+    private fun boolean(j:JSONObject,key:String)=j.get(key) as? Boolean ?: throw JSONException("설정 boolean 형식 오류")
     private fun garage(j: JSONObject): GameChange {
         val v = j.getJSONObject("write")
         if (v.getString("type") != "update") throw JSONException("차량 관리 Update만 지원")
