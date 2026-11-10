@@ -388,7 +388,7 @@ class RentalLedgerTest : InstrumentationTestCase() {
     }
 
     private val deliveryTables = listOf("delivery_lists", "delivery_requests", "delivery_active", "delivery_routes",
-        "delivery_outcomes", "delivery_held", "delivery_changes", "driving_days", "driving_drives", "delivery_route_history", "delivery_hold_outcomes")
+        "delivery_outcomes", "delivery_held", "delivery_changes", "driving_days", "driving_drives", "delivery_route_history", "delivery_hold_outcomes", "material_requests", "repair_requests")
 
     fun testUpgradeFromV1KeepsAccountAndOriginalVehicle() {
         store.close()
