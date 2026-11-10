@@ -311,3 +311,15 @@ GachaHostController는 기존 GachaView 이벤트/응답/GachaFrame을 그대로
 ShopSceneView는 승인된 ShopScreenState.Content만 받아 중립 건물/간판·주차구획·차량·설치 시설을 Native Canvas로 그린다. 전체/차량중심 보기는 같은 공급 상태를 다르게 구성한다. level 공급1→2이상은 표시 외형의 부속동, capacity 공급은 최대12개 전경구획에 반영하며 전체값/공급차량목록은 텍스트로 보존한다. 추가차량/구획은 명시 안내하고 누락공간은 미제공으로 남긴다. 위치는 표시용이며 저장 배치/새 시설 보유나 거래 성공을 만들지 않는다. 실제 차종 외형·로고·캐릭터와 PNG화면 배경은 사용하지 않는다.
 
 기존 요청/비용/Back/gate 계약을 유지한다. pending중 보기전환도 차단하고, 미리보기·callback 성공만으로 확정 전경을 바꾸지 않는다. uiState의 sceneScrollY/controlsScrollY와 기존 mode/selection/pending/requestIds/latestRevision을 같은프로필의새View에 함께복원한다. MainActivity/host/영속codec은 이번 UI작업에 연결하지 않았다.
+
+
+### #51 제품 호스트 진입·Back 연결 — 2026-11-10
+
+HOME에서 ShopView 전경을 표시하고 한 줄의 Back/화면 선택/새로고침 아래 남은 앱 영역 전체를 각 기존 View에 할당한다. 가게·차고·도감·가챠·미확인 정산·첫 차량 안내를 선택한다. Shop 모드/스크롤·차고 선택·정산 선택 및 준비 상태는 기존 수명 경계에서 보존하고, Back은 미리보기/상세→부모→HOME Task 숨김 순서를 유지한다. 가챠 결과→차고의 선택/복귀 연결점은 있지만 현재 조회 전용 가챠가 실제 결과를 생성하는 것은 아니다. 차량 입력 worker·현재 세대·연속 주차3초·gate는 변경하지 않았다.
+
+이 연결의 저장/미지원 조건은 02의 실제 가게 HOME 절을 따른다. 좁은 실제 앱 창·Spinner 터치·CCP·구성/프로세스 복원·실제 gate 기기 검증은 수행 전이며 기기 시험 APK 컴파일로 대체하지 않는다.
+
+
+### 내 기록·시연 랭킹 모듈 연결점 — 2026-11-10
+
+RankingView/Controller는실제내기록6지표의기간/출처·Available0/Empty/Missing/Failure와합성참여자예시를분리한다. Demo를실제온라인순위/내1위로표시하지않는다. 이는독립View/원장읽기모듈이며 MainActivity탐색·실제출발당시지역/Quest원인hook은별도연결한다. 누락을정상0으로숨기지않고늦은응답/gate해제시콘텐츠제한을유지한다. 최종아트WIP·온라인후속범위와 [PRD](01_PRD.md#1차-랭킹-범위)를유지한다.
