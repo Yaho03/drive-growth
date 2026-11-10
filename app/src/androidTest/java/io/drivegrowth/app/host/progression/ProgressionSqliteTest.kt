@@ -18,6 +18,7 @@ class ProgressionSqliteTest : InstrumentationTestCase() {
     private val context get() = instrumentation.targetContext
     private lateinit var names: Map<InputSource, String>
     private lateinit var games: GameSessionFactory
+    private lateinit var initialGrant: Settlement
     private var unavailable = false
     private val zone = ZoneId.of("UTC") // 명시 시험 입력. 제품 전역 시간대 정책이 아니다.
     private var clockUnknown = false
@@ -35,15 +36,22 @@ class ProgressionSqliteTest : InstrumentationTestCase() {
         // C/B 소유 factory-provider.patch를 검증 사본에 적용하는 의존 계약.
         games = GameSessionFactory(context, names, InputSource.SIMULATION, ::definitions)
         val onboarding = StoredOnboardingHostSource(games); val new = ok(onboarding.read())
-        ok(onboarding.choose(new.identity, FirstGrant.CANDIDATES.first()))
+        val granted = ok(onboarding.choose(new.identity, FirstGrant.CANDIDATES.first()))
+        initialGrant = ok(games.open()).use { session ->
+            val status = ok(session.store.readInitialization(session.identity.profileId)).status
+            assertTrue(status is ProfileInitializationStatus.Existing)
+            val original = (status as ProfileInitializationStatus.Existing).original
+            assertEquals(granted, original)
+            original!!.grant
+        }
     }
     override fun tearDown() { names.values.forEach(context::deleteDatabase); super.tearDown() }
     private fun balance() = ok(games.open()).use { ok(it.store.balance()) }
     private fun makeClaimable(): ProgressionRead {
         ok(games.open()).use { session ->
-            val receipt = ok(session.store.commitGameChange(GameChange(RequestId("view-${UUID.randomUUID()}"), TransactionKind.GARAGE,
-                session.identity.source, RuleVersion("source-fixture"))))
-            ok(session.store.markViewed(receipt.settlementId)) // E의 실제0→1 원자 hook 소비. 수동 사건 추가 없음.
+            val before = ok(session.store.balance())
+            ok(session.store.markViewed(initialGrant.settlementId)) // 실제 첫차 원정산의0→1 열람 hook 소비.
+            assertEquals(before, ok(session.store.balance()))
         }
         return ok(source().read(emptySet()))
     }
