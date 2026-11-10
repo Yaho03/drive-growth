@@ -1509,3 +1509,14 @@ main38b3b51의 #147 계약/메모리 참조·#148 VehicleUpgrade.prepareMaterial
 실제assets 게임차종가1000과 명시 SIMULATION 영업 fixture의 prepare→공용SQLite수리→재개방/최초결과재생에서 비용55/잔액945·IDLE/revision2·사고/영업쉬기·성장/희귀도/취득정보를 확인했다. 비용0/Long.MAX 잔액·권위/상태/revision/견적 경계·한쪽 이력 누락/원시숫자 손상·commit/활동쓰기 실패 전체rollback·같은ID/다른종류ID·두연결수리/판매경쟁을 확인했다. material-first 일부는 raw예약행 fixture이며 실제 재료→수리 전체제품흐름으로 확대하지 않는다. v1..v6 정합구조6가지/15개손상변형은 내부반복으로 별도시험수에 더하지 않으며 모든경쟁스케줄/옛APK제품DB이전을 입증하지 않는다.
 
 자기repairsqlitea app/test제거·활성instrumentation없음·제품APK793e1db8/6데이터/권한·창/설정 등18보존checks 전부PASS·슬롯반환/noFurtherAdb를 회수했다. 다른5580/AVD/서버reset/차량신호쓰기는 없으며 새기어P검증으로 기록하지 않는다. 원본근거는 /private/tmp/drive122-repair-sqlite-20261109/independent-review/ 및 independent-device-review/에 보존한다. 실제 제품repairContent/UI·프로세스/전원/실차·초기화/선물SQLite 및 #49/#122 전체완료는 별도다. schema6재료 다음schema7수리 순서를 유지하고 최신main 정상통합/정확head CI는 연결PR에 기록한다.
+
+
+### #162 머지 후 수리 계좌 무갱신 P2·후속 수정 — 2026-11-10
+
+기존3c의 수리23+호환7=30PASS와 일반merge67379487을 당시 근거로 보존한다. 추가 대기 요청/실제 재현은 머지 뒤 도착했다. API34/ARM64/user10의 외부1개가1실행/1assertion실패·오류0으로, account BEFORE UPDATE RAISE(IGNORE)에서 Success·DB잔액1000 vs반환945·revision2/IDLE·공용/수리기록삽입을 관측했다. PR162 추가검토5836490714와49/121/122에필수수정을연결하고122원자성체크를재개했다. 제품DB손실/실차피해재현이아니다.
+
+후속51e0fb7은 account db.update 영향행1검사만추가하고 아니면SQLiteException으로 기존atomic STORAGE_FAILURE/rollback을재사용한다. 제품2줄추가/1줄삭제이며공용helper/다른Ledger·정책을바꾸지않았다. 원A독립소스SHA79a0aed3...가고정원문과바이트동일·기대완화0,정식23도원래3c와동일하다. 독립 archive468파일은정확51e와같고새빌드/설치pullSHA도일치했다(앱45e326ec/시험aaf4bab3).
+
+같은독립1개0.323초PASS: Failure(STORAGE_FAILURE), 실제잔액1000/수리receipt없음/NEEDS_REPAIR, account·vehicles·rentals·settlements·repair_requests5표전후전체행동일을 확인했다. 트리거주입후실행의5표/상태보존이지준비과정포함전체파일bytes불변주장이아니다. 정식수리23개도6.984초23PASS·오류/실패/생략0으로재실행해새실제24개다. 기존30/호환7·작성자core374/app176과합산하지않는다. 작성자APK/시험APK/Lint와독립새빌드1분16초도구분한다.
+
+자기repairfixa2패키지제거·활성instrumentation/자기process없음·제품APK/6데이터/권한/차량·창/설정등19보존checksPASS·해당구간종료를회수했다. A의다음checkpoint는메인배정의별도구간이며조율자adb0이다. 근거 /private/tmp/drive122-repair-account-fix-evidence/independent-review/의REPORT/summary/원문·관측·sourceidentity/설치hash·보존자료. 수정2파일의51e동일성·최신main정상통합/새정확head CI후후속공급하며최신게시head의새장치재실행으로표시하지않는다. 실제수리UI/프로세스·전원/실차/전체49·122완료와초기화/AppHost의별도P2는남는다.

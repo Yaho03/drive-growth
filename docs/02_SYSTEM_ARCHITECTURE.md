@@ -631,3 +631,6 @@ SqliteGameChangeStore는 MaterialChangeStore.readMaterialState/commitMaterial을
 전체 RepairCommand와 지급 전 RepairState 및 당시 전체 RepairSettlement를 repair_requests에 보존한다. 공용 settlements/지갑/차량/대여 테이블을 재사용하며 비용 차감·revision+1·NEEDS_REPAIR→IDLE·두 종류의 정산 기록을 한 거래로 확정한다. 사고 이력·영업 쉬기·희귀도·레벨/진행량·취득 정보는 보존한다. 비용0은 money=null이다. 원래 전체 결과를 현재 콘텐츠/활동보다 먼저 검증·재생하며 다른 전체 입력/도메인 ID는 충돌, 한쪽 이력 누락·손상은 STORAGE_FAILURE다. 원래 결과를 현재 값으로 재구성하지 않는다.
 
 스키마7은 repair_requests만 추가하고 지원 v1~v6의 기존 표/행을 보존한다. 실제 원격 머지 순서에서 번호를 다시 확인한다. 기존 구조 fixture의 schema7 준비 보완은 최종3c473dd의 시험 호환 커밋으로 실제 반영했으며 독립 실제 장치에서 수리23개·호환 표적7개로 이전/실패 rollback·다중 연결/재개방을 확인했다. 정합 구조 fixture이며 실제 옛 APK 제품 DB 이전·프로세스/실차 성공은 아니다. 초기화/첫 선물의 SQLite와 제품 관리 UI/프로세스 연결·전체 #122/#49는 후속이다.
+
+
+수리 account 무갱신 추가 경계: RepairLedger의 잔액 UPDATE는 영향행이 정확히1인지 검사한다. 예외 없는0행 갱신도 저장실패로 전달해 같은 atomic 경계의 차량/활동·공용/수리 기록을 전부 rollback한다. 원래 전체 명령의 재생 우선순위는 유지하고 현재 상태 검사로 과거 결과를 바꾸지 않는다. 원래3c의 RED와 수정51e의 같은 회귀 GREEN은 [06](06_VERIFICATION.md)의 후속 근거를 따른다.
