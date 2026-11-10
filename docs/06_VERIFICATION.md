@@ -1750,7 +1750,7 @@ HOME은 기본DB 없는 자기 새 패키지에서 실제 SDK P gate를 거쳐 U
 
 A source manifest690 항목은 모두 일치했으나 실제 Git 추적 파일691 중 공식 접수양식 DOCX1개가 빠져 있었다. 이를 전체 추적파일 완전 manifest로 표현하지 않으며 A의 전체 SHA에는 포함했다. 앱 SHA81bbefb1ebf7a61b95c2f7803d23130d26b456aa3ca4a108169e82200468ed14와 시험SHA bf94d969f3bae036aacfd76385dc2b3ea839c8bc14cf34109d80bed294fd2686는 설치 후 pull과 같았다. 22:28:51~22:31:33 KST 단독 사용 후 제품/환경19항목 보존, boot24·자기 권한 원복·패키지/계측/forward 정리와 반환을 확인했다. 원문은 /private/tmp/drive-product-main-followup-20261110/independent-device-review/에 보존했다.
 
-HOME 로그의 driver_deferred=DATA_UNAVAILABLE 두 건은 남아 있으며 이번 배정에서 실제 D를 입력/수신하지 않았다. 실제 SDK D→이탈→재접속 영업, 물리 주행 종료·프로세스/전원·실차·최신 Main Results 전체 UI는 별도 미검증이다. 초기 P에서 과거 영업을 만들지 않는 상태와 실제 SDK 영업 성공을 구분한다. Rest·실제 위치/영역 등록·최종 디자인도 포함하지 않는다. 원65를 main188과 합친 새 APK의 장치 성공으로 확대하지 않으며 전체 #41~#44/#43/#51/#28 종료 근거로 사용하지 않는다.
+HOME 로그의 driver_deferred=DATA_UNAVAILABLE 두 건은 남아 있으며 이번 배정에서 실제 D를 입력/수신하지 않았다. 실제 SDK D→이탈→재접속 영업, 물리 주행 종료·프로세스/전원·실차는 별도 미검증이다. 최신 Main Results의 P 상태 UI 흐름은 아래 추가1에서 확인했다. 초기 P에서 과거 영업을 만들지 않는 상태와 실제 SDK 영업 성공을 구분한다. Rest·실제 위치/영역 등록·최종 디자인도 포함하지 않는다. 원65를 main188과 합친 새 APK의 장치 성공으로 확대하지 않으며 전체 #41~#44/#43/#51/#28 종료 근거로 사용하지 않는다.
 
 새 main188 조합은 B18파일과 기존 Location6·data/core/Gradle/Manifest를 직접 대조하고 앱543개를 실패·오류·생략0으로 실행했다. 제품/시험APK·Lint 오류0/경고27도 성공했다. 원본 B의 core420은 동일 입력의 실행 근거로 재사용하며 새 core 실행으로 합산하지 않는다. 문서 후속만 추가한 뒤 저장소/링크·diff를 재확인한다. 이 조합의 새 장치 실행은0이며 원본 A65와 구분한다.
 
