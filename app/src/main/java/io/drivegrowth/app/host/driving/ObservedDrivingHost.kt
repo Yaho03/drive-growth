@@ -12,10 +12,11 @@ class ObservedDrivingHost(private val worker: Executor, private val main: Execut
     private val nextReceiver: () -> String = { UUID.randomUUID().toString() }) {
     private var receiver: String? = null
     private var listener: ((ContractResult<DrivingRecordingResult>) -> Unit)? = null
-    fun start(listener: (ContractResult<DrivingRecordingResult>) -> Unit) {
+    fun start(listener: (ContractResult<DrivingRecordingResult>) -> Unit): String {
         check(receiver == null)
         receiver = nextReceiver().also { require(it.isNotBlank()) }
         this.listener = listener
+        return checkNotNull(receiver) // UI 응답 상관용이며 boot/clock domain으로 쓰지 않는다.
     }
     fun accept(frame: DrivingFrame) {
         val token = receiver ?: return

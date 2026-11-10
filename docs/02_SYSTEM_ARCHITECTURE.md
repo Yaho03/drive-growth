@@ -783,3 +783,14 @@ D 정확92c4ee3의6파일은FusedLocation1.1.3 의존성과FUSED_LOCATION권한�
 start/close의main호출은현재어댑터의상태직렬화API계약이다. SDK자체main필수조건이나임의다중스레드동시호출안전성을확정하지않는다. 세대/현재권한을전달직전에검사하고수신elapsed/UTC를main queue소비시각으로바꾸지않는다. 권한거부/미지원/null·알려진오류는명시Missing이며첫callback전에는NO_DATA다. release실패는원client소유권과예외를보존해새연결생성을막는다. 예상밖RuntimeException도정리시도뒤숨기지않는다. F추가정적감사의원격register/unregisterProxy는oneway전송이며원격완료응답동기대기로단정하지않는다. PackageManager·권한검사·unbindService의caller경계와최악지연미측정은유지한다.
 
 source=VEHICLE/Available은SDK원시출처/형식가용성이며실차·센서clock축/신선도/정확도·휴식장소inside/outside·주차/출발·Rest인정을뜻하지않는다. rawconfidence를m로환산하거나rawtimestamp를현재값으로보정하지않는다. 공공좌표점으로임의반경/영역을만들지않고background/프로세스·전원·정책허용을가정하지않는다. A실제SDK진단과F26·추가스레드감사/새조합검사는 [06](06_VERIFICATION.md#fusedlocation-sdk-6파일-통합-검증--2026-11-10)에서구분한다. main187 위에원6파일만정상통합했고B Main/HostSession·currentInactive/앞모듈·schema15를보존하며Rest schema16은포함하지않았다.
+
+
+### 원관측 영업과 시설·전체 정산의 제품 호스트 연결 — 2026-11-10
+
+같은 GameSessionFactory·프로필·출처·직렬 worker에서 ObservedDriving의 원 저장 결과와 RentalProduct 소비자를 연결한다. 원 anchor/source가 일치하는 연속 관측 범위만 기존 RentalTick에 전달한다. 별도 SDK 리스너·원장·가격 계산은 만들지 않고 중앙 정의·원 방문 저널·기존 RentalRuntime·FirstGift를 소비한다. 최초 P만으로 과거 종료를 만들거나 현재 재고로 지나간 고객을 합성하지 않는다.
+
+DeviceRentalClock은 실제 OS BOOT_COUNT·UTC·elapsedRealtime을 읽는다. receiver/UUID/0을 boot로 채우지 않으며 원 calibration·허용 skew·overflow와 불명 boot를 명시 처리한다. 실제 이탈과 구성 변경을 구분하고 currentInactive의 원 marker·원점·최초 resume 시각을 보존한다. PREPARED/COMPLETED는 원 interval을 현재 clock보다 먼저 소비하며 다른 host slot을 실행·삭제하지 않는다. 확인한 최초 완료만 기존 첫 선물 명령으로 연결한다.
+
+Main HOME은 시설의 typed 구매/쉬기 요청과 원결과를 소비하고, Results는 전체 history·전체/미확인 필터·선택·열람 및 Bundle 복원을 연결한다. 기존 gate·Back·세대/epoch/receiver 검사를 유지하며 제한 뒤 UI 응답으로 새 명령을 발행하지 않는다. stop 전에 수락한 원관측의 영속 처리와 stop 뒤 UI 전달은 구분한다.
+
+B 원본0dd969f는 main187에 기반한다. 새 통합은 main188의 위치 SDK 공급을 보존하며 B 소유18파일을 그대로 반영한다. 위치 SDK의 실제 Main 등록과 Rest 원자 저장은 이 연결에 포함하지 않는다. 신호 공백·지나간 방문·legacy 원점을 현재값으로 채우지 않으므로 일부 종료 영업은 보류될 수 있다. [실제 원본 시험과 새로운 조합](06_VERIFICATION.md#제품-영업시설정산-호스트-연결-검증--2026-11-10)은 구분한다.
