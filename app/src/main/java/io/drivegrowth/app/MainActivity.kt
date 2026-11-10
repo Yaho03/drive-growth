@@ -75,6 +75,7 @@ class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private val interaction = ForegroundInteraction()
     private var input: VehicleInput? = null
+    private var drivingStatus: String? = null
     private var navigation = HostNavigation()
     private var screen: HostQueryState = HostQueryState.Restricted
     private lateinit var management: GarageCommandHost
@@ -287,6 +288,24 @@ class MainActivity : Activity() {
         setVisible(true)
         if (active) return
         active = true
+        session.driving.start { result ->
+            val status = when (result) {
+                is ContractResult.Failure -> {
+                    android.util.Log.w("DriveGrowthDriving", "recording_failure code=${result.error}")
+                    "주행 기록을 확인하지 못했어요. 원래 기록은 다시 연결할 때 확인합니다."
+                }
+                is ContractResult.Success -> {
+                    if (result.value.committed.isNotEmpty()) {
+                        queries.refresh()
+                        session.progression.refresh()
+                        session.ranking.refresh()
+                    }
+                    if (result.value.waiting != null) "주행 기록의 정산 근거를 확인하고 있어요."
+                    else "수신한 주행 관측을 기록하고 있어요."
+                }
+            }
+            if (drivingStatus != status) { drivingStatus = status; if (::chrome.isInitialized) render() }
+        }
         session.progression.attach { frame ->
             progressionFrame = frame
             if (frame.retryComplete) progression.completeRetry()
@@ -305,7 +324,14 @@ class MainActivity : Activity() {
             results.completeMarkViewed(id, result)
         }
         try {
-            input = VehicleInput(this, { if (active) { interaction.accept(it); updateAccess() } }, {}).also { it.start() }
+            input = VehicleInput(this, { observation ->
+                val zone = session.drivingCalendar.take(observation)
+                if (active) {
+                    session.driving.accept(io.drivegrowth.app.host.driving.DrivingFrame(observation, zone))
+                    interaction.accept(observation)
+                    updateAccess()
+                }
+            }, {}, session.drivingCalendar).also { it.start() }
         } catch (_: LinkageError) {
             updateAccess()
         }
@@ -318,6 +344,10 @@ class MainActivity : Activity() {
     }
 
     private fun stopObserving() {
+        active = false // 새 UI/관측 입구를 먼저 닫고 SDK queue를 중단한다.
+        input?.stop()
+        input = null
+        session.driving.stop() // 같은 serial worker 뒤에 실제 중단 시각과 receiver 경계를 보존한다.
         session.progressionUi = progression.uiState
         session.progression.setControlsEnabled(false)
         session.progression.detach()
@@ -469,6 +499,7 @@ class MainActivity : Activity() {
         links.addView(destination, LinearLayout.LayoutParams(0, style.dp(56), 1f))
         links.addView(style.button("새로고침") { if (token == navigationGeneration) refresh() })
         chrome.addView(links)
+        drivingStatus?.let { chrome.addView(style.text(it)) }
         if (navigation.page == HostPage.HOME && expansionState is ShopScreenState.Failure)
             chrome.addView(style.button("보관한 미실행 확장 요청 취소") { expansionHost.cancelSaved() })
         if (navigation.page == HostPage.PROGRESSION) {

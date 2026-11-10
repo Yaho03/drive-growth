@@ -1,6 +1,7 @@
 package io.drivegrowth.app.host
 
 import android.content.Context
+import io.drivegrowth.app.host.driving.*
 import io.drivegrowth.app.data.questDefinitions
 import io.drivegrowth.app.host.delivery.*
 import io.drivegrowth.app.ui.delivery.DeliveryInteractionState
@@ -25,6 +26,45 @@ internal class HostSession(context: Context, private val main: Executor, restore
             } catch (_: java.time.DateTimeException) { ContractResult.Failure(ContractError.POLICY_UNRESOLVED) }
         }
     })
+    val drivingCalendar = ObservationCalendar(64) // 원관측-zone 상관용 기술 버퍼. 게임 수치가 아니다.
+    private val recordingPolicy = io.drivegrowth.app.vehicle.TRIAL_INTERACTION_POLICY.let { policy ->
+        RecordingPolicy(policy.maxSignalAgeMs, policy.maxSampleGapMs, 1000, policy.requiredParkMs,
+            policy.maxStationarySpeedMps, 0.5) // skew/출발속도는 D의 명시 기술 시험값.
+    }
+    private val drivingSource = SessionObservedDrivingSource(games, io.drivegrowth.app.data.SqliteObservedDrivingJournal(),
+        ObservedDrivingReducer(recordingPolicy) { java.util.UUID.randomUUID().toString() }, {
+            when (val loaded = io.drivegrowth.app.data.AssetTrialDefinitionProvider(context.assets).load()) {
+                is ContractResult.Failure -> loaded
+                is ContractResult.Success -> loaded.value.drivingIncomeRules()
+            }
+        })
+    private var drivingActivated = false // worker 전용. 매 관측의 실제 초기화/출처는 별도로 재확인한다.
+    val driving = ObservedDrivingHost(worker, main,
+        { RecordingClock(android.os.SystemClock.elapsedRealtime(), EpochMillis(System.currentTimeMillis())) },
+        { receiver, frame, at ->
+            when (val activated = activateDriving(frame.observation.source)) {
+                is ContractResult.Failure -> activated
+                is ContractResult.Success -> drivingSource.observe(receiver, frame, at)
+            }
+        }, { receiver, at ->
+            if (drivingActivated) drivingSource.pause(receiver, at) else ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+        })
+    private fun activateDriving(source: InputSource): ContractResult<Unit> = when (val opened = games.open()) {
+        is ContractResult.Failure -> opened
+        is ContractResult.Success -> opened.value.use { game ->
+            if (game.identity.source != source) ContractResult.Failure(ContractError.STATE_CONFLICT)
+            else when (val initialized = game.store.readInitialization(game.identity.profileId)) {
+                is ContractResult.Failure -> initialized
+                is ContractResult.Success -> if (initialized.value.status !is ProfileInitializationStatus.Existing)
+                    ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+                else if (drivingActivated) ContractResult.Success(Unit)
+                else when (val activated = game.store.activateObservedDriving(game.identity.profileId)) {
+                    is ContractResult.Failure -> activated
+                    is ContractResult.Success -> { drivingActivated = true; ContractResult.Success(Unit) }
+                }
+            }
+        }
+    }
     var progressionUi = io.drivegrowth.app.ui.progress.ProgressUiState()
     val progression = io.drivegrowth.app.host.progression.ProgressionController(worker, main,
         io.drivegrowth.app.host.progression.FactoryProgressionSource(games, {
@@ -79,6 +119,7 @@ internal class HostSession(context: Context, private val main: Executor, restore
     }
 
     fun release() {
+        driving.stop()
         progression.release()
         delivery.release()
         deliveryNavigation.close()
@@ -87,6 +128,6 @@ internal class HostSession(context: Context, private val main: Executor, restore
         ranking.release()
         gacha.release()
         onboarding.release()
-        worker.shutdownNow()
+        worker.shutdown() // 이미 받은 관측/pause의 영속 쓰기는 폐기하지 않는다.
     }
 }

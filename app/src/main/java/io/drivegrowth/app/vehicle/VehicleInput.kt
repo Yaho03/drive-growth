@@ -25,6 +25,8 @@ import io.drivegrowth.core.driving.ObservationClock
 import io.drivegrowth.core.driving.ObservationCoverage
 import io.drivegrowth.core.driving.VehicleSignals
 import java.util.concurrent.Executor
+import io.drivegrowth.app.host.driving.ObservationCalendar
+import java.time.ZoneId
 
 /** main은 관측 예약·전달만 수행한다. SDK 동기 호출은 프로세스 공통 worker에서 직렬화한다. */
 @Suppress("DEPRECATION")
@@ -32,6 +34,7 @@ class VehicleInput(
     private val context: Context,
     private val onObservation: (VehicleObservation) -> Unit,
     private val onStatus: (String) -> Unit,
+    private val drivingCalendar: ObservationCalendar? = null,
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private var session: VehicleInputQueue.Session? = null
@@ -53,7 +56,7 @@ class VehicleInput(
         Log.i(TAG, "observation_start firstInProcess=$firstInProcess displayId=${display?.displayId}")
         firstInProcess = false
         session = queue.start({ owner ->
-            CarReader(sdkContext, sdkHandler) { queue.invalidate(owner) }
+            CarReader(sdkContext, sdkHandler, drivingCalendar) { queue.invalidate(owner) }
         }) { result ->
             val observation = result.getOrElse { error ->
                 val missing = readSignal<Double> {
@@ -111,7 +114,7 @@ class VehicleInput(
 
 /** SDK 자원은 worker 소유다. main 연결 콜백은 최신 상태만 저장하며 worker 작업을 적재하지 않는다. */
 @Suppress("DEPRECATION")
-private class CarReader(context: Context, handler: Handler, private val connectionChanged: () -> Unit) : VehicleReader {
+private class CarReader(context: Context, handler: Handler, private val drivingCalendar: ObservationCalendar?, private val connectionChanged: () -> Unit) : VehicleReader {
     @Volatile private var connected = false
     @Volatile private var closed = false
     @Volatile private var revision = 0L
@@ -166,7 +169,9 @@ private class CarReader(context: Context, handler: Handler, private val connecti
         }
         if (closed || !connected || revision != version) return missingObservation()
         return VehicleObservation(InputSource.VEHICLE, SystemClock.elapsedRealtime(),
-            EpochMillis(System.currentTimeMillis()), speed, gear, ux)
+            EpochMillis(System.currentTimeMillis()), speed, gear, ux).also { observation ->
+                drivingCalendar?.capture(observation, ZoneId.systemDefault())
+            }
     }
 
     override fun close() {
