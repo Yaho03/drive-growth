@@ -37,7 +37,12 @@ class SqliteRestDrivingJournal internal constructor(private val store:SqliteGame
   if(!identity(db,id))return ContractResult.Failure(ContractError.INVALID_INPUT)
   val module=when(val r=RestAtomicStorage.read(store,db,id)){is ContractResult.Failure->return r;is ContractResult.Success->r.value}
   val confirmed=RestLedger(store).stateIn(db);var effective=confirmed;var grant=module.activeGrant
-  val pending=RestAtomicStorage.contexts(db,id).filter{it.ordinal>module.confirmedCount}
+  val contexts=RestAtomicStorage.contexts(db,id)
+  for(c in contexts.filter{it.ordinal<=module.confirmedCount})when(val original=committedIn(db,id,c.value.trip.id)) {
+   is ContractResult.Failure->return original
+   is ContractResult.Success->if(original.value==null)throw SQLiteException("휴식 현재 상태의 복합 원결과 소실")
+  }
+  val pending=contexts.filter{it.ordinal>module.confirmedCount}
   val departures=RestAtomicStorage.departures(db,id)
   for(c in pending)when(val r=RestTimeline.plan(c.value,departures.filter{it.packet.proof.driveId==c.value.trip.id},effective,grant)) {
    is ContractResult.Failure->return r
@@ -80,6 +85,8 @@ class SqliteRestDrivingJournal internal constructor(private val store:SqliteGame
    is ContractResult.Success->Unit
   }
   val ordinal=old?.ordinal?:module.contextCount+1
+  val ordered=if(old==null)contexts.map{it.value}+c else contexts.map{if(it.ordinal==ordinal)c else it.value}
+  if(!RestTimeline.clockOrder(ordered))return conflict()
   RestAtomicStorage.saveContext(db,c,ordinal,old==null)
   RestAtomicStorage.update(store,db,module,module.copy(revision=module.revision+1,contextCount=if(old==null)ordinal else module.contextCount))
   return projectionIn(db,id)
@@ -102,8 +109,10 @@ class SqliteRestDrivingJournal internal constructor(private val store:SqliteGame
   val p=packet(module.nextStop)
   when(val r=RestEvidenceValidator(input.policy).stop(p.proof)){is ContractResult.Failure->return r;is ContractResult.Success->Unit}
   val at=ObservedDrivingJson.observation(input.departure.to).toString()
-  val anchor=if(at==ObservedDrivingJson.observation(context.value.trip.departure).toString())-1 else context.value.trip.segments.indexOfFirst{ObservedDrivingJson.observation(it.to).toString()==at}
-  if(anchor<0&&at!=ObservedDrivingJson.observation(context.value.trip.departure).toString())return conflict()
+  val first=at==ObservedDrivingJson.observation(context.value.trip.departure).toString()&&input.clock==context.value.departureClock
+  val anchor=if(first)-1 else context.value.trip.segments.indices.firstOrNull{index->
+   ObservedDrivingJson.observation(context.value.trip.segments[index].to).toString()==at&&context.value.segments[index].let{RestClockDomain(it.clockDomain,it.span.bootId)}==input.clock
+  }?:return conflict()
   val actualClock=if(anchor<0)context.value.departureClock else context.value.segments[anchor].let{RestClockDomain(it.clockDomain,it.span.bootId)}
   if(input.clock!=actualClock||input.clock.bootId!=input.departure.bootId)return conflict()
   if(events.any{RestAtomicStorage.exitKey(it.packet.proof)==RestAtomicStorage.exitKey(p.proof)})return conflict()

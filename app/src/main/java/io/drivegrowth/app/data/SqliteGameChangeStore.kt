@@ -55,7 +55,10 @@ class SqliteGameChangeStore(
     fun activateObservedDriving(profileId:ProfileId) = atomic { db -> observedDriving.activate(db,io.drivegrowth.app.host.GameIdentity(profileId,source)) }
     fun observedDrivingReceipt(driveId:String):ContractResult<io.drivegrowth.app.host.driving.ObservedDrivingReceipt?> = atomic { db ->
         val p=when(val r=localProfileId()){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
-        observedDriving.committed(db,io.drivegrowth.app.host.GameIdentity(p,source),driveId)
+        val receipt=observedDriving.committed(db,io.drivegrowth.app.host.GameIdentity(p,source),driveId)
+        if(receipt is ContractResult.Success&&receipt.value==null&&DrivingRecordReader(source).readDrive(db,driveId)?.rest!=null)
+            throw SQLiteException("휴식 주행의 원관측 이력 소실")
+        receipt
     }
     val rental = RentalLedger(this)
     private val initialization = InitializationLedger(this, initializationAuthority)

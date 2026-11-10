@@ -155,4 +155,43 @@ class RestDrivingJournalTest:InstrumentationTestCase() {
   ok(prepare());assertEquals(RestBonusState(1200000,0),ok(store.restDriving.state(id.profileId)).effective)
  }
 
+ fun testCurrentStateRejectsDamagedCompositePayloadWithoutRepair(){
+  ok(store.restDriving.activate(id.profileId));ok(capture(observed(drive(100000))));ok(prepare());ok(store.restDriving.settleAndAck(id.profileId,"original-outgoing"))
+  raw{it.execSQL("UPDATE rest_driving_receipts SET payload='{}',digest=?",arrayOf(ObservedDrivingJson.digest("{}")))};val before=rows()
+  assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.restDriving.state(id.profileId));assertEquals(before,rows())
+ }
+ fun testCurrentStateRejectsLostObservedReceiptWithoutRecreatingIt(){
+  ok(store.restDriving.activate(id.profileId));ok(capture(observed(drive(100000))));ok(prepare());ok(store.restDriving.settleAndAck(id.profileId,"original-outgoing"))
+  raw{it.execSQL("DELETE FROM observed_driving_receipts")};val before=rows()
+  assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.restDriving.state(id.profileId))
+  assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.observedDrivingReceipt("original-outgoing"));assertEquals(before,rows())
+ }
+ fun testCanonicalMoneyReceiptRemainsReadableByMain185History(){
+  ok(store.restDriving.activate(id.profileId));ok(capture(observed(drive(100000))));ok(prepare());val first=ok(store.restDriving.settleAndAck(id.profileId,"original-outgoing"));val before=rows()
+  val history=ok(SettlementHistoryReader(store).read());assertEquals(id,history.identity);val entry=history.entries.single()
+  assertEquals(first.observed.commit.settlement,entry.settlement);assertEquals(TransactionKind.DRIVING,entry.settlement.transaction.kind);assertFalse(entry.viewed);assertEquals(before,rows())
+  ok(store.markViewed(entry.settlement.settlementId));val after=rows();assertTrue(ok(SettlementHistoryReader(store).read()).entries.single().viewed);assertEquals(after,rows())
+ }
+ fun testCommonDrivingReaderKeepsFinalAmountAndRewardedMetersOnceInRanking(){
+  ok(store.restDriving.activate(id.profileId));ok(capture(observed(drive(100000))));ok(prepare());val first=ok(store.restDriving.settleAndAck(id.profileId,"original-outgoing"));val before=rows()
+  val content=(AssetGameContent(context.assets).load() as io.drivegrowth.core.content.ContentLoad.Loaded).snapshot
+  val proof=io.drivegrowth.app.host.ranking.RankingProvenance(id.source,{store.localProfileId()},{store.quests.claimedRequestIds(it)},{store.observedDrivingReceipt(it)})
+  val read=RankingReadSource(store,id.source,content,questCauses={proof.questCauses()},departureZone=proof::departureZone)
+  val result=ok(read.read(first.context.trip.segments.last().to.receivedAt))
+  val money=result.metrics.getValue(io.drivegrowth.app.host.ranking.RankingMetric.EARNED)
+  val meters=result.metrics.getValue(io.drivegrowth.app.host.ranking.RankingMetric.WEEKLY_DISTANCE)
+  assertTrue(money.toString(),money is io.drivegrowth.app.host.ranking.RankingValue.Available);assertTrue(meters.toString(),meters is io.drivegrowth.app.host.ranking.RankingValue.Available)
+  assertEquals(0,BigDecimal(15).compareTo((money as io.drivegrowth.app.host.ranking.RankingValue.Available).amount));assertEquals(0,BigDecimal(1000).compareTo((meters as io.drivegrowth.app.host.ranking.RankingValue.Available).amount));assertEquals(before,rows())
+ }
+
+ fun testDifferentDriveIdCannotCaptureAnEarlierIntervalFromTheSameBoot(){
+  ok(store.restDriving.activate(id.profileId));val first=observed(drive(100000));ok(capture(first))
+  val from=o(3901501);val to=o(3902501);val span=RestObservedSpan("actual-fixture-boot",from,to,missing,missing)
+  val trip=ObservedTrip("reused-physical-interval",from,first.trip.zone,first.trip.rules,BigDecimal("10.0"),listOf(DrivingSegment(from,to,BigDecimal("10.0"))))
+  val next=RestDriveContext(id,trip,definition.rest,definition.restPricing,listOf(RestSegmentEvidence(0,"receiver-2",span,policy)),RestClockDomain("receiver-2","actual-fixture-boot"))
+  val before=ok(store.atomic{store.observedDriving.read(it,id)})
+  ok(store.atomic{store.observedDriving.save(it,id,before.revision,before.copy(revision=before.revision+1,outbox=before.outbox+trip))})
+  val rowsBefore=rows();assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),store.atomic{store.restDriving.captureIn(it,id,1,before.revision+1,next)});assertEquals(rowsBefore,rows())
+ }
+
 }

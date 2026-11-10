@@ -65,4 +65,27 @@ class RestTimelineTest {
   val p=ok(RestTimeline.plan(ctx(listOf(stopped)),emptyList(),RestBonusState(500,8),RestActiveGrant(8,old)))
   assertEquals(0L,p.after.remainingMs);assertEquals(500L,p.boostedMs)
  }
+ @Test fun receiverChangeCannotDoubleConsumeOverlappingElapsedInsideTheSameBoot(){
+  val c=ctx(listOf(span(0,1000),span(500,1500)))
+  val switched=c.copy(segments=c.segments.mapIndexed{i,e->if(i==0)e else e.copy(clockDomain="receiver-2")})
+  assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),RestTimeline.plan(switched,emptyList(),RestBonusState(2000,8),RestActiveGrant(8,old)))
+ }
+ @Test fun aDifferentPhysicalBootCanHaveItsOwnElapsedOriginWithoutFillingGap(){
+  val s=span(0,1000);val next=s.copy(bootId="next-boot",from=s.from.copy(receivedAt=EpochMillis(200000)),to=s.to.copy(receivedAt=EpochMillis(201000)))
+  val p=ok(RestTimeline.plan(ctx(listOf(s,next)),emptyList(),RestBonusState(2000,8),RestActiveGrant(8,old)))
+  assertEquals(2000L,p.boostedMs);assertEquals(RestBonusState(0,8),p.after)
+ }
+ @Test fun changingDriveIdCannotReuseAnEarlierPhysicalInterval(){
+  val first=ctx(listOf(span(0,1000)));val c=ctx(listOf(span(500,1500)))
+  val next=c.copy(trip=c.trip.copy(id="different-drive"),departureClock=RestClockDomain("receiver-2","boot"),segments=c.segments.map{it.copy(clockDomain="receiver-2")})
+  assertFalse(RestTimeline.clockOrder(listOf(first,next)))
+ }
+ @Test fun originalDriveOrderCanCrossReceiverWithGapWithoutConsumingThatGap(){
+  val first=ctx(listOf(span(0,1000)));val c=ctx(listOf(span(10000,11000)))
+  val next=c.copy(trip=c.trip.copy(id="different-drive"),departureClock=RestClockDomain("receiver-2","boot"),segments=c.segments.map{it.copy(clockDomain="receiver-2")})
+  assertTrue(RestTimeline.clockOrder(listOf(first,next)))
+  val a=ok(RestTimeline.plan(first,emptyList(),RestBonusState(2000,8),RestActiveGrant(8,old)))
+  val b=ok(RestTimeline.plan(next,emptyList(),a.after,a.activeGrant));assertEquals(RestBonusState(0,8),b.after)
+ }
+
 }

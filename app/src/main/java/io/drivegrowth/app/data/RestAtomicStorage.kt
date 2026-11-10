@@ -81,11 +81,15 @@ internal object RestAtomicStorage {
   if(db.update("rest_module",values(next),"profile=? AND revision=?",arrayOf(before.identity.profileId.value,before.revision.toString()))!=1)throw SQLiteException("휴식 기능 CAS 무갱신")
   if((read(store,db,next.identity) as? ContractResult.Success)?.value!=next)throw SQLiteException("휴식 기능 실제 쓰기 불일치")
  }
- fun contexts(db:SQLiteDatabase,id:GameIdentity):List<StoredRestContext> = db.rawQuery("SELECT drive_id,ordinal,profile,source,payload,digest FROM rest_contexts ORDER BY ordinal",null).use {r->buildList{while(r.moveToNext()) {
+ fun contexts(db:SQLiteDatabase,id:GameIdentity):List<StoredRestContext> {
+  val result=db.rawQuery("SELECT drive_id,ordinal,profile,source,payload,digest FROM rest_contexts ORDER BY ordinal",null).use {r->buildList{while(r.moveToNext()) {
   val raw=r.text(4);val c=RestDrivingJson.context(JSONObject(raw));val ordinal=r.integer(1,1,Long.MAX_VALUE)
   if(r.text(0)!=c.trip.id||c.identity!=id||r.text(2)!=id.profileId.value||r.text(3)!=id.source.name||RestDrivingJson.context(c).toString()!=raw||r.text(5)!=ObservedDrivingJson.digest(raw))throw SQLiteException("휴식 원구간 원문 손상")
   add(StoredRestContext(ordinal,c))
  }}}
+  if(!RestTimeline.clockOrder(result.map{it.value}))throw SQLiteException("휴식 원 context의 물리 시간 커서 겹침/역전")
+  return result
+ }
  fun saveContext(db:SQLiteDatabase,c:RestDriveContext,ordinal:Long,insert:Boolean) {
   val raw=RestDrivingJson.context(c).toString();val v=ContentValues().apply{put("drive_id",c.trip.id);put("ordinal",ordinal);put("profile",c.identity.profileId.value);put("source",c.identity.source.name);put("payload",raw);put("digest",ObservedDrivingJson.digest(raw))}
   if(insert) {if(db.insertOrThrow("rest_contexts",null,v)<0)throw SQLiteException("휴식 원구간 무삽입")}

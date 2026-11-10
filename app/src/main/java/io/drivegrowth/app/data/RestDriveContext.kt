@@ -38,6 +38,27 @@ data class RestTimelinePlan(val before:RestBonusState,val after:RestBonusState,v
 
 /** 지급하지 않는 원순서 계획. 실제 저장 writer가 동일 계획의 Ledger 결과를 하나씩 대조한다. */
 internal object RestTimeline {
+ /** 보존된 원 context 순서가 물리 시간 커서다. receiver 변경으로 같은 boot의 구간을 재사용하지 않는다. */
+ fun clockOrder(contexts:List<RestDriveContext>):Boolean {
+  val ends=mutableMapOf<String,Pair<String,VehicleObservation>>()
+  fun point(clock:RestClockDomain,o:VehicleObservation):Boolean {
+   val previous=ends[clock.bootId]
+   if(previous!=null) {
+    val old=previous.second
+    if(o.receivedElapsedMs<old.receivedElapsedMs||(o.receivedElapsedMs==old.receivedElapsedMs&&o!=old))return false
+    if(previous.first==clock.domain&&o.receivedAt.value<old.receivedAt.value)return false
+   }
+   ends[clock.bootId]=clock.domain to o;return true
+  }
+  for(c in contexts) {
+   if(!point(c.departureClock,c.trip.departure))return false
+   for(e in c.segments) {
+    val clock=RestClockDomain(e.clockDomain,e.span.bootId)
+    if(!point(clock,e.span.from)||!point(clock,e.span.to))return false
+   }
+  }
+  return true
+ }
  fun plan(context:RestDriveContext,departures:List<RestAnchoredDeparture>,before:RestBonusState,
           activeGrant:RestActiveGrant?):ContractResult<RestTimelinePlan> {
   fun conflict()=ContractResult.Failure(ContractError.STATE_CONFLICT)
@@ -47,15 +68,7 @@ internal object RestTimeline {
    departures.any{it.segment !in -1 until context.segments.size})return conflict()
   val lastStop=before.lastStopNumber
   if((before.remainingMs>0&&activeGrant==null)||activeGrant?.let{it.stopNumber<0||lastStop==null||it.stopNumber>lastStop||before.remainingMs>it.rules.bonusDurationMs}==true)return conflict()
-  val previous=mutableMapOf<Pair<String,String>,RestSegmentEvidence>()
-  for(e in context.segments) {
-   val key=e.clockDomain to e.span.bootId
-   previous[key]?.let { p->
-    val elapsed=e.span.from.receivedElapsedMs-p.span.to.receivedElapsedMs
-    if(elapsed<0||(elapsed==0L&&e.span.from!=p.span.to)||e.span.from.receivedAt.value<p.span.to.receivedAt.value)return conflict()
-   }
-   previous[key]=e
-  }
+  if(!clockOrder(listOf(context)))return conflict()
   var state=before;var grant=activeGrant;var boosted=0L
   val operations=mutableListOf<RestTimelineOperation>();val boosts=mutableListOf<RestBoostSlice>()
   fun depart(at:Int):ContractResult<Unit> {
@@ -76,7 +89,7 @@ internal object RestTimeline {
    for(e in context.segments) {
     val original=context.trip.segments[e.index];val span=e.span
     if(e.clockDomain.isBlank()||span.bootId.isBlank()||span.from!=original.from||span.to!=original.to)return conflict()
-    if(span.from==context.trip.departure&&RestClockDomain(e.clockDomain,span.bootId)!=context.departureClock)return conflict()
+    if(e.index==0&&span.from==context.trip.departure&&RestClockDomain(e.clockDomain,span.bootId)!=context.departureClock)return conflict()
     val gears=listOf(span.from.gear,span.to.gear)
     val eligible=gears.all{it==Observation.Available(Gear.DRIVE)||it==Observation.Available(Gear.REVERSE)}
     if(eligible) {
