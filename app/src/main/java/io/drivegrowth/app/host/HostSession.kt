@@ -19,6 +19,7 @@ internal class HostSession(context: Context, private val main: Executor, restore
     val onboarding = OnboardingHostController(StoredOnboardingHostSource(games), worker, main, restoredOnboarding)
     val queries = HostQueryController(worker, main, source::read, null)
     val gacha = GachaLiveHost(CheckpointGachaSource(StoredGachaHostSource(context, games), SessionGachaJournal(games)), worker, main, queries::refresh)
+    val ranking = io.drivegrowth.app.host.ranking.RankingController(worker, main, source::readRanking)
     val results = ResultsHostController(worker, main, source::markViewed, queries::refresh, restoredResults)
 
     fun expansionWorker(action: () -> Unit) { worker.execute(action) }
@@ -40,6 +41,7 @@ internal class HostSession(context: Context, private val main: Executor, restore
     fun release() {
         queries.release()
         results.release()
+        ranking.release()
         gacha.release()
         onboarding.release()
         worker.shutdownNow()

@@ -41,4 +41,11 @@ class HostNavigationTest {
         assertFalse(navigation.back()); assertEquals(HostPage.HOME, navigation.page)
         assertTrue(navigation.back())
     }
+    @Test fun rankingEntryReturnsHomeWithoutChangingVehicleSelection(){
+        val selected=OwnedVehicleId("remembered")
+        val navigation=HostNavigation(page=HostPage.RANKING,selectedVehicleId=selected)
+        assertFalse(navigation.back());assertEquals(HostPage.HOME,navigation.page)
+        assertEquals(selected,navigation.selectedVehicleId);assertTrue(navigation.back())
+    }
+
 }

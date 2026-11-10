@@ -32,6 +32,11 @@ import io.drivegrowth.app.host.HostPage
 import io.drivegrowth.app.host.HostQueryController
 import io.drivegrowth.app.host.HostQueryState
 import io.drivegrowth.app.host.onboarding.OnboardingStateBundle
+import io.drivegrowth.app.host.ranking.RankingState
+import io.drivegrowth.app.host.ranking.RankingMetric
+import io.drivegrowth.app.ui.ranking.RankingView
+import io.drivegrowth.app.ui.ranking.RankingMode
+import io.drivegrowth.app.ui.ranking.RankingUiState
 import io.drivegrowth.app.host.HostSession
 import io.drivegrowth.app.host.ResultsHostMapper
 import io.drivegrowth.app.host.ResultsStateBundle
@@ -78,10 +83,12 @@ class MainActivity : Activity() {
     private var pendingRouteFailed = false
     private var pendingRouteEnabled = false
     private lateinit var shop: ShopView
+    private lateinit var ranking: RankingView
+    private var rankingState: RankingState = RankingState.Restricted
     private lateinit var gacha: GachaView
     private var navigationGeneration = 0L
     private val destinations = listOf(HostPage.HOME to "가게", HostPage.GARAGE to "보유 차량", HostPage.COLLECTION to "도감",
-        HostPage.GACHA to "가챠", HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내")
+        HostPage.GACHA to "가챠", HostPage.RANKING to "기록·랭킹", HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내")
     private val mapper = GarageHostMapper()
     private val resultsMapper = ResultsHostMapper()
     private lateinit var results: ResultsView
@@ -116,6 +123,14 @@ class MainActivity : Activity() {
         val shopMode = ShopMode.entries.firstOrNull { it.name == savedInstanceState?.getString("shopMode") } ?: ShopMode.OVERALL
         shop.restoreUiState(ShopUiState(mode = shopMode, sceneScrollY = savedInstanceState?.getInt("shopSceneY", 0) ?: 0,
             controlsScrollY = savedInstanceState?.getInt("shopControlsY", 0) ?: 0))
+        ranking = RankingView(this) {
+            if (allowed() && navigation.page == HostPage.RANKING) session.ranking.refresh()
+            else { updateAccess(); ranking.render(RankingState.Restricted, false) }
+        }
+        ranking.restoreUiState(RankingUiState(
+            RankingMode.entries.firstOrNull { it.name == savedInstanceState?.getString("rankingMode") } ?: RankingMode.MY_RECORD,
+            RankingMetric.entries.firstOrNull { it.name == savedInstanceState?.getString("rankingMetric") } ?: RankingMetric.SHOP_LEVEL,
+            (savedInstanceState?.getInt("rankingY", 0) ?: 0).coerceAtLeast(0)))
         onboarding = OnboardingView(this, ::onOnboardingEvent)
         routedNewProfile = savedInstanceState?.getString("onboardingRoutedProfile")
         val deliveryHandler = handler
@@ -226,6 +241,7 @@ class MainActivity : Activity() {
         setVisible(true)
         if (active) return
         active = true
+        session.ranking.attach { rankingState = it; ranking.render(it, allowed() && navigation.page == HostPage.RANKING) }
         if (results.uiState != session.results.uiState) results.restoreUiState(session.results.uiState)
         session.results.attach { id, result ->
             updateAccess()
@@ -246,6 +262,7 @@ class MainActivity : Activity() {
 
     private fun stopObserving() {
         session.results.remember(results.uiState)
+        session.ranking.detach()
         session.results.detach()
         active = false
         handler.removeCallbacks(watchdog)
@@ -257,6 +274,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         pendingRouteGeneration++
+        session.ranking.detach()
         expansionHost.release()
         management.release()
         queries.detach()
@@ -276,6 +294,9 @@ class MainActivity : Activity() {
         outState.putBundle("results", ResultsStateBundle.encode(session.results.uiState))
         outState.putBundle("onboardingHost", OnboardingStateBundle.encode(session.onboarding.uiState))
         outState.putString("onboardingRoutedProfile", routedNewProfile)
+        outState.putString("rankingMode", ranking.uiState.mode.name)
+        outState.putString("rankingMetric", ranking.uiState.metric.name)
+        outState.putInt("rankingY", ranking.uiState.scrollY)
         outState.putString("shopMode", shop.uiState.mode.name)
         outState.putInt("shopSceneY", shop.uiState.sceneScrollY)
         outState.putInt("shopControlsY", shop.uiState.controlsScrollY)
@@ -297,6 +318,7 @@ class MainActivity : Activity() {
         val enabled = allowed()
         queries.setControlsEnabled(enabled)
         session.gacha.setControlsEnabled(enabled && navigation.page == HostPage.GACHA)
+        session.ranking.setControlsEnabled(enabled && navigation.page == HostPage.RANKING)
         session.onboarding.setControlsEnabled(enabled)
         expansionAccess.setControlsEnabled(enabled && navigation.page == HostPage.HOME)
         management.controller.setControlsEnabled(enabled)
@@ -311,6 +333,7 @@ class MainActivity : Activity() {
         session.onboarding.refresh()
         if (navigation.page == HostPage.HOME) expansionHost.load()
         else if (navigation.page == HostPage.GACHA) session.gacha.refresh()
+        else if (navigation.page == HostPage.RANKING) session.ranking.refresh()
         else if (screen != HostQueryState.Loading) queries.refresh()
     }
 
@@ -326,6 +349,7 @@ class MainActivity : Activity() {
             is HostQueryState.Failure -> CollectionScreenState.Error("조회 실패 (${current.error})")
             else -> CollectionScreenState.Loading
         }
+        ranking.render(rankingState, enabled && navigation.page == HostPage.RANKING)
         managementView.render(managementState, enabled)
         val shopState = when (val current = expansionState) {
             is ShopScreenState.Content -> current.copy(name = current.name + when (expansionSource.identity?.source) {
@@ -392,6 +416,7 @@ class MainActivity : Activity() {
             HostPage.ONBOARDING -> showBody(onboarding)
             HostPage.HOME -> showBody(shop)
             HostPage.GACHA -> showBody(gacha)
+            HostPage.RANKING -> showBody(ranking)
         }
     }
 
@@ -546,6 +571,7 @@ class MainActivity : Activity() {
             }
             if (navigation.page == HostPage.HOME && shop.handleBack()) return
             if (navigation.page == HostPage.GACHA && gacha.handleBack()) return
+            if (navigation.page == HostPage.RANKING && ranking.handleBack()) return
             if (navigation.pendingGarageRequest != null) { cancelPreparation(); return }
             if (navigation.page == HostPage.GARAGE && garage.closeDetail()) return
             if (navigation.page == HostPage.RESULTS && results.closeDetail()) return
