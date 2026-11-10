@@ -105,4 +105,17 @@ class FirstGiftStoreIntegrationTest : InstrumentationTestCase() {
         store.close();raw{it.execSQL("DELETE FROM gacha_progress")};store=open()
         assertEquals(failure(ContractError.DATA_UNAVAILABLE),store.commitFirstRentalGift(c));assertEquals(failure(ContractError.DATA_UNAVAILABLE),store.readGachaState())
     }
+    fun testIgnoredWholeResultInsertRollsBackThenSameCommandRetriesOnce() {
+        val first=initialized();complete(first.grant.changedVehicle!!);val c=prepared()
+        val before=ok(store.listUnviewedSettlements());val balance=ok(store.balance())
+        raw { it.execSQL("CREATE TRIGGER ignore_whole_gift BEFORE INSERT ON first_gift_requests BEGIN SELECT RAISE(IGNORE); END") }
+        assertEquals(failure(ContractError.STORAGE_FAILURE),store.commitFirstRentalGift(c))
+        assertEquals(GachaProgress(Revision(0),0,0),ok(store.readGachaState()).progress)
+        assertEquals(before,ok(store.listUnviewedSettlements()));assertEquals(balance,ok(store.balance()))
+        raw { it.execSQL("DROP TRIGGER ignore_whole_gift") }
+        val result=ok(store.commitFirstRentalGift(c))
+        assertEquals(GachaProgress(Revision(1),0,1),result.progress)
+        assertEquals(result,ok(store.commitFirstRentalGift(c)))
+        assertEquals(result.progress,ok(store.readGachaState()).progress)
+    }
 }
