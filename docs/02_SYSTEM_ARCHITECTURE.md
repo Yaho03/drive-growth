@@ -665,6 +665,13 @@ worker 전용 `hostCommands`는 Gacha/단일 Garage GameChange/Material/Repair �
 이는 전체 GachaRequest/UI/attemptId/Bundle의 영속 codec이나 제품 프로세스 복원 구현이 아니다. 실제 동일profile/source factory·비동기 호스트 소비·첫 선물 runtime·NPC/clock/coverage·제품 Activity/프로세스·전원/실차는 후속이다. #44의 신규 Expand 후보는 이 네 명령 공급에 포함하지 않는다. 정확 게시 head/CI는 연결 PR, 실제69 메서드실행과 checkpoint23 재사용 범위는 [검증 문서](06_VERIFICATION.md#초기화첫-선물checkpoint-sqlite-통합81-독립-검증--2026-11-10)를 따른다.
 
 
+### 내 기록·시연 랭킹의 읽기 모듈 — 2026-11-10
+
+원58407d의 RankingReadSource는 기존 같은 profile/source SQLite를 한 snapshot으로 읽고6지표를 집계한다. 지급/지출·schema/helper를 바꾸지 않는다. 누적수익은 전체 확정원장/원인을 검증하고 판매·폐차를 포함·초기지급/환급 제외, 도감은ever-owned고유칸, 최고가는현재OWNED가격×희귀도수익배율이다. 기준은 [PRD](01_PRD.md#1차-랭킹-범위) 한곳을 따른다. RankingController/RankingView와 DemoRankingProvider는 실제내기록과합성참여자/예시순위를분리하고통신/계정/서버를추가하지않는다.
+
+실제0/Empty/Missing/Failure를구분한다. Android checked JSONException은지표경계의STORAGE_FAILURE로변환하고숫자를절삭하거나DB를수리하지않는다. 누적/주간이같은주행원장을검증하면그손상에서두지표가실패할수있으며모든손상에서다른5정상이라고보장하지않는다.
+
+departureZone hook은실제출발당시지역근거를요구한다. 기존LocalDate만있는기록을현재zone/정산시각/고정KST로바꾸지않고불명/다른지역은주간Missing이다. questCauses hook은같은DB의검증된원래Quest지급요청ID만공급한다. 미분류입금이있는데hook이없으면누적Missing이며잔액/미열람목록으로대체하지않는다. 실제생산자/영속근거는 #39/#45/#58/#122에서연결하고 MainActivity hook은별도다.
 ### 제품 세션·첫 실행·가챠·차량 관리의 공통 저장 소비 — 2026-11-10
 
 원cab567은 C274의 GameSessionFactory/온보딩7파일과 Garage 공급을 포함한다. MainActivity/HostSession/StoredHostSource·가챠·차량 관리가 동일 factory/profile/source/store를 소비한다. 기존 DB 모드를 보존하고 두 모드 파일 공존/잘못된 source·손상·사라진 기존 DB를 새 프로필로 바꾸지 않는다. NEW는 실제 helper 근거를 소비하고 초기화/선물 상태를 누락 보정하지 않는다. UI Bundle은 선택/요청 식별만 저장하며 NEW 근거·완료를 만들지 않는다.

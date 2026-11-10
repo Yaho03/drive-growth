@@ -19,7 +19,7 @@ class HostPendingRouteTest {
         val change=GameChange(RequestId("garage"),TransactionKind.GARAGE,InputSource.VEHICLE,RuleVersion("rules"),
             vehicle=VehicleWrite.Update(OwnedVehicleId("car"),Revision(0),2,VehicleLifecycle.OWNED,0))
         assertEquals(ContractResult.Success(HostPage.GARAGE),pendingHostPage(HostCheckpointCommand.Garage(ContentVersion("v"),change)))
-        assertEquals(ContractResult.Success(null),pendingHostPage(null))
+        assertEquals(ContractResult.Success<HostPage?>(null),pendingHostPage(null))
     }
     @Test fun gachaRoutesItsOwnRecoveryWithoutChangingTheOriginalCommand(){
         val vehicle=OwnedVehicle(OwnedVehicleId("award"),VehicleId("hyundai_casper"),1,Revision(0),VehicleLifecycle.OWNED,
@@ -30,18 +30,24 @@ class HostPendingRouteTest {
         assertEquals(vehicle,command.award.vehicle)
     }
 
-    @Test fun unprovidedQuestAndDeliveryPagesFailWithoutInventingAnEmptyRoute(){
-        val zone=java.time.ZoneId.of("Asia/Seoul")
+    @Test fun deliveryRoutesToItsOwnPageAndGaragePreservesForeignCommand(){
+        val command=HostCheckpointCommand.Delivery(ContentVersion("content"),InputSource.VEHICLE,
+            io.drivegrowth.app.data.DeliveryCheckpointOperation.Abandon(
+                io.drivegrowth.core.delivery.DeliveryChangeRules(RuleVersion("delivery-rule"),10),RequestId("chosen")))
+        assertEquals(ContractResult.Success(HostPage.DELIVERY),pendingHostPage(command))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),restoreGaragePending(command))
+        assertEquals(RequestId("chosen"),command.operation.requestId)
+    }
+
+    @Test fun providedQuestPageReturnsTypedSuccessAndGaragePreservesForeignCommand() {
+        val zone=java.time.ZoneId.of("UTC")
         val definition=io.drivegrowth.core.quest.QuestDefinition("daily-result-viewed",RuleVersion("q"),
             io.drivegrowth.core.quest.QuestCadence.DAILY,io.drivegrowth.core.quest.QuestAction.RESULT_VIEWED,1,GameMoney(10),zone,true)
-        val quest=HostCheckpointCommand.Quest(io.drivegrowth.core.quest.QuestClaimCommand(RequestId("quest/claim/foreign"),
+        val command=HostCheckpointCommand.Quest(io.drivegrowth.core.quest.QuestClaimCommand(RequestId("quest/claim/foreign"),
             ProfileId("profile"),InputSource.SIMULATION,definition,io.drivegrowth.core.quest.QuestPeriod(
                 io.drivegrowth.core.quest.QuestCadence.DAILY,java.time.LocalDate.of(2026,11,10),zone),Revision(0)))
-        val delivery=HostCheckpointCommand.Delivery(ContentVersion("v"),InputSource.SIMULATION,
-            io.drivegrowth.app.data.DeliveryCheckpointOperation.Abandon(io.drivegrowth.core.delivery.DeliveryChangeRules(RuleVersion("r"),10),RequestId("delivery-abandon")))
-        for(command in listOf(quest,delivery)){
-            assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),pendingHostPage(command))
-            assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),restoreGaragePending(command))
-        }
+        assertEquals(ContractResult.Success(HostPage.PROGRESSION),pendingHostPage(command))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),restoreGaragePending(command))
     }
+
 }
