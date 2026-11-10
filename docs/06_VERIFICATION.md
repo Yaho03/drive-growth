@@ -1581,3 +1581,12 @@ A는같은원본2파일SHA/기대무변경·새APK/설치pullSHA일치로ReadSou
 491추적파일584동일·저자clean·외부overlay/기대변경0,appbf1d9da4/test605afd5d설치pullSHA일치. API34 ARM64/user10 14:51:22~14:55:52KST단독구간·자기2패키지제거/잔여시험없음·제품APK/6데이터·권한/차량/창/설정/전경등19보존PASS·반환을회수했다. 게시담당adb0. 원문/status/XML·원본SHA/보존근거는 /private/tmp/drive-ranking-local-demo-20261110/fix/independent-device-review/에보존했다.
 
 후속main173(4e100fb)과정상통합해소유12파일584동일·기존실제firstflow Main/HostSession/helper보존을확인했다. 새조합은랭킹JVM15PASS/계측Kotlin컴파일BUILD SUCCESSFUL26초·저장소21/29/413/diffPASS다. 이전e652의APK/Lint성공은그head범위로구분하며새원격정확headCI는메인이확인한다. MainActivity실제진입·실제SDK출발지역/Questhook·온라인/타인순위는미검증이다. 고정KST/Quest원인은명시fixture이며실제6지표전체완료로표시하지않는다. 이전b35실패를소급변경하지않는다.
+
+
+### 완료 고객 집계·확장 소비의 실제 SQLite 검증 — 2026-11-10
+
+정확원542649ae35d0d799a09281dae2b3502213ff3a95의2파일에독립코드APPROVE/필수0과A실제CompletedExpansionLedgerTest13PASS(3.130초·실패/오류/생략0)를회수했다. 명시SIMULATION DB의실제assign/account/settle/finishReturn/receipt를사용하며방문3/미정산은완료0·무차감거절,완료2→3/초과4·9→10/24→25의기존동의임계/비용/용량,동일settle replay미가산·무료/사고완료근거를검증했다. 누락/손상/공유/고아정산의실패/행보존·대문자타도메인정상·확장commit실패rollback/같은ID재시도·현재조건손상뒤원래purchase replay/DB재개방도확인했다. 행assertion을전체파일bytes시험으로과장하지않는다.
+
+480추적파일/정식기대무변경·새APK appf414a98b/test76f07193설치pullSHA일치, API34 ARM64/user10 13:47:45~13:47:51KST구간·자기2패키지/잔여시험정리·19제품보존/반환을회수했다. 작성자core412/app182·D/Garage/E69·다른시험과합산하지않는다. 원문/status/XML·소스/hash·보존자료 /private/tmp/drive44-completed-expansion-20261110/independent-device-review/. 조율자adb0.
+
+최종후보는최신main174(7f5c598)과정상통합하며원정식시험파일과완료count/expand delta를유지하고기존Runtime Pending의parkedSince/엄격조회만추가로보존했다. 새조합Runtime17+랭킹15=32JVM PASS·계측Kotlin컴파일16초·저장소21/29/414/diffPASS를확인했다. 이전b5e6의APK/Lint는그head범위로구분하고새정확head원격CI는root가확인한다. 원542에서Runtime혼합장치13을실행한것으로쓰지않으며새로컬Runtime표적/컴파일근거·정확head/CI는인계자료/연결PR을따른다. helper/schema·shop방문수/보험/buy를바꾸지않는다. 실제정의/제품미리보기·선택터치/Activity·프로세스/전원·실차/전체 #44는후속이다.

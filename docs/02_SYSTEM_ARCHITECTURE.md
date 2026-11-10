@@ -681,3 +681,12 @@ GachaLiveHost→CheckpointGachaSource는 기존 GachaPull/공용 hostCommands의
 실제0/Empty/Missing/Failure를구분한다. Android checked JSONException은지표경계의STORAGE_FAILURE로변환하고숫자를절삭하거나DB를수리하지않는다. 누적/주간이같은주행원장을검증하면그손상에서두지표가실패할수있으며모든손상에서다른5정상이라고보장하지않는다.
 
 departureZone hook은실제출발당시지역근거를요구한다. 기존LocalDate만있는기록을현재zone/정산시각/고정KST로바꾸지않고불명/다른지역은주간Missing이다. questCauses hook은같은DB의검증된원래Quest지급요청ID만공급한다. 미분류입금이있는데hook이없으면누적Missing이며잔액/미열람목록으로대체하지않는다. 실제생산자/영속근거는 #39/#45/#58/#122에서연결하고 MainActivity hook은별도다.
+
+
+### 확장 조건의 확정 완료 고객 조회 — 2026-11-10
+
+원542649a의 RentalLedger.completedRentalCount()는 같은 DB의 rentals/settlements를 기존 decodeCompleted로 검증하고 rentalId/settlementId 고유 건수를 반환한다. 누락·손상·공유 정산/정확 소문자 rental/settle/ 고아는 STORAGE_FAILURE이며 정상0/미완료로보정하지않는다. 타 도메인 대문자 prefix는 자기 고아로 취급하지 않는다.
+
+expand는 기존 purchase atomic 안에서만 완료수를 preview의 servedCustomers에 공급하고 단계/공간/차감을 함께확정한다. 원래 동일 전체요청 replay를 현재조건보다먼저 유지한다. shop().servedCustomers의 방문수·보험/buy 의미는바꾸지않으며 제품미리보기는별도completedRentalCount를소비해야한다. 현재원래정산이검증되면무료/사고영업도완료이며현개체/잔액으로과거완료를추정하지않는다.
+
+최신main Runtime Pending의 parkedSince/엄격정수조회를정상통합해보존했다. helper/schema/새원장은변경하지않았다. 이부분은버전있는실제확장정의·시설비용/효과·제품source/UI·영속Expand명령모두를제공하지않으며동의된시험값은 [PRD](01_PRD.md#기존-동의된-대여확장-시험값)를따른다.

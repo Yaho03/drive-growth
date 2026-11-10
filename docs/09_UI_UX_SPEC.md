@@ -330,3 +330,6 @@ HOME에서 ShopView 전경을 표시하고 한 줄의 Back/화면 선택/새로�
 ### 내 기록·시연 랭킹 모듈 연결점 — 2026-11-10
 
 RankingView/Controller는실제내기록6지표의기간/출처·Available0/Empty/Missing/Failure와합성참여자예시를분리한다. Demo를실제온라인순위/내1위로표시하지않는다. 이는독립View/원장읽기모듈이며 MainActivity탐색·실제출발당시지역/Quest원인hook은별도연결한다. 누락을정상0으로숨기지않고늦은응답/gate해제시콘텐츠제한을유지한다. 최종아트WIP·온라인후속범위와 [PRD](01_PRD.md#1차-랭킹-범위)를유지한다.
+
+
+확장 미리보기의 완료 고객 수는 공통 RentalLedger.completedRentalCount 결과를 소비하고 shop의 기존 방문수로 대체하지 않는다. 최종 확정은 같은 purchase 거래가 재검사한다. 이 조회/저장 부분 공급만으로 확장 버튼·실제 정의/source·제품 화면 연결이 완료된 것은 아니며 손상 조회는 정상0명으로 숨기지 않는다.
