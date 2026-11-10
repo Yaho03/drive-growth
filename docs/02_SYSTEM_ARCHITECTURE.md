@@ -212,7 +212,7 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 | `choose(store, profileId, chosen)` | NEW만 근거와 `INITIAL_GARAGE_CAPACITY`로 `commitFirstGrantInitialization`을 호출해 초기 재화·첫 차·초기 공간·마커를 한 번에 확정한다. 이미 확정된 프로필(EXISTING)은 현재 콘텐츠로 다시 만들지 않고 **보관된 원래 전체 명령을 그대로** `commitInitialization`에 제출한다. 그래서 콘텐츠·규칙 버전이 바뀌거나 원래 차종이 빠져도 같은 선택은 처음 결과를 재생한다. 응답을 잃으면 같은 선택으로 다시 부른다 | 다른 차 `STATE_CONFLICT`, 다른 프로필 `INVALID_INPUT`, 원래 명령에 첫 차 없음 `STORAGE_FAILURE`, 원래 결과 없는 기존 프로필·UNKNOWN `DATA_UNAVAILABLE`(commit 호출 안 함) |
 | `prepareOpeningGift(store: FirstRentalGiftStore, profileId, source)` | 같은 프로필 원장의 최초 완료 영업(rentalId·정산 ID)과 현재 가챠 revision으로 고정 요청 ID `opening-gift`의 `FirstRentalGiftCommand`(무료 뽑기권 +1, 돈·차량 불변)를 만든다. 이미 지급된 프로필은 원래 명령을 돌려주므로 다시 제출하면 처음 결과가 재생된다(프로필당 1회). 호출자가 `commitFirstRentalGift`로 확정한다 | 다른 프로필·출처 `INVALID_INPUT`, 완료 영업 없음 `DATA_UNAVAILABLE`, 버전·revision 불일치 `STATE_CONFLICT` |
 
-`commitInitialization`은 아래 #121의 명시 메모리 참조로 제공하며 실제 SQLite/NEW 근거 발급은 후속이다. `commitFirstRentalGift`의 메모리/SQLite 확정은 별도 후속이다. 이번에는 계약의 `prepareInitialization`/`prepareFirstRentalGift`로 확정을 흉내 내는 시험 저장소로 후보·선택·재요청·선물 명령만 검증했다. NEW 근거 발급과 legacy 복구 정책은 저장 측 책임이다.
+`commitInitialization`은 아래 #121의 명시 메모리 참조로 제공하며 실제 SQLite/NEW 근거 발급은 후속이다. `commitFirstRentalGift`도 아래 같은 메모리 원장의 참조로 제공하며 실제 SQLite/live 확정은 후속이다. #151 당시에는 계약의 `prepareInitialization`/`prepareFirstRentalGift` 응답을 공급하는 시험 저장소로 후보·선택·재요청·선물 명령을 검증했다. 현재 같은 메모리 원장의 실제 참조 확정은 아래 #121 공급과 구분한다. NEW 근거 발급과 legacy 복구 정책은 저장 측 책임이다.
 
 ### 원자성·오류·재시도
 
@@ -554,7 +554,7 @@ PR #127은 가챠 검토용 커밋 `08eb3c4`를 기반으로 `core.contract.Mate
 | 재료 강화 | `InMemoryGameChangeStore : MaterialChangeStore`, `MaterialFixtureConfiguration`의 명시 출처/버전/활동과 기존 지갑·차량·모니터를 공유. 같은 전체 명령은 당시 두 개체/잔액/거래를 먼저 재생하고 legacy/gacha/material의 요청 ID 충돌을 양방향 거절 | #122 재료 SQLite의 두 개체·요청·최초 결과 원자 저장은 PR #156으로 제공. #48 제품 UI·명령 영속 복원은 후속 |
 | 수리 | 기존 `InMemoryGameChangeStore : RepairChangeStore`의 `readRepairState/commitRepair/repairSettlement`, 같은 원장의 잠금·지갑·개체·요청 ID와 재료 활동 공유. 명시 `RepairFixtureConfiguration`으로 활동·확정 사고·견적을 공급 | 실제 SQLite commit, RentalLedger의 live 활동·사고/VehicleCare 견적 공급, #49 제품 명령 연결 |
 | 초기화 | 기존 `InMemoryGameChangeStore : InitializationChangeStore`의 readInitialization/commitInitialization, 명시 프로필 상태·마커 fixture, 같은 원장 재화·첫 차·공간·마커·원래 결과 원자 확정/재생. 기존 FirstGrant 전용 어댑터 소비 | 실제 NEW 근거 발급·legacy 복구·SQLite 원자 저장, #151 소비 래퍼는 main 제공이며 #50/#56 제품 연결은 후속 |
-| 첫 영업 선물 | `FirstRentalGiftStore`, 전체 명령/원래 결과, 순수 prepare·소비 fixture | 실제 메모리/SQLite commit·가챠 무료권 소비와 경쟁, #50 제품 지급 |
+| 첫 영업 선물 | 기존 `InMemoryGameChangeStore : FirstRentalGiftStore`, 명시 구성과 같은 가챠 progress·모니터에서 무료권/마커/최초 전체 결과 원자 확정·재생, 요청 ID 양방향 충돌·가챠 무료권 소비와 경쟁 | 실제 RentalLedger/live 완료 근거·같은 프로필 권위·SQLite commit, #50 제품 지급/프로세스 |
 
 재료 참조는 같은 잠금에서 최신 두 개체·잔액·활동을 읽고 기존 prepare를 실행한 뒤 비용·두 revision·재료 소비·최초 결과를 함께 확정한다. 비용0은 `money=null`이며 새 요금 규칙이 아니다. 설정/활동 누락은 DATA_UNAVAILABLE, 명시 실패는 그대로 전달하고 IDLE/0으로 보정하지 않는다. 활동 Map은 구성 시 복사·변경 불가 처리한다. 실패 주입과 동일 재료·다른 명령 종류의 경쟁도 같은 원장에서 검증한다. fixture 활동은 고정 시험 입력이며 제품 RentalLedger의 live 활동이 아니다.
 
@@ -567,6 +567,8 @@ PR #127은 가챠 검토용 커밋 `08eb3c4`를 기반으로 `core.contract.Mate
 2026-11-09 초기화 후속: `InitializationFixtureConfiguration`은 명시 상태/양성 근거 및 저장된 마커를 시험 입력으로 공급한다. 빈 차고/이력 부재에서 NEW를 추론하지 않는다. 같은 모니터에서 현재 지갑·소유 개체 수를 읽고 기존 prepareInitialization으로 검사해 초기 재화·첫 차·공간·마커·전체 결과를 함께 확정한다. 비용/무료권을 임의로 만들지 않고, 명시 가챠 상태가 있으면 공간만 공유하며 진행/무료권은 보존한다. 일반 Add도 확정된 초기 공간을 검사한다.
 
 기존 결과는 당시 전체 명령/차량/재화/거래/source/프로필/마커/공간 연결을 확인한 뒤 readInitialization의 EXISTING(original)로 공급한다. 마커-결과 누락/손상은 STORAGE_FAILURE, UNKNOWN/마커 없는 legacy는 무지급이다. 현재 콘텐츠·후보·잔액·성장/판매가 달라도 보관한 전체 명령은 최초 결과를 재생하고, 다른 선택·명령과 legacy/gacha/material/repair의 같은 ID는 충돌이다. 검증에 원래 근거를 사용하는 것은 NEW 발급 구현이 아니다. 초기화 참조 작성 당시와 달리 현재 #151의 원래 명령 재생·선물 호출자 source/profile 수정도 main 제공이며, 이 참조의 기존 개체 ID 충돌 수정과 별도 근거로 구분한다.
+
+2026-11-10 선물 메모리 참조 공급: `FirstRentalGiftFixtureConfiguration`의 명시 프로필/출처·콘텐츠/규칙·최초 완료 영업을 시험 입력으로 받는다. 잔액/차량 존재로 완료를 추론하지 않으며 수익0 완료도 허용한다. 같은 모니터와 기존 `gachaState.progress`에서 무료권+1/revision+1·프로필 마커·최초 전체 결과를 함께 확정한다. 재화·차량·활동·보장 카운터는 보존한다. 당시 상태는 기록 검증용이며 별도 현재 권위가 아니다. command/거래/마커/결과의 연결 손상·누락은 STORAGE_FAILURE, 같은 전체 명령은 현재 권위/완료 조회보다 먼저 원래 결과를 재생한다. 기존 legacy/gacha/material/repair/initialization과 요청 ID를 양방향 거절하고, 가챠 무료권 소비와 같은 progress revision으로 경쟁한다. 초기화의 기존 개체 ID guard를 유지한 통합88bb의 독립84개로 검토했다. 실제 SQLite/live 완료·NEW issuer/legacy 복구·제품 UI/프로세스는 별도다.
 
 첫 선물은 같은 프로필 원장의 최초 완료 영업 rentalId/SettlementId를 근거로 무료권+1·GachaProgress revision+1·프로필당 마커를 함께 계획한다. 잔액은 완료 증거가 아니며 정상 수익0도 허용한다. 가챠의 무료권 소비와 같은 progress revision을 사용하고 보장 카운터·재화는 유지한다. `Ready`는 예정일 뿐 실제 지급이 아니다. 동일 전체 명령은 최초 전체 결과 재생, 다른 명령/기능의 같은 요청 ID는 충돌이어야 한다.
 
@@ -616,3 +618,5 @@ SqliteGameChangeStore는 MaterialChangeStore.readMaterialState/commitMaterial을
 스키마6은 material_requests만 추가하며 지원 v1~v5의 기존 표/행/정산·렌털·발견·가챠·탁송/주행 이력을 보존한다. 이전 중 실패는 SQLiteOpenHelper 거래로 롤백하고 원본을 보존한다. 스키마5 공급이 main에 반영된 뒤 준비한 버전이며 향후 PR 머지 순서가 달라지면 재확인한다. 최초 결과 재생은 현재 버전 공급/활동/성장/처분과 독립적이며 원래 상태+명령의 순수 검증 결과, 공용 정산의 ID/출처/종류/규칙/금액/잔액/시각 및 두 역할을 대조한다. JSON 정수·금액/차량은 공용 LedgerJson decoder를 재사용해 소수/문자열/지수/범위 초과를 보정하지 않고 STORAGE_FAILURE로 반환한다. 수리/초기화/선물 실제 commit·제품 UI/권위 공급·프로세스/실차 연결과 #122 전체 완료는 별도 후속이다.
 
 재료 SQLite의 자기 material-v1 공용 정산이 남고 material_requests 행만 누락된 경우는 정상 타 기능 ID 충돌과 구분해 STORAGE_FAILURE로 거절한다. 누락 snapshot을 현재 개체에서 재구성하지 않으며 원본을 보존한다. 정상 같은 명령의 최초 전체 결과 재생·다른 입력/다른 기능 ID의 STATE_CONFLICT는 유지한다.
+
+휴식 원장의 head 쓰기도 같은 거래의 필수 확정이다. rest_head의 singleton 행1 삽입 결과를 검사하고 무삽입/실패는 STORAGE_FAILURE로 전달해 로그·head·allocator를 함께 rollback한다. 정상 seq gap을 손상으로 거절하지 않으며 연결/머리 정보의 누락 검증·같은 요청 재생·실패 재시도는 유지한다.
