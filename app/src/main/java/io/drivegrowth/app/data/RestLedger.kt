@@ -130,11 +130,12 @@ class RestLedger internal constructor(private val store: SqliteGameChangeStore) 
             put("command", command)
             put("result", result.toString())
         })
-        db.insertWithOnConflict("rest_head", null, ContentValues().apply {
+        val headId = db.insertWithOnConflict("rest_head", null, ContentValues().apply {
             put("id", 1)
             put("last", seq)
             put("count", entries.size + 1L)
         }, SQLiteDatabase.CONFLICT_REPLACE)
+        if (headId != 1L) throw JSONException("휴식 머리 정보 저장 실패")
     }
 
     /**

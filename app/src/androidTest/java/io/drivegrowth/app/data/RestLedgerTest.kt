@@ -258,6 +258,22 @@ class RestLedgerTest : InstrumentationTestCase() {
         }))
     }
 
+    fun testIgnoredHeadInsertRollsBackRecordAndSequenceBeforeRetry() {
+        ok(ledger.depart(rules, stop(1)))
+        val before = dump()
+        sql("CREATE TRIGGER ignore_rest_head BEFORE INSERT ON rest_head BEGIN SELECT RAISE(IGNORE); END")
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), ledger.consume(rules, "drive-a", 1, 5 * minute))
+        assertEquals(before, dump())
+        assertEquals(RestBonusState(20 * minute, 1), state())
+        sql("DROP TRIGGER ignore_rest_head")
+        val first = ok(ledger.consume(rules, "drive-a", 1, 5 * minute))
+        assertEquals(RestBonusState(15 * minute, 1), first)
+        reopen()
+        assertEquals(first, state())
+        assertEquals(first, ok(ledger.consume(rules, "drive-a", 1, 5 * minute)))
+        assertEquals(2, logCount())
+    }
+
     fun testTwoConnectionsDepartingTheSameStopIssueOneBonus() {
         val other = open()
         val otherLedger = RestLedger(other)
