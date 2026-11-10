@@ -1746,3 +1746,5 @@ D의UTC A→B→A반례는물리elapsed중첩과별개다. 같은boot/domain A�
 F복수departure1은정확9db+별도F시험의명시compact SIMULATION 조합으로7.967초PASS/정상footer·carry/두departure/단일입금/재생/rollback을확인한별도근거다. C1/day실패를해결한시험이아니며그F1을E46의source/APK/계획에넣거나46쌍을덮지않았다. 원830/9db·C/D/A실패/성공및새46준비자료는 /private/tmp/drive-rest-domain-utc-fix-20261110/REPORT.md와관련원본independent-review/device-review에분리보존했다.
 
 새main188조합은앱593 실패/오류/생략0,제품/시험APK·Lint오류0/경고27,78tasks/2분19초에성공했다. RestTimeline/동일D clock16은이593에포함되며별도합산하지않는다. core420은동일core/commonbuild입력의이전근거/이번재실행0이다. 저장소21/29/453·diff/소스동일성검사도통과했다. 이는로컬JVM/컴파일/APK/Lint결과이며새SQLite46/금융후조건통과나최종독립승인을대신하지않는다. mainCI42823800132는root인계시실행중으로만기록한다. 담당새기기/ADB/원격/canonical수정0이며실제B producer/Main/boot·domain/장소권위·SDK/프로세스·전원·실차·제품UI·전체#40/#39/#51/#57/#28/#122는미완료로유지한다.
+
+후속 C는 정확6a4의 metadata·공개 읽기 코드 범위에서 새 필수 지적0을 보고했고, 공개 결과 소비 호환 JVM8을 별도 실행했다. 이는 새 SQLite guard 실행이 아니다. D도 정확6a4의 SQL day 수정 코드를 수용했으며 원 SQL4의 동일 SHA와 ack 이후·commit 이전의 정확 day 대조/rollback 및 과거 결과 선재생을 확인했다. 두 부분 코드 수용은 A의 수정 후 SQLite GREEN이나 전체 Rest 최종 승인이 아니다. D 보고의 후속47은 원 E46에 F 추가1을 더하는 별도 시험 조합이며, 원 E46 source/APK/계획을 교체하지 않는다. 실제 실행 결과와 후행 단언 도달 여부는 아직 수신하지 않았다.
