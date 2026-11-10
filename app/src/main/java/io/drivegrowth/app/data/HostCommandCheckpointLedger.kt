@@ -27,6 +27,7 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
         when (val checked = profile(profileId)) { is ContractResult.Failure -> return@atomic checked; else -> Unit }
         val prior = read(db, profileId)
         if (prior != null) return@atomic if (prior.command == command) ContractResult.Success(prior) else conflict()
+        if (command is HostCheckpointCommand.Quest && command.value.profileId!=profileId) return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
         if (!command.validFor(store.source)) return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
         val encoded = HostCheckpointJson.encode(profileId, command)
         // 잘못된 호출 입력을 DB 손상으로 저장하지 않는다.
@@ -36,10 +37,15 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
         if (decoded != (profileId to command)) return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
         if (command is HostCheckpointCommand.Delivery) {
             if(!DeliveryCheckpointStorage.canPrepare(db,command)) return@atomic conflict()
+        } else if(command is HostCheckpointCommand.Quest) {
+            when(val old=store.quests.settlement(command.value.requestId)) {
+                is ContractResult.Failure->return@atomic old
+                is ContractResult.Success->old.value?.let{if(it.command!=command.value)return@atomic conflict()}
+            }
         } else if (store.requestUnavailable(db, command.requestId)) return@atomic conflict()
         db.execSQL("INSERT INTO host_command_checkpoint VALUES(1,?,0,?)", arrayOf(encoded,HostCheckpointJson.digest(encoded,0)))
-        val saved=HostCommandCheckpoint(profileId,if(command is HostCheckpointCommand.Delivery)decoded.second else command,HostCheckpointPhase.SAVED)
-        if(command is HostCheckpointCommand.Delivery && read(db,profileId)!=saved)throw SQLiteException("탁송 durable SAVED 실제 쓰기 누락")
+        val saved=HostCommandCheckpoint(profileId,if(command is HostCheckpointCommand.Delivery || command is HostCheckpointCommand.Quest)decoded.second else command,HostCheckpointPhase.SAVED)
+        if((command is HostCheckpointCommand.Delivery || command is HostCheckpointCommand.Quest) && read(db,profileId)!=saved)throw SQLiteException("명령 durable SAVED 실제 쓰기 누락")
         ContractResult.Success(saved)
     }
 
@@ -51,10 +57,19 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
         when (val checked = profile(profileId)) { is ContractResult.Failure -> return@atomic checked; else -> Unit }
         val prior = read(db, profileId) ?: return@atomic ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         if (prior.command != command) return@atomic conflict()
+        // 이 두 유형의 STARTED는 기능 확정과 같은 거래에서만 남는다. 원결과 소실을 새 실행으로 채우지 않는다.
+        if(prior.phase==HostCheckpointPhase.STARTED) when(command) {
+            is HostCheckpointCommand.Quest->when(val original=store.quests.settlement(command.value.requestId)) {
+                is ContractResult.Failure->return@atomic original
+                is ContractResult.Success->if(original.value==null)return@atomic ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+            }
+            is HostCheckpointCommand.Delivery->if(!DeliveryCheckpointStorage.hasOriginal(db,command))return@atomic ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+            else->Unit
+        }
         db.execSQL("UPDATE host_command_checkpoint SET phase=1,digest=? WHERE id=1",arrayOf(HostCheckpointJson.digest(HostCheckpointJson.encode(profileId,command),1)))
         // nested 실패는 바깥 STARTED 쓰기도 rollback한다. 성공이면 원장과 표시가 함께 남는다.
-        if(command is HostCheckpointCommand.Delivery && read(db,profileId)!=HostCommandCheckpoint(profileId,command,HostCheckpointPhase.STARTED))
-            throw SQLiteException("탁송 STARTED 실제 쓰기 누락")
+        if((command is HostCheckpointCommand.Delivery || command is HostCheckpointCommand.Quest) && read(db,profileId)!=HostCommandCheckpoint(profileId,command,HostCheckpointPhase.STARTED))
+            throw SQLiteException("명령 STARTED 실제 쓰기 누락")
         val result=commit(command)
         if(result is ContractResult.Success && result.value is HostCheckpointResult.Delivery && !(result.value as HostCheckpointResult.Delivery).value.isFinal) {
             db.execSQL("UPDATE host_command_checkpoint SET phase=0,digest=? WHERE id=1",arrayOf(HostCheckpointJson.digest(HostCheckpointJson.encode(profileId,command),0)))
@@ -68,7 +83,10 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
         when (val checked = profile(profileId)) { is ContractResult.Failure -> return@atomic checked; else -> Unit }
         val prior = read(db, profileId) ?: return@atomic ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         if (prior.command != command || prior.phase != HostCheckpointPhase.STARTED) return@atomic conflict()
-        val receiptExists = if(command is HostCheckpointCommand.Delivery) DeliveryCheckpointStorage.hasOriginal(db,command) else db.rawQuery("SELECT 1 FROM settlements WHERE request_id=?",arrayOf(command.requestId.value)).use { it.moveToFirst() }
+        val receiptExists = if(command is HostCheckpointCommand.Quest) when(val old=store.quests.settlement(command.value.requestId)) {
+            is ContractResult.Failure->return@atomic old
+            is ContractResult.Success->old.value?.let{if(it.command!=command.value)return@atomic conflict();true}?:false
+        } else if(command is HostCheckpointCommand.Delivery) DeliveryCheckpointStorage.hasOriginal(db,command) else db.rawQuery("SELECT 1 FROM settlements WHERE request_id=?",arrayOf(command.requestId.value)).use { it.moveToFirst() }
         if (!receiptExists) return@atomic ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         // 같은 쓰기 거래 안에서 기존 receipt 존재를 고정한 뒤 원장 자체 decoder로 검증·재생한다.
         val result = commit(command)
@@ -80,7 +98,15 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
     fun cancelUnstarted(profileId: ProfileId, command: HostCheckpointCommand): ContractResult<Unit> = store.atomic { db ->
         when (val checked = profile(profileId)) { is ContractResult.Failure -> return@atomic checked; else -> Unit }
         val prior = read(db, profileId) ?: return@atomic ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
-        if (prior.command != command || prior.phase != HostCheckpointPhase.SAVED || (if(command is HostCheckpointCommand.Delivery) !DeliveryCheckpointStorage.canCancel(db,command) else store.requestUnavailable(db, command.requestId)))
+        val unavailable=when(command) {
+            is HostCheckpointCommand.Delivery->!DeliveryCheckpointStorage.canCancel(db,command)
+            is HostCheckpointCommand.Quest->when(val old=store.quests.settlement(command.value.requestId)) {
+                is ContractResult.Failure->return@atomic old
+                is ContractResult.Success->old.value!=null
+            }
+            else->store.requestUnavailable(db,command.requestId)
+        }
+        if (prior.command != command || prior.phase != HostCheckpointPhase.SAVED || unavailable)
             return@atomic conflict()
         if (db.delete("host_command_checkpoint", "id=1", null) != 1) throw SQLiteException("checkpoint 취소 대상 누락")
         ContractResult.Success(Unit)
@@ -107,6 +133,7 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
         is HostCheckpointCommand.Garage -> wrap(store.commitGameChange(command.value)) { HostCheckpointResult.Garage(it) }
         is HostCheckpointCommand.Material -> wrap(store.commitMaterial(command.value)) { HostCheckpointResult.Material(it) }
         is HostCheckpointCommand.Repair -> wrap(store.commitRepair(command.value)) { HostCheckpointResult.Repair(it) }
+        is HostCheckpointCommand.Quest -> wrap(store.quests.claim(command.value)){HostCheckpointResult.Quest(it)}
         is HostCheckpointCommand.Delivery -> wrap(store.atomic{db->DeliveryCheckpointStorage.commit(store,db,command)}) {HostCheckpointResult.Delivery(it)}
         is HostCheckpointCommand.Expand -> wrap(commitExpand(command)) { HostCheckpointResult.Expand(it) }
     }

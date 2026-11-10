@@ -205,6 +205,25 @@ class QuestLedger(private val store:SqliteGameChangeStore,
         if(store.readBalance(db)!=plan.balance || recorded(db,command.requestId)!=confirmed)throw SQLiteException("Quest 정산·마커 삽입 확인 실패")
         ContractResult.Success(confirmed)
     }
+    /** 현재 정의/기간/잔액으로 재구성하지 않고 검증된 최초 전체 claim을 읽는다. */
+    fun settlement(requestId:RequestId):ContractResult<QuestClaimSettlement?> = store.atomic { db->
+        if(!requestId.value.startsWith("quest/claim/"))return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
+        val actual=when(val r=profile()){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
+        val original=recorded(db,requestId)
+        if(original!=null) {
+            if(original.command.profileId!=actual)return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
+            return@atomic ContractResult.Success(original)
+        }
+        db.rawQuery("SELECT command FROM settlements WHERE request_id=?",arrayOf(requestId.value)).use {
+            if(it.moveToFirst()) {
+                val owner=(org.json.JSONTokener(it.text(0)).nextValue() as? JSONObject)?.optString("type")
+                if(owner=="quest-claim-v1")throw SQLiteException("Quest 최초 원문 없는 공용 정산")
+                return@atomic ContractResult.Failure(ContractError.STATE_CONFLICT)
+            }
+        }
+        if(store.requestUnavailable(db,requestId,questClaim=true))return@atomic ContractResult.Failure(ContractError.STATE_CONFLICT)
+        ContractResult.Success(null)
+    }
     override fun claimedRequestIds(id:ProfileId):ContractResult<Set<RequestId>> = store.atomic { db->
         val checked=identity(id);if(checked is ContractResult.Failure)return@atomic checked
         ContractResult.Success(java.util.Collections.unmodifiableSet(claims(db,id).mapTo(linkedSetOf()){it.command.requestId}))
@@ -250,7 +269,7 @@ class QuestLedger(private val store:SqliteGameChangeStore,
 }
 
 /** 공용 숫자/차량 decoder와 canonical 원문 검사를 사용한다. */
-private object QuestJson {
+internal object QuestJson {
     private fun zone(value:String)=try {ZoneId.of(value)}catch(e:java.time.DateTimeException){throw org.json.JSONException("Quest 시간대 형식 오류").apply{initCause(e)}}
     private fun date(value:String)=try {LocalDate.parse(value)}catch(e:java.time.DateTimeException){throw org.json.JSONException("Quest 기간 날짜 형식 오류").apply{initCause(e)}}
     private fun JSONObject.n(key:String)=LedgerJson.integer(this,key,0,Long.MAX_VALUE)
