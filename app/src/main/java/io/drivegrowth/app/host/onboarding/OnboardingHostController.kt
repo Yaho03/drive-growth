@@ -134,8 +134,8 @@ class OnboardingHostController(private val source: OnboardingHostSource, private
         return gift == null || (gift.profileId == value.identity.profileId && gift.source == value.identity.source)
     }
     private fun fail(error: ContractError, choice: VehicleId?) {
-        screen = if (choice == null) OnboardingScreenState.LoadError("저장 상태 확인 실패 ($error)", true)
-        else OnboardingScreenState.GrantError(choice, null, "확정 결과를 확인하지 못했습니다 ($error). 같은 요청으로 다시 확인해 주세요", true, false, label(bound?.source))
+        screen = if (choice == null) OnboardingScreenState.LoadError("저장 상태를 확인하지 못했습니다. ${errorText(error)}", true)
+        else OnboardingScreenState.GrantError(choice, null, "확정 결과를 확인하지 못했습니다. ${errorText(error)} 같은 요청으로 다시 확인해 주세요", true, false, label(bound?.source))
     }
     private fun candidates(): List<OnboardingCandidate> {
         val value = snapshot ?: return emptyList()
@@ -159,7 +159,7 @@ class OnboardingHostController(private val source: OnboardingHostSource, private
                 else {
                     val name = (value.content as? ContractResult.Success)?.value?.catalog?.vehicles?.find { it.vehicleId == car.vehicleId }?.displayName ?: "저장된 첫 차량"
                     OnboardingScreenState.Completed(car, name,
-                        listOf("최초 확정 게임머니 ${saved.grant.balance.units}", "최초 차량 공간 ${saved.garageCapacity}칸") + giftSummary(value.gift),
+                        listOf("첫 차량 지급 당시의 기록입니다", "최초 확정 게임머니 ${saved.grant.balance.units}", "최초 차량 공간 ${saved.garageCapacity}칸") + giftSummary(value.gift),
                         true, source)
                 }
             }
@@ -183,10 +183,18 @@ class OnboardingHostController(private val source: OnboardingHostSource, private
     }
     private fun giftSummary(gift: ContractResult<FirstRentalGiftState>?): List<String> = when (gift) {
         null -> listOf("개업 선물은 첫 영업 완료 뒤 확인합니다")
-        is ContractResult.Failure -> listOf("개업 선물 확인 대기 (${gift.error})")
+        is ContractResult.Failure -> listOf("개업 선물 확인 대기 · ${errorText(gift.error)}")
         is ContractResult.Success -> listOf(
             if (gift.value.granted != null) "개업 선물 1장 지급 기록을 확인했습니다" else "첫 영업 완료를 기다리고 있습니다",
             "현재 무료 뽑기권 ${gift.value.progress.freeTickets}장")
+    }
+    private fun errorText(error: ContractError) = when (error) {
+        ContractError.PERMISSION_DENIED -> "필요한 접근 권한을 확인해 주세요."
+        ContractError.DATA_UNAVAILABLE -> "필요한 정보가 아직 제공되지 않았습니다."
+        ContractError.STORAGE_FAILURE -> "저장된 원본을 유지하고 다시 확인해 주세요."
+        ContractError.STATE_CONFLICT, ContractError.INVALID_INPUT -> "프로필이나 요청 상태가 달라졌습니다."
+        ContractError.POLICY_UNRESOLVED -> "처리 기준을 확인할 때까지 기다려 주세요."
+        else -> "현재 상태에서는 요청을 처리할 수 없습니다."
     }
     private fun label(source: InputSource?) = when (source) { InputSource.VEHICLE -> "차량 모드 프로필"; InputSource.SIMULATION -> "모의 입력 프로필"; null -> "프로필 확인 중" }
     private fun publish() { listener?.invoke(screen, enabled && !released) }

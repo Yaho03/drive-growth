@@ -81,7 +81,7 @@ class OnboardingHostControllerTest {
     @Test fun storageFailureShowsRetryAndDoesNotNavigate() {
         val h=Harness();h.load();h.choose();h.source.failure=ContractError.STORAGE_FAILURE
         h.host.onEvent(OnboardingEvent.ConfirmSelection(FirstGrant.CANDIDATES.first()));h.w.run();h.m.run()
-        assertTrue(h.frames.last().first is OnboardingScreenState.GrantError);h.host.onEvent(OnboardingEvent.GoToShop);assertEquals(0,h.shops)
+        assertTrue(h.frames.last().first is OnboardingScreenState.GrantError);assertFalse((h.frames.last().first as OnboardingScreenState.GrantError).message.contains("STORAGE_FAILURE"));h.host.onEvent(OnboardingEvent.GoToShop);assertEquals(0,h.shops)
     }
     @Test fun detachedOrOtherProfileSelectionCannotLeakIntoFreshProfile() {
         val initial=OnboardingHostUiState(GameIdentity(ProfileId("other"),InputSource.SIMULATION),OnboardingStep.CONFIRMING,FirstGrant.CANDIDATES.first())
