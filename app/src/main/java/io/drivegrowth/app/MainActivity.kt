@@ -16,7 +16,10 @@ import io.drivegrowth.app.host.garage.GarageCommandHost
 import io.drivegrowth.app.host.garage.GarageCommandState
 import io.drivegrowth.app.host.garage.GarageCommandView
 import io.drivegrowth.app.host.garage.GarageActionAvailability
-import io.drivegrowth.app.host.shop.ShopHostMapper
+import io.drivegrowth.app.host.shop.ShopExpansionHostController
+import io.drivegrowth.app.host.shop.ShopExpansionAccess
+import io.drivegrowth.app.host.shop.SessionShopExpansionSource
+import io.drivegrowth.app.ui.shop.ShopScreenState
 import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.app.ui.shop.ShopEvent
 import io.drivegrowth.app.ui.shop.ShopMode
@@ -46,6 +49,7 @@ import io.drivegrowth.app.ui.garage.GarageView
 import io.drivegrowth.app.vehicle.ForegroundInteraction
 import io.drivegrowth.app.vehicle.VehicleInput
 import io.drivegrowth.core.contract.ContractError
+import io.drivegrowth.core.contract.InputSource
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.contract.Observation
@@ -65,10 +69,16 @@ class MainActivity : Activity() {
     private var managementState: GarageCommandState = GarageCommandState.Idle
     private var recoveredManagement = false
     private var managementVisible = false
-    private val shopMapper = ShopHostMapper()
+    private lateinit var expansionSource: SessionShopExpansionSource
+    private lateinit var expansionHost: ShopExpansionHostController
+    private lateinit var expansionAccess: ShopExpansionAccess
+    private var expansionState: ShopScreenState = ShopScreenState.Loading
+    private var pendingPage: HostPage? = null
+    private var pendingRouteGeneration = 0L
+    private var pendingRouteFailed = false
+    private var pendingRouteEnabled = false
     private lateinit var shop: ShopView
     private lateinit var gacha: GachaView
-    private var shopRevision = 0
     private var navigationGeneration = 0L
     private val destinations = listOf(HostPage.HOME to "가게", HostPage.GARAGE to "보유 차량", HostPage.COLLECTION to "도감",
         HostPage.GACHA to "가챠", HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내")
@@ -115,6 +125,16 @@ class MainActivity : Activity() {
         gacha = GachaView(this, ::onGachaEvent, session.gacha.uiState)
         results.restoreUiState(session.results.uiState)
         queries = session.queries
+        expansionSource = SessionShopExpansionSource(applicationContext, session.games)
+        expansionHost = ShopExpansionHostController(expansionSource, session::expansionWorker,
+            { handler.post(it) }, { state, _ ->
+                expansionState = state
+                if (state is ShopScreenState.Content && shop.uiState.pending != null)
+                    shop.restoreUiState(shop.uiState.copy(pending = null, selection = null, message = "최신 저장 상태를 표시합니다."))
+                if (::body.isInitialized) render()
+            }, shop::complete, shop::completeRetry, committed = { if (allowed()) queries.refresh() },
+            initialRevision = shop.uiState.latestRevision ?: Revision(0))
+        expansionAccess = ShopExpansionAccess(expansionHost)
         management = GarageCommandHost(applicationContext, { handler.post(it) }, session.games) { state ->
             val prior = managementState
             managementState = state
@@ -176,7 +196,7 @@ class MainActivity : Activity() {
         })
         queries.attach {
             screen = it
-            if (it is HostQueryState.Content) shopRevision = Math.addExact(shopRevision, 1)
+            if (it is HostQueryState.Content) refreshPendingRoute()
             render()
             if (it is HostQueryState.Content || it is HostQueryState.Failure) {
                 session.results.completeQuery()
@@ -236,6 +256,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        pendingRouteGeneration++
+        expansionHost.release()
         management.release()
         queries.detach()
         session.gacha.remember(gacha.uiState)
@@ -276,14 +298,19 @@ class MainActivity : Activity() {
         queries.setControlsEnabled(enabled)
         session.gacha.setControlsEnabled(enabled && navigation.page == HostPage.GACHA)
         session.onboarding.setControlsEnabled(enabled)
+        expansionAccess.setControlsEnabled(enabled && navigation.page == HostPage.HOME)
         management.controller.setControlsEnabled(enabled)
+        val routeGained = enabled && !pendingRouteEnabled
+        pendingRouteEnabled = enabled
+        if (routeGained) refreshPendingRoute()
         if (enabled && !recoveredManagement) { recoveredManagement = true; management.controller.recover() }
     }
 
     private fun refresh() {
         if (!allowed()) { updateAccess(); return }
         session.onboarding.refresh()
-        if (navigation.page == HostPage.GACHA) session.gacha.refresh()
+        if (navigation.page == HostPage.HOME) expansionHost.load()
+        else if (navigation.page == HostPage.GACHA) session.gacha.refresh()
         else if (screen != HostQueryState.Loading) queries.refresh()
     }
 
@@ -300,7 +327,15 @@ class MainActivity : Activity() {
             else -> CollectionScreenState.Loading
         }
         managementView.render(managementState, enabled)
-        shop.render(shopMapper.map(screen, Revision(shopRevision)), enabled)
+        val shopState = when (val current = expansionState) {
+            is ShopScreenState.Content -> current.copy(name = current.name + when (expansionSource.identity?.source) {
+                InputSource.SIMULATION -> " · 모의 원장"
+                InputSource.VEHICLE -> " · 차량 원장"
+                null -> " · 출처 확인 필요"
+            })
+            else -> current
+        }
+        shop.render(shopState, enabled)
         garage.render(garageState, enabled)
         collection.render(collectionState, enabled)
         results.render(resultsMapper.map(screen), enabled)
@@ -329,6 +364,20 @@ class MainActivity : Activity() {
         links.addView(destination, LinearLayout.LayoutParams(0, style.dp(56), 1f))
         links.addView(style.button("새로고침") { if (token == navigationGeneration) refresh() })
         chrome.addView(links)
+        if (navigation.page == HostPage.HOME && expansionState is ShopScreenState.Failure)
+            chrome.addView(style.button("보관한 미실행 확장 요청 취소") { expansionHost.cancelSaved() })
+        if (pendingRouteFailed)
+            chrome.addView(style.button("보관 요청 종류를 다시 확인") { refreshPendingRoute() })
+        pendingPage?.takeIf { it != navigation.page }?.let { target ->
+            chrome.addView(style.button(when (target) {
+                HostPage.GACHA -> "보관한 가챠 요청 확인"
+                HostPage.GARAGE -> "보관한 차량 관리 요청 확인"
+                else -> "보관한 가게 확장 요청 확인"
+            }) {
+                select(target)
+                if (target == HostPage.GARAGE) { managementVisible = true; management.controller.recover() }
+            })
+        }
         if (navigation.page == HostPage.GACHA && session.gacha.failed)
             chrome.addView(style.button("보관한 미실행 가챠 요청 취소") { session.gacha.cancelUnstarted() })
         navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE && !managementVisible }?.let {
@@ -360,11 +409,30 @@ class MainActivity : Activity() {
         render()
     }
 
+    private fun refreshPendingRoute() {
+        if (!allowed()) return
+        val generation = ++pendingRouteGeneration
+        session.pendingRoute { result ->
+            if (!isDestroyed && generation == pendingRouteGeneration && allowed()) {
+                when (result) {
+                    is ContractResult.Failure -> pendingRouteFailed = true
+                    is ContractResult.Success -> { pendingRouteFailed = false; pendingPage = result.value }
+                }
+                if (::body.isInitialized) render()
+            }
+        }
+    }
+
     private fun onShopEvent(event: ShopEvent) {
-        if (!allowed()) { updateAccess(); return }
+        if (!allowed()) {
+            updateAccess()
+            if (event is ShopEvent.Submit) shop.complete(event.request, ContractResult.Failure(ContractError.UX_RESTRICTED))
+            else shop.completeRetry()
+            return
+        }
         when (event) {
-            ShopEvent.Retry -> refresh()
-            is ShopEvent.Submit -> shop.complete(event.request, ContractResult.Failure(ContractError.DATA_UNAVAILABLE))
+            ShopEvent.Retry -> if (!expansionHost.load()) shop.completeRetry()
+            is ShopEvent.Submit -> expansionHost.submit(event.request)
         }
     }
 
