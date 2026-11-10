@@ -1,6 +1,9 @@
 package io.drivegrowth.app.host
 
 import android.content.Context
+import io.drivegrowth.app.host.gacha.GachaBrowseHost
+import io.drivegrowth.app.host.gacha.StoredGachaHostSource
+import io.drivegrowth.core.contract.InputSource
 import io.drivegrowth.app.ui.results.ResultsUiState
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
@@ -10,11 +13,13 @@ internal class HostSession(context: Context, main: Executor, restoredResults: Re
     private val worker = Executors.newSingleThreadExecutor()
     private val source = StoredHostSource(context)
     val queries = HostQueryController(worker, main, source::read, null)
+    val gacha = GachaBrowseHost(StoredGachaHostSource(context, InputSource.SIMULATION), worker, main)
     val results = ResultsHostController(worker, main, source::markViewed, queries::refresh, restoredResults)
 
     fun release() {
         queries.release()
         results.release()
+        gacha.release()
         worker.shutdownNow()
     }
 }

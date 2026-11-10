@@ -32,4 +32,13 @@ class HostNavigationTest {
         assertEquals(id, navigation.selectedVehicleId)
         assertEquals(request, navigation.pendingGarageRequest)
     }
+    @Test fun gachaAwardDetailBackReturnsToGachaBeforeHome() {
+        val navigation = HostNavigation()
+        navigation.openAward(OwnedVehicleId("award"))
+        assertEquals(HostPage.GARAGE, navigation.page)
+        assertFalse(navigation.back()); assertNull(navigation.selectedVehicleId)
+        assertFalse(navigation.back()); assertEquals(HostPage.GACHA, navigation.page)
+        assertFalse(navigation.back()); assertEquals(HostPage.HOME, navigation.page)
+        assertTrue(navigation.back())
+    }
 }

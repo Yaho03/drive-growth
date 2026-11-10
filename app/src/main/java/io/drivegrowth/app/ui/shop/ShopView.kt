@@ -2,7 +2,6 @@ package io.drivegrowth.app.ui.shop
 
 import android.content.Context
 import android.view.View
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
@@ -21,18 +20,26 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     private var controlsScroll: ScrollView? = null
     private var sceneY = 0
     private var controlsY = 0
-    val uiState: ShopUiState get() = interaction.uiState
+    val uiState: ShopUiState get() = interaction.uiState.copy(
+        sceneScrollY = sceneScroll?.takeIf { it.isLaidOut }?.scrollY ?: sceneY,
+        controlsScrollY = controlsScroll?.takeIf { it.isLaidOut }?.scrollY ?: controlsY,
+    )
 
     init { orientation = VERTICAL; setBackgroundColor(style.base) }
     fun render(state: ShopScreenState, controlsEnabled: Boolean) { interaction.render(state, controlsEnabled); drawScreen() }
-    fun restoreUiState(state: ShopUiState) { interaction.restoreUiState(state); drawScreen() }
+    fun restoreUiState(state: ShopUiState) {
+        interaction.restoreUiState(state)
+        sceneY = state.sceneScrollY.coerceAtLeast(0); controlsY = state.controlsScrollY.coerceAtLeast(0)
+        sceneScroll = null; controlsScroll = null
+        drawScreen()
+    }
     fun complete(request: ShopRequest, result: ContractResult<Unit>) { interaction.complete(request, result); drawScreen() }
     fun completeRetry() { interaction.completeRetry(); drawScreen() }
     /** 부모 탐색 전에 미리보기를 닫는다. 처리 중인 요청은 부모 탐색을 차단하지 않는다. */
     fun handleBack(): Boolean { val handled = interaction.cancel(); if (handled) drawScreen(); return handled }
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        val next = w >= style.dp(1000)
+        val next = w >= style.dp(840)
         if (next != wide) { wide = next; post { drawScreen() } }
     }
     private fun s(id: Int, vararg args: Any) = context.getString(id, *args)
@@ -44,19 +51,20 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         sceneScroll = null; controlsScroll = null; removeAllViews()
         setPadding(dp(24), dp(16), dp(24), dp(16))
         if (!interaction.controlsEnabled) { addView(text(s(R.string.shop_restricted), 28)); return@with }
-        addView(text(s(R.string.shop_title), 32, bold = true))
+        if (interaction.state !is ShopScreenState.Content) addView(text(s(R.string.shop_title), 32, bold = true))
         when (val state = interaction.state) {
             ShopScreenState.Loading -> addView(text(s(R.string.shop_loading)))
             is ShopScreenState.Empty -> problem(s(R.string.shop_empty), state.message, true)
             is ShopScreenState.Failure -> problem(s(R.string.shop_failure), state.message, true)
             is ShopScreenState.Unsupported -> problem(s(R.string.shop_unsupported), state.message, false)
             is ShopScreenState.Content -> {
-                addView(text(s(if (state.origin == ShopOrigin.FIXTURE) R.string.shop_fixture else R.string.shop_committed), color = accent))
+                addView(text(s(if (state.origin == ShopOrigin.FIXTURE) R.string.shop_fixture else R.string.shop_committed), 16, color = muted))
                 val area = if (wide) row() else column()
                 addView(area, LayoutParams(-1, 0, 1f))
                 if (wide) {
-                    sceneScroll = scroll(scene(state), sceneY); controlsScroll = scroll(controls(state), controlsY)
-                    area.addView(sceneScroll, LayoutParams(0, -1, 1f))
+                    sceneScroll = scroll(scene(state), sceneY).apply { tag = "shop:scene-scroll" }
+                    controlsScroll = scroll(controls(state), controlsY).apply { tag = "shop:controls-scroll" }
+                    area.addView(sceneScroll, LayoutParams(0, -1, 1.8f))
                     area.addView(controlsScroll, LayoutParams(0, -1, 1f).apply { marginStart = dp(20) })
                 } else {
                     // 좁은 화면은 한 스크롤로 모든 정보와 확인/취소에 접근한다.
@@ -78,39 +86,36 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     }
     private fun scene(c: ShopScreenState.Content) = with(style) {
         column().apply {
-            addView(text(c.name, 28, bold = true))
-            addView(text(s(R.string.shop_level, c.level?.toString() ?: s(R.string.shop_unknown))))
-            addView(text(s(R.string.shop_capacity, c.ownedCount?.toString() ?: s(R.string.shop_unknown), c.capacity?.toString() ?: s(R.string.shop_unknown))))
-            addView(text(s(R.string.shop_balance, money(c.balance))))
+            addView(text(c.name, 30, bold = true))
+            addView(text(s(R.string.shop_level, c.level?.toString() ?: s(R.string.shop_unknown)) + " · " +
+                s(R.string.shop_capacity, c.ownedCount?.toString() ?: s(R.string.shop_unknown), c.capacity?.toString() ?: s(R.string.shop_unknown)), 22))
+            addView(text(s(R.string.shop_balance, money(c.balance)), 24, color = accent))
             val modes = row()
-            for (mode in ShopMode.entries) modes.addView(button(s(if (mode == ShopMode.OVERALL) R.string.shop_overall else R.string.shop_vehicles), primary = uiState.mode == mode) {
-                interaction.mode(mode); drawScreen()
-            }.apply { tag = "shop:mode:$mode" }, LayoutParams(0, -2, 1f))
+            for (mode in ShopMode.entries) modes.addView(button(
+                s(if (mode == ShopMode.OVERALL) R.string.shop_overall else R.string.shop_vehicles),
+                enabled = uiState.pending == null, primary = uiState.mode == mode,
+            ) { interaction.mode(mode); drawScreen() }.apply { tag = "shop:mode:$mode" },
+                LayoutParams(0, -2, 1f).apply { if (mode == ShopMode.VEHICLES) marginStart = dp(8) })
             add(this, modes)
-            add(this, card().apply {
-                addView(text(s(R.string.shop_committed), color = muted))
-                addView(text(c.appearance.sign, 28, color = ink, bold = true))
-                val preview = interaction.selection?.option?.command as? ShopCommand.Decorate
-                if (preview != null) {
-                    addView(text(s(R.string.shop_preview_label), color = accent))
-                    addView(text(s(R.string.shop_after, preview.appearance.sign), 28, color = ink, bold = true))
-                }
-                if (uiState.mode == ShopMode.OVERALL) {
-                    addView(View(context).apply { background = shape(c.appearance.accentArgb); contentDescription = c.appearance.sign }, LayoutParams(-1, dp(36)))
-                }
-                addView(text(s(R.string.shop_neutral), color = muted))
-                if (c.vehicles.isEmpty()) addView(text(s(R.string.shop_no_vehicles)))
-                c.vehicles.forEach { vehicle ->
-                    val line = row()
-                    line.addView(ImageView(context).apply {
-                        setImageResource(R.drawable.shop_vehicle); contentDescription = vehicle.name
-                    }, LayoutParams(dp(100), dp(72)))
-                    line.addView(column().apply {
-                        addView(text(vehicle.name, 24, bold = true)); addView(text(vehicle.id.value, color = muted)); addView(text(vehicle.status))
-                    }, LayoutParams(0, -2, 1f))
-                    add(this, line)
-                }
-            })
+            add(this, ShopSceneView(context, c, uiState.mode))
+            addView(text(c.appearance.sign, 24, bold = true))
+            addView(text(s(R.string.shop_neutral), 16, color = muted))
+            addView(text(s(R.string.shop_scene_layout_note), 16, color = muted))
+            val model = shopSceneModel(c)
+            if (model.additionalVehicles > 0) addView(text(s(R.string.shop_scene_more, model.additionalVehicles), 18))
+            if (c.capacity != null && c.capacity > 12) addView(text(s(R.string.shop_scene_capacity_more), 18))
+            // 시각 미리보기는 확정 전경을 바꾸지 않는다. 요청안/비용은 기존 확인 흐름에 남긴다.
+            (interaction.selection?.option?.command as? ShopCommand.Decorate)?.let { preview ->
+                add(this, text(s(R.string.shop_preview_label), color = accent))
+                addView(text(s(R.string.shop_after, preview.appearance.sign), 24, bold = true))
+            }
+            if (c.vehicles.isEmpty()) addView(text(s(R.string.shop_no_vehicles)))
+            c.vehicles.forEach { vehicle ->
+                add(this, column().apply {
+                    addView(text(vehicle.name, 24, bold = true))
+                    addView(text(vehicle.status, 20)); addView(text(vehicle.id.value, 16, color = muted))
+                })
+            }
         }
     }
     private fun controls(c: ShopScreenState.Content) = with(style) {
