@@ -157,7 +157,8 @@ class SqliteGameChangeStore(
         val vehicle = when (val write = change.vehicle) {
             null -> null
             is VehicleWrite.Add -> {
-                val capacity = GachaLedger.capacityIfConfigured(db) ?: InitializationLedger.capacityIfInitialized(db)
+                val initializedCapacity = initialization.capacityIfInitialized(db)
+                val capacity = GachaLedger.capacityIfConfigured(db) ?: initializedCapacity
                 if (capacity != null && readVehicles(db).count { it.lifecycle == VehicleLifecycle.OWNED } >= capacity)
                     return failure(ContractError.CAPACITY_EXCEEDED)
                 if (findVehicle(db, write.vehicle.ownedVehicleId) != null) return failure(ContractError.STATE_CONFLICT)

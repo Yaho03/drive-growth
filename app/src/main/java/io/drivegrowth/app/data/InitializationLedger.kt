@@ -49,27 +49,15 @@ internal class InitializationLedger(
             verifyAccount(db, source)
             db.execSQL("INSERT INTO initialization_profile VALUES(1,?,?,NULL,NULL,NULL)", arrayOf("local-" + UUID.randomUUID(), source.name))
         }
-        /** 가챠 진행이 아직 없는 초기 프로필도 기존 공용 shop의 같은 공간을 사용한다. */
-        fun capacityIfInitialized(db: SQLiteDatabase): Int? {
-            db.rawQuery("""SELECT p.marker_request,r.request_id,s.request_id FROM initialization_profile p
-                LEFT JOIN initialization_requests r ON r.request_id=p.marker_request
-                LEFT JOIN settlements s ON s.request_id=p.marker_request WHERE p.id=1""",null).use {
-                if (!it.moveToFirst()) throw SQLiteException("초기화 프로필 누락")
-                if (it.isNull(0)) return null
-                if (it.isNull(1) || it.isNull(2) || it.text(0)!=it.text(1) || it.text(0)!=it.text(2))
-                    throw SQLiteException("초기 공간의 지급 기록 누락")
-            }
-            return db.rawQuery("SELECT capacity FROM shop WHERE id=1",null).use {
-                if (!it.moveToFirst()) throw SQLiteException("공용 공간 누락")
-                it.integer(0,1,Int.MAX_VALUE.toLong()).toInt()
-            }
-        }
         private fun verifyAccount(db: SQLiteDatabase, source: InputSource) {
             db.rawQuery("SELECT source FROM account WHERE id=1", null).use {
                 if (!it.moveToFirst() || it.text(0) != source.name || it.moveToNext()) throw SQLiteException("프로필 원장 출처 불일치")
             }
         }
     }
+    /** 가챠 공간이 구성됐어도 초기화 기록의 손상을 무시하지 않는다. 현재 개체/잔액은 재생 조건이 아니다. */
+    internal fun capacityIfInitialized(db: SQLiteDatabase): Int? =
+        if (recorded(db, profile(db)) == null) null else capacity(db)
     private data class Profile(val id: ProfileId, val proof: NewProfileEvidence?, val marker: RequestId?)
     private fun profile(db: SQLiteDatabase): Profile = db.rawQuery(
         "SELECT profile_id,source,proof_id,proof_revision,marker_request FROM initialization_profile WHERE id=1", null).use { row ->
@@ -142,6 +130,8 @@ internal class InitializationLedger(
             is ContractResult.Failure -> return@atomic result
             is ContractResult.Success -> result.value
         }
+        if (store.readBalance(db) != ready.balance || store.findVehicle(db, ready.vehicle.ownedVehicleId) != ready.vehicle)
+            throw SQLiteException("신규 초기화의 실제 잔액/개체 쓰기 불일치")
         val result = InitializationSettlement(command,receipt,ready.garageCapacity,ready.marker)
         db.execSQL("UPDATE shop SET capacity=? WHERE id=1",arrayOf(ready.garageCapacity))
         db.execSQL("UPDATE initialization_profile SET marker_request=? WHERE id=1",arrayOf(command.grant.requestId.value))
@@ -178,7 +168,11 @@ internal class InitializationLedger(
         }
         if (p.marker!=null) throw JSONException("초기화 마커의 전체 결과 누락")
         db.rawQuery("SELECT command FROM settlements WHERE request_id=?",arrayOf(FirstGrant.REQUEST_ID.value)).use { row ->
-            if (row.moveToFirst() && JSONObject(row.text(0)).optString("type")=="initialization-v1") throw JSONException("초기화 공용 정산만 남음")
+            if (row.moveToFirst()) {
+                val encoded = row.text(0)
+                if (encoded.startsWith("{") && JSONObject(encoded).optString("type")=="initialization-v1")
+                    throw JSONException("초기화 공용 정산만 남음")
+            }
         }
         return null
     }
