@@ -740,3 +740,12 @@ NEW Intro 자동 진입은 아직 명시 탐색하지 않은 HOME에서만 허�
 main182 위에 E0e553299의 중앙trial v3·Rental 저장14·Facility typed 저장15·확정 경제원점 정책을 정상 통합한 후보다. 기존 같은DB/profile/source에서 원방문/동결입력·구간/커서·원정산을 보존하며, 물리주행종료 기반과 실제 앱 이탈 경제원점의 basis를 구분한다. 실제 이탈인지/구성변경인지 판단하는 B 제품 수명 코드는 포함하지 않는다. 재접속/재이탈로 경제원점을 재시작하지 않고 unknown legacy를 현재 시각/P로 보정하지 않는다. 실제P/휴식·미관측gap을 합성하지 않는다.
 
 FacilityPurchase와 VehicleResting은 공용typed checkpoint를 쓰며 구매는 실제Settlement, 쉬기는 비금융원명령/전후설정을 보존한다. 원결과 재생은 현재정의/상태보다 우선하며, 완료된 쉬기ID도 generic금전명령이 재사용할 수 없다. f99의 독립ID반례RED와 d8/0e55 후속수정을 구분한다. 새원장/지갑을 만들지 않았다. 실제미연결 두명령은 현재pending 경로에서 STATE_CONFLICT로 표시하고 원문을 보존하며 다른페이지/빈슬롯/성공으로 숨기지 않는다. 기존 Main/HostSession·SDK/Navi·schema13 원문·parkedSince는 유지한다. F 코드승인·A exact d8 시설15와 새조합 자동검사는 서로 구분하며 root의 최종 검토/정확CI 전 게시가능으로 단정하지 않는다.
+
+
+### 전체 정산 이력·영업 상세의 읽기 모듈 공급 — 2026-11-10
+
+C 정확1ea3e6a의 SettlementHistoryReader는 같은 store의 전체 settlements·실제 viewed와 기존 typed 원명령/원결과를 대조해 읽기 전용 Snapshot을 제공한다. 열람한 정산도 전체 이력에 남으며 미확인/전체 필터와 선택은 ResultsUiState·기존 Bundle 경계에 보존한다. 같은 실제 GameSessionFactory의 작업별 session을 소비하지만 여러 기능 조회 전체를 하나의 원자 snapshot이라고 약속하지 않는다. 현재 콘텐츠 부재는 차량 이름 미제공이고 과거 정산 삭제/정상 빈 목록으로 대체하지 않는다. 초기 지급은 기존 canonical codec·readInitialization의 Existing.original/marker를 검증하고 지급을 재실행하지 않는다.
+
+ResultsHostController의 optional readHistory를 공급하며 미주입 기존 소비 경로는 유지한다. 실제 열람 쓰기는 기존 markViewed만 호출하고 성공 후 이력을 재조회한다. 표시 viewed의 Done과 실제 로컬 Pending 응답 해소는 구분하며 조회/필터/선택/복원이 열람·재화 지급을 자동 실행하지 않는다. 보관된 CompletedRental의 매출/시설 보너스/가상 사고/matchReview/washReview/단골 nullable만 표시한다. 미제공 감액·상한 원인이나 시간 provenance를 현재시각/최종금액에서 역산하지 않는다.
+
+이 공급 후보는 main183 위 모듈·시험14파일만 정상 통합하고 C1ea와 동일하게 보존했다. MainActivity/HostSession의 최신 실제 readHistory 주입·gate/수동 재조회/historyState/Bundle·탐색 연결은 B의 별도 제품 작업이다. 옛 activity-hook.patch를 최신 Main에 덮지 않는다. 원래 A 검증은1ea+같은 원본2파일hook 조합이며 이 후보 또는 최신 B 제품 Main의 장치 실행으로 표시하지 않는다. 원래 실패·수정/실행과 새 로컬 조합의 범위는 [06](06_VERIFICATION.md#전체-정산-이력-모듈-공급-검증--2026-11-10)을 따른다. #54/#28 전체 완료는 아니다.

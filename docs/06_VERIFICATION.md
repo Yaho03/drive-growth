@@ -1654,3 +1654,14 @@ E 결합본 `0e5532993f4a18f7955226b9814bf9394a6b2e00`은 f99에 최소 수정 2
 main182와 E 결합본의 정상 통합에는 충돌이 없었다. E 소유 28파일은 원문과 같고 MainActivity·HostSession·VehicleInput은 main182와 동일하다. 추가 호환은 아직 미연결인 시설/쉬기 pending에 명시적 `STATE_CONFLICT`를 반환하는 경로와 회귀 1개뿐이다. 새 조합 코어 420개·앱 463개는 실패·오류·생략 0, 앱/시험 APK와 Lint 오류 0·경고 27, 저장소·링크 및 diff 검사를 통과했다. root도 E28 원문·공통 호스트 보존과 경로 표적 6개를 직접 확인했다. 첫 표적 재실행은 비어 있는 별도 Gradle 캐시의 offline 의존성 미해결로 실패했고, 기존 캐시에서 같은 검사가 성공했다. 이 환경 실패를 코드 결함이나 검사 성공으로 바꾸지 않는다.
 
 새 통합 조합의 장치 실행은 0이다. 제품 DB/옛 APK migration, 실제 Main 경제 이탈 driver·구성 변경 분류, 시설 화면·Rest 연결, SDK·FGS·프로세스/전원·실차는 별도 미완료다. 확정 정책의 저장 공급과 실제 앱 수명 검증을 구분한다. 최종 head·원격 검사·main 반영은 해당 PR에서 확인한다.
+
+
+### 전체 정산 이력 모듈 공급 검증 — 2026-11-10
+
+C 원본25c82c2의 전체 이력 reader·Results controller/mapper/Bundle/표시와 수정1ea3e6a를 main183 1a919af 위에 정상 통합했다. 모듈·시험14파일은 정확1ea와 모두 바이트 동일하며 MainActivity/HostSession·공통 factory·helper/schema/writer·E28은 main 그대로다. 옛 activity-hook.patch나 B의 미완료 제품 파일을 복사하지 않았다. README·이슈의 원격 반영은 root 담당이며 이 공급으로 전체 #54/#28을 완료 처리하지 않는다.
+
+원25c+원래2파일hook의 A 실제 정식7은5PASS/2FAIL(1.103초)이고 reader4/View1은 통과, factory2는 초기화 뒤 첫history read의 STORAGE_FAILURE에서 실패해 뒤 열람/재개방/Bundle 단언이 미도달이었다. 이 실패를 보존했다. 수정1ea는 기존 initialization-v1 canonical codec·readInitialization의 Existing.original/marker를 대조하고 표시 Done과 실제 로컬 Pending 응답 해소를 구분한다. F의 같은 반례1RED→동일1GREEN 및 기존29+같은1의JVM30 통과는 코드 검증 근거이며 Android 실행 수와 합산하지 않는다. F 최종 권고는 APPROVE 범위의 두P2 해소·필수수정0이고 전체 기능 승인으로 확대하지 않는다.
+
+A의 정확1ea+원래동일2파일hook 조합은 원7PASS1.728초·추가초기화4PASS1.391초, 실패/오류/생략0이다. 원7 source/기대 무변경·전체620파일·빌드/설치pull APK해시를 대조했고 factory2가 실제 초기조회→열람사건0→1/중복사건1회·재개방 원정산·scope/선택/Bundle·유실Pending 자동쓰기0까지 도달했다. 추가4는 정상 초기화의 전체이력/현재콘텐츠부재/행무변경과 proof/marker/nested grant 소수 손상의 실제mutation·실패/원본보존을 확인했다. 고유SIMULATION SQLite이며 API34 ARM64/user10,20:33:40~20:34:48KST 단독 구간·19/19 제품/환경보존·자기패키지/프로세스/계측정리·반환이다. 원문/설치·소스hash/보존은 /private/tmp/drive-results-history-fix-20261110/independent-device-review/와 independent-review/에 있다. 기존25c 실패를 새1ea 성공으로 소급변경하지 않는다.
+
+새 모듈 조합은 core420·app472 시험이 실패/오류/생략0, 제품/시험APK와 Lint(오류0·경고27)가 성공했다.80tasks/2분28초이며 저장소·링크/diff 검사는 최종 인계/PR에서 확인한다. 이 조합의 새 장치실행과 담당 ADB는0이다. **A11은 head단독이나 최신B Main 연결의 실행이 아니다.** Main/HostSession의 readHistory 실제 주입·최신 gate/Bundle/탐색과 UI·Activity/프로세스·SDK/전원·실차는 B/관련 후속에서 구분 검증한다. 저장된 매출/시설보너스/가상사고/평가·단골 nullable 표시만 공급하며 미제공 감액/상한·시간 provenance는 확인불가로 남긴다. AI 보조 검토이며 별도 사람 승인·정확 원격CI/main 반영을 확보한 것으로 표시하지 않는다.
