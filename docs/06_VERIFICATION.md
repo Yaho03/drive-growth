@@ -1435,3 +1435,14 @@ main38b3b51의 #147 계약/메모리 참조·#148 VehicleUpgrade.prepareMaterial
 사용자의 커밋·푸시·Draft PR 게시 지시에 따라 main e1dc5c8을 통합했다. 충돌은 06의 추가 기록뿐이며 main 원문과 위 재료 기록을 모두 보존했다. 기존 재료 제품/정식시험·공용 저장 소스는 로컬 구현0c5dc2f와 동일하다. main의 #150 수리 명령·#152 가격1000/콘텐츠 버전 변경은 공급 그대로 유지했으며 실제 수리 commit은 이 재료 PR 범위가 아니다.
 
 통합 후 core357·앱175개 실패/오류/생략0, APK/시험APK·lint·저장소/diff 검사 통과(BUILD SUCCESSFUL10초). 새 콘텐츠에서 MaterialLedgerTest24 + GachaPullSqliteTest4 = API37 SQLite28개 실패/오류0, 34.994초를 직접 실행했다. 원문은 /private/tmp/122-material-main-build.log와 /private/tmp/122-material-publish-device.log에 보존했다. 기존124개 전체를 이 main 조합에서 다시 실행한 것으로 표시하지 않으며 앞선146개/최종24개 근거와 구분한다. 원격 head/CI는 PR 게시 후 확인하고 Draft·미머지로 공유한다.
+
+
+### #156 재료 SQLite P2 수정·독립 장치 검증
+
+원head dc9687d의 독립 정식39개 성공과 별도로, 자기 material 이력 누락 회귀는 API34에서 기대 STORAGE_FAILURE 대신 STATE_CONFLICT로1개 실패했고 정상 타기능 ID 비교1개는 통과했다(2개/1PASS·1FAIL·오류0·0.362초). 오류 assertion 전 손상 DB 바이트 불변은 통과했으며 잔액/개체 별도 값 비교나 새로운 중복 지급/제품 DB 손실 재현은 아니다. 이 당시 실패를 보존한다.
+
+수정068ce4a1은 전용 이력 조회 실패 뒤 남은 공용 정산의 material-v1 종류를 확인해 누락 자기 이력을 STORAGE_FAILURE로 구분한다. 독립 검토는 소스198개·원래 회귀 SHA/기대값 무변경을 확인하고 코드 APPROVE·필수0을 회수했다. 같은 고정 회귀와 정식Material25를 Pleos API34/ARM64/사용자10 격리환경에서 단1회 실행해26개 전부 통과(실패/오류/생략0·runner529.861초)를 확인했다. 정상타기능 ID·두 snapshot 재개방/재생·원자 실패/지원 구조 이전도 포함한다. 기존39·RED2·작성자 API37/148과 합산하지 않는다.
+
+설치 후 pull APK SHA가 빌드본과 두패키지 모두 일치했다. 자기 material156green2패키지를 제거하고 제품APK793e1db8·정확6파일·권한·설정·기존 전면 상태/관측 가능한 주차0 보존과 슬롯 반환을 확인했다. 기어 직접 조회는 user-build 제한으로 불가해 측정 성공으로 기록하지 않았다. AVD/서버/5580 변경은 없다.
+
+게시 담당은 최신 main과 양쪽06 기록을 정상 통합하고 수정2파일·앱 전체 tree가 검토068ce4a1과 동일함을 확인했다. 이전 장치26개를 새 게시 head 실행으로 쓰지 않으며 새 정확 head CI와 원리뷰 해결·main 공급은 [PR #156](https://github.com/Yaho03/drive-growth/pull/156)을 따른다. schema6은 material_requests 추가와 지원 v1~v5 정합 구조 fixture 이전 범위이고 옛 APK 최초 쓰기/제품DB 이전·실제 강화 UI·durable 명령/프로세스/실차와 다른 SQLite 명령은 별도다.
