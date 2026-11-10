@@ -41,14 +41,20 @@ internal class StoredHostSource(context: Context, private val databaseName: Stri
         }
     }
 
-    /** 같은 factory/profile/source의 실제 6지표만 읽는다. 시연 provider와 미공급 근거는 주입하지 않는다. */
+    /** 같은 factory/profile/source의 실제 6지표와 검증된 원인만 읽는다. 시연 provider를 주입하지 않는다. */
     fun readRanking() = readRanking(EpochMillis(System.currentTimeMillis()))
     internal fun readRanking(asOf: EpochMillis): ContractResult<io.drivegrowth.app.host.ranking.RankingSnapshot> = try {
         val loaded = (AssetGameContent(context.assets).load() as? ContentLoad.Loaded)?.snapshot
         if (loaded == null) ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         else withStore { store, source ->
-            // 출발 당시 zone/검증된 Quest 원인이 없으면 RankingReadSource의 Missing 경계를 유지한다.
-            io.drivegrowth.app.data.RankingReadSource(store, source, loaded).read(asOf)
+            val provenance = io.drivegrowth.app.host.ranking.RankingProvenance(source,
+                store::localProfileId, store.quests::claimedRequestIds, store::observedDrivingReceipt)
+            // 두 공개 원인 조회는 동일 store의 중첩 읽기다. 바깥 RankingReadSource transaction을 공유한다.
+            io.drivegrowth.app.data.RankingReadSource(store, source, loaded,
+                questCauses = { db ->
+                    if (!db.inTransaction()) ContractResult.Failure(ContractError.STORAGE_FAILURE)
+                    else provenance.questCauses()
+                }, departureZone = provenance::departureZone).read(asOf)
         }
     } catch (error: RuntimeException) { failure("ranking-read", error) }
 

@@ -188,5 +188,5 @@ class RankingReadSource(private val store: SqliteGameChangeStore, private val so
     private class MissingEvidence(val reason:String):RuntimeException()
     private class EvidenceFailure(val error:ContractError):RuntimeException()
     private fun <T> required(result:ContractResult<T>):T=when(result){is ContractResult.Success->result.value;is ContractResult.Failure->throw EvidenceFailure(result.error)}
-    private fun metric(read:()->RankingValue):RankingValue=try{read()}catch(e:MissingEvidence){RankingValue.Missing(e.reason)}catch(e:EvidenceFailure){RankingValue.Failure(e.error)}catch(_:JSONException){RankingValue.Failure(ContractError.STORAGE_FAILURE)}catch(_:RuntimeException){RankingValue.Failure(ContractError.STORAGE_FAILURE)}
+    private fun metric(read:()->RankingValue):RankingValue=try{read()}catch(e:MissingEvidence){RankingValue.Missing(e.reason)}catch(e:RankingProvenanceFailure){RankingValue.Failure(e.error)}catch(e:EvidenceFailure){RankingValue.Failure(e.error)}catch(_:JSONException){RankingValue.Failure(ContractError.STORAGE_FAILURE)}catch(_:RuntimeException){RankingValue.Failure(ContractError.STORAGE_FAILURE)}
 }
