@@ -175,7 +175,8 @@ class SqliteRestDrivingJournal internal constructor(private val store:SqliteGame
   val ack=state.copy(revision=state.revision+1,outbox=state.outbox.drop(1))
   when(val r=store.observedDriving.save(db,id,state.revision,ack)){is ContractResult.Failure->return r;is ContractResult.Success->Unit}
   val expectedBalance=paid.settlement?.balance?:balanceBefore
-  if(store.readBalance(db)!=expectedBalance||ledger.stateIn(db)!=planned.timeline.after)throw SQLiteException("휴식 지급/소모/ack 최종 실제 상태 불일치")
+  if(store.readBalance(db)!=expectedBalance||ledger.stateIn(db)!=planned.timeline.after||DrivingRecordReader(id.source).readDay(db,paid.day.day)!=paid.day)
+   throw SQLiteException("휴식 지급/소모/일누계/ack 최종 실제 상태 불일치")
   return when(val r=committedIn(db,id,driveId)) {
    is ContractResult.Failure->r
    is ContractResult.Success->r.value?.let{ContractResult.Success(it)}?:throw SQLiteException("휴식 최종 복합 원결과 소실")
