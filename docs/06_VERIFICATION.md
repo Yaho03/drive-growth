@@ -1641,3 +1641,10 @@ main179가 B5c9514d5의 조상임을 확인하고 새 후보에서 정상 merge�
 B 본인검증은 af48의 결정적 Intro회귀 RED3/6→같은6GREEN, 표적16·core420/app458·APK/시험APK/Lint0오류27경고다. 검증af48과5c의 app/core/Gradle 동일성을 대조했고 원본APK두개의SHA도 B보고와 일치했다. 이 게시 준비에서 전체Gradle을 반복하지 않았다. 새 저장소·링크/diff 검사와 최종head는 인계에 기록한다.
 
 Progress의 기존 Native8fc 첫플레이1과 fixture수정dac의SQLite13, 랭킹원3d BackFAIL과1a5 cold-wrapperPASS, Driving0681 A23은 각각 정확원본의 독립 근거다. 과거랭킹FAIL 원인을 새 Intro race 하나로 확정하지 않는다. **A의 정확5c 원본 cold-wrapper1회는13.006초에 PASS**이며 원래 method/wrapper·gate/HOME/wait·최종원장 기대값을 유지하고 최종suite출력을 회수했다. 새baseline24의 SDKgate 허용 뒤6지표·Demo/주간선택·재생성·Back2/HOME/ShopView·잔액/차량 불변을 확인했고19/19보존·장치반환을 기록했다. 이번 Android에서는 Intro가 첫 Ranking 선택보다 먼저 도착했다. 상충 순서를 강제한 Android RED→GREEN으로 쓰지 않으며 그 결정적 순서는 B JVM6의3RED→6GREEN 근거와 분리한다. 좌표터치/CCP·새 NativeProgress/Driving/도착·과거3dFAIL의 단일원인 해소는 미검증이다. D는 최소 Intro delta를 독립 검토해 JVM30개 통과·추가 필수 지적0으로 수용했고, A의 소스646파일·설치 APK·최종suite 출력을 대조했다. AI 검토와 별도 사람 승인은 구분한다. A의 원본5c 실행은 이 문서 준비의 신규 기기 실행으로 합산하지 않는다. 실제 SDK/내비도착 상관·권한·gate·프로세스/전원·실차·자동영업/시설·새경제원점정책은 각 실제검증 범위를 확인해야 한다.
+
+
+### Rental·시설 schema15 정상 통합 후보 — 2026-11-10
+
+원f99에서 A의 Rental32PASS8.263초·시설14PASS2.867초와19/19반환을 확인했다. 이후 F 독립 ID 반례1의 실제RED가 드러나 HOLD됐고 그 실패를 정상14PASS로 덮지 않는다. 후속 d8 최소수정과 exact0e55는 공용record의facility_command_results 소유ID 충돌검사를 보완한다. d8의 A 정식14+독립1 전체15PASS3.042초·원문/기대값 동일·같은ID STATE_CONFLICT 및 전체행 보존, F 코드승인/필수0과 E결합본 검증 범위를 구분하며 f99의Rental32가 바뀌거나 새결합에서 재실행된 것으로 쓰지 않는다. 제품DB/옛APK migration·실제Main/SDK/수명/전원/실차는 별도미검증이다.
+
+main182와0e55의정상merge는충돌없음. E28파일은정확원본과같고 Main/HostSession/VehicleInput은현재main과동일하다. 추가호환은미연결시설/쉬기typedpending의명시STATE_CONFLICT와관련회귀뿐이며helper/data논리수정0·새UI/RestWIP0이다. 새 main조합 core420/app463 실패·오류·생략0, APK·시험APK·Lint오류0/경고27와저장소21/29/434·diff검사를통과했다. F보고는코드승인/당시device갱신대기이며A후속15근거를별도로확인했다. 최종exacthead검토·원격CI·머지는root가판정하고기기·제품전체완료로확대하지않는다.
