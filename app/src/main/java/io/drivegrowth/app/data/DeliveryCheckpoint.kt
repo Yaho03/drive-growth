@@ -118,8 +118,11 @@ internal object DeliveryCheckpointStorage {
                 is DeliveryCheckpointOperation.Select->if(actual(store.delivery.inProgress())!=DeliveryInProgress((result.value as DeliveryCheckpointReceipt.Selected).value.selected.active,op.route,op.at))throw SQLiteException("탁송 실제 최초 경로 불일치")
                 is DeliveryCheckpointOperation.Change->if(actual(store.delivery.inProgress())?.route!=op.route)throw SQLiteException("탁송 실제 변경 경로 불일치")
                 is DeliveryCheckpointOperation.Abandon,is DeliveryCheckpointOperation.Arrival->if(actual(store.delivery.active())!=null)throw SQLiteException("탁송 활성 종료 쓰기 불일치")
-                is DeliveryCheckpointOperation.Hold->Unit
+                is DeliveryCheckpointOperation.Hold->if(actual(store.delivery.held()).any{it.requestId==op.requestId})throw SQLiteException("탁송 보류 실제 제거 불일치")
             }
+            val arrived=(result.value as? DeliveryCheckpointReceipt.Arrived)?.value?.outcome
+            if(arrived is DeliveryOutcome.VehicleHeld && actual(store.delivery.held()).singleOrNull{it.requestId==op.requestId}!=arrived.held)
+                throw SQLiteException("탁송 보류 실제 생성 불일치")
             if(replaced && op is DeliveryCheckpointOperation.Arrival && actual(store.delivery.lists(op.replacement.createdOn)).contains(op.replacement)!=true)
                 throw SQLiteException("탁송 실제 교체 목록 불일치")
             val encoded=DeliveryCheckpointJson.encode(c).toString()
