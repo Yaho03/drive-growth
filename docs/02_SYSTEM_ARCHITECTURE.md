@@ -28,7 +28,7 @@
 | 저장 기술·스키마 | 정산 경계, 보유 개체·영업·탁송·가챠 데이터, 손상·이전 버전 복구 조건 | 첫 거래 원장은 Android SQLite v1. 적용 범위와 이후 이전 기준은 [거래 원장 영속 저장](#거래-원장-영속-저장) 참조 |
 | 백그라운드 서비스·계산 시점 | 게임 기록 정책 답변과 실제 수명주기 검증, 게임 진행 규칙 | Foreground Service·WorkManager 등의 방식과 주행 중 계산 여부 미정 |
 | 음성·휴게소·Gleo 연결 | 유형별 주행 허용, 장소 데이터 출처, 인증·스키마 승인·실제 SDK 가용성 | 기능을 제외하지 않고 조건 확인. 사용할 SDK와 호출 흐름은 기능별 확정 |
-| 랭킹·계정·서버 | 경쟁 대상·지표, 사용자 식별·동의, 동기화·오프라인 범위 | 서버 제품·DB·인증·통신 라이브러리와 버전 미정 |
+| 랭킹 후속 온라인 | [PRD의 1차 범위](01_PRD.md#1차-랭킹-범위)에 따라 실제 사용자 간 순위는 향후 연결 | 이번 1차는 실제 내 기록 조회와 분리된 시연용 provider/화면. 새 서버·인증·외부 계정은 구성하지 않음. 후속 온라인의 기술/식별/동의·통신 계약은 별도 |
 | 게임 데이터·산식 | 팀의 영업·탁송·강화·보상 수치 합의 | 과거 시험용 계산을 최종 계약으로 승격하지 않음 |
 
 결정 대기는 기능 제외를 뜻하지 않는다. 해당 기능의 입력·동작·결과·실패 처리와 검증 조건이 정해지면 기술을 선택하고 구현 이슈로 나눈다. 전체 게임 규칙의 일괄 확정까지 모든 기반 조사를 기다릴 필요는 없다.
@@ -422,7 +422,7 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 
 `io.drivegrowth.core.garage.VehicleDisposal`의 `planSale(owned, requestId, source, VehicleRef, accidents, activityOf)`·`planScrap(...)`은 처분 금액 CREDIT(0이면 금액 변경 없음)과 `VehicleWrite.Update`(SOLD/SCRAPPED, 레벨·진행량·취득 정보 보존)를 담은 불변 `GameChange` 계획을 만든다. 호출자가 `commitGameChange`로 저장하고, 응답을 잃으면 같은 계획을 재제출해 처음 정산을 재생한다. 판매의 사고 횟수는 #116 `CompletedRentalSource.accidentCount(ownedVehicleId)`에서 읽으며 조회 실패·음수는 그대로/`INVALID_INPUT`, 사고 3회 이상 판매는 `INVALID_INPUT`(폐차만 가능)이다. 대여·반납 중과 revision 불일치는 `STATE_CONFLICT`, 수리 필요는 판매·폐차 가능, 처분된 개체는 `DATA_UNAVAILABLE`이다. 동시 대여와의 최종 점유 경쟁은 저장소(#107 SQLite)가 확정 때 검사한다.
 
-`io.drivegrowth.core.garage.VehicleRepair.prepare(store, requestId, source, VehicleRef)`는 #121 `RepairChangeStore.readRepairState`(PR #147)의 개체·활동·확정 사고 누계·잔액·견적을 읽는다. 저장 측 콘텐츠·규칙 버전과 견적이 이 앱의 `VehicleCare.repairCost(차종 가격, 개체 희귀도)`와 같을 때만 `RepairCommand`를 만든다. 다르면 `STATE_CONFLICT`, 콘텐츠에 없는 차종은 `DATA_UNAVAILABLE`, 조회 실패는 받은 오류 그대로다. 화면에서 본 revision·수리 필요 상태·잔액은 공통 `prepareRepairChange`로 미리 검사한다(수리 필요가 아니거나 옛 revision이면 `STATE_CONFLICT`, 잔액 부족은 `INSUFFICIENT_FUNDS`). 저장하지 않는다. 호출자가 `store.commitRepair(command)`로 비용 차감·NEEDS_REPAIR→IDLE·revision+1을 한 정산에 확정한다. 응답을 잃으면 보관한 같은 command를 다시 제출한다. 사고 누계·성장·취득 정보·영업 쉬기는 바뀌지 않는다. `VehicleRepairTest`는 #155의 메모리 참조 `InMemoryGameChangeStore.commitRepair`로 이 명령의 실제 확정(차감 440·IDLE 회복·revision+1·사고 누계 보존), 같은 명령 재제출의 최초 정산 재생, 저장 실패 시 잔액·수리 필요·revision 무변경을 확인한다. 거절 경로는 읽기 전용 시험 저장소로 검증한다. **SQLite `commitRepair`·live 활동·DB 재개방은 #122 후속이다.**
+`io.drivegrowth.core.garage.VehicleRepair.prepare(store, requestId, source, VehicleRef)`는 #121 `RepairChangeStore.readRepairState`(PR #147)의 개체·활동·확정 사고 누계·잔액·견적을 읽는다. 저장 측 콘텐츠·규칙 버전과 견적이 이 앱의 `VehicleCare.repairCost(차종 가격, 개체 희귀도)`와 같을 때만 `RepairCommand`를 만든다. 다르면 `STATE_CONFLICT`, 콘텐츠에 없는 차종은 `DATA_UNAVAILABLE`, 조회 실패는 받은 오류 그대로다. 화면에서 본 revision·수리 필요 상태·잔액은 공통 `prepareRepairChange`로 미리 검사한다(수리 필요가 아니거나 옛 revision이면 `STATE_CONFLICT`, 잔액 부족은 `INSUFFICIENT_FUNDS`). 저장하지 않는다. 호출자가 `store.commitRepair(command)`로 비용 차감·NEEDS_REPAIR→IDLE·revision+1을 한 정산에 확정한다. 응답을 잃으면 보관한 같은 command를 다시 제출한다. 사고 누계·성장·취득 정보·영업 쉬기는 바뀌지 않는다. `VehicleRepairTest`는 #155의 메모리 참조 `InMemoryGameChangeStore.commitRepair`로 이 명령의 실제 확정(차감 440·IDLE 회복·revision+1·사고 누계 보존), 같은 명령 재제출의 최초 정산 재생, 저장 실패 시 잔액·수리 필요·revision 무변경을 확인한다. 거절 경로는 읽기 전용 시험 저장소로 검증한다. **SQLite `commitRepair`·같은 DB 활동/확정 사고·DB 재개방은 #162로 부분 공급됐다.** 실제 제품 콘텐츠/명령·UI/프로세스 연결은 후속이며 아래 「#122 수리 SQLite 확정 경계」와 실행 근거를 따른다.
 
 ### 거래 원장 영속 저장
 
@@ -473,7 +473,7 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 | PR #111 | main `094ee59` 반영. #126의 전체 GachaCommand를 보존·재제출하고 저장소의 최초 전체 결과를 소비. 동일 ID·다른 입력과 마지막 칸 경쟁의 이전 두 P1 해결 | 실제 SQLite #136·공용 금액 #139와 콘텐츠→SQLite 시험 #145는 main 제공. 제품 UI·프로세스 복원·무료권 지급은 후속이며 #47 전체 완료가 아님 |
 | PR #116 | main `0799eb5` 반영. VehicleHistoryStore와 CompletedRentalSource의 이력/발견·완료 영업/사고 조회 제공. 입력 snapshot·정산 연결·원시 값의 세 지적 해결 | 이력 부재만으로 신규 프로필을 판정하지 않음. 실제 표시 이벤트 연결·무료권·다중 강화·초기화는 별도 후속 |
 | PR #128·#134·#137 | 목록/선택·도착/보관·기본 주행·변경/포기 Ledger main 제공. 최신 head는 #136의 엄격 공용 금액 decoder 포함 | #139 공용 연결/이전의 active 결제 검증·지원 v4 재생 두 P2는 해결되어 main 공급. 실제 SDK/제품 호스트·화면/프로세스는 후속. 세부 실행·head는 [06 최신 재검토](06_VERIFICATION.md#pr-수정본-재검토와-부분-인계--2026-11-08) 참조 |
-| PR #138·#141·#140 | #138 가격 계산·#141 사고 조회 기반 판매/폐차 GameChange 계획은 main 제공. #140 도감/첫 지급 이력의 core 소비는 snapshot P2 해결 후 main 공급 | #140의 동일 사본 검사/변환은 JVM28개 통과. #49 수리 명령과 실제 SQLite/제품 연결, #50 신규 판별/첫 선물은 후속. FirstGrant false는 NEW 판정이 아님 |
+| PR #138·#141·#140 | #138 가격 계산·#141 사고 조회 기반 판매/폐차 GameChange 계획은 main 제공. #140 도감/첫 지급 이력의 core 소비는 snapshot P2 해결 후 main 공급 | #140의 동일 사본 검사/변환은 JVM28개 통과. #49 수리 명령 #150·SQLite #162는 부분 공급이며 제품 연결은 후속. #50 초기화/첫 선물 메모리 참조는 #159/#160, 실제 NEW 발급·SQLite/제품 연결은 별도. FirstGrant false는 NEW 판정이 아님 |
 
 ### 공통 명령·결과·실패의 확장 조건
 
@@ -493,13 +493,13 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 | #37 후보·선택 | 일자/거리 구간/출처·목적지/경로 세대·관측/예상 거리·콘텐츠/규칙·고정 후보/다음 번호·선택 → 저장 목록·활성 한 건·전체 선택 요청 이력/당시 결과. 구매 결제와 선택을 같은 확정으로 처리 | #112 계산 유지. 정원이 DeliveryLedger·직렬화·시험과 후보별 발견 키를 공급, D가 실제 표시된 목록 ID/버전·희귀도 있는 구매 후보 키를 전달하고 경민의 검토된 발견 저장 API로 기록한다. 미선택 후보도 발견/미획득으로 유지하며 생성만 한 미표시 후보·희귀도 없는 수익 후보에 키를 만들지 않는다. 경민이 공용 연결 책임. [#37 조율](https://github.com/Yaho03/drive-growth/issues/37#issuecomment-6705230075)의 분담·원자성·출처/요청 ID 조건 유지 |
 | #38 변경·취소 | 활성 의뢰 ID/revision·원래 결제/사용한 변경 기회·실제+새 예상 거리·새 선택/차액·규칙 → 변경/포기·차액 결제/환급·기회 소비·이력. 한 요청으로 확정 | #112 선택/오류 재사용, 독립 계산 가능. 잔액 부족이면 원래 의뢰/돈/기회 유지. 최저 희귀도·취소 최소액 등 #24 제안은 확정 전 |
 | #39 도착·정산·임시 보관 | 활성 의뢰/revision·현재 경로와 연결 가능한 도착 증거·출처/시각·확인된 주행 구간·기한·보관 상태 → 수익/차량 지급 또는 확인 대기. 완료 슬롯 교체도 같은 거래 | 증거 부족은 대기·미지급. P·거리0·앱 보관 routeId만으로 도착 추정 금지(#80). 구매 만차의 24시간 보관/수령과 기한 뒤5% 공제, 미도착24시간 전액 환급은 서로 다른 상태·중복 방지 필요 |
-| #41~#44 영업·시설 | 방문/대여 ID·개체/revision·유형/요금·고객/사고 고정값·검증 구간/원래 주차시각·시설/확장 규칙 → 배정·정산·반납·영업 쉬기·가게/공간 snapshot | RentalLedger의 assign/account/pending/settle/finishReturn/activity/setResting/shop/buy/expand 유지. 신규 원장 대신 콘텐츠/차량 입력 어댑터 보완. 방문 건수와 완료 고객 기준을 동일시하지 않음. pending은 원래 parkedSince를 반환하지 않으므로 복원 입력을 보완. setResting은 현재 ID/불리언만 받으므로 UI 요청 동일성/최신 상태 대조를 연결부에서 구체화. 미정 금액/단골은 정책 대기 |
+| #41~#44 영업·시설 | 방문/대여 ID·개체/revision·유형/요금·고객/사고 고정값·검증 구간/원래 주차시각·시설/확장 규칙 → 배정·정산·반납·영업 쉬기·가게/공간 snapshot | RentalLedger의 assign/account/pending/settle/finishReturn/activity/setResting/shop/buy/expand 유지. 신규 원장 대신 콘텐츠/차량 입력 어댑터 보완. 방문 건수와 완료 고객 기준을 동일시하지 않음. pending은 원래 parkedSince를 반환하지 않으므로 복원 입력을 보완. setResting은 현재 ID/불리언만 받으므로 UI 요청 동일성/최신 상태 대조를 연결부에서 구체화. [기존 동의된 시험값](01_PRD.md#기존-동의된-대여확장-시험값)은 버전 있는 정의로 공급한다. 일반Lv1 대여 기준을 모든 차종 요금으로 채우지 않고 확장은 확정 완료 고객 근거를 조회한다. 20종별 시간당료·고객 분포·미제공 시설 비용/효과·단골은 별도 정의/공급 대기 |
 | #49 수리·처분 | 개체/revision·확정 사고 누계/활동·차종가/취득액·최신 규칙 → 수리비/회복 또는 판매/폐차금·lifecycle·당시 정산. 사고 이력 보존·영업 점유와 같은 DB에서 검사 | 기존 단일 Update를 재사용. salePrice의 레벨 가산·실제 취득액 기준과 repairCost의 희귀도 비용 배율은 위 「#49 수리·판매·폐차 금액 계산」에 반영. 수리비 차감+NEEDS_REPAIR 종료는 원자 명령 확장. #116 반영된 사고 조회를 소비하며 처분 계획과 실제 저장/수리 연결을 구분 |
 | #46 도감·활동 | 처분 포함 획득/검증된 발견 키·출처/버전·활동/영업 쉬기 → Garage.collection/availableForRental의 입력 | Garage·현재 보유 조회·RentalLedger 활동은 유지. #116 API는 main 제공이며 #140의 core 소비는 snapshot 수정·재검토 후 main 공급. 제품 mapper의 DATA_UNAVAILABLE 경계는 후속 연결. 획득은 실제 지급에, 발견은 실제 표시한 탁송 후보/가챠 결과에 연결. 미선택 구매 후보도 발견으로 보존하며 발견 저장 실패를 기록 성공으로 표시하지 않음 |
 | #45 퀘스트·업적·채택 이벤트 | 버전 있는 정의(ID·기간/시간대·목표·보상·조건) + 중복 제거 가능한 원인 이벤트 ID/출처/확정 ID → 진행/완료/수령/만료 snapshot. 보상·수령 마커를 한 거래로 확정 | 기본 주행/탁송/영업/강화/수집 이벤트를 재생해도 진행/지급 한 번. 정의는 #24·#35, 계산은 경민, 공통 수령 저장은 후속. 제외된 거리 목표·주말/시즌을 생성하지 않음 |
 | #36·#39·#40 주행·휴식 | 같은 부팅의 관측 순서/단조 시각·UTC·출처·누락·확인된 구간/일자 + 휴식 장소/출발 증거 → 원인 구간·보상 반영 거리/상한·버프 상태/시작 이벤트/소모 커서 | 기존 차량 gate/DriveEngine 기록과 RestBonus 계산 유지. 경험치 SnapshotStore를 게임머니 원장으로 간주하지 않음. 구간 중복 제거·주행 수익/하루500km·버프 소모를 원자 저장·복원. 주행 서비스·음성 활성화는 #81 조건 충족 후 |
 | #55 꾸미기 | 채택 아이템/해금/가격/배치 영역·현재 배치 revision·선택/미리보기 → 확정 배치/구매 결과 | 미리보기는 무저장, 확정 시 소유/해금·가격·배치를 공통 거래로 검사. 아이템 정의/비용/배치 규칙은 #24 결정 대기. 시설 buy를 꾸미기 지급으로 임의 대체하지 않음 |
-| #58 랭킹 | 가게 레벨·도감 수집 수·보유 차량 수·누적 게임머니·주행거리·최고가의 확정 집계 원인·범위/기간·출처·콘텐츠·집계 시각 → 값/지원 상태·채택 시 서버 응답 | 최고가=현재 보유 차종가×희귀도 수익 배율, 주행거리 하루500km/주간 초기화는 기존 기준. 가게 단계·도감 수·보유 수·누적금의 집계/동률·온라인 식별/API/인증/검증/개인정보는 #24·#58 결정. [댓글6705552358](https://github.com/Yaho03/drive-growth/issues/24#issuecomment-6705552358)은 제안. 로컬 fixture를 실제 순위로 표시하지 않음 |
+| #58 랭킹 | 가게 레벨·도감 수집 수·보유 차량 수·누적 게임머니·주행거리·최고가의 확정 집계 원인·범위/기간·출처·콘텐츠·집계 시각 → 값/지원 상태. 1차 실제 내 기록과 시연용 예시 provider를 분리 | 최고가=현재 보유 차종가×희귀도 수익 배율, 주행거리 하루500km/주간 초기화는 기존 기준. [1차 범위](01_PRD.md#1차-랭킹-범위)는 확정이며 실제 내 기록의 집계/기간/출처·누락을 엄격히 공급한다. 세 집계 기준은 [PRD](01_PRD.md#1차-랭킹-범위)로 확정됐다. 같은 DB의 전체 확정 원장/보유 이력·보상 반영 거리에서 읽고 미열람 목록·현재 잔액으로 대체하지 않는다. 확정 수익은 원래 정산/명령의 원인으로 분류해 포함·제외/중복을 검증한다. 기간/출처·이력의 완전성이 없으면 명시 Missing이며 정상0을 만들지 않는다. 온라인 식별/API/인증/개인정보는 향후 연결 계약으로 분리한다. [댓글6705552358](https://github.com/Yaho03/drive-growth/issues/24#issuecomment-6705552358)은 제안. 로컬 fixture를 실제 순위로 표시하지 않음 |
 | #51~#58 공통 UI | 프로필/출처·현재 gate·콘텐츠/규칙 버전·대상 ID/revision·준비/확정 requestId·시도 세대 → Loading/내용(빈값)/Pending/실패/미지원/확정 snapshot | HostSession·QueryController·ResultsHostController·각 View 재사용. 현재 StoredHostSource의 기본 원장은 SIMULATION이며 차량 gate 허용을 실제 보상 출처로 혼동하지 않음. HostSnapshot은 개별 순차 조회이며 DB 일괄 원자 snapshot이 아님. 서로 의존하는 필드의 일관 조회/기준 revision은 저장 후속의 해당 조회에서 보완. 제한/페이지 이동/재생성 뒤 늦은 응답을 새 요청 결과로 쓰지 않음. Bundle의 선택/Pending만으로 지급 성공을 추정하지 않고 원래 요청을 조회·복구. #53/#55 표시 UI는 #124/#125 main 인계(실제 호스트/거래 연결은 별도), #57 표시 UI는 fixture로 진행 |
 
 ### 시간·초기화·이전과 검증 게이트
@@ -552,7 +552,7 @@ PR #127은 가챠 검토용 커밋 `08eb3c4`를 기반으로 `core.contract.Mate
 | 묶음 | 이번에 실행·제공하는 범위 | 실제 저장·제품 연결에서 남은 범위 |
 |---|---|---|
 | 재료 강화 | `InMemoryGameChangeStore : MaterialChangeStore`, `MaterialFixtureConfiguration`의 명시 출처/버전/활동과 기존 지갑·차량·모니터를 공유. 같은 전체 명령은 당시 두 개체/잔액/거래를 먼저 재생하고 legacy/gacha/material의 요청 ID 충돌을 양방향 거절 | #122 재료 SQLite의 두 개체·요청·최초 결과 원자 저장은 PR #156으로 제공. #48 제품 UI·명령 영속 복원은 후속 |
-| 수리 | 기존 `InMemoryGameChangeStore : RepairChangeStore`의 `readRepairState/commitRepair/repairSettlement`, 같은 원장의 잠금·지갑·개체·요청 ID와 재료 활동 공유. 명시 `RepairFixtureConfiguration`으로 활동·확정 사고·견적을 공급 | 실제 SQLite commit, RentalLedger의 live 활동·사고/VehicleCare 견적 공급, #49 제품 명령 연결 |
+| 수리 | 기존 `InMemoryGameChangeStore : RepairChangeStore`의 `readRepairState/commitRepair/repairSettlement`, 같은 원장의 잠금·지갑·개체·요청 ID와 재료 활동 공유. 명시 `RepairFixtureConfiguration`으로 활동·확정 사고·견적을 공급 | #122 수리 SQLite commit과 RentalLedger 활동/확정사고·VehicleCare 견적은 아래 경계로 제공. 실제 제품 repairContent 공급·#49 UI/명령 영속 복원은 후속 |
 | 초기화 | 기존 `InMemoryGameChangeStore : InitializationChangeStore`의 readInitialization/commitInitialization, 명시 프로필 상태·마커 fixture, 같은 원장 재화·첫 차·공간·마커·원래 결과 원자 확정/재생. 기존 FirstGrant 전용 어댑터 소비 | 실제 NEW 근거 발급·legacy 복구·SQLite 원자 저장, #151 소비 래퍼는 main 제공이며 #50/#56 제품 연결은 후속 |
 | 첫 영업 선물 | 기존 `InMemoryGameChangeStore : FirstRentalGiftStore`, 명시 구성과 같은 가챠 progress·모니터에서 무료권/마커/최초 전체 결과 원자 확정·재생, 요청 ID 양방향 충돌·가챠 무료권 소비와 경쟁 | 실제 RentalLedger/live 완료 근거·같은 프로필 권위·SQLite commit, #50 제품 지급/프로세스 |
 
@@ -615,8 +615,19 @@ SqliteGameChangeStore는 MaterialChangeStore.readMaterialState/commitMaterial을
 
 확정 순서는 기존 재료 요청/최초 결과의 무결성 검증·동일 명령 재생 → 공용 요청 ID 충돌 검사 → 최신 버전/revision/활동/잔액 검증 → 두 차량·비용·공용 정산·최초 전체 결과 저장이다. 서로 다른 요청이 같은 재료를 소비하거나 배정/처분과 경쟁하면 같은 DB 거래의 현재 조건으로 판정한다. 단일 GameChange 두 건으로 나누지 않는다. 공용 settlements에는 동일 거래의 메타데이터를 연결하고, material_requests에는 전체 명령·검증 당시 상태·역할별 두 snapshot을 포함한 최초 MaterialSettlement를 저장한다. 두 역할을 현재 차량이나 nullable 단일 changedVehicle에서 재구성하지 않는다. 비용0은 money=null이며 가짜0원 결제를 만들지 않는다. 기존 가챠/대여 방문/무금액 탁송 선택과 요청 ID 공간을 공유한다.
 
-스키마6은 material_requests만 추가하며 지원 v1~v5의 기존 표/행/정산·렌털·발견·가챠·탁송/주행 이력을 보존한다. 이전 중 실패는 SQLiteOpenHelper 거래로 롤백하고 원본을 보존한다. 스키마5 공급이 main에 반영된 뒤 준비한 버전이며 향후 PR 머지 순서가 달라지면 재확인한다. 최초 결과 재생은 현재 버전 공급/활동/성장/처분과 독립적이며 원래 상태+명령의 순수 검증 결과, 공용 정산의 ID/출처/종류/규칙/금액/잔액/시각 및 두 역할을 대조한다. JSON 정수·금액/차량은 공용 LedgerJson decoder를 재사용해 소수/문자열/지수/범위 초과를 보정하지 않고 STORAGE_FAILURE로 반환한다. 수리/초기화/선물 실제 commit·제품 UI/권위 공급·프로세스/실차 연결과 #122 전체 완료는 별도 후속이다.
+스키마6은 material_requests만 추가하며 지원 v1~v5의 기존 표/행/정산·렌털·발견·가챠·탁송/주행 이력을 보존한다. 이전 중 실패는 SQLiteOpenHelper 거래로 롤백하고 원본을 보존한다. 스키마5 공급이 main에 반영된 뒤 준비한 버전이며 향후 PR 머지 순서가 달라지면 재확인한다. 최초 결과 재생은 현재 버전 공급/활동/성장/처분과 독립적이며 원래 상태+명령의 순수 검증 결과, 공용 정산의 ID/출처/종류/규칙/금액/잔액/시각 및 두 역할을 대조한다. JSON 정수·금액/차량은 공용 LedgerJson decoder를 재사용해 소수/문자열/지수/범위 초과를 보정하지 않고 STORAGE_FAILURE로 반환한다. 수리 SQLite commit은 아래 #162로 공급됐고 초기화/선물 SQLite·제품 UI/권위 공급·프로세스/실차 연결과 #122 전체 완료는 별도 후속이다.
 
 재료 SQLite의 자기 material-v1 공용 정산이 남고 material_requests 행만 누락된 경우는 정상 타 기능 ID 충돌과 구분해 STORAGE_FAILURE로 거절한다. 누락 snapshot을 현재 개체에서 재구성하지 않으며 원본을 보존한다. 정상 같은 명령의 최초 전체 결과 재생·다른 입력/다른 기능 ID의 STATE_CONFLICT는 유지한다.
 
 휴식 원장의 head 쓰기도 같은 거래의 필수 확정이다. rest_head의 singleton 행1 삽입 결과를 검사하고 무삽입/실패는 STORAGE_FAILURE로 전달해 로그·head·allocator를 함께 rollback한다. 정상 seq gap을 손상으로 거절하지 않으며 연결/머리 정보의 누락 검증·같은 요청 재생·실패 재시도는 유지한다.
+
+
+### #122 수리 SQLite 확정 경계
+
+2026-11-10, 별도 로컬 head `272b62dc2777c6a391e8939cf9a321e5f847e025`에서 기존 SqliteGameChangeStore가 RepairChangeStore의 readRepairState/commitRepair/repairSettlement를 구현한다. 선행 PR156 dc9687의 schema6와 MaterialLedger 이력 누락 수정068ce4a를 정상 통합한 기준이며 수정/호환 최종3c473dd의 독립 코드34개 및 실제 SQLite30개를 확인했다. 정확 게시 head/CI/main 공급은 연결 PR을 따른다.
+
+명시 repairContent 공급자는 검증된 GameContentSnapshot을 반환한다. 조회 중 상태를 변경하지 않으며 같은 콘텐츠/규칙 버전과 차종 가격을 공급한다. 없으면 DATA_UNAVAILABLE, 명시 실패는 그대로 전달한다. 같은 SQLite 거래에서 현재 개체·잔액·RentalLedger 활동/확정 사고 누계와 실제 VehicleCare 견적을 대조한다. NEEDS_REPAIR 활동도 확정 사고 영업에 연결돼야 하며 누락을 IDLE/0으로 보정하지 않는다.
+
+전체 RepairCommand와 지급 전 RepairState 및 당시 전체 RepairSettlement를 repair_requests에 보존한다. 공용 settlements/지갑/차량/대여 테이블을 재사용하며 비용 차감·revision+1·NEEDS_REPAIR→IDLE·두 종류의 정산 기록을 한 거래로 확정한다. 사고 이력·영업 쉬기·희귀도·레벨/진행량·취득 정보는 보존한다. 비용0은 money=null이다. 원래 전체 결과를 현재 콘텐츠/활동보다 먼저 검증·재생하며 다른 전체 입력/도메인 ID는 충돌, 한쪽 이력 누락·손상은 STORAGE_FAILURE다. 원래 결과를 현재 값으로 재구성하지 않는다.
+
+스키마7은 repair_requests만 추가하고 지원 v1~v6의 기존 표/행을 보존한다. 실제 원격 머지 순서에서 번호를 다시 확인한다. 기존 구조 fixture의 schema7 준비 보완은 최종3c473dd의 시험 호환 커밋으로 실제 반영했으며 독립 실제 장치에서 수리23개·호환 표적7개로 이전/실패 rollback·다중 연결/재개방을 확인했다. 정합 구조 fixture이며 실제 옛 APK 제품 DB 이전·프로세스/실차 성공은 아니다. 초기화/첫 선물의 SQLite와 제품 관리 UI/프로세스 연결·전체 #122/#49는 후속이다.
