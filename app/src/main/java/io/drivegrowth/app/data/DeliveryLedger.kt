@@ -170,6 +170,9 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
     }
 
     /** 현재 활성 의뢰. 없으면 null이다. */
+    /** 실제 보류 대금/변경 사용 여부. 조회는 상태를 바꾸지 않는다. */
+    fun terms(): ContractResult<DeliveryTerms?> = store.atomic { db -> ContractResult.Success(readTerms(db)) }
+
     fun active(): ContractResult<ActiveDelivery?> = store.atomic { db -> ContractResult.Success(readActive(db)) }
 
     /**
@@ -330,7 +333,10 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
             put("command", command)
             put("result", DeliveryJson.arrivalResult(progress.route, progress.startedAt, slots, outcome).toString())
         })
-        ContractResult.Success(ArrivalCommit(outcome, recorded))
+        val confirmed=ArrivalCommit(outcome,recorded)
+        if(outcome is DeliveryOutcome.VehicleHeld && (readHeld(db,requestId)!=outcome.held || (readOutcome(db,requestId) as? StoredArrival)?.commit!=confirmed))
+            throw android.database.sqlite.SQLiteException("도착 보류 실제 원문/결과 쓰기 불일치")
+        ContractResult.Success(confirmed)
     }
 
     /**
@@ -469,13 +475,18 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
                 is ContractResult.Failure -> return@atomic result
                 is ContractResult.Success -> result.value
             }
-            db.delete("delivery_held", "request_id = ?", arrayOf(requestId.value))
+            if(db.delete("delivery_held", "request_id = ?", arrayOf(requestId.value))!=1)
+                throw android.database.sqlite.SQLiteException("보류 실제 제거 누락")
             db.insertOrThrow("delivery_hold_outcomes", null, ContentValues().apply {
                 put("request_id", requestId.value)
                 put("command", command)
                 put("result", DeliveryJson.holdResult(held, outcome).toString())
             })
-            ContractResult.Success(HoldCommit(outcome, recorded))
+            val confirmed=HoldCommit(outcome,recorded)
+            if(readHeld(db,requestId)!=null || readHoldOutcome(db,requestId)?.commit!=confirmed || store.readBalance(db)!=recorded.balance ||
+                recorded.changedVehicle?.let{store.findVehicle(db,it.ownedVehicleId)!=it}==true)
+                throw android.database.sqlite.SQLiteException("보류 실제 제거/정산/개체 쓰기 불일치")
+            ContractResult.Success(confirmed)
         }
 
     /** 끝난 의뢰의 명령과 당시 결과. 도착 정산과 포기가 같은 표를 써서 한 의뢰는 한 번만 끝난다. */

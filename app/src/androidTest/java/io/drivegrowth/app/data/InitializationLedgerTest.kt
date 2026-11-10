@@ -83,7 +83,7 @@ class InitializationLedgerTest : InstrumentationTestCase() {
     }
     fun testLegacyVersionSevenFixtureGetsUnknownEvenWhenEmpty() {
         profile();store.close()
-        raw { db -> db.execSQL("DROP TABLE initialization_requests");db.execSQL("DROP TABLE initialization_profile");db.execSQL("DROP TABLE first_gift_requests");db.execSQL("DROP TABLE first_gift_markers");db.execSQL("DROP TABLE host_command_checkpoint");db.version=7 }
+        raw { db -> db.execSQL("DROP TABLE initialization_requests");db.execSQL("DROP TABLE initialization_profile");db.execSQL("DROP TABLE first_gift_requests");db.execSQL("DROP TABLE first_gift_markers");listOf("quest_events","quest_claims","quest_tracking").forEach{db.execSQL("DROP TABLE $it")};db.execSQL("DROP TABLE host_command_checkpoint");stripDeliveryCheckpointFixture(db);db.version=7 }
         open();assertTrue(state().status is ProfileInitializationStatus.Unknown)
         assertEquals(GameMoney(0),ok(store.balance()));assertTrue(ok(store.listOwnedVehicles()).isEmpty())
         val s=state();val c=InitializationCommand(s.profileId,NewProfileEvidence(s.profileId,source,"not-issued-by-store",Revision(0)),s.contentVersion,

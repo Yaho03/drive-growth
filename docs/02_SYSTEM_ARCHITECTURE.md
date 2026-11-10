@@ -699,3 +699,10 @@ E 원본 `26c1e7b`의 `trial-definitions.csv`와 `TrialDefinition`은 기존 PRD
 B 원본 `aef5a11`의 Main HOME은 같은 `HostSession.games` factory·단일 worker를 쓰는 `SessionShopExpansionSource`와 `ShopExpansionHostController`를 연결한다. 미리보기는 실제 완료 고객 수를 읽고, 확인 시 최신 저장 조건과 정의를 재검증한다. typed Expand 원명령은 기존 같은 DB/profile checkpoint의 SAVED→STARTED→원래 결과 확인·finish로 처리한다. 실행 전 명시 취소와 결과 불명 복구를 구분하고 현재 입력으로 명령을 다시 만들지 않는다. 기존 가챠/차량 관리 명령과 보관 슬롯을 공유하며 다른 종류의 명령은 해당 화면으로 안내한다. Garage adapter도 Expand를 자기 명령으로 해석하지 않는다.
 
 허용 상태의 실제 전이만 확장 호스트에 전달하며 동일 상태의 250ms 반복 전달은 재렌더하지 않는다. 제한·화면 이탈·Activity 해제 뒤 오래된 응답은 적용하지 않고, 재진입 시 같은 저장 원명령을 복구한다. 시설 구매·배치·꾸미기, 자동 영업 driver, 신규 Quest/Driving 생산자, 랭킹 Main 진입은 이 통합에 포함하지 않는다. 기존 #173·#174·#175 소스와 저장 공급은 유지한다. 실행 및 미검증 범위는 [06](06_VERIFICATION.md#중앙-시험-정의실제-확장-main-통합--2026-11-10)을 따른다.
+
+
+### Quest·Delivery schema12 저장 공급 — 2026-11-10
+
+E b8972b56의 기능 커밋만 main177 위에 통합한 후보는 schema12다. Quest 정의/기간·실제 원인 이벤트·최초 수령/원래 요청 조회와 typed Quest 명령을 기존 같은 DB/profile/source 원장에 연결한다. 확정 결과 열람·실제 차량 성장·대여 완료의 원자 이벤트 hook을 공급하며 현재 값을 과거 진행으로 합성하지 않는다. Delivery 선택/변경/포기/도착/Hold 전체 원명령과 당시 중앙 trial 규칙을 저장·재생한다. STARTED/정산의 실제 쓰기와 Hold 생성/해소의 후조건을 확인하고 실패 시 같은 거래를 롤백한다. 삭제/INSERT 무시 회귀와 손상 zone 검증을 포함한다.
+
+E 변경31파일 중30개는 b897과 동일하며 RentalLedger는 최신 main의 Pending.parkedSince·엄격 정수 조회만 추가 보존했다. 중앙 trial·helper/data에 새로운 제품 논리를 추가하지 않았다. 현 앱 소비 호환은 Garage adapter의 Quest/Delivery 명령·결과를 STATE_CONFLICT로 거절하고, 보관 경로 조회도 두 명령을 명시 실패로 반환해 UI의 재확인 상태로 전달한다. null은 실제 빈 checkpoint에만 사용하며 명령을 지우거나 다른 페이지 명령으로 실행/취소하지 않는다. Driving schema13·제품 Progress/Delivery Main·랭킹 진입은 포함하지 않는다. 제품 연결과 공식 SDK/기기 범위는 별도다.

@@ -19,6 +19,8 @@ internal object HostCheckpointJson {
             is HostCheckpointCommand.Garage -> { kind = "garage"; value = LedgerJson.command(command.value) }
             is HostCheckpointCommand.Material -> { kind = "material"; value = MaterialJson.command(command.value) }
             is HostCheckpointCommand.Repair -> { kind = "repair"; value = RepairJson.command(command.value) }
+            is HostCheckpointCommand.Quest -> {kind="quest";value=QuestJson.command(command.value)}
+            is HostCheckpointCommand.Delivery -> { kind="delivery";value=DeliveryCheckpointJson.encode(command) }
             is HostCheckpointCommand.Expand -> { kind = "expand"; value = expand(command) }
         }
         return JSONObject().put("type", "host-command-v1").put("profile", profile.value).put("kind", kind)
@@ -37,10 +39,12 @@ internal object HostCheckpointJson {
             "garage" -> HostCheckpointCommand.Garage(content, garage(value))
             "material" -> HostCheckpointCommand.Material(MaterialJson.command(value))
             "repair" -> HostCheckpointCommand.Repair(RepairJson.command(value))
+            "quest" -> HostCheckpointCommand.Quest(QuestJson.command(value))
+            "delivery" -> DeliveryCheckpointJson.decode(value)
             "expand" -> expand(value)
             else -> throw JSONException("미지원 checkpoint 명령 종류")
         }
-        if (!command.validFor(command.origin) || encode(profile, command) != text)
+        if ((command is HostCheckpointCommand.Quest && command.value.profileId!=profile) || !command.validFor(command.origin) || encode(profile, command) != text)
             throw JSONException("checkpoint 전체 명령/교차 필드 불일치")
         return profile to command
     }
