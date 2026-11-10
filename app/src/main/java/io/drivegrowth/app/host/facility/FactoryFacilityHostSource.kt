@@ -48,14 +48,8 @@ class FactoryFacilityHostSource(context:Context,private val games:GameSessionFac
     }
     override fun save(command:FacilityCommand)=use(command) { game->
         val durable=journal?:return@use ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
-        // UI의 가격/개체/설정 사본은 권위가 아니다. E가 같은 거래 안에서도 최종 조건을 재검사한다.
-        val actual=when(val r=read(game)){is ContractResult.Failure->return@use r;is ContractResult.Success->r.value}
-        val valid=when(command) {
-            is FacilityCommand.Buy->command.definitionVersion==actual.definitionVersion && actual.offers[command.offer.facility]==command.offer
-            is FacilityCommand.Rest->actual.vehicles.any{it.ownedVehicleId==command.vehicle.ownedVehicleId && it.revision==command.vehicle.revision} &&
-                (command.vehicle.ownedVehicleId in actual.resting)==command.expected && command.expected!=command.desired
-        }
-        if(!valid)ContractResult.Failure(ContractError.STATE_CONFLICT) else durable.save(game,command)
+        // 검증된 원결과는 현재 정의/개체/revision/쉬기 상태보다 우선한다. 새 명령 조건도 E가 같은 거래에서 검사한다.
+        durable.save(game,command)
     }
     override fun execute(command:FacilityCommand)=use(command){game->journal?.execute(game,command)?:ContractResult.Failure(ContractError.DATA_UNAVAILABLE)}
     override fun finish(command:FacilityCommand)=use(command){game->journal?.finish(game,command)?:ContractResult.Failure(ContractError.DATA_UNAVAILABLE)}
