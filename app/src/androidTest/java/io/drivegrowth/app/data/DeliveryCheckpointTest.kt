@@ -106,8 +106,11 @@ class DeliveryCheckpointTest:InstrumentationTestCase() {
         ok(store.hostCommands.cancelUnstarted(profile,c));assertNull(ok(store.hostCommands.load(profile)))
     }
     fun testV11MigrationPreservesQuestCompletenessAndAllExistingRows() {
-        val before=rows();var tracking:List<String> = emptyList();raw{db->tracking=db.rawQuery("SELECT * FROM quest_tracking",null).use{r->buildList{while(r.moveToNext())add((0 until r.columnCount).joinToString("|"){r.getString(it)})}}}
-        store.close();raw{stripDeliveryCheckpointFixture(it);it.version=11};store=open();assertEquals(before,rows())
+        val before=rows();val beforeBalance=ok(store.balance());var tracking:List<String> = emptyList();raw{db->tracking=db.rawQuery("SELECT * FROM quest_tracking",null).use{r->buildList{while(r.moveToNext())add((0 until r.columnCount).joinToString("|"){r.getString(it)})}}}
+        store.close();raw{stripDeliveryCheckpointFixture(it);it.version=11};store=open()
+        // helper 생성자는 lazy다. 공개 읽기로 실제 upgrade를 연 뒤 버전/전체 행을 대조한다.
+        assertEquals(beforeBalance,ok(store.balance()));assertEquals(before,rows())
+        raw{db->for(table in listOf("delivery_requests","delivery_changes","delivery_outcomes","delivery_hold_outcomes"))db.rawQuery("PRAGMA table_info($table)",null).use{r->var found=false;while(r.moveToNext())if(r.getString(1)=="host_command")found=true;assertTrue(table,found)}}
         raw{db->assertEquals(12,db.version);val after=db.rawQuery("SELECT * FROM quest_tracking",null).use{r->buildList{while(r.moveToNext())add((0 until r.columnCount).joinToString("|"){r.getString(it)})}};assertEquals(tracking,after)}
     }
     fun testIgnoredSaveAndNonfinalSavedRestorationCannotReportDurability() {
