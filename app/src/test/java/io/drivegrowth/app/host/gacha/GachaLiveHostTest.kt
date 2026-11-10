@@ -133,4 +133,13 @@ class GachaLiveHostTest {
         h.host.detach();assertNull(h.host.uiState.garagePending)
     }
 
+    @Test fun `저장 실패 안내는 내부 코드를 노출하지 않고 원래 요청 확인을 안내한다`() {
+        val h=Harness();h.loadFailure=true;h.start()
+        val failure=h.ui.frame!!.screen as GachaScreen.Failure
+        assertEquals(ContractError.STORAGE_FAILURE,failure.error)
+        assertEquals("지급 결과를 확인하지 못했어요. 보관한 원래 요청으로 다시 확인해 주세요. 다른 관리 요청이 보관 중이면 차량 관리에서 확인해 주세요.",failure.message)
+        assertFalse(ContractError.entries.any{it.name in failure.message});assertTrue(failure.retryAllowed)
+        assertEquals(0,h.executes);assertEquals(0,h.prepares)
+    }
+
 }

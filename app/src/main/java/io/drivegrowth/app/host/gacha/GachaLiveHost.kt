@@ -173,7 +173,7 @@ class GachaLiveHost(private val source: CheckpointGachaSource, private val worke
         resolve?.invoke(key)
     }
     private fun failure(error: ContractError) = show(GachaScreen.Failure(error,
-        "지급 결과를 확인하지 못했어요 ($error). 보관한 원래 요청으로 다시 확인해 주세요. 다른 관리 요청이 보관 중이면 차량 관리에서 확인해 주세요.", true))
+        "지급 결과를 확인하지 못했어요. 보관한 원래 요청으로 다시 확인해 주세요. 다른 관리 요청이 보관 중이면 차량 관리에서 확인해 주세요.", true))
 }
 private fun <T> safe(action: () -> ContractResult<T>): ContractResult<T> = try { action() }
     catch (_: SecurityException) { ContractResult.Failure(ContractError.PERMISSION_DENIED) }
