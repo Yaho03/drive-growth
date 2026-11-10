@@ -87,6 +87,10 @@ class MainActivity : Activity() {
     private lateinit var expansionHost: ShopExpansionHostController
     private lateinit var expansionAccess: ShopExpansionAccess
     private var expansionState: ShopScreenState = ShopScreenState.Loading
+    private lateinit var facilityControls: io.drivegrowth.app.ui.shop.FacilityControlsView
+    private lateinit var facilityHome: LinearLayout
+    private var displayedFacilityShop: ShopScreenState.Content? = null
+    private var facilityUiRequest: io.drivegrowth.app.ui.shop.ShopRequest? = null
     private var pendingPage: HostPage? = null
     private var pendingRouteGeneration = 0L
     private var pendingRouteFailed = false
@@ -140,6 +144,12 @@ class MainActivity : Activity() {
         collection = CollectionView(this, ::refresh)
         results = ResultsView(this, ::onResultsEvent)
         shop = ShopView(this, ::onShopEvent)
+        facilityControls = io.drivegrowth.app.ui.shop.FacilityControlsView(this, ::onFacilityEvent)
+        facilityHome = style.column().apply {
+            addView(shop, LinearLayout.LayoutParams(-1, 0, 1f))
+            addView(android.widget.ScrollView(this@MainActivity).apply { addView(facilityControls) },
+                LinearLayout.LayoutParams(-1, style.dp(220)))
+        }
         val shopMode = ShopMode.entries.firstOrNull { it.name == savedInstanceState?.getString("shopMode") } ?: ShopMode.OVERALL
         shop.restoreUiState(ShopUiState(mode = shopMode, sceneScrollY = savedInstanceState?.getInt("shopSceneY", 0) ?: 0,
             controlsScrollY = savedInstanceState?.getInt("shopControlsY", 0) ?: 0))
@@ -182,12 +192,25 @@ class MainActivity : Activity() {
         expansionHost = ShopExpansionHostController(expansionSource, session::expansionWorker,
             { handler.post(it) }, { state, _ ->
                 expansionState = state
-                if (state is ShopScreenState.Content && shop.uiState.pending != null)
+                if (state is ShopScreenState.Content && shop.uiState.pending?.selection?.option?.command is io.drivegrowth.app.ui.shop.ShopCommand.Expand)
                     shop.restoreUiState(shop.uiState.copy(pending = null, selection = null, message = "최신 저장 상태를 표시합니다."))
                 if (::body.isInitialized) render()
             }, shop::complete, shop::completeRetry, committed = { if (allowed()) queries.refresh() },
             initialRevision = shop.uiState.latestRevision ?: Revision(0))
         expansionAccess = ShopExpansionAccess(expansionHost)
+        session.facility.changed = { state, _ ->
+            facilityUiRequest?.let { original ->
+                val receipt = state.receipt as? io.drivegrowth.app.host.facility.FacilityReceipt.Purchased
+                if (receipt?.command?.requestId == original.requestId &&
+                    receipt.command.offer == (original.selection.option.command as? io.drivegrowth.app.ui.shop.ShopCommand.BuyFacility)?.offer) {
+                    shop.complete(original, ContractResult.Success(Unit)); facilityUiRequest = null
+                    if (allowed()) queries.refresh()
+                } else if (!state.busy && state.error != null) {
+                    shop.complete(original, ContractResult.Failure(state.error)); facilityUiRequest = null
+                }
+            }
+            if (::body.isInitialized) render()
+        }
         management = GarageCommandHost(applicationContext, { handler.post(it) }, session.games) { state ->
             val prior = managementState
             managementState = state
@@ -374,6 +397,7 @@ class MainActivity : Activity() {
         delivery.release()
         pendingRouteGeneration++
         session.ranking.detach()
+        session.facility.changed = null
         expansionHost.release()
         management.release()
         queries.detach()
@@ -430,6 +454,7 @@ class MainActivity : Activity() {
         session.gacha.setControlsEnabled(enabled && navigation.page == HostPage.GACHA)
         session.ranking.setControlsEnabled(enabled && navigation.page == HostPage.RANKING)
         session.onboarding.setControlsEnabled(enabled)
+        session.facility.setControlsEnabled(enabled && navigation.page == HostPage.HOME)
         expansionAccess.setControlsEnabled(enabled && navigation.page == HostPage.HOME)
         management.controller.setControlsEnabled(enabled)
         val routeGained = enabled && !pendingRouteEnabled
@@ -443,7 +468,7 @@ class MainActivity : Activity() {
         session.onboarding.refresh()
         if (navigation.page == HostPage.PROGRESSION) session.progression.refresh()
         else if (navigation.page == HostPage.DELIVERY) { session.deliveryNavigation.refresh(); session.delivery.refresh() }
-        else if (navigation.page == HostPage.HOME) expansionHost.load()
+        else if (navigation.page == HostPage.HOME) { session.facility.refresh(); expansionHost.load() }
         else if (navigation.page == HostPage.GACHA) session.gacha.refresh()
         else if (navigation.page == HostPage.RANKING) session.ranking.refresh()
         else if (screen != HostQueryState.Loading) queries.refresh()
@@ -471,7 +496,18 @@ class MainActivity : Activity() {
             })
             else -> current
         }
-        shop.render(shopState, enabled)
+        val facility = session.facility.state
+        val facts = facility.facts
+        val facilityReady = facts != null && facts.identity == expansionSource.identity &&
+            !facility.busy && facility.pending == null && facility.receipt == null && facility.error == null && !facility.foreign && !facility.unsupported
+        val combinedShop = if (shopState is ShopScreenState.Content && facts != null && facts.identity == expansionSource.identity)
+            io.drivegrowth.app.host.facility.FacilityHostMapper.merge(shopState, facts, facilityReady)
+        else shopState
+        displayedFacilityShop = combinedShop as? ShopScreenState.Content
+        shop.render(combinedShop, enabled)
+        val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
+            ?.associate { it.vehicleId to it.displayName }.orEmpty()
+        facilityControls.render(facility, enabled && navigation.page == HostPage.HOME, names)
         garage.render(garageState, enabled)
         collection.render(collectionState, enabled)
         results.render(resultsMapper.map(screen), enabled)
@@ -516,7 +552,7 @@ class MainActivity : Activity() {
                 HostPage.GARAGE -> "보관한 차량 관리 요청 확인"
                 HostPage.DELIVERY -> "보관한 탁송 요청 확인"
                 HostPage.PROGRESSION -> "보관한 퀘스트 청구 확인"
-                else -> "보관한 가게 확장 요청 확인"
+                else -> "보관한 가게 요청 확인"
             }) {
                 select(target)
                 if (target == HostPage.GARAGE) { managementVisible = true; management.controller.recover() }
@@ -534,7 +570,7 @@ class MainActivity : Activity() {
             HostPage.COLLECTION -> showBody(collection)
             HostPage.RESULTS -> showBody(results)
             HostPage.ONBOARDING -> showBody(onboarding)
-            HostPage.HOME -> showBody(shop)
+            HostPage.HOME -> showBody(facilityHome)
             HostPage.GACHA -> showBody(gacha)
             HostPage.DELIVERY -> {
                 showBody(deliveryBody)
@@ -663,7 +699,41 @@ class MainActivity : Activity() {
         }
         when (event) {
             ShopEvent.Retry -> if (!expansionHost.load()) shop.completeRetry()
-            is ShopEvent.Submit -> expansionHost.submit(event.request)
+            is ShopEvent.Submit -> when (event.request.selection.option.command) {
+                is io.drivegrowth.app.ui.shop.ShopCommand.BuyFacility -> {
+                    val original = event.request
+                    val shown = displayedFacilityShop
+                    if (shown == null || original.selection.revision != shown.revision ||
+                        shown.facilities.none { it.option == original.selection.option }) {
+                        shop.complete(original, ContractResult.Failure(ContractError.STATE_CONFLICT))
+                    } else {
+                        facilityUiRequest = original
+                        val mapped = original.copy(selection = original.selection.copy(revision = Revision(session.facility.state.version)))
+                        if (!session.facility.submit(mapped)) {
+                            facilityUiRequest = null
+                            shop.complete(original, ContractResult.Failure(ContractError.STATE_CONFLICT))
+                        }
+                    }
+                }
+                else -> expansionHost.submit(event.request)
+            }
+        }
+    }
+
+    private fun onFacilityEvent(event: io.drivegrowth.app.ui.shop.FacilityControlsEvent) {
+        if (!allowed() || navigation.page != HostPage.HOME) { updateAccess(); return }
+        when (event) {
+            is io.drivegrowth.app.ui.shop.FacilityControlsEvent.SetResting -> session.facility.setResting(
+                io.drivegrowth.app.host.facility.RestingRequest(event.version,
+                    io.drivegrowth.core.contract.RequestId("facility-rest-" + java.util.UUID.randomUUID()),
+                    event.vehicle, event.expected, event.desired))
+            io.drivegrowth.app.ui.shop.FacilityControlsEvent.Retry -> session.facility.refresh()
+            io.drivegrowth.app.ui.shop.FacilityControlsEvent.Acknowledge -> if (session.facility.acknowledge()) {
+                expansionHost.load(); queries.refresh(); refreshPendingRoute()
+            }
+            io.drivegrowth.app.ui.shop.FacilityControlsEvent.CancelSaved -> if (session.facility.cancelSaved()) {
+                expansionHost.load(); refreshPendingRoute()
+            }
         }
     }
 

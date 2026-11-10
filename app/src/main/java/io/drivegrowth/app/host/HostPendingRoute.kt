@@ -8,7 +8,7 @@ internal fun pendingHostPage(command: HostCheckpointCommand?): ContractResult<Ho
     null -> null
     is HostCheckpointCommand.Gacha -> HostPage.GACHA
     is HostCheckpointCommand.Garage, is HostCheckpointCommand.Material, is HostCheckpointCommand.Repair -> HostPage.GARAGE
-    is HostCheckpointCommand.Expand -> HostPage.HOME
+    is HostCheckpointCommand.Expand, is HostCheckpointCommand.FacilityPurchase, is HostCheckpointCommand.VehicleResting -> HostPage.HOME
     is HostCheckpointCommand.Delivery -> HostPage.DELIVERY
     is HostCheckpointCommand.Quest -> HostPage.PROGRESSION
 })

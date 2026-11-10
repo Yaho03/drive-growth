@@ -102,6 +102,10 @@ internal class HostSession(context: Context, private val main: Executor, restore
     val ranking = io.drivegrowth.app.host.ranking.RankingController(worker, main, source::readRanking)
     val results = ResultsHostController(worker, main, source::markViewed, queries::refresh, restoredResults)
 
+    val facility = io.drivegrowth.app.host.facility.FacilityHostController(
+        io.drivegrowth.app.host.facility.FactoryFacilityHostSource(context, games,
+            io.drivegrowth.app.host.facility.CheckpointFacilityDurablePort()), worker, main)
+
     fun expansionWorker(action: () -> Unit) { worker.execute(action) }
     fun pendingRoute(done: (ContractResult<HostPage?>) -> Unit) {
         worker.execute {
@@ -121,6 +125,7 @@ internal class HostSession(context: Context, private val main: Executor, restore
     fun release() {
         driving.stop()
         progression.release()
+        facility.release()
         delivery.release()
         deliveryNavigation.close()
         queries.release()
