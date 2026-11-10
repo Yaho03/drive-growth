@@ -13,6 +13,7 @@ import android.view.ViewTreeObserver
 import android.view.MotionEvent
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Spinner
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.data.SqliteGameChangeStore
 import io.drivegrowth.app.ui.onboarding.OnboardingView
@@ -40,6 +41,11 @@ class ResultsHostActivityTest : InstrumentationTestCase() {
     private fun texts(activity: MainActivity) = descendants(activity.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }
     private fun button(activity: MainActivity, label: String) = descendants(activity.window.decorView)
         .filterIsInstance<Button>().first { it.text.toString() == label }
+    private fun destination(activity: MainActivity, label: String) {
+        val spinner = activity.window.decorView.findViewWithTag<Spinner>("host:destination")
+        val position = (0 until spinner.count).first { spinner.getItemAtPosition(it).toString() == label }
+        spinner.setSelection(position)
+    }
     private fun results(activity: MainActivity) = descendants(activity.window.decorView).filterIsInstance<ResultsView>().single()
     private fun tap(button: Button) {
         ui { button.requestRectangleOnScreen(Rect(0, 0, button.width, button.height), true) }
@@ -93,7 +99,7 @@ class ResultsHostActivityTest : InstrumentationTestCase() {
         var current = instrumentation.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
         try {
             awaitUi(current, "실제 P SDK 관측으로 탐색이 열려야 한다") { texts(current).contains("미확인 정산") }
-            ui { button(current, "미확인 정산").performClick() }
+            ui { destination(current, "미확인 정산") }
             val openTag = "results:open:${stored.settlementId.value}"
             val markTag = "results:mark:${stored.settlementId.value}"
             awaitUi(current, "저장된 정산이 실제 View에 전달돼야 한다") { current.window.decorView.findViewWithTag<View>(openTag) != null }
@@ -164,7 +170,7 @@ class ResultsHostActivityTest : InstrumentationTestCase() {
                 it.taskInfo.persistentId == current.taskId
             }.moveToFront() }
             awaitUi(current, "저장 후 사용자 복귀에서 새 gate·조회로 가게를 복원한다") { texts(current).contains("드라이브 키우기") }
-            tap(ui { button(current, "첫 차량 안내") })
+            ui { destination(current, "첫 차량 안내") }; instrumentation.waitForIdleSync()
             screenshot(current, "host-narrow-onboarding.png")
             ui {
                 assertEquals(1, descendants(current.window.decorView).filterIsInstance<OnboardingView>().size)
