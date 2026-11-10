@@ -3,11 +3,12 @@ package io.drivegrowth.app.data
 import android.content.res.AssetManager
 import io.drivegrowth.app.host.shop.*
 import io.drivegrowth.core.contract.*
-import java.io.IOException
 
-/** 동의된 확장 시험 정의만 읽는다. 파일 실패를 임의 금액/기본 단계로 채우지 않는다. */
-class AssetShopExpansionProvider internal constructor(private val read: () -> String) : ShopExpansionDefinitionSource {
-    constructor(assets: AssetManager) : this({ assets.open("content/shop-expansions.csv").bufferedReader(Charsets.UTF_8).use { it.readText() } })
-    override fun load(): ContractResult<ShopExpansionDefinition> = try { parseShopExpansionDefinition(read()) }
-        catch (_: IOException) { ContractResult.Failure(ContractError.DATA_UNAVAILABLE) }
+/** 확장 숫자를 별도 복제하지 않고 단일 trial 정의를 위임 소비한다. */
+class AssetShopExpansionProvider(assets:AssetManager) : ShopExpansionDefinitionSource {
+    private val definitions=AssetTrialDefinitionProvider(assets)
+    override fun load():ContractResult<ShopExpansionDefinition> = when(val r=definitions.load()) {
+        is ContractResult.Failure->r
+        is ContractResult.Success->ContractResult.Success(r.value.expansions)
+    }
 }
