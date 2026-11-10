@@ -29,7 +29,7 @@ internal class HostSession(context: Context, private val main: Executor, restore
                 is ContractResult.Success -> opened.value.use { game ->
                     when (val saved = game.store.hostCommands.load(game.identity.profileId)) {
                         is ContractResult.Failure -> saved
-                        is ContractResult.Success -> ContractResult.Success(pendingHostPage(saved.value?.command))
+                        is ContractResult.Success -> pendingHostPage(saved.value?.command)
                     }
                 }
             }
