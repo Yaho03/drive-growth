@@ -279,6 +279,8 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
                 is ContractResult.Failure -> result
                 is ContractResult.Success -> {
                     db.execSQL("UPDATE rentals SET phase='RETURNING',settlement_request=?,rounding=? WHERE id=?", arrayOf(request.value,rounding.name,id.value))
+                    val event = store.quests.onRentalCompleted(db, id, result.value)
+                    if (event is ContractResult.Failure) return@atomic event
                     ContractResult.Success(receipt(result.value))
                 }
             }
