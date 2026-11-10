@@ -7,12 +7,15 @@ import io.drivegrowth.core.contract.SettlementId
 import java.util.Collections
 
 /** 확정 정산을 그대로 보존한다. null 차종명은 조회 공급자가 이름을 제공하지 않은 상태다. */
-data class ResultPresentation(val settlement: Settlement, val vehicleName: String? = null)
+data class ResultPresentation(val settlement: Settlement, val vehicleName: String? = null,
+    val viewed: Boolean = false, val rental: io.drivegrowth.core.rental.CompletedRental? = null,
+    val rentalVehicleName: String? = null)
 enum class ResultsOrigin { STORED, FIXTURE }
+enum class ResultsScope { UNVIEWED, ALL }
 
 sealed interface ResultsScreenState {
     data object Loading : ResultsScreenState
-    data class Content(val results: List<ResultPresentation>, val origin: ResultsOrigin) : ResultsScreenState {
+    data class Content(val results: List<ResultPresentation>, val origin: ResultsOrigin, val historyAvailable: Boolean = false) : ResultsScreenState {
         init {
             require(results.map { it.settlement.settlementId }.distinct().size == results.size) { "정산 ID 중복" }
         }
@@ -34,6 +37,7 @@ data class ResultsUiState(
     val selectedId: SettlementId? = null,
     val readStates: Map<SettlementId, ResultsReadState> = emptyMap(),
     val retryPending: Boolean = false,
+    val scope: ResultsScope = ResultsScope.UNVIEWED,
 )
 
 sealed interface ResultsEvent {
@@ -64,10 +68,21 @@ class ResultsInteraction(private val onEvent: (ResultsEvent) -> Unit) {
 
     fun restoreUiState(value: ResultsUiState) { update(value) }
     fun restoreSelection(id: SettlementId?) { update(uiState.copy(selectedId = id)) }
-    fun readState(id: SettlementId): ResultsReadState = uiState.readStates[id] ?: ResultsReadState.Ready
+    val visibleResults: List<ResultPresentation> get() {
+        val content = state as? ResultsScreenState.Content ?: return emptyList()
+        return if (!content.historyAvailable || uiState.scope == ResultsScope.ALL) content.results
+            else content.results.filter { !it.viewed && readState(it.settlement.settlementId) != ResultsReadState.Done }
+    }
+    fun scope(value: ResultsScope) {
+        if (controlsEnabled && (state as? ResultsScreenState.Content)?.historyAvailable == true)
+            update(uiState.copy(scope = value))
+    }
+    fun readState(id: SettlementId): ResultsReadState =
+        if ((state as? ResultsScreenState.Content)?.results?.any { it.settlement.settlementId == id && it.viewed } == true)
+            ResultsReadState.Done else uiState.readStates[id] ?: ResultsReadState.Ready
 
     fun select(id: SettlementId) {
-        if (!controlsEnabled || (state as? ResultsScreenState.Content)?.results?.none { it.settlement.settlementId == id } != false) return
+        if (!controlsEnabled || visibleResults.none { it.settlement.settlementId == id }) return
         update(uiState.copy(selectedId = id))
         onEvent(ResultsEvent.SelectResult(id))
     }
@@ -80,7 +95,7 @@ class ResultsInteraction(private val onEvent: (ResultsEvent) -> Unit) {
     }
 
     fun canMarkViewed(id: SettlementId): Boolean = controlsEnabled &&
-        selectedResult?.settlement?.settlementId == id && readState(id) != ResultsReadState.Done &&
+        selectedResult?.settlement?.settlementId == id && selectedResult?.viewed != true && readState(id) != ResultsReadState.Done &&
         uiState.readStates.values.none { it == ResultsReadState.Pending }
 
     fun requestMarkViewed(id: SettlementId): Boolean {
@@ -92,7 +107,7 @@ class ResultsInteraction(private val onEvent: (ResultsEvent) -> Unit) {
 
     /** 동기 callback과 다른 정산의 늦은 응답도 ID로 구분한다. 미요청/완료된 ID 응답은 무시한다. */
     fun completeMarkViewed(id: SettlementId, result: ContractResult<Unit>) {
-        if (readState(id) != ResultsReadState.Pending) return
+        if (uiState.readStates[id] != ResultsReadState.Pending) return
         val next = when (result) {
             is ContractResult.Success -> ResultsReadState.Done
             is ContractResult.Failure -> ResultsReadState.Failed(result.error)

@@ -10,6 +10,7 @@ import io.drivegrowth.core.contract.SettlementId
 internal object ResultsStateBundle {
     fun encode(state: ResultsUiState) = Bundle().apply {
         putString("selected", state.selectedId?.value)
+        putString("scope", state.scope.name)
         putBoolean("retry", state.retryPending)
         putBundle("reads", Bundle().apply {
             state.readStates.forEach { (id, value) ->
@@ -43,6 +44,8 @@ internal object ResultsStateBundle {
                 put(SettlementId(key), state)
             }
         }
-        return ResultsUiState(selected, restored, saved?.getBoolean("retry") ?: false)
+        return ResultsUiState(selected, restored, saved?.getBoolean("retry") ?: false,
+            io.drivegrowth.app.ui.results.ResultsScope.entries.firstOrNull { it.name == saved?.getString("scope") }
+                ?: io.drivegrowth.app.ui.results.ResultsScope.UNVIEWED)
     }
 }
