@@ -111,7 +111,7 @@ class DeliveryCheckpointTest:InstrumentationTestCase() {
         // helper 생성자는 lazy다. 공개 읽기로 실제 upgrade를 연 뒤 버전/전체 행을 대조한다.
         assertEquals(beforeBalance,ok(store.balance()));assertEquals(before,rows())
         raw{db->for(table in listOf("delivery_requests","delivery_changes","delivery_outcomes","delivery_hold_outcomes"))db.rawQuery("PRAGMA table_info($table)",null).use{r->var found=false;while(r.moveToNext())if(r.getString(1)=="host_command")found=true;assertTrue(table,found)}}
-        raw{db->assertEquals(16,db.version);val after=db.rawQuery("SELECT * FROM quest_tracking",null).use{r->buildList{while(r.moveToNext())add((0 until r.columnCount).joinToString("|"){r.getString(it)})}};assertEquals(tracking,after)}
+        raw{db->assertEquals(17,db.version);val after=db.rawQuery("SELECT * FROM quest_tracking",null).use{r->buildList{while(r.moveToNext())add((0 until r.columnCount).joinToString("|"){r.getString(it)})}};assertEquals(tracking,after)}
     }
     fun testIgnoredSaveAndNonfinalSavedRestorationCannotReportDurability() {
         val first=select();raw{it.execSQL("CREATE TRIGGER ignore_save BEFORE INSERT ON host_command_checkpoint BEGIN SELECT RAISE(IGNORE); END")};val initial=rows()

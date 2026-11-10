@@ -45,7 +45,7 @@ class QuestStoreIntegrationTest: InstrumentationTestCase() {
     }
     fun testActualFreshHelperIssuesTrackingAndCentralSixDefinitionsWithoutReentry() {
         val before=rows();assertEquals(6,states().size);assertTrue(states().all{it.count==0&&it.status==QuestStatus.IN_PROGRESS&&it.definition.zone==zone})
-        raw{db->assertEquals(16,db.version)
+        raw{db->assertEquals(17,db.version)
             for(table in listOf("quest_tracking","quest_events","quest_claims","host_command_checkpoint","observed_driving_marker","observed_driving_state","observed_driving_receipts"))db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name=?",arrayOf(table)).use{assertTrue(table,it.moveToFirst())}
             for(table in listOf("delivery_requests","delivery_changes","delivery_outcomes","delivery_hold_outcomes"))db.rawQuery("PRAGMA table_info($table)",null).use{r->var found=false;while(r.moveToNext())if(r.getString(1)=="host_command")found=true;assertTrue(table,found)}
             db.rawQuery("SELECT profile,source,complete_since FROM quest_tracking",null).use{assertTrue(it.moveToFirst());assertEquals(profile.value,it.getString(0));assertEquals(source.name,it.getString(1));assertEquals(0L,it.getLong(2));assertFalse(it.moveToNext())}}
@@ -106,7 +106,7 @@ class QuestStoreIntegrationTest: InstrumentationTestCase() {
     }
     fun testV10MigrationFailurePreservesVersionAndWholeFile() {
         store.close();raw{it.version=10};val file=context.getDatabasePath(name);val before=file.readBytes();store=open()
-        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.balance());store.close();assertTrue(before.contentEquals(file.readBytes()));raw{assertEquals(10,it.version);it.version=16};store=open()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.balance());store.close();assertTrue(before.contentEquals(file.readBytes()));raw{assertEquals(10,it.version);it.version=17};store=open()
     }
     fun testQuestNamespaceReservedFromNewGenericAndCheckpointCommands() {
         val change=GameChange(RequestId("quest/claim/wrong-owner"),TransactionKind.GARAGE,source,definition.rules,MoneyChange(MoneyDirection.CREDIT,GameMoney(1)))

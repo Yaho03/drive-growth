@@ -23,6 +23,7 @@ internal object HostCheckpointJson {
             is HostCheckpointCommand.Material -> { kind = "material"; value = MaterialJson.command(command.value) }
             is HostCheckpointCommand.Repair -> { kind = "repair"; value = RepairJson.command(command.value) }
             is HostCheckpointCommand.Quest -> {kind="quest";value=QuestJson.command(command.value)}
+            is HostCheckpointCommand.Decoration -> {kind="decoration";value=DecorationJson.command(command.value)}
             is HostCheckpointCommand.Delivery -> { kind="delivery";value=DeliveryCheckpointJson.encode(command) }
             is HostCheckpointCommand.Expand -> { kind = "expand"; value = expand(command) }
             is HostCheckpointCommand.FacilityPurchase -> {kind="facility";value=JSONObject().put("request",command.requestId.value).put("source",command.source.name).put("definition",command.definitionVersion.value)
@@ -47,6 +48,7 @@ internal object HostCheckpointJson {
             "material" -> HostCheckpointCommand.Material(MaterialJson.command(value))
             "repair" -> HostCheckpointCommand.Repair(RepairJson.command(value))
             "quest" -> HostCheckpointCommand.Quest(QuestJson.command(value))
+            "decoration" -> HostCheckpointCommand.Decoration(DecorationJson.command(value))
             "delivery" -> DeliveryCheckpointJson.decode(value)
             "expand" -> expand(value)
             "facility" -> HostCheckpointCommand.FacilityPurchase(RequestId(value.getString("request")),InputSource.valueOf(value.getString("source")),ContentVersion(value.getString("definition")),
@@ -55,7 +57,7 @@ internal object HostCheckpointJson {
                 VehicleRef(OwnedVehicleId(value.getString("vehicle")),Revision(int(value,"revision"))),boolean(value,"expected"),boolean(value,"desired"))
             else -> throw JSONException("미지원 checkpoint 명령 종류")
         }
-        if ((command is HostCheckpointCommand.Quest && command.value.profileId!=profile) || !command.validFor(command.origin) || encode(profile, command) != text)
+        if (((command is HostCheckpointCommand.Quest && command.value.profileId!=profile) || (command is HostCheckpointCommand.Decoration && command.value.profileId!=profile)) || !command.validFor(command.origin) || encode(profile, command) != text)
             throw JSONException("checkpoint 전체 명령/교차 필드 불일치")
         return profile to command
     }

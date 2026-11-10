@@ -97,7 +97,7 @@ class RestDrivingJournalTest:InstrumentationTestCase() {
  }
  fun testSchema15UpgradeKeepsFinancialAndObservedRowsWithoutBootBackfill(){
   observed();val kept=rows().filter{it.startsWith("account:")||it.startsWith("observed_driving_state:")};store.close();raw{stripRestFixture(it);it.version=15};store=open();assertEquals(id.profileId,ok(store.localProfileId()))
-  assertEquals(kept,rows().filter{it.startsWith("account:")||it.startsWith("observed_driving_state:")});assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),store.restDriving.state(id.profileId));raw{assertEquals(16,it.version)}
+  assertEquals(kept,rows().filter{it.startsWith("account:")||it.startsWith("observed_driving_state:")});assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),store.restDriving.state(id.profileId));raw{assertEquals(17,it.version)}
  }
  fun testRawRestHistoryWithoutMarkerCannotBeAdoptedAsCurrentEvidence(){
   ok(RestLedger(store).depart(definition.rest,RestStop(1,id.source,Observation.Available(RestPlace.SERVICE_AREA),Observation.Available(3600000),Observation.Available(300000))));val before=rows()

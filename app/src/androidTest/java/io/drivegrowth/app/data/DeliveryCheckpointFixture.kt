@@ -35,5 +35,11 @@ internal fun stripRentalProductFixture(db:SQLiteDatabase) {
 
 /** schema16의 신규 표만 제거한다. legacy 이전 fixture용이며 원장 행의 기대값은 유지한다. */
 internal fun stripRestFixture(db:SQLiteDatabase) {
+    stripDecorationFixture(db)
     for(table in listOf("rest_module","rest_contexts","rest_departures","rest_driving_receipts","rest_log","rest_head"))db.execSQL("DROP TABLE IF EXISTS $table")
+}
+
+/** schema17 도입 전 구조만 재현하는 시험 utility. */
+internal fun stripDecorationFixture(db:SQLiteDatabase) {
+    for(table in listOf("decoration_requests","decoration_module"))db.execSQL("DROP TABLE IF EXISTS $table")
 }
