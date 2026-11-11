@@ -121,10 +121,11 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
             DeliverySettlementRules(expansion.rules,settle.n("arrival_window_ms"),settle.n("hold_window_ms"),settle.i("hold_refund_fee_percent")))
         val visit=scalar("rental_visits",setOf("interval_ms","max_replay_visits","rounding"));require(visit.n("interval_ms")==1800000L&&visit.i("max_replay_visits")>0)
         val categoryRows=sections.getValue("rental_categories");require(categoryRows.first()==listOf("vehicle_id","category","basis","demand_weight"))
+        val categoryBases=setOf("market-small","body-sedan","body-suv","body-mpv","eco-powertrain")
         val categories=linkedMapOf<VehicleId,RentalCategory>();val categoryBasis=linkedMapOf<VehicleId,String>();val demand=linkedMapOf<VehicleId,Int>()
         for(row in categoryRows.drop(1)) {
             require(row.size==4);val id=VehicleId(row[0]);require(id !in categories)
-            categories[id]=RentalCategory.valueOf(row[1]);require(row[2] in setOf("market-small","body-sedan","body-suv","body-mpv"));categoryBasis[id]=row[2]
+            categories[id]=RentalCategory.valueOf(row[1]);require(row[2] in categoryBases);categoryBasis[id]=row[2]
             val weight=number(row[3]);require(weight in 1..Int.MAX_VALUE);demand[id]=weight.toInt()
         };require(categories.keys==knownVehicles)
         val durations=records("rental_durations",listOf("hours","weight","return_minutes")) {

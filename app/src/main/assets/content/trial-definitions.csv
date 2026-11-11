@@ -1,4 +1,4 @@
-definition_version,trial-demo-2026-11-10-v4
+definition_version,trial-demo-2026-11-10-v5
 rule_version,trial-demo-2026-11-10-v4
 trial,true
 from_level,current_capacity,next_capacity,completed_rentals,price
@@ -112,17 +112,17 @@ hyundai_avante,SEDAN,body-sedan,1
 hyundai_sonata,SEDAN,body-sedan,1
 hyundai_tucson,SUV,body-suv,1
 hyundai_staria_tourer,VAN,body-mpv,1
-hyundai_casper_electric,SMALL,market-small,1
+hyundai_casper_electric,ECO,eco-powertrain,1
 hyundai_grandeur,SEDAN,body-sedan,1
 hyundai_santafe,SUV,body-suv,1
 hyundai_staria_lounge,VAN,body-mpv,1
-hyundai_ioniq5,SUV,body-suv,1
-hyundai_ioniq6,SEDAN,body-sedan,1
-hyundai_nexo,SUV,body-suv,1
+hyundai_ioniq5,ECO,eco-powertrain,1
+hyundai_ioniq6,ECO,eco-powertrain,1
+hyundai_nexo,ECO,eco-powertrain,1
 genesis_g80,SEDAN,body-sedan,1
 hyundai_palisade,SUV,body-suv,1
 genesis_gv70,SUV,body-suv,1
-hyundai_ioniq9,SUV,body-suv,1
+hyundai_ioniq9,ECO,eco-powertrain,1
 genesis_g90,SEDAN,body-sedan,1
 genesis_gv80,SUV,body-suv,1
 
