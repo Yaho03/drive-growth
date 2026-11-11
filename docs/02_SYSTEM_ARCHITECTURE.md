@@ -856,6 +856,13 @@ main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결
 이 경계는 같은 source 인스턴스의 미확정 제안 재시도이며 디스크 큐/프로세스 사망 전 미저장 입력 복원을 새로 보장하지 않는다. 호출자는 실패한 원 frame/clock의 재시도와 수명 종료 순서를 보존해야 한다. 새 producer는 같은 session worker에서 같은 store.atomic 안의 `restDriving.projectionIn(db, identity)`를 먼저 검증하고 `RestAtomicStorage.contexts(db, identity).map { it.value }`의 원 ordinal 순서를 읽어 성공한 전체 목록만 restore한다. contexts 단독·별도 거래 조회·elapsed 재정렬·실패를 빈 목록으로 보정하지 않는다. 실제 Main/HostSession 등록·opt-in·boot/domain/장소 권위 공급·정책·전체 SDK/프로세스 검증은 별도다.
 
 
+### #40·#57 진행 화면의 휴식 원장 읽기
+
+`FactoryProgressionSource`의 선택적 읽기 포트는 퀘스트와 같은 `GameSession`에서 `restDriving.state(profileId)`를 조회할 수 있다. 저장소가 검증한 `RestDrivingProjection`과 `ContractResult` 오류를 진행 상태에 전달한다. 포트가 없으면 `UNSUPPORTED`를 유지한다. 기록 없음, 읽기 실패, 빈 원장, 미확정 주행은 잔여 시간 미확인으로 표시하며, 미확정 투영으로 활성 버프를 표시하지 않는다.
+
+진행 화면은 확정 주행이 있고 미확정 주행이 없는 스냅샷의 저장 잔여 시간과 입력 출처만 표시한다. 이 조회는 현재 장소, 이번 휴식 인정 여부나 다음 출발 효과를 제공하지 않는다. 제품 `MainActivity`·`HostSession` 등록은 별도이며, 조립 시 같은 프로필의 읽기 허용·동의·근거를 확인해야 한다. 저장 활성화, 주행 명령·지급, SDK 등록은 조회 범위 밖이다.
+
+
 ### #55 가게 꾸미기·확장 완료 원결과 조회
 
 `ShopOriginalResultReader(store).decoration(profileId, requestId)`는 `ContractResult<DecorationSettlement?>`를, `expansion(profileId, requestId, fullShopExpansion)`은 `ContractResult<Settlement?>`를 반환한다. 같은 SQLite 거래에서 실제 프로필과 저장 출처를 확인하고 원명령·최초 결과와 전역 요청 ID 소유자를 대조한다. 확장 호출자는 처음 확정한 전체 입력을 전달하고 reader는 공통 정산의 원명령과 최초 결과를 대조한다. 시설 구매 원결과는 기존 `hostCommands.facilityResult`에서 읽는다. 유료 꾸미기의 공통 원정산과 무료 구매·보유품 적용의 금융 정산 없는 typed 결과를 그대로 읽는다.

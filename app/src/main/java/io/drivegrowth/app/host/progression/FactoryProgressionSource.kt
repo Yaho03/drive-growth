@@ -1,5 +1,6 @@
 package io.drivegrowth.app.host.progression
 
+import io.drivegrowth.app.data.RestDrivingProjection
 import io.drivegrowth.app.host.*
 import io.drivegrowth.app.ui.progress.*
 import io.drivegrowth.core.contract.*
@@ -10,7 +11,8 @@ import java.util.UUID
 /** E가 같은 열린 session의 실제 Quest 읽기/claim lookup/단일 checkpoint를 공급한다. */
 data class ProgressionBackend(val quests: QuestChangeStore,
     val lookup: (RequestId) -> ContractResult<QuestClaimSettlement?>,
-    val journal: ProgressionJournal?)
+    val journal: ProgressionJournal?,
+    val readRest: (() -> ContractResult<RestDrivingProjection>)? = null)
 
 /** worker 전용. 같은 GameSessionFactory를 열고 모든 경로에서 닫는다. 새 지갑/DB/Quest 정의를 만들지 않는다. */
 class FactoryProgressionSource(private val games: GameSessionFactory,
@@ -18,6 +20,11 @@ class FactoryProgressionSource(private val games: GameSessionFactory,
     private val now: () -> Observation<EpochMillis>,
     private val requestId: () -> RequestId = { RequestId("quest/claim/${UUID.randomUUID()}") }) : ProgressionSource {
     constructor(games: GameSessionFactory, now: () -> Observation<EpochMillis>) : this(games, ::storedQuestProgressionBackend, now)
+    /** 호출자가 휴식 읽기 허용 여부를 판단한다. 이 포트는 활성화나 정산을 호출하지 않는다. */
+    constructor(games: GameSessionFactory, now: () -> Observation<EpochMillis>,
+        readRest: ((GameSession) -> ContractResult<RestDrivingProjection>)?) :
+        this(games, { session -> storedQuestProgressionBackend(session, readRest?.let { reader -> { reader(session) } }) }, now)
+
     private val offers = linkedMapOf<ProgressKey, QuestClaimCommand>()
     private fun <T> use(identity: GameIdentity? = null, action: (GameSession, ProgressionBackend) -> ContractResult<T>): ContractResult<T> =
         when (val opened = games.open()) {
@@ -33,9 +40,10 @@ class FactoryProgressionSource(private val games: GameSessionFactory,
             is ContractResult.Failure -> return@use read
             is ContractResult.Success -> read.value
         }
+        fun withRest(read: ProgressionRead) = ContractResult.Success(read.copy(rest = access.readRest?.invoke()))
         if (pending is ProgressionJournalState.Quest) {
             if (!matches(identity, pending.command)) return@use failure(ContractError.INVALID_INPUT)
-            return@use ContractResult.Success(ProgressionRead(identity, emptyList(), emptyMap(), pending, true))
+            return@use withRest(ProgressionRead(identity, emptyList(), emptyMap(), pending, true))
         }
         val recovered = linkedMapOf<ClaimReference, QuestClaimSettlement?>()
         for (reference in references) {
@@ -48,7 +56,7 @@ class FactoryProgressionSource(private val games: GameSessionFactory,
         }
         if (recovered.isNotEmpty()) {
             val original = recovered.values.filterNotNull().map { it.progress }.distinctBy(::progressKey)
-            return@use ContractResult.Success(ProgressionRead(identity, Collections.unmodifiableList(original), emptyMap(), pending,
+            return@use withRest(ProgressionRead(identity, Collections.unmodifiableList(original), emptyMap(), pending,
                 access.journal != null, Collections.unmodifiableMap(recovered)))
         }
         when (val initialized = initialized(session)) { is ContractResult.Failure -> return@use initialized; else -> Unit }
@@ -64,7 +72,7 @@ class FactoryProgressionSource(private val games: GameSessionFactory,
         }
         if (active.values.map { it.requestId }.toSet().size != active.size) return@use failure(ContractError.STATE_CONFLICT)
         offers.clear(); offers.putAll(active)
-        ContractResult.Success(ProgressionRead(identity, Collections.unmodifiableList(ArrayList(states)),
+        withRest(ProgressionRead(identity, Collections.unmodifiableList(ArrayList(states)),
             Collections.unmodifiableMap(LinkedHashMap(active)), pending, access.journal != null,
             Collections.unmodifiableMap(recovered)))
     }

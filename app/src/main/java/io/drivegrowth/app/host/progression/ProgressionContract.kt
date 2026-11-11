@@ -1,5 +1,6 @@
 package io.drivegrowth.app.host.progression
 
+import io.drivegrowth.app.data.RestDrivingProjection
 import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.app.ui.progress.*
 import io.drivegrowth.core.contract.*
@@ -23,7 +24,9 @@ data class ProgressionRead(val identity: GameIdentity, val quests: List<QuestPro
     val offers: Map<ProgressKey, QuestClaimCommand>, val journal: ProgressionJournalState,
     val journalSupported: Boolean,
     /** null은 검증된 원장 조회의 부재다. 조회실패를 null로 낮추면 안 된다. */
-    val resolved: Map<ClaimReference, QuestClaimSettlement?> = emptyMap())
+    val resolved: Map<ClaimReference, QuestClaimSettlement?> = emptyMap(),
+    /** 미연결은 null이며 연결된 조회의 실패는 원래 오류를 보존한다. */
+    val rest: ContractResult<RestDrivingProjection>? = null)
 interface ProgressionSource {
     fun read(references: Set<ClaimReference>): ContractResult<ProgressionRead>
     fun save(identity: GameIdentity, command: QuestClaimCommand): ContractResult<Unit>

@@ -7,9 +7,17 @@ import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.quest.*
 
 /** E b1b4f262의 실제 동일 store capability만 연결한다. 별도 저널/잔액/원문 복제는 없다. */
-fun storedQuestProgressionBackend(session: GameSession): ContractResult<ProgressionBackend> = ContractResult.Success(
+fun storedQuestProgressionBackend(session: GameSession): ContractResult<ProgressionBackend> =
+    storedQuestProgressionBackend(session, null)
+
+internal fun storedQuestProgressionBackend(session: GameSession,
+    readRest: (() -> ContractResult<RestDrivingProjection>)?): ContractResult<ProgressionBackend> = ContractResult.Success(
     ProgressionBackend(session.store.quests, session.store.quests::settlement,
-        StoredQuestProgressionJournal(session.identity, session.store.hostCommands)))
+        StoredQuestProgressionJournal(session.identity, session.store.hostCommands), readRest))
+
+/** 같은 세션의 검증된 저장 projection과 원결과를 조회한다. 활성화 여부와 입력 권위는 호스트가 확인한다. */
+internal fun readStoredRestProgression(session: GameSession): ContractResult<RestDrivingProjection> =
+    session.store.restDriving.state(session.identity.profileId)
 
 private class StoredQuestProgressionJournal(private val identity: GameIdentity,
     private val ledger: HostCommandCheckpointLedger) : ProgressionJournal {
