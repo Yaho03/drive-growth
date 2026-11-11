@@ -44,6 +44,14 @@ class StoredShopExpansionSource(
         }
         ContractResult.Success(mapShopExpansion(profile,source,definition,shop,count,money,vehicles))
     }
+    /** 호출자가 소유한 같은 연결을 읽으며 열거나 닫지 않는다. */
+    internal fun readIn(store: SqliteGameChangeStore): ContractResult<ShopExpansionSnapshot> {
+        if (store.source != source) return ContractResult.Failure(ContractError.INVALID_INPUT)
+        return when (val definition = definitions.load()) {
+            is ContractResult.Failure -> definition
+            is ContractResult.Success -> readSnapshot(store, definition.value)
+        }
+    }
     override fun read(): ContractResult<ShopExpansionSnapshot> = when(val d=definitions.load()) {
         is ContractResult.Failure->d
         is ContractResult.Success->withStore { readSnapshot(it,d.value) }
