@@ -1376,6 +1376,20 @@ JDK17·기존 Android SDK35·Gradle8.11.1, `--offline --no-daemon`을 사용했�
 
 
 
+### #35 콘텐츠 버전 전환과 최초 가챠 결과 재개방 — 2026-11-11
+
+PR #152 직전의 콘텐츠 버전 `trial-content-2026-11-07`과 차종 기준액 8,000을 시험 입력으로 재현했다. 역적용한 두 메타데이터와 차량 사실 CSV를 이전 커밋 `04483988`의 원본과 바이트 단위로 대조했다. 이 입력으로 초기 지급과 유료 가챠를 확정한 현재 스키마의 격리 `SIMULATION` DB를 새 `GameSessionFactory`로 다시 열었다. 현재 APK 자산의 `trial-content-2026-11-09`·캐스퍼 기준액 1,000과 별도 유료권 500을 확인했다.
+
+Pleos API 34 ARM64 사용자 10에서 `PackagedContentAuthoritySqliteTest#testReopenedLedgerUsesPackagedAuthorityAndPreservesFirstGachaResult` 1건이 0.278초에 통과했다(22:14:20–22:14:21 KST, 실패·오류·생략 0). 옛 버전의 새 요청 및 같은 ID의 버전 변경은 `STATE_CONFLICT`·무변경이었다. 동일 전체 원명령은 당시 정산·취득액·가챠 진행을 재생했다. 새 버전 요청 확정 후 다시 열어 같은 프로필·출처, 보유 3대·정산 3건·잔액 0·최종 가챠 진행을 확인했다. 시험 UUID DB가 제거됐고, 장치·제품 보존 19개 및 두 격리 패키지 정리를 확인했다.
+
+시험 소스는 main `f91089a3ec0a07b80e5074ef1b88468a693c9d65`에 단일 계측 패치 SHA-256 `fa2a874bf8ba37744ac0d29d749f34bf3573961a9ad9ed88b02037e0ce44f25f`를 적용한 상태다. 격리 앱 `6ac4143a53f9695966f093455a29aa34d6c8af1c56a8eaa9f633906544106714`와 시험 APK `3dd4649db41843fbd1d74d4cb9c18bf62f28492576c569a251a9fa05fb745ae3`는 준비본과 설치 후 회수본 해시가 일치했다. JDK 17에서 Debug 앱·시험 APK를 오프라인 빌드했다. 최초 Gradle은 2분 16초에 `BUILD SUCCESSFUL`을 출력했고, 뒤따른 zsh 래퍼의 종료 기록에서 코드 1이 발생했다. 최종 시험 소스의 재빌드는 22:03:01–22:03:49 KST에 종료 코드 0으로 완료했다. 위 장치 결과는 고정 패키지명 단언을 제거하기 전 격리 APK의 기록이다.
+
+정식 Debug 계측이 개인 검증용 패키지명에 종속되지 않도록 고정 단언 한 줄을 제거했다. UUID 시험 DB와 SIMULATION 출처, 거래 단언은 유지했다. main `46297fa6c07e2366a3018ee75be8c958a2c26c23`의 수정 시험 소스 SHA-256은 `9e733074fabc0749c9c70e371ee97f403886f624386ab8b6601055d04d17a758`다. 같은 격리 패키지의 앱·시험 APK 빌드는 22:21:41–22:22:30 KST에 종료 코드 0으로 완료했다. 수정 시험 APK `a79df53005f52a2974813863cf96c7f4bc24a23eaa3e9fc582bee30cbfff565e`와 앱의 설치 해시가 각각 빌드본과 일치했다. 같은 지정 계측을 Pleos API 34 ARM64 사용자 10에서 다시 실행해 **1건 통과, 0.235초**(22:27:58–22:27:59 KST, 실패·오류·생략 0)를 확인했다. 시험 DB 제거·장치 및 제품 보존 19개·격리 패키지 정리도 확인했다. 두 계측은 각 APK의 별도 실행으로 기록한다.
+
+별도 기존 #207 실제 차고 화면의 PNG와 XML에서 캐스퍼 일렉트릭(`hyundai_casper_electric`)의 게임 차종 가격 1,300과 취득 기준액 500이 따로 표시된 것을 확인했다. 설치 APK `f0d804bc755c1781bfc22eb04741c4513a3133eb0f19255c83b19a43df6b6603`의 `game-content.csv`와 `vehicle-facts.csv`는 실행 소스 `dce75aea` 및 현재 기준과 바이트가 일치했다. 차종 가격은 `trial-content-2026-11-09`의 기준액 1,000에 비율 130%를 적용한 값이다. 기존 실행에서 한 차종을 확인한 근거다. [PR #207](https://github.com/Yaho03/drive-growth/pull/207)
+
+#35에는 콘텐츠 권위 전환과 현재 스키마 DB 재개방, 기존 한 차종 가격 표시를 부분 근거로 인계한다. 전체 차종 가격 화면, 옛 APK에서의 업데이트, 구형 스키마 이전, 이 콘텐츠 전환 경로의 OS 프로세스 종료·재시작, 실제 차량 SDK·실차·최종 밸런스는 이번 계측 범위 밖이다.
+
 ## #121 수리 메모리 원장 참조 — 2026-11-09
 
 [호열의 후속 요청](https://github.com/Yaho03/drive-growth/issues/121#issuecomment-6733710261)의 첫 묶음이다. main `04483988` 기반 로컬 코드 `acabbd75c5919c8ec0b637eacb6d8130d57f47e5`에서 기존 InMemoryGameChangeStore에 수리 read/commit/정산 조회를 추가했다. source/버전·활동·확정 사고·견적은 명시 시험 입력이며 실제 RentalLedger/VehicleCare live 공급이 아니다. 실제 제공·저장 책임은 [02](02_SYSTEM_ARCHITECTURE.md#121-재료-강화-메모리-참조와-추가-계약)를 따른다.
