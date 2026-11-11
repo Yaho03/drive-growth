@@ -240,9 +240,68 @@ class ShopOriginalResultReaderDeviceTest : InstrumentationTestCase() {
         unchanged { assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), reader.expansion(profile, c.requestId, c.offer)) }
     }
 
+    /** 실제 확정 원결과를 v18에서 허용됐던 요청 키로 맞추고, 빈 공통 슬롯 그대로 이전한다. */
+    private fun reopenShopV18(rekey: (SQLiteDatabase) -> Unit) {
+        assertNull(ok(store.hostCommands.load(profile)))
+        store.close()
+        raw { db ->
+            rekey(db)
+            db.execSQL("DROP TABLE achievements")
+            db.version = 18
+        }
+        store = open()
+        assertNull(ok(store.hostCommands.load(profile)))
+        raw { assertEquals(19, it.version) }
+        stopDefinitions()
+    }
+
+    fun testV18FinishedReservedPrefixExpansionRestoresWithoutSlotOrNewDefinitions() {
+        val (command, actual) = completeExpansion()
+        val legacy = RequestId("achievement/legacy-expand")
+        val original = actual.copy(transaction = actual.transaction.copy(requestId = legacy))
+        reopenShopV18 { db ->
+            db.execSQL("UPDATE settlements SET request_id=?,result=? WHERE request_id=?",
+                arrayOf(legacy.value, LedgerJson.settlement(original).toString(), command.requestId.value))
+        }
+        unchanged {
+            assertEquals(original, ok(reader.expansion(profile, legacy, command.offer)))
+            assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
+                reader.expansion(profile, legacy, command.offer.copy(price = GameMoney(command.offer.price.units + 1))))
+        }
+        addForeignVisitOwner(legacy)
+        unchanged { assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), reader.expansion(profile, legacy, command.offer)) }
+        assertNull(ok(store.hostCommands.load(profile)))
+        noDefinitions()
+    }
+
+    fun testV18FinishedReservedPrefixPaidDecorationRestoresWithoutSlotOrNewDefinitions() {
+        ok(store.decorations.activate(profile)); unlock()
+        val command = decoration("paid-before-upgrade", paid = true)
+        val before = ok(store.decorations.state(profile))
+        val actual = buy(command)
+        val legacy = RequestId("achievement/legacy-decoration")
+        val receipt = requireNotNull(actual.settlement)
+        val legacyReceipt = receipt.copy(transaction = receipt.transaction.copy(requestId = legacy))
+        val original = actual.copy(command = command.copy(requestId = legacy), settlement = legacyReceipt)
+        val payload = DecorationJson.record(original.command, before, trialDecorationDefinitions(), original)
+        val change = GameChange(legacy, TransactionKind.FACILITY, source, command.ruleVersion,
+            MoneyChange(MoneyDirection.DEBIT, command.expectedPrice))
+        reopenShopV18 { db ->
+            db.execSQL("UPDATE settlements SET request_id=?,command=?,result=? WHERE request_id=?", arrayOf(
+                legacy.value, LedgerJson.command(change).toString(), LedgerJson.settlement(legacyReceipt).toString(), command.requestId.value))
+            db.execSQL("UPDATE decoration_requests SET request_id=?,payload=?,digest=? WHERE request_id=?", arrayOf(
+                legacy.value, payload, ObservedDrivingJson.digest(payload), command.requestId.value))
+        }
+        unchanged { assertEquals(original, ok(reader.decoration(profile, legacy))) }
+        addForeignVisitOwner(legacy)
+        unchanged { assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), reader.decoration(profile, legacy)) }
+        assertNull(ok(store.hostCommands.load(profile)))
+        noDefinitions()
+    }
+
     fun testReservedPrefixesStayBlockedWithoutOriginals() {
         stopDefinitions()
-        for (value in listOf("quest/unknown", "quest/claim/unknown", "delivery/unknown", "drive/unknown")) {
+        for (value in listOf("quest/unknown", "quest/claim/unknown", "delivery/unknown", "drive/unknown", "achievement/unknown", "achievement/claim/unknown")) {
             val id = RequestId(value)
             unchanged { assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), reader.decoration(profile, id))
                 assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), reader.expansion(profile, id, expandCommand().offer)) }

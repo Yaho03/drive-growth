@@ -7,6 +7,7 @@ import io.drivegrowth.app.host.*
 import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
 import io.drivegrowth.app.ui.progress.ClaimReference
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.achievement.*
 import io.drivegrowth.core.garage.FirstGrant
 import io.drivegrowth.core.quest.*
 import java.time.ZoneId
@@ -70,6 +71,44 @@ class ProgressionSqliteTest : InstrumentationTestCase() {
         raw { it.execSQL("UPDATE quest_tracking SET complete_since=?", arrayOf(System.currentTimeMillis() + 1)) }
         val read = ok(source().read(emptySet()))
         assertTrue(read.quests.all { it.status == QuestStatus.UNKNOWN && it.count == null && it.revision == null })
+    }
+    fun testAchievementAndSixQuestsShareFactoryAndReplayTheOriginalCheckpoint() {
+        games.enableAchievements()
+        ok(games.open()).use { session ->
+            val extra = OwnedVehicle(OwnedVehicleId("achievement-progress-extra"), VehicleId("hyundai_avante"), 1, Revision(0),
+                VehicleLifecycle.OWNED, Rarity.COMMON, 0, GameMoney(0), VehicleAcquisitionSource.GACHA)
+            ok(session.store.commitGameChange(GameChange(RequestId("achievement-progress-add"), TransactionKind.GARAGE,
+                session.identity.source, RuleVersion("fixture-add"), null, VehicleWrite.Add(extra))))
+        }
+        val src = source()
+        val read = ok(src.read(emptySet()))
+        assertEquals(6, read.quests.size)
+        assertEquals(4, ok(requireNotNull(read.achievements)).size)
+        val key = achievementKey(AchievementMetric.OWNED)
+        val command = read.achievementOffers.getValue(key)
+        val before = balance()
+        ok(src.save(read.identity, command))
+        val original = ok(games.open()).use { session ->
+            (ok(session.store.hostCommands.execute(read.identity.profileId, HostCheckpointCommand.Achievement(command)))
+                as HostCheckpointResult.Achievement).value
+        }
+
+        unavailable = true
+        games = GameSessionFactory(context, names, InputSource.SIMULATION, ::definitions).also { it.enableAchievements() }
+        val fresh = source()
+        val pending = ok(fresh.read(emptySet())).journal as ProgressionJournalState.Achievement
+        assertEquals(command, pending.command)
+        assertEquals(ProgressionPhase.STARTED, pending.phase)
+        assertEquals(original, ok(fresh.execute(read.identity, command)))
+        val reference = ClaimReference(key, 99, command.requestId.value)
+        assertEquals(original, ok(fresh.read(setOf(reference))).resolvedAchievements[reference])
+        assertEquals(GameMoney(before.units + command.milestone.definition.reward.units), balance())
+        unavailable = false
+        val again = ok(fresh.read(emptySet()))
+        assertEquals(6, again.quests.size)
+        assertEquals(AchievementStatus.CLAIMED, ok(requireNotNull(again.achievements))
+            .single { it.definition.metric == AchievementMetric.OWNED }.status)
+        assertFalse(key in again.achievementOffers)
     }
     fun testMissingCentralDefinitionFailsWithoutFallbackGoalsOrRewards() {
         unavailable = true; assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE), source().read(emptySet()))

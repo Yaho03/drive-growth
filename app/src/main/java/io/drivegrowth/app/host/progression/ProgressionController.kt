@@ -2,6 +2,7 @@ package io.drivegrowth.app.host.progression
 
 import io.drivegrowth.app.ui.progress.*
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.achievement.AchievementClaimCommand
 import io.drivegrowth.core.quest.*
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
@@ -46,12 +47,19 @@ class ProgressionController(private val worker: Executor, private val main: Exec
                 val read = latest ?: return
                 val item = content?.entries?.find { it.key == event.key } ?: return
                 if (item.revision != event.revision || item.claim?.enabled != true || item.claim.requestKey != event.requestKey) return
-                val command = read.offers[event.key] ?: return
-                if (command.requestId.value != event.requestKey) return
+                val quest = read.offers[event.key]
+                val achievement = read.achievementOffers[event.key]
+                if ((quest?.requestId ?: achievement?.requestId)?.value != event.requestKey) return
                 val token = generation.incrementAndGet(); references.add(ClaimReference(event.key, event.revision, event.requestKey))
                 emit(ProgressScreenState.Loading, true)
-                job(token, { source.save(read.identity, command) }) { result ->
-                    when (result) { is ContractResult.Failure -> failed(); is ContractResult.Success -> execute(token, read, command) }
+                if (quest != null) {
+                    job(token, { source.save(read.identity, quest) }) { result ->
+                        when (result) { is ContractResult.Failure -> failed(); is ContractResult.Success -> execute(token, read, quest) }
+                    }
+                } else if (achievement != null) {
+                    job(token, { source.save(read.identity, achievement) }) { result ->
+                        when (result) { is ContractResult.Failure -> failed(); is ContractResult.Success -> execute(token, read, achievement) }
+                    }
                 }
             }
             else -> Unit // 상세 선택/닫기는 기존 View가 소유한다.
@@ -61,10 +69,19 @@ class ProgressionController(private val worker: Executor, private val main: Exec
     fun cancelSaved() {
         if (!enabled.get() || released.get() || busy) return
         val read = latest ?: return
-        val pending = read.journal as? ProgressionJournalState.Quest ?: return
-        if (pending.phase != ProgressionPhase.SAVED) return
+        val cancel: () -> ContractResult<Unit> = when (val pending = read.journal) {
+            is ProgressionJournalState.Quest -> {
+                if (pending.phase != ProgressionPhase.SAVED) return
+                ({ source.cancelSaved(read.identity, pending.command) })
+            }
+            is ProgressionJournalState.Achievement -> {
+                if (pending.phase != ProgressionPhase.SAVED) return
+                ({ source.cancelSaved(read.identity, pending.command) })
+            }
+            else -> return
+        }
         val token = generation.incrementAndGet()
-        job(token, { source.cancelSaved(read.identity, pending.command) }) { result ->
+        job(token, cancel) { result ->
             when (result) { is ContractResult.Failure -> failed(); is ContractResult.Success -> refresh() }
         }
     }
@@ -78,11 +95,15 @@ class ProgressionController(private val worker: Executor, private val main: Exec
                     val read = result.value
                     if (latest != null && latest!!.identity != read.identity) { content = null; failed(); return@job }
                     latest = read
-                    val pending = read.journal as? ProgressionJournalState.Quest
                     val next = mapper.content(read); content = next
-                    val resolved = read.resolved.keys.toSet(); references.removeAll(resolved)
+                    val resolved = read.resolved.keys + read.resolvedAchievements.keys
+                    references.removeAll(resolved)
                     emit(next, true, resolved)
-                    if (pending != null) execute(token, read, pending.command) else if (resolved.isNotEmpty()) refresh()
+                    when (val pending = read.journal) {
+                        is ProgressionJournalState.Quest -> execute(token, read, pending.command)
+                        is ProgressionJournalState.Achievement -> execute(token, read, pending.command)
+                        else -> if (resolved.isNotEmpty()) refresh()
+                    }
                 }
             }
         }
@@ -97,6 +118,24 @@ class ProgressionController(private val worker: Executor, private val main: Exec
                     val next = mapper.receipt(read, receipt); content = next
                     val resolved = references.filter { it.requestKey == command.requestId.value && it.key == progressKey(receipt.progress) }.toSet()
                     references.removeAll(resolved); emit(next, true, resolved); refresh()
+                }
+            }
+        }
+    }
+    private fun execute(token: Long, read: ProgressionRead, command: AchievementClaimCommand) {
+        job(token, { source.execute(read.identity, command) }) { result ->
+            when (result) {
+                is ContractResult.Failure -> failed()
+                is ContractResult.Success -> {
+                    val receipt = result.value
+                    if (receipt.command != command || command.profileId != read.identity.profileId ||
+                        command.source != read.identity.source) { failed(); return@job }
+                    val next = mapper.receipt(read, receipt); content = next
+                    val key = achievementKey(command.milestone.definition.metric)
+                    val resolved = references.filter { it.requestKey == command.requestId.value && it.key == key }.toSet()
+                    references.removeAll(resolved)
+                    emit(next, true, resolved)
+                    refresh()
                 }
             }
         }

@@ -3,6 +3,7 @@ package io.drivegrowth.app.host.progression
 import io.drivegrowth.app.data.RestDrivingProjection
 import io.drivegrowth.app.ui.progress.*
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.achievement.*
 import io.drivegrowth.core.quest.*
 import java.math.BigDecimal
 import java.util.Collections
@@ -20,6 +21,25 @@ class ProgressionMapper {
         read.quests.forEach { progress ->
             val offer = read.offers[progressKey(progress)]
             entries[progressKey(progress)] = item(progress, offer, read.journalSupported && read.journal == ProgressionJournalState.Clear)
+        }
+        achievementItems(read, read.journalSupported && read.journal == ProgressionJournalState.Clear).forEach { entries[it.key] = it }
+        val pendingAchievement = read.journal as? ProgressionJournalState.Achievement
+        if (pendingAchievement != null) {
+            val milestone = pendingAchievement.command.milestone
+            val entry = achievementItem(AchievementProgress(milestone.definition, milestone.measure, milestone), null, false)
+            entries[entry.key] = entry.copy(status = RewardStatus.PENDING, note = "저장된 업적 청구의 원결과를 확인하고 있습니다.")
+        }
+        read.resolvedAchievements.forEach { (reference, receipt) ->
+            if (receipt != null) {
+                val milestone = receipt.command.milestone
+                val entry = achievementItem(AchievementProgress(milestone.definition, milestone.measure, milestone, claimed = true), null, false)
+                entries[entry.key] = entry
+            } else {
+                val old = entries[reference.key] ?: previous[reference.key]
+                entries[reference.key] = if (old?.status == RewardStatus.CLAIMED) old else
+                    ProgressItem(reference.key, ProgressGroup.ACHIEVEMENT, 0, "이전 업적 청구", null, null, null,
+                        RewardStatus.FAILED, "원장에 확정된 이전 업적 청구가 없습니다.")
+            }
         }
         val pending = read.journal as? ProgressionJournalState.Quest
         if (pending != null) {
@@ -42,13 +62,65 @@ class ProgressionMapper {
     fun receipt(read: ProgressionRead?, result: QuestClaimSettlement): ProgressScreenState.Content {
         val base = read?.quests.orEmpty().associateBy(::progressKey).toMutableMap()
         base[progressKey(result.progress)] = result.progress.copy(status = QuestStatus.CLAIMED)
-        return screen(result.command.source, base.values.map { item(it, null, false) }, read?.rest)
+        return screen(result.command.source, base.values.map { item(it, null, false) } +
+            (read?.let { achievementItems(it, false) }.orEmpty()), read?.rest)
     }
+    fun receipt(read: ProgressionRead, result: AchievementClaimSettlement): ProgressScreenState.Content {
+        val milestone = result.command.milestone
+        val earned = achievementItem(AchievementProgress(milestone.definition, milestone.measure, milestone, claimed = true), null, false)
+        val items = achievementItems(read, false).filter { it.key != earned.key } + earned
+        return screen(read.identity.source, read.quests.map { item(it, null, false) } + items, read.rest)
+    }
+
+    private fun achievementItems(read: ProgressionRead, allowClaim: Boolean): List<ProgressItem> =
+        when (val values = read.achievements) {
+            null -> emptyList()
+            is ContractResult.Failure -> listOf(ProgressItem(ProgressKey("unavailable-achievements", "lifetime"),
+                ProgressGroup.ACHIEVEMENT, 0, "업적 조회", null, null, null, RewardStatus.FAILED,
+                "업적 기록을 확인할 수 없습니다. (${values.error})"))
+            is ContractResult.Success -> values.value.map { progress ->
+                achievementItem(progress, read.achievementOffers[achievementKey(progress.definition.metric)], allowClaim)
+            }
+        }
+
+    private fun achievementItem(progress: AchievementProgress, command: AchievementClaimCommand?, allowClaim: Boolean): ProgressItem {
+        val definition = progress.milestone?.definition ?: progress.definition
+        val measure = progress.milestone?.measure ?: progress.measure
+        val status = when (progress.status) {
+            AchievementStatus.UNKNOWN -> RewardStatus.LOCKED
+            AchievementStatus.IN_PROGRESS -> RewardStatus.IN_PROGRESS
+            AchievementStatus.CLAIMABLE -> RewardStatus.CLAIMABLE
+            AchievementStatus.CLAIMED -> RewardStatus.CLAIMED
+        }
+        val title = when (definition.metric) {
+            AchievementMetric.OWNED -> "보유 차량 수"
+            AchievementMetric.CUSTOMERS -> "누적 고객 수"
+            AchievementMetric.SHOP -> "가게 레벨"
+            AchievementMetric.COLLECTION -> "도감 완성률"
+        }
+        val ratio = measure?.let { value ->
+            val total = value.total
+            if (total == null) minOf(100L, value.count.toLong() * 100 / definition.goal).toInt()
+            else minOf(100L, value.count.toLong() * 10000 / (total.toLong() * definition.goal)).toInt()
+        }
+        val label = measure?.let { value ->
+            val total = value.total
+            if (total == null) "${value.count} / ${definition.goal}"
+            else "${value.count} / ${total}칸 · 목표 ${definition.goal}%"
+        } ?: "진행 확인 불가"
+        val claim = command?.takeIf { progress.status == AchievementStatus.CLAIMABLE }?.let {
+            ClaimOffer(it.requestId.value, allowClaim, if (allowClaim) null else "다른 미확정 청구를 먼저 확인해 주세요.")
+        }
+        return ProgressItem(achievementKey(definition.metric), ProgressGroup.ACHIEVEMENT, 0, title, label,
+            ratio, "${definition.reward.units} 게임머니", status,
+            if (definition.trial) "조정 가능한 시험 정의 · ${definition.version.value}" else definition.version.value, claim)
+    }
+
     private fun screen(source: InputSource, entries: List<ProgressItem>,
         rest: ContractResult<RestDrivingProjection>?): ProgressScreenState.Content {
         val unsupported = ProgressItem(ProgressKey("unsupported-achievements", "unavailable"), ProgressGroup.ACHIEVEMENT, 0,
             "업적 조회", null, null, null, RewardStatus.UNSUPPORTED, "실제 업적 조회 연결 미지원")
-        val displayed = (entries + unsupported).map { value ->
+        val displayed = (if (entries.any { it.group == ProgressGroup.ACHIEVEMENT }) entries else entries + unsupported).map { value ->
             val signature = value.copy(revision = 0)
             val last = revisions[value.key] ?: -1
             val revision = if (previous[value.key] == signature) maxOf(last, 0) else Math.addExact(last, 1)

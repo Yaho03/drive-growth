@@ -39,9 +39,9 @@ internal class HostSession(
             } catch (_: java.time.DateTimeException) { ContractResult.Failure(ContractError.POLICY_UNRESOLVED) }
         }
     }
-    val games = if (simulation == null) GameSessionFactory(context, questDefinitions = questDefinitions) else
+    val games = (if (simulation == null) GameSessionFactory(context, questDefinitions = questDefinitions) else
         GameSessionFactory(context, mapOf(InputSource.SIMULATION to "unified-simulation.db"), InputSource.SIMULATION,
-            questDefinitions, { epochNow().value })
+            questDefinitions, { epochNow().value })).also { it.enableAchievements() }
     val drivingCalendar = ObservationCalendar(64) // 원관측-zone 상관용 기술 버퍼. 게임 수치가 아니다.
     private val recordingPolicy = simulation?.policy ?: io.drivegrowth.app.vehicle.TRIAL_INTERACTION_POLICY.let { policy ->
         RecordingPolicy(policy.maxSignalAgeMs, policy.maxSampleGapMs, 1000, policy.requiredParkMs,
