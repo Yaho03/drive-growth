@@ -114,7 +114,15 @@ class SqliteGameChangeStore(
 
     internal enum class RequestDomain { GENERAL, DELIVERY, DRIVING }
 
-    internal fun requestUnavailable(db: SQLiteDatabase, id: RequestId, questClaim: Boolean = false): Boolean {
+    internal fun requestUnavailable(db: SQLiteDatabase, id: RequestId, questClaim: Boolean = false): Boolean =
+        requestOwners(db, id, questClaim, null)
+
+    /** 원문/전체 명령/금융 연결을 같은 거래에서 검증한 reader만 자기 원소유를 제외한다. */
+    internal enum class OriginalRequestOwner { EXPANSION, DECORATION }
+    internal fun requestOwnedElsewhere(db: SQLiteDatabase, id: RequestId, owner: OriginalRequestOwner): Boolean =
+        requestOwners(db, id, false, owner)
+
+    private fun requestOwners(db: SQLiteDatabase, id: RequestId, questClaim: Boolean, owner: OriginalRequestOwner?): Boolean {
         if (id.value.startsWith("quest/") && !(questClaim && id.value.startsWith("quest/claim/"))) return true
         if (id.value.startsWith("delivery/") || id.value.startsWith("drive/")) return true
         val queries = listOf(
@@ -132,7 +140,14 @@ class SqliteGameChangeStore(
             "SELECT 1 FROM first_gift_requests WHERE request_id=?",
             "SELECT 1 FROM first_gift_markers WHERE request_id=?",
             "SELECT 1 FROM quest_claims WHERE request_id=?")
-        return queries.any { sql -> db.rawQuery(sql, arrayOf(id.value)).use { it.moveToFirst() } }
+        return queries.any { sql ->
+            val own = when (sql) {
+                "SELECT 1 FROM settlements WHERE request_id=?" -> owner != null
+                "SELECT 1 FROM decoration_requests WHERE request_id=?" -> owner == OriginalRequestOwner.DECORATION
+                else -> false
+            }
+            !own && db.rawQuery(sql, arrayOf(id.value)).use { it.moveToFirst() }
+        }
     }
 
     internal fun record(db: SQLiteDatabase, change: GameChange, command: String,
