@@ -14,7 +14,7 @@ internal class TrialRentalInputs(categories:Map<VehicleId,RentalCategory>,basis:
     val returns=Collections.unmodifiableMap(LinkedHashMap(returns))
     val customers=Collections.unmodifiableList(ArrayList(customers))
 }
-/** 게임용 분류이며 실제 성능/법적 차급이 아니다. 근거는 docs/data/vehicles.csv의 body/market이다. */
+/** PRD의 차종별 대여 유형 하나를 중앙 시험 정의에서 공급한다. 실차 자료는 분류 근거로만 사용한다. */
 fun TrialDefinition.rentalVisitDefinition():ContractResult<RentalVisitDefinition> = ContractResult.Success(RentalVisitDefinition(version,rules,trial,rental.interval,rental.categories,rentalRates,rental.demand,rental.durations,rental.returns,rental.customers,fuelBonusPerRental,rental.rounding))
 fun TrialDefinition.rentalReplayLimit():ContractResult<Int> = ContractResult.Success(rental.replayLimit)
 fun TrialDefinition.rentalCategoryBasis():Map<VehicleId,String> = rental.basis
