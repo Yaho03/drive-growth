@@ -15,6 +15,17 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RestSimulationScenarioTest {
+    @Test fun displayPhasesFollowTheExistingFixtureAndKeepTheExitPhaseForFinalParking() {
+        val rest = RestRules(RuleVersion("test-rest"), 3_600_000, 300_000, 1_200_000, 150)
+        val phases = mutableListOf<RestSimulationScenario.Phase>()
+        for ((_, area) in RestSimulationScenario.frames(rest)) {
+            val phase = RestSimulationScenario.phaseFor(phases.lastOrNull(), area)
+            if (phase != phases.lastOrNull()) phases += phase
+        }
+        assertEquals(listOf(RestSimulationScenario.Phase.DRIVE, RestSimulationScenario.Phase.REST,
+            RestSimulationScenario.Phase.DEPARTURE), phases)
+    }
+
     @Test fun simulatedTimelineYieldsExactlyOneQualifiedDeparture() {
         val rest = RestRules(RuleVersion("test-rest"), 3_600_000, 300_000, 1_200_000, 150)
         val driving = DrivingIncomeRules(RuleVersion("test-driving"), 500_000, GameMoney(100))

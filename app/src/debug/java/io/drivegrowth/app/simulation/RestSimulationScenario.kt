@@ -26,7 +26,16 @@ internal object RestSimulationScenario {
     internal val recordingPolicy = RecordingPolicy(sampleMs, sampleMs, 1_000, 3_000, 0.1, 0.5)
     internal val evidencePolicy = RestEvidencePolicy(sampleMs, sampleMs, 1_000, 0.5, 0.1)
 
-    fun run(games: GameSessionFactory): ContractResult<List<ObservedDrivingReceipt>> {
+    fun run(games: GameSessionFactory): ContractResult<List<ObservedDrivingReceipt>> =
+        when (val prepared = prepareRun(games)) {
+            is ContractResult.Failure -> prepared
+            is ContractResult.Success -> when (val result = prepared.value.run()) {
+                is ContractResult.Failure -> result
+                is ContractResult.Success -> ContractResult.Success(checkNotNull(result.value))
+            }
+        }
+
+    fun prepareRun(games: GameSessionFactory): ContractResult<Run> {
         val (identity, definition) = when (val setup = prepare(games)) {
             is ContractResult.Failure -> return setup
             is ContractResult.Success -> setup.value
@@ -35,23 +44,57 @@ internal object RestSimulationScenario {
         val source = SessionObservedDrivingSource(games, SqliteObservedDrivingJournal(),
             ObservedDrivingReducer(recordingPolicy) { UUID.randomUUID().toString() }, definition::drivingIncomeRules)
         source.restObservationProvider = producer
+        return ContractResult.Success(Run(producer, source, samples(definition.rest).iterator()))
+    }
 
-        val receipts = mutableListOf<ObservedDrivingReceipt>()
-        for ((frame, place) in frames(definition.rest)) {
-            val raw = frame.observation
-            when (val staged = producer.observe(receiver, clockDomain, raw, place)) {
-                is ContractResult.Failure -> return staged
-                is ContractResult.Success -> Unit
-            }
-            when (val recorded = source.observe(receiver, frame, RecordingClock(raw.receivedElapsedMs, raw.receivedAt))) {
-                is ContractResult.Failure -> return recorded
-                is ContractResult.Success -> {
-                    recorded.value.waiting?.let { return ContractResult.Failure(it) }
-                    receipts += recorded.value.committed
+    internal data class Sample(val frame: DrivingFrame, val place: Observation<RestAreaProof>, val last: Boolean)
+
+    /** 실패한 표본과 같은 source/producer를 worker에 남겨 명시 재시도에서 그대로 사용한다. */
+    class Run internal constructor(
+        private val producer: ForegroundRestObservationProducer,
+        private val source: SessionObservedDrivingSource,
+        private val inputs: Iterator<Sample>,
+    ) {
+        private val receipts = mutableListOf<ObservedDrivingReceipt>()
+        private var pending: Sample? = null
+        private var phase: Phase? = null
+        private var completed = false
+
+        /** null은 현재 거래를 마치고 다음 원표본 생성 전에 중지한 상태다. */
+        fun run(
+            onPhase: (Phase) -> Unit = {},
+            canContinue: () -> Boolean = { true },
+        ): ContractResult<List<ObservedDrivingReceipt>?> {
+            while (true) {
+                if (completed) return ContractResult.Success(receipts.toList())
+                if (!canContinue()) return ContractResult.Success(null)
+                val (frame, place, last) = pending ?: inputs.next().also { pending = it }
+                val raw = frame.observation
+                val next = phaseFor(phase, place)
+                if (next != phase) { phase = next; onPhase(next) }
+                when (val staged = producer.observe(receiver, clockDomain, raw, place)) {
+                    is ContractResult.Failure -> return staged
+                    is ContractResult.Success -> Unit
+                }
+                when (val recorded = source.observe(receiver, frame, RecordingClock(raw.receivedElapsedMs, raw.receivedAt))) {
+                    is ContractResult.Failure -> return recorded
+                    is ContractResult.Success -> {
+                        receipts += recorded.value.committed
+                        recorded.value.waiting?.let { return ContractResult.Failure(it) }
+                        pending = null
+                        completed = last
+                    }
                 }
             }
         }
-        return ContractResult.Success(receipts.toList())
+    }
+
+    enum class Phase { DRIVE, REST, DEPARTURE }
+
+    internal fun phaseFor(previous: Phase?, place: Observation<RestAreaProof>): Phase = when {
+        (place as? Observation.Available)?.value?.inside == true -> Phase.REST
+        previous == Phase.REST || previous == Phase.DEPARTURE -> Phase.DEPARTURE
+        else -> Phase.DRIVE
     }
 
     private fun prepare(games: GameSessionFactory): ContractResult<Pair<GameIdentity, TrialDefinition>> {
@@ -89,7 +132,10 @@ internal object RestSimulationScenario {
         }
     }
 
-    internal fun frames(rules: RestRules): Sequence<Pair<DrivingFrame, Observation<RestAreaProof>>> = sequence {
+    internal fun frames(rules: RestRules): Sequence<Pair<DrivingFrame, Observation<RestAreaProof>>> =
+        samples(rules).map { it.frame to it.place }
+
+    private fun samples(rules: RestRules): Sequence<Sample> = sequence {
         val firstPark = rules.minDrivingMs + 1_000
         val departure = firstPark + rules.minParkedMs + 1_000
         val nextDriveMs = 100_000L
@@ -98,7 +144,7 @@ internal object RestSimulationScenario {
         for (elapsed in sampleTimes(departure, nextDriveMs)) yield(sample(elapsed, parked = false, inside = false))
         val lastPark = departure + nextDriveMs + 1_000
         yield(sample(lastPark, parked = true, inside = false))
-        yield(sample(lastPark + recordingPolicy.parkMs, parked = true, inside = false))
+        yield(sample(lastPark + recordingPolicy.parkMs, parked = true, inside = false, last = true))
     }
 
     private fun sampleTimes(start: Long, duration: Long): Sequence<Long> = sequence {
@@ -113,7 +159,7 @@ internal object RestSimulationScenario {
         }
     }
 
-    private fun sample(elapsed: Long, parked: Boolean, inside: Boolean): Pair<DrivingFrame, Observation<RestAreaProof>> {
+    private fun sample(elapsed: Long, parked: Boolean, inside: Boolean, last: Boolean = false): Sample {
         val utc = EpochMillis(epochBaseMs + elapsed)
         val raw = VehicleObservation(InputSource.SIMULATION, elapsed, utc,
             Observation.Available(if (parked) 0.0 else 10.0),
@@ -121,6 +167,6 @@ internal object RestSimulationScenario {
         val place = RestAreaProof("rest-simulation-area", RestPlace.SERVICE_AREA, ContentVersion("rest-simulation-v1"),
             "https://example.test/rest-simulation", "fixture-only", "2026-11-11",
             InputSource.SIMULATION, inside, elapsed, utc)
-        return DrivingFrame(raw, Observation.Available(ZoneId.of("UTC"))) to Observation.Available(place)
+        return Sample(DrivingFrame(raw, Observation.Available(ZoneId.of("UTC"))), Observation.Available(place), last)
     }
 }

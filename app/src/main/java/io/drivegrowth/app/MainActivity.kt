@@ -483,11 +483,14 @@ open class MainActivity : Activity() {
         super.onSaveInstanceState(outState)
     }
 
-    private fun allowed() = active &&
+    protected fun allowed() = active &&
         (session.simulation?.controlsAllowed ?: (interaction.state(SystemClock.elapsedRealtime()) == Observation.Available(VehicleInteraction.ALLOWED)))
+
+    protected open fun onControlsAvailabilityChanged(allowed: Boolean) = Unit
 
     private fun updateAccess() {
         val enabled = allowed()
+        onControlsAvailabilityChanged(enabled)
         session.results.setControlsEnabled(enabled && navigation.page == HostPage.RESULTS)
         queries.setControlsEnabled(enabled)
         session.progression.setControlsEnabled(enabled && navigation.page == HostPage.PROGRESSION)
