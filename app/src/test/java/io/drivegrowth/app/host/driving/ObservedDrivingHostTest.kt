@@ -26,4 +26,14 @@ class ObservedDrivingHostTest {
         host.start{callbacks++};host.accept(frame());host.stop();host.start{callbacks++};host.accept(frame())
         w.drain();m.drain();assertEquals(listOf("receiver-1","receiver-2"),tokens);assertEquals(1,callbacks)
     }
+    @Test fun completionWaitsForAcceptedWorkerWorkAndRunsAfterOldUiIsDetached() {
+        val worker=Queue();val main=Queue();val calls=mutableListOf<String>()
+        val host=ObservedDrivingHost(worker,main,{RecordingClock(200,EpochMillis(1100))},
+            {_,_,_->calls+="stored";ContractResult.Failure(ContractError.DATA_UNAVAILABLE)},
+            {_,_->ContractResult.Failure(ContractError.DATA_UNAVAILABLE)},{"receiver"})
+        host.start{calls+="old-ui"};host.accept(frame()){calls+="completed"};host.stop()
+        assertTrue(calls.isEmpty());worker.drain();assertEquals(listOf("stored"),calls)
+        main.drain();assertEquals(listOf("stored","completed"),calls)
+    }
+
 }

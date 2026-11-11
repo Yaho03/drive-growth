@@ -158,23 +158,26 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
             is ContractResult.Success -> r.value
         }
         val before = previous
-        val continuous = before != null && at.elapsedMs > before.first.elapsedMs &&
-            at.elapsedMs - before.first.elapsedMs <= policy.maxGapMs
-        if (!continuous) { parkCandidate = null; canConfirmEnd = false }
-        if (moving) { canConfirmEnd = true; parkCandidate = null; physicalEnd = null }
-        if (canConfirmEnd && state.parkSince == input.receivedElapsedMs) parkCandidate = at
-        if (tripOpen && state.trip == null && canConfirmEnd && parkCandidate != null && continuous) {
-            physicalEnd = parkCandidate; parkCandidate = null; canConfirmEnd = false
+        // 같은 원표본의 금융/도착 재시도는 motion 원점과 이미 보존한 span을 다시 만들지 않는다.
+        if (before?.first != at || latest != input) {
+            val continuous = before != null && at.elapsedMs > before.first.elapsedMs &&
+                at.elapsedMs - before.first.elapsedMs <= policy.maxGapMs
+            if (!continuous) { parkCandidate = null; canConfirmEnd = false }
+            if (moving) { canConfirmEnd = true; parkCandidate = null; physicalEnd = null }
+            if (canConfirmEnd && state.parkSince == input.receivedElapsedMs) parkCandidate = at
+            if (tripOpen && state.trip == null && canConfirmEnd && parkCandidate != null && continuous) {
+                physicalEnd = parkCandidate; parkCandidate = null; canConfirmEnd = false
+            }
+            latest = input; tripOpen = state.trip != null
+            val motion: Observation<RentalMotion> = when {
+                tripOpen -> Observation.Available(RentalMotion.Driving)
+                (input.gear as? Observation.Available)?.value == Gear.PARK && physicalEnd != null -> Observation.Available(RentalMotion.Parked(physicalEnd!!.epoch))
+                else -> Observation.Missing(MissingReason.NO_DATA)
+            }
+            visitFloor = before?.first ?: at
+            if (continuous) append(RentalTick(input.source, before.first, at, before.second))
+            previous = at to motion
         }
-        latest = input; tripOpen = state.trip != null
-        val motion: Observation<RentalMotion> = when {
-            tripOpen -> Observation.Available(RentalMotion.Driving)
-            (input.gear as? Observation.Available)?.value == Gear.PARK && physicalEnd != null -> Observation.Available(RentalMotion.Parked(physicalEnd!!.epoch))
-            else -> Observation.Missing(MissingReason.NO_DATA)
-        }
-        visitFloor = before?.first ?: at
-        if (continuous) append(RentalTick(input.source, before.first, at, before.second))
-        previous = at to motion
         if (needsResume) {
             if (resumeAt == null) resumeAt = at // 실제 SDK 재접속의 첫 원시 frame 경계. 재시도에서 교체하지 않는다.
             val boundary = when (val r = journal.currentInactive(checkNotNull(bound))) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }

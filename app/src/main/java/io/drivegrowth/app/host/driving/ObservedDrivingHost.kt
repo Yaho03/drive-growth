@@ -18,11 +18,14 @@ class ObservedDrivingHost(private val worker: Executor, private val main: Execut
         this.listener = listener
         return checkNotNull(receiver) // UI 응답 상관용이며 boot/clock domain으로 쓰지 않는다.
     }
-    fun accept(frame: DrivingFrame) {
+    fun accept(frame: DrivingFrame, completed: (() -> Unit)? = null) {
         val token = receiver ?: return
         worker.execute {
             val result = observe(token, frame, clock()) // 처리 지연을 원관측의 수신 시각으로 바꾸지 않는다.
-            main.execute { if (receiver == token) listener?.invoke(result) }
+            main.execute {
+                if (receiver == token) listener?.invoke(result)
+                completed?.invoke() // 시연 입력의 backpressure. 실제 관측 입력은 공급하지 않는다.
+            }
         }
     }
     fun stop() {

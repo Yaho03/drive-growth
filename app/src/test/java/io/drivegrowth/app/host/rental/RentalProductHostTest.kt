@@ -46,4 +46,13 @@ class RentalProductHostTest {
         assertEquals(listOf(true to actual, false to missing), calls)
         assertSame(actual, calls.first().second); assertSame(missing, calls.last().second)
     }
+    @Test fun sourceFailureIsTypedAndDoesNotCrashWorker() {
+        val worker=Queue();val main=Queue();var answer:ContractResult<RentalRuntimeSnapshot>?=null
+        val host=RentalProductHost(worker,main,{_,_->throw IllegalStateException("explicit fixture failure")},{},{},{_,_->ContractResult.Success(Unit)})
+        host.start("receiver"){answer=it};worker.drain()
+        val result=host.observed("receiver",frame,recorded);main.drain()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),result)
+        assertEquals(result,answer)
+    }
+
 }

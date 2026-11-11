@@ -68,7 +68,7 @@ import io.drivegrowth.core.contract.Revision
 import io.drivegrowth.core.contract.VehicleInteraction
 import io.drivegrowth.core.progression.VehicleAction
 
-class MainActivity : Activity() {
+open class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private val interaction = ForegroundInteraction()
     private var input: VehicleInput? = null
@@ -175,10 +175,16 @@ class MainActivity : Activity() {
         automaticIntroAllowed = if (savedInstanceState?.containsKey("onboardingAutoEntryAllowed") == true)
             savedInstanceState.getBoolean("onboardingAutoEntryAllowed") else savedInstanceState == null && lastNonConfigurationInstance == null
         val deliveryHandler = handler
-        session = lastNonConfigurationInstance as? HostSession ?: HostSession(applicationContext, { deliveryHandler.post(it) },
-            ResultsStateBundle.decode(savedInstanceState?.getBundle("results")),
-            OnboardingStateBundle.decode(savedInstanceState?.getBundle("onboardingHost")),
-            restoredShop, restoredFacility, failedShopRestore)
+        session = lastNonConfigurationInstance as? HostSession ?: HostSession(
+            context = applicationContext,
+            main = { deliveryHandler.post(it) },
+            restoredResults = ResultsStateBundle.decode(savedInstanceState?.getBundle("results")),
+            restoredOnboarding = OnboardingStateBundle.decode(savedInstanceState?.getBundle("onboardingHost")),
+            restoredShop = restoredShop,
+            restoredFacility = restoredFacility,
+            failedShopRestore = failedShopRestore,
+            simulation = io.drivegrowth.app.host.HostSimulationProvider.create(this),
+        )
         if (session.failedShopRestore == null) session.failedShopRestore = failedShopRestore
         failedShopRestore = session.failedShopRestore
         shop.restoreUiState(session.home.uiState)
@@ -287,7 +293,7 @@ class MainActivity : Activity() {
                 shop.completeRetry()
             }
         }
-        if (savedInstanceState == null) {
+        if (savedInstanceState == null && session.simulation == null) {
             val permissions = arrayOf("android.car.permission.CAR_SPEED", "android.car.permission.CAR_POWERTRAIN")
                 .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
             if (permissions.isNotEmpty()) requestPermissions(permissions.toTypedArray(), 1)
@@ -310,6 +316,8 @@ class MainActivity : Activity() {
         if (active) return
         active = true
         rentalFingerprint = null
+        session.simulation?.changed = { if (active) { updateAccess(); if (::chrome.isInitialized) render() } }
+        if (session.simulation?.clock() is ContractResult.Failure) { updateAccess(); return }
         val rentalReceiver = session.driving.start { result ->
             val status = when (result) {
                 is ContractResult.Failure -> {
@@ -369,7 +377,11 @@ class MainActivity : Activity() {
             if (state !is io.drivegrowth.app.ui.results.ResultsScreenState.Loading) results.completeRetry()
             if (::chrome.isInitialized) render()
         }
-        try {
+        if (session.simulation != null) {
+            session.attachSimulation { frame, done ->
+                if (active) { session.driving.accept(frame, done); updateAccess() }
+            }
+        } else try {
             input = VehicleInput(this, { observation ->
                 val zone = session.drivingCalendar.take(observation)
                 if (active) {
@@ -390,6 +402,8 @@ class MainActivity : Activity() {
     }
 
     private fun stopObserving() {
+        session.simulation?.stop()
+        session.simulation?.changed = null
         active = false // 새 UI/관측 입구를 먼저 닫고 SDK queue를 중단한다.
         input?.stop()
         input = null
@@ -470,7 +484,7 @@ class MainActivity : Activity() {
     }
 
     private fun allowed() = active &&
-        interaction.state(SystemClock.elapsedRealtime()) == Observation.Available(VehicleInteraction.ALLOWED)
+        (session.simulation?.controlsAllowed ?: (interaction.state(SystemClock.elapsedRealtime()) == Observation.Available(VehicleInteraction.ALLOWED)))
 
     private fun updateAccess() {
         val enabled = allowed()
@@ -534,8 +548,22 @@ class MainActivity : Activity() {
         onboarding.render(onboardingState, enabled)
         renderDelivery(enabled && navigation.page == HostPage.DELIVERY)
         chrome.removeAllViews()
+        session.simulation?.let { simulation ->
+            chrome.addView(style.text(simulation.status).apply { tag = "simulation:status" })
+            chrome.addView(style.button("모의주행 시작 · 논리 1시간") {
+                if (allowed() && navigation.page != HostPage.ONBOARDING) session.prepareSimulation { result ->
+                    if (allowed()) when (result) {
+                        is ContractResult.Failure -> simulation.rejected(result.error)
+                        is ContractResult.Success -> simulation.begin()
+                    }
+                }
+            }.apply {
+                tag = "simulation:start"; isEnabled = enabled && navigation.page != HostPage.ONBOARDING
+            })
+            if (simulation.canRetry) chrome.addView(style.button("같은 모의 입력 재시도") { simulation.retry() }.apply { tag = "simulation:retry" })
+        }
         if (!enabled) {
-            showBody(style.text("주차 후 조작이 허용되면 이용할 수 있습니다."))
+            showBody(style.text(if (session.simulation == null) "주차 후 조작이 허용되면 이용할 수 있습니다." else "명시 모의주행 중입니다. 완료 후 모의 주차 화면에서 결과를 확인하세요."))
             return
         }
         val token = ++navigationGeneration
@@ -648,6 +676,12 @@ class MainActivity : Activity() {
         deliveryBody.removeAllViews()
         val details = style.column()
         if (enabled) {
+            if (session.simulation != null) {
+                details.addView(style.text(session.deliveryNavigation.description.orEmpty()))
+                details.addView(style.button("시연 목적지 확인") {
+                    if (allowed() && session.deliveryNavigation.confirm() is ContractResult.Success) session.delivery.refresh()
+                }.apply { tag = "simulation:destination" })
+            } else {
             val raw = session.deliveryNavigation.snapshot
             val destination = raw?.destination as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
             val distance = raw?.remainingEstimatedMeters as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
@@ -665,6 +699,7 @@ class MainActivity : Activity() {
                 })
             }
             details.addView(style.text("실제 이동거리와 도착 상관 근거는 확인 대기예요. 프로필만으로 실차 주행을 확정하지 않아요."))
+            }
             val state = session.delivery.state
             val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
                 ?.associate { it.vehicleId to it.displayName }.orEmpty()
@@ -696,7 +731,7 @@ class MainActivity : Activity() {
                     }
                 }
                 details.addView(style.text(message))
-                details.addView(style.button("처리 결과 확인하고 새로 조회") { session.delivery.acknowledge() })
+                details.addView(style.button("처리 결과 확인하고 새로 조회") { session.delivery.acknowledge() }.apply { tag = "delivery:acknowledge" })
             }
             if (session.delivery.canCancelUnstarted == true)
                 details.addView(style.button("미실행 요청 취소 확인") { session.delivery.cancelUnstarted() })
