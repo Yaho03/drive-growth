@@ -208,7 +208,7 @@ class DecorationLedgerTest : InstrumentationTestCase() {
     }
     fun testSchema16UpgradeKeepsExistingRowsAndExplicitlyUnintroducedDecoration() {
         val before=rows().filterNot{it.startsWith("decoration_")};store.close();raw{stripDecorationFixture(it);it.version=16};store=open();ok(store.localProfileId())
-        assertEquals(before,rows().filterNot{it.startsWith("decoration_")});assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),store.decorations.state(profile));raw{assertEquals(18,it.version)}
+        assertEquals(before,rows().filterNot{it.startsWith("decoration_")});assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),store.decorations.state(profile));raw{assertEquals(19, it.version)}
         assertEquals(emptySet<String>(),activate().ownedIds);assertEquals(GameMoney(1000),ok(store.balance()))
     }
     fun testExistingSchema18MissingTableIsNotSilentlyRecreated() {

@@ -47,6 +47,13 @@ weekly-result-viewed,3,300
 weekly-vehicle-level-up,3,300
 weekly-rental-completed,3,300
 
+[achievement_rewards]
+id,version,trial,goal,reward
+owned-vehicles,achievement-trial-v1,true,2,100
+completed-customers,achievement-trial-v1,true,3,150
+shop-level,achievement-trial-v1,true,2,200
+collection-completion,achievement-trial-v1,true,5,150
+
 [provenance]
 key,value
 authorization,user-demo-trial-2026-11-10

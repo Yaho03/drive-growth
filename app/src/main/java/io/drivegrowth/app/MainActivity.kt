@@ -618,7 +618,7 @@ open class MainActivity : Activity() {
         }
         if (navigation.page == HostPage.PROGRESSION) {
             if (progressionRestoreFailed) chrome.addView(style.text("화면 상태를 복원하지 못해 저장 기록을 다시 확인합니다."))
-            chrome.addView(style.button("미시작 퀘스트 청구 취소 확인") { if (allowed()) session.progression.cancelSaved() })
+            chrome.addView(style.button("미시작 보상 청구 취소 확인") { if (allowed()) session.progression.cancelSaved() })
         }
         if (pendingRouteFailed)
             chrome.addView(style.button("보관 요청 종류를 다시 확인") { refreshPendingRoute() })
@@ -627,7 +627,7 @@ open class MainActivity : Activity() {
                 HostPage.GACHA -> "보관한 가챠 요청 확인"
                 HostPage.GARAGE -> "보관한 차량 관리 요청 확인"
                 HostPage.DELIVERY -> "보관한 탁송 요청 확인"
-                HostPage.PROGRESSION -> "보관한 퀘스트 청구 확인"
+                HostPage.PROGRESSION -> "보관한 보상 청구 확인"
                 else -> "보관한 가게 요청 확인"
             }) {
                 select(target)

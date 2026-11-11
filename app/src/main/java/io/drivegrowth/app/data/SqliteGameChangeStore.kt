@@ -10,6 +10,8 @@ import android.database.sqlite.SQLiteOpenHelper
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.decoration.*
 import io.drivegrowth.core.quest.QuestDefinitions
+import io.drivegrowth.core.achievement.ACHIEVEMENT_CLAIM_PREFIX
+import io.drivegrowth.core.achievement.AchievementMetric
 import io.drivegrowth.core.content.GameContentSnapshot
 import io.drivegrowth.core.garage.CollectionKey
 import io.drivegrowth.core.garage.VehicleHistoryStore
@@ -69,6 +71,7 @@ class SqliteGameChangeStore(
     private val initialization = InitializationLedger(this, initializationAuthority)
     fun localProfileId() = initialization.profileId()
     val quests = QuestLedger(this, ::localProfileId) { questDefinitions?.invoke() ?: ContractResult.Failure(ContractError.DATA_UNAVAILABLE) }
+    val achievements = AchievementLedger(this)
     val hostCommands = HostCommandCheckpointLedger(this)
     val decorations = SqliteDecorationLedger(this)
     override fun readInitialization(profileId: ProfileId) = initialization.readInitialization(profileId)
@@ -112,10 +115,26 @@ class SqliteGameChangeStore(
         }
     }
 
+    // 같은 직렬 쓰기 거래에서 검증된 기존 checkpoint를 처리하는 동안만 적용한다.
+    private var recoveringCheckpoint: HostCommandCheckpoint? = null
+
+    internal fun <T> recoverCheckpointNamespace(db: SQLiteDatabase, checkpoint: HostCommandCheckpoint, action: () -> T): T {
+        val command = checkpoint.command
+        if (!command.usesReservedAchievementNamespace) return action()
+        check(db.inTransaction() && recoveringCheckpoint == null)
+        recoveringCheckpoint = checkpoint
+        return try { action() } finally { recoveringCheckpoint = null }
+    }
+
     internal enum class RequestDomain { GENERAL, DELIVERY, DRIVING }
 
-    internal fun requestUnavailable(db: SQLiteDatabase, id: RequestId, questClaim: Boolean = false): Boolean =
-        requestOwners(db, id, questClaim, null)
+    internal fun requestUnavailable(db: SQLiteDatabase, id: RequestId, questClaim: Boolean = false, achievementClaim: Boolean = false): Boolean {
+        if (id.value.startsWith("achievement/") && !(achievementClaim && id.value.startsWith(ACHIEVEMENT_CLAIM_PREFIX))) {
+            val checkpoint = recoveringCheckpoint
+            if (checkpoint == null || checkpoint.command.requestId != id || checkpoint.phase != HostCheckpointPhase.SAVED) return true
+        }
+        return requestOwners(db, id, questClaim, null)
+    }
 
     /** 원문/전체 명령/금융 연결을 같은 거래에서 검증한 reader만 자기 원소유를 제외한다. */
     internal enum class OriginalRequestOwner { EXPANSION, DECORATION }
@@ -139,7 +158,8 @@ class SqliteGameChangeStore(
             "SELECT 1 FROM initialization_requests WHERE request_id=?",
             "SELECT 1 FROM first_gift_requests WHERE request_id=?",
             "SELECT 1 FROM first_gift_markers WHERE request_id=?",
-            "SELECT 1 FROM quest_claims WHERE request_id=?")
+            "SELECT 1 FROM quest_claims WHERE request_id=?",
+            "SELECT 1 FROM achievements WHERE request_id=?")
         return queries.any { sql ->
             val own = when (sql) {
                 "SELECT 1 FROM settlements WHERE request_id=?" -> owner != null
@@ -157,7 +177,7 @@ class SqliteGameChangeStore(
         if (domain == RequestDomain.DELIVERY && change.kind != TransactionKind.DELIVERY ||
             domain == RequestDomain.DRIVING && change.kind != TransactionKind.DRIVING)
             return failure(ContractError.INVALID_INPUT)
-        for (table in listOf("visits", "facility_command_results", "decoration_requests", "rest_departures", "gacha_requests", "delivery_requests", "material_requests", "repair_requests", "initialization_requests", "first_gift_requests", "first_gift_markers", "quest_claims")) {
+        for (table in listOf("visits", "facility_command_results", "decoration_requests", "rest_departures", "gacha_requests", "delivery_requests", "material_requests", "repair_requests", "initialization_requests", "first_gift_requests", "first_gift_markers", "quest_claims", "achievements")) {
             val key = if (table == "visits") "id" else "request_id"
             if (db.rawQuery("SELECT 1 FROM $table WHERE $key=?", arrayOf(id)).use { it.moveToFirst() })
                 return failure(ContractError.STATE_CONFLICT)
@@ -182,8 +202,14 @@ class SqliteGameChangeStore(
                 ContractResult.Success(readRecordedSettlement(db, change) ?: throw SQLiteException("기존 정산 누락"))
             else failure(ContractError.STATE_CONFLICT)
         }
-        // 기존 GENERAL 원명령 replay 뒤에만 신규 Quest namespace를 예약한다.
+        // 기존 GENERAL 원명령 replay 뒤에만 신규 요청의 namespace를 검사한다.
         if (id.startsWith("quest/")) return failure(ContractError.STATE_CONFLICT)
+        if (id.startsWith("achievement/")) {
+            val checkpoint = recoveringCheckpoint
+            val original = checkpoint?.command
+            if (checkpoint?.phase != HostCheckpointPhase.SAVED || original?.requestId != change.requestId ||
+                original is HostCheckpointCommand.Garage && original.value != change) return failure(ContractError.STATE_CONFLICT)
+        }
         if ((id.startsWith("delivery/") && domain != RequestDomain.DELIVERY) ||
             (id.startsWith("drive/") && domain != RequestDomain.DRIVING))
             return failure(ContractError.STATE_CONFLICT)
@@ -202,7 +228,8 @@ class SqliteGameChangeStore(
             }
         }
         var beforeGrowth: OwnedVehicle? = null
-        val vehicle = when (val write = change.vehicle) {
+        val write = change.vehicle
+        val vehicle = when (write) {
             null -> null
             is VehicleWrite.Add -> {
                 val initializedCapacity = initialization.capacityIfInitialized(db)
@@ -235,14 +262,29 @@ class SqliteGameChangeStore(
             Transaction(TransactionId(UUID.randomUUID().toString()), change.requestId, change.kind, change.source, change.ruleVersion, change.money),
             balance, vehicle, EpochMillis(clock()),
         )
+        if (beforeGrowth != null && vehicle != null && vehicle.lifecycle != VehicleLifecycle.OWNED) {
+            // 업적 도입 뒤 처음 처분하는 경우에도 아직 소유 중인 원 상태를 같은 거래에서 확인한다.
+            val observed = achievements.observe(db, setOf(AchievementMetric.OWNED))
+            if (observed is ContractResult.Failure) return observed
+        }
         db.execSQL("UPDATE account SET balance = ? WHERE id = 1", arrayOf(balance.units))
-        if (vehicle != null) writeVehicle(db, vehicle, change.vehicle is VehicleWrite.Add)
+        if (vehicle != null) writeVehicle(db, vehicle, write is VehicleWrite.Add)
         insertSettlement(db, change.requestId, command, result)
         if(beforeGrowth!=null && vehicle!=null && vehicle.level>beforeGrowth.level &&
             (findVehicle(db,vehicle.ownedVehicleId)!=vehicle || readBalance(db)!=result.balance))
             throw SQLiteException("성장 실제 개체/재화 쓰기 불일치")
         val event = quests.onVehicleChanged(db, beforeGrowth, vehicle, result)
         if (event is ContractResult.Failure) return event
+        if (write is VehicleWrite.Add && achievements.authority != null) {
+            if (findVehicle(db, write.vehicle.ownedVehicleId) != vehicle || readBalance(db) != result.balance)
+                throw SQLiteException("업적 원인 차량/재화 쓰기 불일치")
+            db.rawQuery("SELECT settlement_id,command,result FROM settlements WHERE request_id=?", arrayOf(id)).use {
+                if (!it.moveToFirst() || it.text(0) != result.settlementId.value || it.text(1) != command ||
+                    it.text(2) != LedgerJson.settlement(result).toString()) throw SQLiteException("업적 원인 정산 쓰기 불일치")
+            }
+            val recorded = achievements.observe(db, setOf(AchievementMetric.OWNED, AchievementMetric.COLLECTION))
+            if (recorded is ContractResult.Failure) return recorded
+        }
         return ContractResult.Success(result)
     }
 
@@ -273,7 +315,7 @@ class SqliteGameChangeStore(
     internal fun <T> readResult(query: (SQLiteDatabase) -> ContractResult<T>): ContractResult<T> =
         storage { query(helper.readableDatabase) }
 
-    private fun readVehicles(db: SQLiteDatabase): List<OwnedVehicle> =
+    internal fun readVehicles(db: SQLiteDatabase): List<OwnedVehicle> =
         db.rawQuery("SELECT payload FROM vehicles ORDER BY owned_id", null).use { cursor ->
             buildList { while (cursor.moveToNext()) add(LedgerJson.vehicle(JSONObject(cursor.getString(0)))) }
         }
@@ -364,7 +406,7 @@ internal enum class LedgerFailureReason { SQLITE, CORRUPT, UNSUPPORTED_SCHEMA, S
 private class LedgerStorageException(val reason: LedgerFailureReason) : SQLiteException(reason.name)
 
 private class LedgerHelper(context: Context, name: String, private val source: InputSource, private val initialGachaProgress: GachaProgress?, private val clock: () -> Long) : SQLiteOpenHelper(
-    context, name, null, 18,
+    context, name, null, 19,
     // Android 기본 핸들러의 손상 DB 삭제를 막고 원본을 보존한다.
     DatabaseErrorHandler { throw LedgerStorageException(LedgerFailureReason.CORRUPT) },
 ) {
@@ -396,13 +438,14 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         RestAtomicStorage.createTables(db)
         DecorationStorage.createTables(db, source)
         RentalBasisStorage.createTables(db)
+        AchievementLedger.createTables(db)
         initialGachaProgress?.let { GachaLedger.insertInitialProgress(db, it) }
     }
     private fun createDiscoveries(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE discoveries (vehicle_id TEXT NOT NULL, rarity TEXT NOT NULL, PRIMARY KEY(vehicle_id, rarity))")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion !in 1..17 || newVersion != 18) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
+        if (oldVersion !in 1..18 || newVersion != 19) throw LedgerStorageException(LedgerFailureReason.UNSUPPORTED_SCHEMA)
         verifySource(db)
         // 기존 원장과 개체 JSON은 그대로 보존한다.
         if (oldVersion == 1) RentalLedger.createTables(db)
@@ -430,7 +473,8 @@ private class LedgerHelper(context: Context, name: String, private val source: I
         if(oldVersion<15)FacilityCheckpointStorage.createTables(db)
         if(oldVersion<16)RestAtomicStorage.createTables(db)
         if(oldVersion<17)DecorationStorage.createTables(db, source)
-        RentalBasisStorage.createTables(db)
+        if (oldVersion < 18) RentalBasisStorage.createTables(db)
+        AchievementLedger.createTables(db)
     }
     /** 이 버전은 세 실제 사건 hook과 함께 공급한다. onCreate 재진입 없이 이미 발급한 profile을 전달한다. */
     private fun beginQuestTracking(db: SQLiteDatabase, fresh: Boolean) {

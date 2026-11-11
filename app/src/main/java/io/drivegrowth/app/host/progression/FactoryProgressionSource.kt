@@ -4,6 +4,7 @@ import io.drivegrowth.app.data.RestDrivingProjection
 import io.drivegrowth.app.host.*
 import io.drivegrowth.app.ui.progress.*
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.achievement.*
 import io.drivegrowth.core.quest.*
 import java.util.Collections
 import java.util.UUID
@@ -12,7 +13,9 @@ import java.util.UUID
 data class ProgressionBackend(val quests: QuestChangeStore,
     val lookup: (RequestId) -> ContractResult<QuestClaimSettlement?>,
     val journal: ProgressionJournal?,
-    val readRest: (() -> ContractResult<RestDrivingProjection>)? = null)
+    val readRest: (() -> ContractResult<RestDrivingProjection>)? = null,
+    val readAchievements: (() -> ContractResult<List<AchievementProgress>>)? = null,
+    val lookupAchievement: ((RequestId) -> ContractResult<AchievementClaimSettlement?>)? = null)
 
 /** worker 전용. 같은 GameSessionFactory를 열고 모든 경로에서 닫는다. 새 지갑/DB/Quest 정의를 만들지 않는다. */
 class FactoryProgressionSource(private val games: GameSessionFactory,
@@ -26,6 +29,7 @@ class FactoryProgressionSource(private val games: GameSessionFactory,
         this(games, { session -> storedQuestProgressionBackend(session, readRest?.let { reader -> { reader(session) } }) }, now)
 
     private val offers = linkedMapOf<ProgressKey, QuestClaimCommand>()
+    private val achievementOffers = linkedMapOf<ProgressKey, AchievementClaimCommand>()
     private fun <T> use(identity: GameIdentity? = null, action: (GameSession, ProgressionBackend) -> ContractResult<T>): ContractResult<T> =
         when (val opened = games.open()) {
             is ContractResult.Failure -> opened
@@ -45,8 +49,26 @@ class FactoryProgressionSource(private val games: GameSessionFactory,
             if (!matches(identity, pending.command)) return@use failure(ContractError.INVALID_INPUT)
             return@use withRest(ProgressionRead(identity, emptyList(), emptyMap(), pending, true))
         }
+        if (pending is ProgressionJournalState.Achievement) {
+            if (!matches(identity, pending.command)) return@use failure(ContractError.INVALID_INPUT)
+            return@use withRest(ProgressionRead(identity, emptyList(), emptyMap(), pending, true))
+        }
         val recovered = linkedMapOf<ClaimReference, QuestClaimSettlement?>()
+        val recoveredAchievements = linkedMapOf<ClaimReference, AchievementClaimSettlement?>()
         for (reference in references) {
+            if (reference.requestKey.startsWith(ACHIEVEMENT_CLAIM_PREFIX)) {
+                val lookup = access.lookupAchievement ?: return@use failure(ContractError.DATA_UNAVAILABLE)
+                val receipt = when (val read = lookup(RequestId(reference.requestKey))) {
+                    is ContractResult.Failure -> return@use read
+                    is ContractResult.Success -> read.value
+                }
+                if (receipt != null && (!validReceipt(identity, receipt.command, receipt) ||
+                        achievementKey(receipt.command.milestone.definition.metric) != reference.key ||
+                        receipt.command.requestId.value != reference.requestKey)) return@use failure(ContractError.STORAGE_FAILURE)
+                recoveredAchievements[reference] = receipt
+                achievementOffers.entries.removeAll { it.value.requestId.value == reference.requestKey }
+                continue
+            }
             if (!reference.requestKey.startsWith("quest/claim/")) return@use failure(ContractError.INVALID_INPUT)
             val receipt = when (val read = access.lookup(RequestId(reference.requestKey))) { is ContractResult.Failure -> return@use read; is ContractResult.Success -> read.value }
             if (receipt != null && (!validReceipt(identity, receipt.command, receipt) || progressKey(receipt.progress) != reference.key))
@@ -54,10 +76,11 @@ class FactoryProgressionSource(private val games: GameSessionFactory,
             recovered[reference] = receipt
             offers.entries.removeAll { it.value.requestId.value == reference.requestKey }
         }
-        if (recovered.isNotEmpty()) {
+        if (recovered.isNotEmpty() || recoveredAchievements.isNotEmpty()) {
             val original = recovered.values.filterNotNull().map { it.progress }.distinctBy(::progressKey)
             return@use withRest(ProgressionRead(identity, Collections.unmodifiableList(original), emptyMap(), pending,
-                access.journal != null, Collections.unmodifiableMap(recovered)))
+                access.journal != null, Collections.unmodifiableMap(recovered),
+                resolvedAchievements = Collections.unmodifiableMap(recoveredAchievements)))
         }
         when (val initialized = initialized(session)) { is ContractResult.Failure -> return@use initialized; else -> Unit }
         val states = when (val read = access.quests.read(identity.profileId, now())) { is ContractResult.Failure -> return@use read; is ContractResult.Success -> read.value }
@@ -72,9 +95,21 @@ class FactoryProgressionSource(private val games: GameSessionFactory,
         }
         if (active.values.map { it.requestId }.toSet().size != active.size) return@use failure(ContractError.STATE_CONFLICT)
         offers.clear(); offers.putAll(active)
+        val achievements = access.readAchievements?.invoke()
+        val ready = linkedMapOf<ProgressKey, AchievementClaimCommand>()
+        if (achievements is ContractResult.Success) for (progress in achievements.value) {
+            val milestone = progress.milestone ?: continue
+            if (milestone.profileId != identity.profileId || milestone.source != identity.source) return@use failure(ContractError.INVALID_INPUT)
+            if (progress.status != AchievementStatus.CLAIMABLE) continue
+            val key = achievementKey(progress.definition.metric)
+            val prior = achievementOffers[key]?.takeIf { it.milestone == milestone }
+            ready[key] = prior ?: AchievementClaimCommand(RequestId(ACHIEVEMENT_CLAIM_PREFIX + UUID.randomUUID()), milestone)
+        }
+        achievementOffers.clear(); achievementOffers.putAll(ready)
         withRest(ProgressionRead(identity, Collections.unmodifiableList(ArrayList(states)),
             Collections.unmodifiableMap(LinkedHashMap(active)), pending, access.journal != null,
-            Collections.unmodifiableMap(recovered)))
+            Collections.unmodifiableMap(recovered), achievements = achievements,
+            achievementOffers = Collections.unmodifiableMap(ready)))
     }
     override fun save(identity: GameIdentity, command: QuestClaimCommand): ContractResult<Unit> = use(identity) { session, access ->
         if (!matches(identity, command)) return@use failure(ContractError.INVALID_INPUT)
@@ -84,6 +119,7 @@ class FactoryProgressionSource(private val games: GameSessionFactory,
             is ContractResult.Success -> when (val state = prior.value) {
                 ProgressionJournalState.Foreign -> return@use failure(ContractError.STATE_CONFLICT)
                 is ProgressionJournalState.Quest -> return@use if (state.command == command) journal.save(command) else failure(ContractError.STATE_CONFLICT)
+                is ProgressionJournalState.Achievement -> return@use failure(ContractError.STATE_CONFLICT)
                 ProgressionJournalState.Clear -> Unit
             }
         }
@@ -120,6 +156,66 @@ class FactoryProgressionSource(private val games: GameSessionFactory,
         }
         journal.cancelSaved(command)
     }
+    override fun save(identity: GameIdentity, command: AchievementClaimCommand): ContractResult<Unit> = use(identity) { session, access ->
+        if (!matches(identity, command)) return@use failure(ContractError.INVALID_INPUT)
+        val journal = access.journal ?: return@use failure(ContractError.DATA_UNAVAILABLE)
+        when (val read = journal.load()) {
+            is ContractResult.Failure -> return@use read
+            is ContractResult.Success -> when (val pending = read.value) {
+                is ProgressionJournalState.Achievement -> return@use if (pending.command == command) journal.save(command) else failure(ContractError.STATE_CONFLICT)
+                ProgressionJournalState.Clear -> Unit
+                else -> return@use failure(ContractError.STATE_CONFLICT)
+            }
+        }
+        val initialized = initialized(session)
+        if (initialized is ContractResult.Failure) return@use initialized
+        if (achievementOffers[achievementKey(command.milestone.definition.metric)] != command)
+            return@use failure(ContractError.STATE_CONFLICT)
+        journal.save(command)
+    }
+
+    override fun execute(identity: GameIdentity, command: AchievementClaimCommand): ContractResult<AchievementClaimSettlement> = use(identity) { _, access ->
+        if (!matches(identity, command)) return@use failure(ContractError.INVALID_INPUT)
+        val journal = access.journal ?: return@use failure(ContractError.DATA_UNAVAILABLE)
+        val pending = when (val loaded = journal.load()) {
+            is ContractResult.Failure -> return@use loaded
+            is ContractResult.Success -> loaded.value
+        }
+        if (pending !is ProgressionJournalState.Achievement || pending.command != command)
+            return@use failure(ContractError.STATE_CONFLICT)
+        val lookup = access.lookupAchievement ?: return@use failure(ContractError.DATA_UNAVAILABLE)
+        val receipt = when (val executed = journal.execute(command)) {
+            is ContractResult.Failure -> return@use executed
+            is ContractResult.Success -> executed.value
+        }
+        if (!validReceipt(identity, command, receipt)) return@use failure(ContractError.STORAGE_FAILURE)
+        when (val stored = lookup(command.requestId)) {
+            is ContractResult.Failure -> return@use stored
+            is ContractResult.Success -> if (stored.value != receipt) return@use failure(ContractError.STORAGE_FAILURE)
+        }
+        when (val finished = journal.finish(command)) {
+            is ContractResult.Failure -> finished
+            is ContractResult.Success -> ContractResult.Success(receipt)
+        }
+    }
+
+    override fun cancelSaved(identity: GameIdentity, command: AchievementClaimCommand): ContractResult<Unit> = use(identity) { _, access ->
+        if (!matches(identity, command)) return@use failure(ContractError.INVALID_INPUT)
+        val journal = access.journal ?: return@use failure(ContractError.DATA_UNAVAILABLE)
+        journal.cancelSaved(command)
+    }
+
+    private fun matches(identity: GameIdentity, command: AchievementClaimCommand) =
+        command.profileId == identity.profileId && command.source == identity.source
+
+    private fun validReceipt(identity: GameIdentity, command: AchievementClaimCommand, receipt: AchievementClaimSettlement): Boolean {
+        val tx = receipt.settlement.transaction
+        val definition = command.milestone.definition
+        return matches(identity, command) && receipt.command == command && tx.requestId == command.requestId &&
+            tx.source == command.source && tx.kind == TransactionKind.GARAGE && tx.ruleVersion == definition.version &&
+            tx.money == MoneyChange(MoneyDirection.CREDIT, definition.reward) && receipt.settlement.changedVehicle == null
+    }
+
     private fun initialized(session: GameSession): ContractResult<Unit> = when (val read = session.store.readInitialization(session.identity.profileId)) {
         is ContractResult.Failure -> read
         is ContractResult.Success -> if (read.value.status is ProfileInitializationStatus.Existing) ContractResult.Success(Unit)

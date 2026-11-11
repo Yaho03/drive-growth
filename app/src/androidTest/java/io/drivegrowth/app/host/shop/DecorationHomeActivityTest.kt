@@ -339,7 +339,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
         val tables = listOf("host_command_checkpoint", "decoration_requests", "settlements")
         buildList {
             db.rawQuery("PRAGMA user_version", null).use {
-                it.moveToFirst(); assertEquals(18, it.getInt(0)); add("schema:${it.getInt(0)}")
+                it.moveToFirst(); assertEquals(19, it.getInt(0)); add("schema:${it.getInt(0)}")
             }
             for (table in tables) db.rawQuery("SELECT * FROM $table ORDER BY rowid", null).use { cursor ->
                 while (cursor.moveToNext()) add(table + ":" + (0 until cursor.columnCount).joinToString("|") {

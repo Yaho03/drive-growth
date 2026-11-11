@@ -3,6 +3,7 @@ package io.drivegrowth.app.data
 import io.drivegrowth.app.host.shop.ShopExpansionDefinition
 import io.drivegrowth.app.host.shop.parseShopExpansionDefinition
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.achievement.*
 import io.drivegrowth.core.rental.*
 import io.drivegrowth.core.delivery.*
 import io.drivegrowth.core.driving.DrivingIncomeRules
@@ -17,6 +18,8 @@ class TrialDefinition internal constructor(
     val expansions: ShopExpansionDefinition, rates: Map<VehicleId,GameMoney>, facilities: Map<Facility,FacilityOffer>,
     val fuelBonusPerRental: GameMoney, quests: Map<String,TrialQuestNumbers>, provenance: Map<String,String>,
     internal val delivery: TrialDeliveryRules, internal val driving: DrivingIncomeRules, internal val rental:TrialRentalInputs,internal val rest:RestRules,internal val restPricing:RestPricingPolicy,
+    achievements: ContractResult<Map<AchievementMetric, AchievementDefinition>> =
+        ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
 ) {
     val version get()=expansions.version
     val rules get()=expansions.rules
@@ -24,6 +27,10 @@ class TrialDefinition internal constructor(
     val rentalRates: Map<VehicleId,GameMoney> = Collections.unmodifiableMap(LinkedHashMap(rates))
     val facilityOffers: Map<Facility,FacilityOffer> = Collections.unmodifiableMap(LinkedHashMap(facilities))
     val questRewards: Map<String,TrialQuestNumbers> = Collections.unmodifiableMap(LinkedHashMap(quests))
+    val achievementDefinitions: ContractResult<Map<AchievementMetric, AchievementDefinition>> = when (achievements) {
+        is ContractResult.Failure -> achievements
+        is ContractResult.Success -> ContractResult.Success(Collections.unmodifiableMap(LinkedHashMap(achievements.value)))
+    }
     val provenance: Map<String,String> = Collections.unmodifiableMap(LinkedHashMap(provenance))
     fun deliveryRules():ContractResult<DeliveryRules> = ContractResult.Success(delivery.proposal)
     fun deliveryChangeRules():ContractResult<DeliveryChangeRules> = ContractResult.Success(delivery.change)
@@ -56,10 +63,18 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
         for(line in lines.drop(marker)) {
             if(line.startsWith("[")) {
                 require(line.endsWith("]"));val name=line.substring(1,line.length-1)
-                require(name in names && name !in sections);sections[name]=mutableListOf();current=name
+                if (name == "achievement_rewards") {
+                    // 중복 업적 섹션은 업적 정의만 거절하도록 표식한다.
+                    if (name in sections) sections.getValue(name).add(emptyList())
+                    else sections[name] = mutableListOf()
+                } else {
+                    require(name in names && name !in sections)
+                    sections[name] = mutableListOf()
+                }
+                current = name
             } else sections.getValue(checkNotNull(current)).add(line.split(',').map(String::trim))
         }
-        require(sections.keys==names)
+        require(sections.keys - "achievement_rewards" == names)
         fun number(value:String):Long { require(value.matches(Regex("0|[1-9][0-9]*")));return value.toLong() }
         fun <K,V> records(name:String,header:List<String>,read:(List<String>)->Pair<K,V>):Map<K,V> {
             val rows=sections.getValue(name);require(rows.size>1 && rows.first()==header)
@@ -80,6 +95,7 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
             require(it[0].isNotBlank());val goal=number(it[1]);require(goal<=Int.MAX_VALUE)
             it[0] to TrialQuestNumbers(goal.toInt(),GameMoney(number(it[2])))
         }
+        val achievements = parseAchievementDefinitions(sections["achievement_rewards"])
         val provenance=records("provenance",listOf("key","value")) {require(it[1].isNotBlank());it[0] to it[1]}
         require(provenance.keys==setOf("authorization","prior_agreement","balance_status","quest_ids"))
         fun scalar(name:String,keys:Set<String>):Map<String,String> {
@@ -125,7 +141,25 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
         val pricing=RestPricingPolicy.entries.singleOrNull{it.id==rest.getValue("pricing_policy")}?:throw IllegalArgumentException("휴식 가격 기술 정책")
         ContractResult.Success(TrialDefinition(expansion,rates,facilities,GameMoney(number(fuel[0][1])),quests,provenance,delivery,
             DrivingIncomeRules(expansion.rules,drive.n("daily_cap_meters"),GameMoney(drive.n("income_per_km"))),rental,
-            RestRules(expansion.rules,rest.n("min_driving_ms"),rest.n("min_parked_ms"),rest.n("bonus_duration_ms"),rest.i("bonus_percent")),pricing))
+            RestRules(expansion.rules,rest.n("min_driving_ms"),rest.n("min_parked_ms"),rest.n("bonus_duration_ms"),rest.i("bonus_percent")),pricing, achievements))
     } catch (_:IllegalArgumentException) { ContractResult.Failure(ContractError.INVALID_INPUT) }
       catch (_:IllegalStateException) { ContractResult.Failure(ContractError.INVALID_INPUT) }
+}
+
+
+private fun parseAchievementDefinitions(rows: List<List<String>>?): ContractResult<Map<AchievementMetric, AchievementDefinition>> {
+    if (rows == null) return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+    return try {
+        require(rows.firstOrNull() == listOf("id", "version", "trial", "goal", "reward"))
+        val definitions = linkedMapOf<AchievementMetric, AchievementDefinition>()
+        for (row in rows.drop(1)) {
+            require(row.size == 5 && row[2] == "true" && row[3].matches(Regex("[1-9][0-9]*")) &&
+                row[4].matches(Regex("[1-9][0-9]*")))
+            val metric = AchievementMetric.entries.singleOrNull { it.id == row[0] } ?: throw IllegalArgumentException("업적 ID")
+            val definition = AchievementDefinition(metric, RuleVersion(row[1]), row[3].toInt(), GameMoney(row[4].toLong()), true)
+            require(definitions.put(metric, definition) == null)
+        }
+        require(definitions.keys == AchievementMetric.entries.toSet() && definitions.values.map { it.version }.distinct().size == 1)
+        ContractResult.Success(definitions)
+    } catch (_: IllegalArgumentException) { ContractResult.Failure(ContractError.INVALID_INPUT) }
 }

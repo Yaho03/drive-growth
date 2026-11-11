@@ -1,6 +1,7 @@
 package io.drivegrowth.app.data
 
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.achievement.*
 import io.drivegrowth.core.rental.ShopExpansion
 import io.drivegrowth.core.rental.FacilityOffer
 import io.drivegrowth.core.garage.VehicleRef
@@ -14,6 +15,7 @@ sealed interface HostCheckpointCommand {
     data class Material(val value: MaterialCommand) : HostCheckpointCommand
     data class Repair(val value: RepairCommand) : HostCheckpointCommand
     data class Quest(val value:QuestClaimCommand):HostCheckpointCommand
+    data class Achievement(val value: AchievementClaimCommand) : HostCheckpointCommand
     data class Decoration(val value:DecorationCommand):HostCheckpointCommand
     data class Delivery(val contentVersion:ContentVersion,val source:InputSource,val operation:DeliveryCheckpointOperation):HostCheckpointCommand
     data class Expand(val requestId: RequestId, val source: InputSource,
@@ -38,12 +40,17 @@ sealed interface HostCheckpointResult {
     data class Material(val value: MaterialSettlement) : HostCheckpointResult
     data class Repair(val value: RepairSettlement) : HostCheckpointResult
     data class Quest(val value:QuestClaimSettlement):HostCheckpointResult
+    data class Achievement(val value: AchievementClaimSettlement) : HostCheckpointResult
     data class Decoration(val value:DecorationSettlement):HostCheckpointResult
     data class Delivery(val value:DeliveryCheckpointReceipt):HostCheckpointResult
     data class Expand(val value: Settlement) : HostCheckpointResult
     data class FacilityPurchase(val value:Settlement):HostCheckpointResult
     data class VehicleResting(val value:VehicleRestingReceipt):HostCheckpointResult
 }
+
+/** 신규 저장에만 적용한다. 이전 버전의 정규 원문은 형식·소유권을 별도로 검증한다. */
+internal val HostCheckpointCommand.usesReservedAchievementNamespace: Boolean
+    get() = this !is HostCheckpointCommand.Achievement && requestId.value.startsWith("achievement/")
 
 internal fun HostCheckpointCommand.validFor(source: InputSource): Boolean {
     if (origin != source || requestId.value.startsWith("delivery/") || requestId.value.startsWith("drive/") || (requestId.value.startsWith("quest/") && this !is HostCheckpointCommand.Quest)) return false
@@ -60,6 +67,7 @@ internal fun HostCheckpointCommand.validFor(source: InputSource): Boolean {
             is DeliveryCheckpointOperation.Abandon -> true
         }
         is HostCheckpointCommand.Quest -> value.source==source
+        is HostCheckpointCommand.Achievement -> value.source == source
         is HostCheckpointCommand.Decoration -> value.source==source
         is HostCheckpointCommand.Material -> true
         is HostCheckpointCommand.Expand -> true
@@ -74,6 +82,7 @@ internal val HostCheckpointCommand.origin: InputSource get() = when(this) {
     is HostCheckpointCommand.Material -> value.source
     is HostCheckpointCommand.Repair -> value.source
     is HostCheckpointCommand.Quest -> value.source
+    is HostCheckpointCommand.Achievement -> value.source
     is HostCheckpointCommand.Decoration -> value.source
     is HostCheckpointCommand.Delivery -> source
     is HostCheckpointCommand.Expand -> source
@@ -87,6 +96,7 @@ internal val HostCheckpointCommand.content: ContentVersion get() = when(this) {
     is HostCheckpointCommand.Repair -> value.contentVersion
     // Quest는 차량 콘텐츠를 소비하지 않으므로 envelope에는 실제 Quest 정의 버전을 교차 대조한다.
     is HostCheckpointCommand.Quest -> ContentVersion(value.definition.version.value)
+    is HostCheckpointCommand.Achievement -> value.milestone.measure.contentVersion ?: ContentVersion(value.milestone.definition.version.value)
     is HostCheckpointCommand.Decoration -> ContentVersion(value.ruleVersion.value)
     is HostCheckpointCommand.Delivery -> contentVersion
     is HostCheckpointCommand.Expand -> definitionVersion
@@ -99,6 +109,7 @@ internal val HostCheckpointCommand.rule: RuleVersion get() = when(this) {
     is HostCheckpointCommand.Material -> value.ruleVersion
     is HostCheckpointCommand.Repair -> value.ruleVersion
     is HostCheckpointCommand.Quest -> value.definition.version
+    is HostCheckpointCommand.Achievement -> value.milestone.definition.version
     is HostCheckpointCommand.Decoration -> value.ruleVersion
     is HostCheckpointCommand.Delivery -> when(val op=operation) {
         is DeliveryCheckpointOperation.Select->op.proposed.list.ruleVersion
@@ -117,6 +128,7 @@ internal val HostCheckpointCommand.requestId: RequestId get() = when(this) {
     is HostCheckpointCommand.Material -> value.requestId
     is HostCheckpointCommand.Repair -> value.requestId
     is HostCheckpointCommand.Quest -> value.requestId
+    is HostCheckpointCommand.Achievement -> value.requestId
     is HostCheckpointCommand.Decoration -> value.requestId
     is HostCheckpointCommand.Delivery -> operation.requestId
     is HostCheckpointCommand.Expand -> requestId

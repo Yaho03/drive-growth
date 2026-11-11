@@ -4,6 +4,7 @@
         <activity android:name=".simulation.RestSimulationActivity" android:exported="false">
             <meta-data android:name="distractionOptimized" android:value="false" />
         </activity>
+        <activity android:name="io.drivegrowth.app.ui.progress.ProgressScrollTestActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter tools:node="removeAll" />
         </activity>
