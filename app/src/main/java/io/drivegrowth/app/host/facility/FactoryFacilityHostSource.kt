@@ -29,7 +29,7 @@ class FactoryFacilityHostSource(context:Context,private val games:GameSessionFac
         }
     override fun pending()=use { game->journal?.pending(game)?:ContractResult.Success(FacilityPending.Unsupported) }
     override fun read()=use { game->read(game) }
-    private fun read(game:GameSession):ContractResult<FacilityFacts> {
+    internal fun read(game:GameSession):ContractResult<FacilityFacts> {
         val definition=when(val r=definitions.load()){is ContractResult.Failure->return r;is ContractResult.Success->r.value}
         val shop=when(val r=game.store.rental.shop()){is ContractResult.Failure->return r;is ContractResult.Success->r.value}
         val balance=when(val r=game.store.balance()){is ContractResult.Failure->return r;is ContractResult.Success->r.value}

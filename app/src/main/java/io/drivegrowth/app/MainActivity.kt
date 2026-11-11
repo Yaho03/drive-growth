@@ -24,9 +24,6 @@ import io.drivegrowth.app.host.garage.GarageCommandHost
 import io.drivegrowth.app.host.garage.GarageCommandState
 import io.drivegrowth.app.host.garage.GarageCommandView
 import io.drivegrowth.app.host.garage.GarageActionAvailability
-import io.drivegrowth.app.host.shop.ShopExpansionHostController
-import io.drivegrowth.app.host.shop.ShopExpansionAccess
-import io.drivegrowth.app.host.shop.SessionShopExpansionSource
 import io.drivegrowth.app.ui.shop.ShopScreenState
 import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.app.ui.shop.ShopEvent
@@ -84,18 +81,14 @@ class MainActivity : Activity() {
     private var managementState: GarageCommandState = GarageCommandState.Idle
     private var recoveredManagement = false
     private var managementVisible = false
-    private lateinit var expansionSource: SessionShopExpansionSource
-    private lateinit var expansionHost: ShopExpansionHostController
-    private lateinit var expansionAccess: ShopExpansionAccess
-    private var expansionState: ShopScreenState = ShopScreenState.Loading
     private lateinit var facilityControls: io.drivegrowth.app.ui.shop.FacilityControlsView
     private lateinit var facilityHome: LinearLayout
-    private var displayedFacilityShop: ShopScreenState.Content? = null
-    private var facilityUiRequest: io.drivegrowth.app.ui.shop.ShopRequest? = null
     private var pendingPage: HostPage? = null
     private var pendingRouteGeneration = 0L
     private var pendingRouteFailed = false
     private var pendingRouteEnabled = false
+    private var failedShopRestore: Bundle? = null
+    private val shopRestoreFailed get() = failedShopRestore != null
     private lateinit var shop: ShopView
     private lateinit var progression: io.drivegrowth.app.ui.progress.ProgressView
     private var progressionFrame: io.drivegrowth.app.host.progression.ProgressionFrame? = null
@@ -152,8 +145,23 @@ class MainActivity : Activity() {
                 LinearLayout.LayoutParams(-1, style.dp(220)))
         }
         val shopMode = ShopMode.entries.firstOrNull { it.name == savedInstanceState?.getString("shopMode") } ?: ShopMode.OVERALL
-        shop.restoreUiState(ShopUiState(mode = shopMode, sceneScrollY = savedInstanceState?.getInt("shopSceneY", 0) ?: 0,
-            controlsScrollY = savedInstanceState?.getInt("shopControlsY", 0) ?: 0))
+        var restoredFacility: io.drivegrowth.app.host.facility.FacilityCommand.Buy? = null
+        val restoredShop = if (savedInstanceState?.containsKey("shopUi") == true) {
+            val bundle = savedInstanceState.getBundle("shopUi")
+            val decoded = io.drivegrowth.app.host.shop.ShopUiStateBundle.decodePresent(bundle)
+            val original = io.drivegrowth.app.host.shop.ShopUiStateBundle.decodeFacility(bundle)
+            if (decoded is ContractResult.Success && original is ContractResult.Success) {
+                restoredFacility = original.value
+                decoded.value
+            } else {
+                // 잘못된 shopUi만 보존하고 다른 화면의 저장 상태는 현재 값으로 갱신한다.
+                failedShopRestore = Bundle(savedInstanceState).apply {
+                    keySet().filter { it != "shopUi" }.forEach(::remove)
+                }
+                ShopUiState()
+            }
+        } else ShopUiState(mode = shopMode, sceneScrollY = savedInstanceState?.getInt("shopSceneY", 0) ?: 0,
+            controlsScrollY = savedInstanceState?.getInt("shopControlsY", 0) ?: 0)
         ranking = RankingView(this) {
             if (allowed() && navigation.page == HostPage.RANKING) session.ranking.refresh()
             else { updateAccess(); ranking.render(RankingState.Restricted, false) }
@@ -169,7 +177,11 @@ class MainActivity : Activity() {
         val deliveryHandler = handler
         session = lastNonConfigurationInstance as? HostSession ?: HostSession(applicationContext, { deliveryHandler.post(it) },
             ResultsStateBundle.decode(savedInstanceState?.getBundle("results")),
-            OnboardingStateBundle.decode(savedInstanceState?.getBundle("onboardingHost")))
+            OnboardingStateBundle.decode(savedInstanceState?.getBundle("onboardingHost")),
+            restoredShop, restoredFacility, failedShopRestore)
+        if (session.failedShopRestore == null) session.failedShopRestore = failedShopRestore
+        failedShopRestore = session.failedShopRestore
+        shop.restoreUiState(session.home.uiState)
         progression = io.drivegrowth.app.ui.progress.ProgressView(this) { event ->
             if (allowed() && navigation.page == HostPage.PROGRESSION) session.progression.handle(event) else updateAccess()
         }
@@ -189,29 +201,11 @@ class MainActivity : Activity() {
         gacha = GachaView(this, ::onGachaEvent, session.gacha.uiState)
         results.restoreUiState(session.results.uiState)
         queries = session.queries
-        expansionSource = SessionShopExpansionSource(applicationContext, session.games)
-        expansionHost = ShopExpansionHostController(expansionSource, session::expansionWorker,
-            { handler.post(it) }, { state, _ ->
-                expansionState = state
-                if (state is ShopScreenState.Content && shop.uiState.pending?.selection?.option?.command is io.drivegrowth.app.ui.shop.ShopCommand.Expand)
-                    shop.restoreUiState(shop.uiState.copy(pending = null, selection = null, message = "최신 저장 상태를 표시합니다."))
-                if (::body.isInitialized) render()
-            }, shop::complete, shop::completeRetry, committed = { if (allowed()) queries.refresh() },
-            initialRevision = shop.uiState.latestRevision ?: Revision(0))
-        expansionAccess = ShopExpansionAccess(expansionHost)
-        session.facility.changed = { state, _ ->
-            facilityUiRequest?.let { original ->
-                val receipt = state.receipt as? io.drivegrowth.app.host.facility.FacilityReceipt.Purchased
-                if (receipt?.command?.requestId == original.requestId &&
-                    receipt.command.offer == (original.selection.option.command as? io.drivegrowth.app.ui.shop.ShopCommand.BuyFacility)?.offer) {
-                    shop.complete(original, ContractResult.Success(Unit)); facilityUiRequest = null
-                    if (allowed()) queries.refresh()
-                } else if (!state.busy && state.error != null) {
-                    shop.complete(original, ContractResult.Failure(state.error)); facilityUiRequest = null
-                }
-            }
+        session.home.attach({ _, _ -> if (::body.isInitialized) render() }, { request, result ->
+            shop.complete(request, result)
+            if (result is ContractResult.Success && allowed()) { queries.refresh(); refreshPendingRoute() }
             if (::body.isInitialized) render()
-        }
+        }, shop::completeRetry)
         management = GarageCommandHost(applicationContext, { handler.post(it) }, session.games) { state ->
             val prior = managementState
             managementState = state
@@ -431,8 +425,8 @@ class MainActivity : Activity() {
         delivery.release()
         pendingRouteGeneration++
         session.ranking.detach()
-        session.facility.changed = null
-        expansionHost.release()
+        session.home.remember(shop.uiState)
+        session.home.detach()
         management.release()
         queries.detach()
         session.gacha.remember(gacha.uiState)
@@ -457,6 +451,10 @@ class MainActivity : Activity() {
         outState.putString("rankingMode", ranking.uiState.mode.name)
         outState.putString("rankingMetric", ranking.uiState.metric.name)
         outState.putInt("rankingY", ranking.uiState.scrollY)
+        failedShopRestore?.let(outState::putAll) ?: run {
+            session.home.remember(shop.uiState)
+            outState.putBundle("shopUi", io.drivegrowth.app.host.shop.ShopUiStateBundle.encode(shop.uiState, session.home.facilityOriginalCommand))
+        }
         outState.putString("shopMode", shop.uiState.mode.name)
         outState.putInt("shopSceneY", shop.uiState.sceneScrollY)
         outState.putInt("shopControlsY", shop.uiState.controlsScrollY)
@@ -489,8 +487,7 @@ class MainActivity : Activity() {
         session.gacha.setControlsEnabled(enabled && navigation.page == HostPage.GACHA)
         session.ranking.setControlsEnabled(enabled && navigation.page == HostPage.RANKING)
         session.onboarding.setControlsEnabled(enabled)
-        session.facility.setControlsEnabled(enabled && navigation.page == HostPage.HOME)
-        expansionAccess.setControlsEnabled(enabled && navigation.page == HostPage.HOME)
+        session.home.setControlsEnabled(enabled && navigation.page == HostPage.HOME && !shopRestoreFailed)
         management.controller.setControlsEnabled(enabled)
         val routeGained = enabled && !pendingRouteEnabled
         pendingRouteEnabled = enabled
@@ -504,7 +501,7 @@ class MainActivity : Activity() {
         if (navigation.page == HostPage.RESULTS) { session.results.remember(results.uiState); session.results.refreshHistory() }
         else if (navigation.page == HostPage.PROGRESSION) session.progression.refresh()
         else if (navigation.page == HostPage.DELIVERY) { session.deliveryNavigation.refresh(); session.delivery.refresh() }
-        else if (navigation.page == HostPage.HOME) { session.facility.refresh(); expansionHost.load() }
+        else if (navigation.page == HostPage.HOME) { session.facility.refresh(); session.home.refresh() }
         else if (navigation.page == HostPage.GACHA) session.gacha.refresh()
         else if (navigation.page == HostPage.RANKING) session.ranking.refresh()
         else if (screen != HostQueryState.Loading) queries.refresh()
@@ -524,26 +521,13 @@ class MainActivity : Activity() {
         }
         ranking.render(rankingState, enabled && navigation.page == HostPage.RANKING)
         managementView.render(managementState, enabled)
-        val shopState = when (val current = expansionState) {
-            is ShopScreenState.Content -> current.copy(name = current.name + when (expansionSource.identity?.source) {
-                InputSource.SIMULATION -> " · 모의 원장"
-                InputSource.VEHICLE -> " · 차량 원장"
-                null -> " · 출처 확인 필요"
-            })
-            else -> current
-        }
+        val homeEnabled = enabled && navigation.page == HostPage.HOME && !shopRestoreFailed
+        shop.render(if (shopRestoreFailed) ShopScreenState.Failure("가게 화면 상태를 복원하지 못해 요청을 보존하고 조작을 제한합니다.")
+            else session.home.state.screen, homeEnabled)
         val facility = session.facility.state
-        val facts = facility.facts
-        val facilityReady = facts != null && facts.identity == expansionSource.identity &&
-            !facility.busy && facility.pending == null && facility.receipt == null && facility.error == null && !facility.foreign && !facility.unsupported
-        val combinedShop = if (shopState is ShopScreenState.Content && facts != null && facts.identity == expansionSource.identity)
-            io.drivegrowth.app.host.facility.FacilityHostMapper.merge(shopState, facts, facilityReady)
-        else shopState
-        displayedFacilityShop = combinedShop as? ShopScreenState.Content
-        shop.render(combinedShop, enabled)
         val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
             ?.associate { it.vehicleId to it.displayName }.orEmpty()
-        facilityControls.render(facility, enabled && navigation.page == HostPage.HOME, names)
+        facilityControls.render(facility, homeEnabled && session.home.facilityControlsEnabled, names)
         garage.render(garageState, enabled)
         collection.render(collectionState, enabled)
         results.render(if (session.results.hasHistorySource) session.results.historyState else resultsMapper.map(screen), enabled)
@@ -574,8 +558,33 @@ class MainActivity : Activity() {
         links.addView(style.button("새로고침") { if (token == navigationGeneration) refresh() })
         chrome.addView(links)
         drivingStatus?.let { chrome.addView(style.text(it)) }
-        if (navigation.page == HostPage.HOME && expansionState is ShopScreenState.Failure)
-            chrome.addView(style.button("보관한 미실행 확장 요청 취소") { expansionHost.cancelSaved() })
+        if (navigation.page == HostPage.HOME && homeEnabled) {
+            val home = session.home.state
+            if (home.activationRequired) chrome.addView(style.button("꾸미기 기능 사용 시작") {
+                if (allowed() && navigation.page == HostPage.HOME && !shopRestoreFailed) session.home.activateDecoration()
+            }.apply { tag = "decoration:activate"; isEnabled = homeEnabled })
+            (home.decoration?.receipt ?: (home.original as? io.drivegrowth.app.data.HostCheckpointResult.Decoration)?.value)?.let { receipt ->
+                chrome.addView(style.text("꾸미기 원결과 · ${receipt.command.decorationId} · 비용 ${receipt.command.expectedPrice.units} · " +
+                    (if (receipt.settlement == null) "비금융 결과" else "확정 금융 정산") + " · 당시 잔액 ${receipt.state.balance.units}")
+                    .apply { tag = "decoration:receipt" })
+            }
+            val recovered = when (val original = home.original) {
+                is io.drivegrowth.app.data.HostCheckpointResult.Expand -> "확장" to original.value
+                is io.drivegrowth.app.data.HostCheckpointResult.FacilityPurchase -> "시설" to original.value
+                else -> null
+            }
+            recovered?.let { (kind, receipt) ->
+                chrome.addView(style.text("$kind 원결과 확인 · 당시 잔액 ${receipt.balance.units} · 현재 상태는 별도 조회합니다.")
+                    .apply { tag = "shop:original-receipt" })
+            }
+            if (home.decoration?.pending != null && home.decoration.receipt?.command != home.decoration.pending)
+                chrome.addView(style.button("보관한 미실행 꾸미기 요청 취소") {
+                    if (allowed() && navigation.page == HostPage.HOME) session.home.cancelDecorationSaved()
+                }.apply { tag = "decoration:cancel-saved"; isEnabled = homeEnabled })
+            if (home.screen is ShopScreenState.Failure) chrome.addView(style.button("보관한 미실행 확장 요청 취소") {
+                if (allowed() && navigation.page == HostPage.HOME) session.home.cancelExpansionSaved()
+            }.apply { isEnabled = homeEnabled })
+        }
         if (navigation.page == HostPage.PROGRESSION) {
             if (progressionRestoreFailed) chrome.addView(style.text("화면 상태를 복원하지 못해 저장 기록을 다시 확인합니다."))
             chrome.addView(style.button("미시작 퀘스트 청구 취소 확인") { if (allowed()) session.progression.cancelSaved() })
@@ -727,32 +736,16 @@ class MainActivity : Activity() {
     }
 
     private fun onShopEvent(event: ShopEvent) {
-        if (!allowed()) {
+        session.home.remember(shop.uiState)
+        if (!allowed() || navigation.page != HostPage.HOME || shopRestoreFailed) {
             updateAccess()
             if (event is ShopEvent.Submit) shop.complete(event.request, ContractResult.Failure(ContractError.UX_RESTRICTED))
             else shop.completeRetry()
             return
         }
         when (event) {
-            ShopEvent.Retry -> if (!expansionHost.load()) shop.completeRetry()
-            is ShopEvent.Submit -> when (event.request.selection.option.command) {
-                is io.drivegrowth.app.ui.shop.ShopCommand.BuyFacility -> {
-                    val original = event.request
-                    val shown = displayedFacilityShop
-                    if (shown == null || original.selection.revision != shown.revision ||
-                        shown.facilities.none { it.option == original.selection.option }) {
-                        shop.complete(original, ContractResult.Failure(ContractError.STATE_CONFLICT))
-                    } else {
-                        facilityUiRequest = original
-                        val mapped = original.copy(selection = original.selection.copy(revision = Revision(session.facility.state.version)))
-                        if (!session.facility.submit(mapped)) {
-                            facilityUiRequest = null
-                            shop.complete(original, ContractResult.Failure(ContractError.STATE_CONFLICT))
-                        }
-                    }
-                }
-                else -> expansionHost.submit(event.request)
-            }
+            ShopEvent.Retry -> if (!session.home.refresh()) shop.completeRetry()
+            is ShopEvent.Submit -> session.home.submit(event.request)
         }
     }
 
@@ -765,10 +758,10 @@ class MainActivity : Activity() {
                     event.vehicle, event.expected, event.desired))
             io.drivegrowth.app.ui.shop.FacilityControlsEvent.Retry -> session.facility.refresh()
             io.drivegrowth.app.ui.shop.FacilityControlsEvent.Acknowledge -> if (session.facility.acknowledge()) {
-                expansionHost.load(); queries.refresh(); refreshPendingRoute()
+                session.home.refresh(); queries.refresh(); refreshPendingRoute()
             }
             io.drivegrowth.app.ui.shop.FacilityControlsEvent.CancelSaved -> if (session.facility.cancelSaved()) {
-                expansionHost.load(); refreshPendingRoute()
+                session.home.refresh(); refreshPendingRoute()
             }
         }
     }

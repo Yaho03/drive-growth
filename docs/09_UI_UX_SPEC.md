@@ -258,6 +258,12 @@ collection.render(mappedCollectionState, controlsEnabled = allowedByCommonShell)
 
 
 #55 새 View의 첫 render/복원 순서 최소 수정은 원코드 `515507c`의 A 코드/구조 검토와 C 신규 View 표적1개·임시 실제 호스트에서 확인했다. [06의 첫 복원 근거](06_VERIFICATION.md#55-첫-복원-수정의-독립-검토장치-근거-회수)를 따르며 같은 활성 View의 과거 상태 반복 복원·제품 호스트/프로세스 저장으로 범위를 넓히지 않는다.
+### #55 Main HOME의 가게 꾸미기 연결
+
+주차 허용 상태의 HOME에서 꾸미기 사용을 명시적으로 시작한다. 미리보기·Back·취소는 저장을 변경하지 않는다. 무료·유료 구매와 보유품 무료 재적용은 저장 결과를 읽은 뒤 현재 외형·잔액에 반영한다. 원결과를 복원할 때는 당시 잔액과 현재 조회 값을 구분한다.
+
+가게 상태에는 화면 revision과 전체 옵션, requestId·attemptId를 함께 보관한다. 시설 원명령은 별도의 정의 버전·규칙 버전·프로필·출처를 대조한다. 완료 원결과 조회와 공용 슬롯의 요청 복구는 별도 경로를 사용한다. shopUi가 손상되면 가게 조작을 제한하고 다음 복원에 원본을 유지한다. Main 원본의 Activity 재생성과 실제 저장 근거는 [검증 기록](06_VERIFICATION.md#55-main-가게-꾸미기와-원결과-소비-검증)을 따른다.
+
 ### #57 퀘스트·업적·휴식 독립 표시 UI
 
 2026-11-07 `app/ui/progress/ProgressView`를 Android Views로 구현했다. `4r-quests-achievements.png`·`5c-landscape-quests-achievements.png`·`4t-rest-bonus-info.png`·`4c-rest-stop-open.png`를 직접 열어 어두운 바탕, 둥근 카드, 파란 청구 버튼과 진행 막대를 참고했다. 기존 중립 `wireframes.svg`의 정보 우선순위도 확인했다. 시안의 캐릭터·코인 이미지·운전 지시형 휴식 문구는 사용하지 않는다. 새 자산·의존성·음성·게임 알림은 없다. 화면의 목표·보상 예시는 제품 규칙이 아니다.
