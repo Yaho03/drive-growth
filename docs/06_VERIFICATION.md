@@ -2084,6 +2084,24 @@ SQLite 시험은 정상2시간·감액3시간·상한 제외1시간, 원 매출3
 PR #200 반영 main `cf0dc17c8359e5f358e6074667aaa9d6b03533f6`과 이번 시간 근거를 결합해 코어444·앱687개(실패·오류·생략0), Debug/시험 APK·Lint를 다시 확인했다. Gradle은 2분40초에 성공했고 Lint는 오류0·경고27이다. 공용 helper의 원결과 소유자 조회와 schema18 변경은 함께 보존했다. 02의 동시 추가 절 충돌은 두 계약 모두 유지해 해결했으며 이 결합 APK의 새 장치 실행은 하지 않았다.
 
 
+### #54 실제 Main 대여 정산 열람과 새 프로세스 검증 — 2026-11-11
+
+Pleos 2.1.0/API 34/ARM64의 격리 앱에서 `f91089a3ec0a07b80e5074ef1b88468a693c9d65`의 실제 `MainActivity`를 열었다. Pleos SDK가 `PARK ux=false`를 반환했고, 대여 구간·가상 영업 사고·거래는 명시적인 SIMULATION 입력으로 준비했다.
+
+| 지정 계측 | 결과 | 실제 화면·저장 확인 |
+|---|---|---|
+| 열람 전후 | 1개 통과, 8.333초, PID 16322 | 미확인 목록에서 대상 정산을 열었다. 정상 2시간·감액 3시간·상한 제외 1시간, 적용 당시 정책, 가상 영업 사고, 확정 매출 174·포함된 시설 보너스 0·정산 후 확정 잔액 1,174 게임머니를 확인했다. 이후 시험용 25 입금이 반영된 원장 잔액은 1,199였다. 열람 후 원정산은 유지됐고 대상 `RESULT_VIEWED`는 1건이었다. |
+| 새 OS 프로세스 재실행 | 1개 통과, 7.199초, PID 18160 | 첫 계측 종료로 PID가 이미 없었고 격리 앱에 `force-stop`을 실행한 뒤에도 없었다. 같은 설치·DB·프로필을 사용했다. 미확인 목록에서 대상이 사라졌고 전체 기록에서 동일 정산·상세·열람 완료 상태와 비활성 확인 버튼을 확인했다. 대상 열람 이벤트는 1건이었다. |
+
+두 실행 뒤 각각 회수한 일관된 SQLite 사본에서 `account`, `vehicles`, `rentals`, `rental_result_basis`, `settlements`, `quest_events`, `gacha_progress`, `first_gift_markers`, `first_gift_requests`, `initialization_profile`, `initialization_requests`의 행이 모두 같았다. 두 DB 파일의 SHA-256도 `3615fbca9ada288df75c5efd07e83acdcf48dc47ed3a420835833fab8ca5dcd9`로 일치했다. 비교 구간은 명시적 열람이 저장된 뒤부터 새 프로세스에서 상세를 다시 읽은 뒤까지다.
+
+이전 세 계측은 각각 초기 목록 탐색 실패, 첫 영업 선물 준비 및 시간 근거의 참조 비교 오류, 이력 재조회 중 준비 확인과 상세 읽기 사이의 경합으로 종료됐다. 최종 계측은 준비 여부·상세·완료 표시를 같은 UI 작업에서 읽고 시험 스레드에서 단언했다. 세 이전 시도와 제품 APK의 바이트는 동일했고 제품 코드는 변경하지 않았다.
+
+- **실행 식별.** 격리 앱·계측 APK의 설치 후 회수 SHA-256은 각각 `5d3655e67a5adc2723e82ceb383372649890793c8643a1b6285de5f15e85b5c1`, `e6f2fbdfbdd0020cce45d1c59ebb059ba1c90fb0b2e49b51e008d09bfa850531`이었다. `am instrument --user 10 -w -r -e class`로 `io.drivegrowth.verify.mainresults54.test/android.test.InstrumentationTestRunner`에서 `io.drivegrowth.app.host.ActualMainRentalResultsVerificationTest`의 `testSeedMixedRentalAndMarkViewedInActualMain`, `testReopenedMainPreservesViewedMixedRentalWithoutWriting`를 순서대로 각각 실행했다. 계측 패치 SHA-256은 `0ac0e81ce7e028e3022cd82ee563be290164e5a901c922b621a99b89f3efdca6`이다.
+- **장치 반환.** 23:58:41–23:59:02 KST에 기존 AVD를 사용했다. 제품 APK와 데이터 파일 6개를 포함한 보존 항목 19개가 일치했다. 시험 앱의 임시 속도 권한을 원복했고, 격리 패키지·프로세스·계측을 정리했다.
+- **적용 범위.** 이번 계측은 화면의 텍스트와 버튼 상태를 검증했다. [대표 전체 기록 화면](evidence/product-host-20261110/actual-results.png)은 #190에서 캡처한 실제 Main이며 위 대여 상세의 캡처는 없다. 최신 결합 APK에서의 재실행, 런처 복귀·저장 중 강제 종료·상세 선택 자동 복원, 대여 상세의 SDK D/P 전환, 전원·실차와 전체 제출 흐름은 별도 검증 범위다. [#54](https://github.com/Yaho03/drive-growth/issues/54) · [#28](https://github.com/Yaho03/drive-growth/issues/28)
+
+
 ## 탁송 발견 저장과 도감 갱신 — 2026-11-11
 
 후보 표시 확인 뒤 저장 성공 시 같은 세션 도감 조회를 갱신한다. 일시 저장 실패 뒤에는 원 표시를 다시 제출한다. 원 표시가 무효면 실패 화면에서 새 후보 조회로 진행할 수 있다. 확정 결과 확인과 미실행 요청 취소의 저장 결과는 발견 저장과 독립적으로 처리한다. 기존 #116 발견 API와 #181 탁송 호스트를 사용한다.
