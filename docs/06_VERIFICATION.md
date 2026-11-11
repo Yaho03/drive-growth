@@ -1841,6 +1841,26 @@ A source manifest690 항목은 모두 일치했으나 실제 Git 추적 파일69
 
 결합 사본에서 core 444개·앱 JVM 775개를 실행해 실패·오류·생략 0건을 확인했다. Debug 앱·계측 APK와 서명 전 Release APK 빌드, Lint(오류 0·경고 34), 저장소·링크와 diff 검사를 통과했다. Debug 런처는 `UnifiedSimulationActivity`, Release 런처는 기존 `MainActivity`다. Release APK에 Debug 시연·휴식 시연 클래스가 없음을 확인했다.
 
+#### #38·#53 모의 탁송 거리 재사용 회귀 — 2026-11-12
+
+`SimulationNavigationDistanceTest`는 이전 모의 탁송 정산 후 새 의뢰를 고르고 출발 전에 목적지를 변경하는 흐름을 확인한다. 관측 거리는 출발 당시 프로필·의뢰·경로와 현재 원장이 일치할 때 제공한다. 새 의뢰의 출발 전에는 `Missing(NO_DATA)`가 전달되어 변경 제안이 `DATA_UNAVAILABLE`로 끝나야 한다. 원래 경로의 거리와 모의 도착 시각 보존, 새 모의 주행에서 관측한 0m, 다른 프로필 조회, 같은 의뢰에서의 경로 교체도 대조한다.
+
+| 시험 | 소스 기준 | 확인 결과 |
+|---|---|---|
+| RED 계측 | `3213f8d` + 동일 계측시험 | 0.367초, 1개 실행·단언 실패 1건·오류 0건. 88행에서 `Missing(NO_DATA)` 대신 이전 주행의 `Available(ObservedDistance(36000, SIMULATION))`이 반환됨 |
+| GREEN 계측 | `3213f8d` + 거리 수정 + 동일 계측시험 | 0.445초, `OK (1 test)`. 출발 전 거리 누락과 변경 제안의 `DATA_UNAVAILABLE`을 포함해 위 회귀 조건 통과 |
+| GREEN 자동 검사 | 위 GREEN 소스 | core 444개·앱 JVM 782개, 실패·오류·생략 0건. `lintDebug` 오류 0건·경고 40건, `compileReleaseKotlin` 통과 |
+| #212 통합 사본 | `fa8baf5` + 거리 수정·계측시험 | 소비 경로와 패치 적용을 정적으로 대조했다. 이 조합의 빌드·기기 계측은 미실행 |
+
+A가 API 34 ARM64 에뮬레이터에서 RED와 GREEN을 차례로 각 1회 실행했다. 설치된 앱·계측 APK를 회수해 빌드 산출물과 SHA-256이 일치함을 확인했다.
+
+| 실행 | 설치 앱 SHA-256 | 설치 계측 APK SHA-256 |
+|---|---|---|
+| RED | `5f9d77bb5ad625fa93f8a4bdf0e319e36f70384220b4b770820ab0c3a235b09f` | `fcdd7c1d7793f47a905c50a400abf5ab5018ee515577bd13bdd5d3ae770f4760` |
+| GREEN | `74db823089ac9a2c9e0b4873e1a46e1e86d198de7b1ba55c007a2226f35cf5e0` | `10e99d764044125c22e4cd3b41e2eda8af283d4a34de143de31d44a0df1fa166` |
+
+이 항목의 입력은 Debug 모의 주행이다. 실제 내비 거리 수신과 실차 검증은 별도 검증 항목에 따른다.
+
 #### 결합 APK의 지정 계측 시험
 
 A는 코드 커밋 `dce75aea611904d2f94d754e4cbeb080c38e9848`의 Debug 앱 `io.drivegrowth.app.simulation`을 API 34 ARM64에서 설치하고 아래 네 시험을 각각 한 번 실행했다. 네 설치 앱의 SHA-256은 `33479608b9d1baf46ad202481c57c8a196be11556a80a44e954adba9bf6711a9`로 동일했다.

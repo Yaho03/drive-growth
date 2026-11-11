@@ -31,8 +31,10 @@ internal class SimulationNavigation(private val prefs: SharedPreferences, privat
             val arrival: Observation<DeliveryArrivalEvidence> = if (same && arrivalRoute != null)
                 Observation.Available(DeliveryArrivalEvidence(RouteId(arrivalRoute), InputSource.SIMULATION,
                     EpochMillis(prefs.getLong("arrivalAt", -1)))) else Observation.Missing(MissingReason.NO_DATA)
-            val moved = if (prefs.contains("moved")) Observation.Available(ObservedDistance(prefs.getLong("moved", 0), InputSource.SIMULATION))
-                else Observation.Missing(MissingReason.NO_DATA)
+            val moved = when (val read = readObservedDistance(identity)) {
+                is ContractResult.Failure -> return read
+                is ContractResult.Success -> read.value
+            }
             return ContractResult.Success(DeliveryNavigationSnapshot(if (confirmed) DestinationKey("unified-simulation-destination") else null,
                 "시연 종착지", Observation.Available(EstimatedRouteDistance(36_000, InputSource.SIMULATION)), moved,
                 arrival, if (confirmed) {
@@ -41,6 +43,31 @@ internal class SimulationNavigation(private val prefs: SharedPreferences, privat
                 } else null))
         }
     }
+    private fun readObservedDistance(identity: GameIdentity): ContractResult<Observation<ObservedDistance>> {
+        val meters = prefs.getLong("routeMoved", -1)
+        val route = prefs.getString("runRoute", null)
+        val request = prefs.getString("runRequest", null)
+        val missing = Observation.Missing(MissingReason.NO_DATA)
+        if (meters < 0 || route == null || request == null || prefs.getString("runProfile", null) != identity.profileId.value)
+            return ContractResult.Success(missing)
+        return when (val read = inProgress(identity)) {
+            is ContractResult.Failure -> read
+            is ContractResult.Success -> {
+                val current = read.value
+                ContractResult.Success(if (current != null && current.route.value == route && current.active.requestId.value == request)
+                    Observation.Available(ObservedDistance(meters, identity.source)) else missing)
+            }
+        }
+    }
+
+    private fun inProgress(identity: GameIdentity): ContractResult<DeliveryInProgress?> = when (val opened = games.open()) {
+        is ContractResult.Failure -> opened
+        is ContractResult.Success -> opened.value.use { game ->
+            if (game.identity != identity) ContractResult.Failure(ContractError.STATE_CONFLICT)
+            else game.store.delivery.inProgress()
+        }
+    }
+
     override fun setControlsEnabled(value: Boolean) { enabled = value }
     override fun refresh() { if (enabled) changed?.invoke() }
     override fun confirm(): ContractResult<Unit> = if (!enabled) ContractResult.Failure(ContractError.UX_RESTRICTED)
@@ -57,28 +84,28 @@ internal class SimulationNavigation(private val prefs: SharedPreferences, privat
         if (timeline.stage == 1) {
             val start = timeline.elapsedMs - 1000
             if (prefs.getLong("routeRun", -1) != start) {
-                val progress = when (val opened = games.open()) {
-                    is ContractResult.Failure -> return opened
-                    is ContractResult.Success -> opened.value.use { game ->
-                        if (game.identity != actor) return ContractResult.Failure(ContractError.STATE_CONFLICT)
-                        when (val read = game.store.delivery.inProgress()) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
-                    }
+                val progress = when (val read = inProgress(actor)) {
+                    is ContractResult.Failure -> return read
+                    is ContractResult.Success -> read.value
                 }
                 check(prefs.edit().putLong("routeRun", start).putString("runProfile", actor.profileId.value)
-                    .putString("runRoute", progress?.route?.value).putString("runRequest", progress?.active?.requestId?.value).commit())
+                    .putString("runRoute", progress?.route?.value).putString("runRequest", progress?.active?.requestId?.value)
+                    .remove("routeMoved").commit())
             }
         }
         val trip = actual.state.trip ?: actual.committed.lastOrNull()?.trip
-        if (trip != null) check(prefs.edit().putLong("moved", trip.meters.setScale(0, RoundingMode.DOWN).longValueExact()).commit())
+        if (trip != null && trip.source == InputSource.SIMULATION && timeline.stage > 0 &&
+            trip.departure.receivedElapsedMs - 1000 == prefs.getLong("routeRun", -1) &&
+            prefs.getString("runProfile", null) == actor.profileId.value &&
+            prefs.getString("runRoute", null) != null && prefs.getString("runRequest", null) != null) {
+            check(prefs.edit().putLong("routeMoved", trip.meters.setScale(0, RoundingMode.DOWN).longValueExact()).commit())
+        }
         if (!timeline.arrival || prefs.getString("runProfile", null) != actor.profileId.value) return ContractResult.Success(Unit)
         val route = prefs.getString("runRoute", null) ?: return ContractResult.Success(Unit) // 출발 당시 활성 탁송이 없으면 도착을 만들지 않는다.
         if (prefs.getString("arrivalRoute", null) == route) return ContractResult.Success(Unit) // 최초 원래 사건 시각을 보존한다.
-        val current = when (val opened = games.open()) {
-            is ContractResult.Failure -> return opened
-            is ContractResult.Success -> opened.value.use { game ->
-                if (game.identity != actor) return ContractResult.Failure(ContractError.STATE_CONFLICT)
-                when (val read = game.store.delivery.inProgress()) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
-            }
+        val current = when (val read = inProgress(actor)) {
+            is ContractResult.Failure -> return read
+            is ContractResult.Success -> read.value
         } ?: return ContractResult.Failure(ContractError.STATE_CONFLICT)
         val now = (clock() as? ContractResult.Success)?.value ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         if (current.route.value != route || current.active.requestId.value != prefs.getString("runRequest", null) ||
