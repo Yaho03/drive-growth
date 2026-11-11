@@ -1893,6 +1893,37 @@ A는 다른 frame/receiver/clock/pause와 실제 previous revision의 충돌/원
 원본은 `/private/tmp/drive-rest-producer-retry-fix-20261111/independent-device-review/`, F 독립 대조는 `/private/tmp/drive-rest-retry-review-f-20261111/`, root 결합 로그는 `/private/tmp/drive-rest-retry-root-validation-20261111.log`에 보존한다. 최신 main 결합 APK의 실제 장치 실행은0이며 A 원본 쌍과 구분한다. Main의 원입력 보관·명시 등록/활성화·현재 SDK/장소 증거·Rest UI 및 #40/#51/#28 전체는 남는다. #189는 기능 구현 뒤 적용한다.
 
 
+## #46 공통 차량 계약의 최신 main 재확인 — 2026-11-11
+
+사용자의 공통 차량 계약 확장 요청을 최신 main `8eb1c5904b34ee7a3a7d07a21f24babe62c9ee1f`에서 다시 대조했다. #46 본문·공통 계약 요청과 후속 회신, PR #100의 조회 범위, PR #104 최종 head `9c32bb38c93b4f219a2cfcc4113c0cd1c8776db8`·머지 코드·CI와 최신 PRD를 직접 확인했다. 요청한 개체 희귀도·진행량·실제 취득액/출처, 단일 공통 Rarity, Add/Update·요청 동일성·당시 결과 재생 및 공통 fixture는 이미 공급돼 있어 재구현하지 않았다. 기존 소비 코드·테스트·빌드 설정도 수정하지 않았다.
+
+02의 「#34 저장 확장의 연결점과 기존 데이터 조건」과 #46 요약에서 #116/#140/#149의 이력·발견·mapper 공급을 미제공으로 읽을 수 있는 과거 안내를 바로잡았다. 필드·단위·오류·실행 예제의 기준은 [기존 계약 절](02_SYSTEM_ARCHITECTURE.md#46-개체-정보-v1과-공통-소비-예제)이며 새 모델이나 별도 원장을 만들지 않았다. 기존 PR #104 검증과 아래 새 실행은 구분한다.
+
+독립 worktree의 `codex/46-vehicle-contract-current-20261111`에서 Temurin JDK17.0.6·기존 Android SDK35/Build Tools35·Gradle Wrapper8.11.1로 실행했다. SDK·JDK는 환경변수로 지정했고 의존성·개발환경 설치나 에뮬레이터·adb 사용은 없었다.
+
+```sh
+./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest \
+  --offline --no-daemon --max-workers=1 \
+  -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process \
+  '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8 -XX:-TieredCompilation'
+python3 scripts/check_repository.py
+git diff --check
+```
+
+| 실제 검사 | 결과·적용 범위 |
+|---|---|
+| 전체 Gradle 명령 | BUILD SUCCESSFUL, 3분33초, actionable 80개 모두 실행 |
+| `:core:test` | 444개 통과, 실패·오류·생략0. `OwnedVehicleContractTest`11개·`GarageTest`18개·`VehicleUpgradeTest`11개·`GachaPullTest`12개·`FirstGrantTest`6개 포함 |
+| 계약 회귀 입력 | 동일 차종/다른 희귀도·성장, 무료0/할인250/유료500/구매탁송800, 범위/최대레벨, 외부 목록 변경 방지, 생성→조회→성장→처분의 취득 정보 보존, 같은 요청 재생·새 필드 차이 충돌·실패 무변경을 기존 정식 테스트로 재실행 |
+| `:app:testDebugUnitTest` | 667개 통과, 실패·오류·생략0. 앱 소비자 컴파일 포함, 실제 Android SQLite 실행 아님 |
+| `:app:assembleDebug :app:lintDebug` | 성공. Lint 오류0·기존 제품 경고27. 빌드의 SDK XML 버전 경고와 deprecated API 경고는 숨기지 않았으며 도구 버전을 바꾸지 않음 |
+| `:app:assembleDebugAndroidTest` | SQLite 개체 codec·원래 정산·legacy 거절 관련 시험을 포함한 장치 시험 APK 컴파일 성공. 장치 실행 없음 |
+
+결과 근거는 같은 worktree의 `core/build/test-results/test/`·`app/build/test-results/testDebugUnitTest/` XML과 `app/build/reports/lint-results-debug.xml`이다. 저장소·링크 검사와 `git diff --check`도 통과했다. 문서 두 파일 이외의 소스·Gradle·Manifest 변경은 없다.
+
+**남은 경계:** 이번 재확인은 공통 계약·메모리 동작·현재 소비자 자동 검사까지다. PR #104의 과거 SQLite26개 장치 실행은 기존 근거로만 참조하며 새로 실행했다고 세지 않는다. 탁송 후보·변경 후보는 표시 확인 뒤 발견 키를 저장하도록 main에 연결돼 있다. 이번에는 같은 세션에서 도감이 갱신되는지, 저장 실패 뒤 원래 표시 목록으로 재시도하는지, 제품 앱/프로세스 재실행 뒤 도감과 개체 상태가 일치하는지 실행하지 않았다. 가챠 지급 이력은 보유 칸에 반영되며, 결과 표시 이벤트의 발견 기록은 #52에서 별도로 다룬다. 필수 정보 없는 legacy 개체/명령/정산의 근거 기반 복구·이전 정책과 기능 간 동시 변경 검증도 남는다. 실제 무료0과 정보 누락을 구분하는 명시 실패를 유지하고 기존 DB·앱 데이터를 삭제하지 않았다. #46 전체 완료·#33/#34 재개방·담당/ready/Blocked by 변경 없이 현재 PR 검토와 기존 #28 통합 검증으로 인계한다.
+
+
 ## 대여 정산의 저장된 시간 근거와 화면 검증 — 2026-11-11
 
 정상·감액·상한 제외 시간을 실제 수락 구간과 각 구간에 적용된 당시 정책으로 저장하고 기존 Main 정산 조회→ResultsHostMapper→ResultsView에 연결했다. 금액은 최초 Settlement를 표시하며 시간에서 다시 지급하거나 현재 잔액으로 바꾸지 않는다. 기록이 없는 이전 결과는 확인 불가다. 계약은 [시간 근거 schema18](02_SYSTEM_ARCHITECTURE.md#대여-결과-시간-근거-schema18), 표현은 [시간 상세](09_UI_UX_SPEC.md#영업-정산의-시간-상세)를 따른다.
