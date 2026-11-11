@@ -1,6 +1,16 @@
 package io.drivegrowth.core.rental
 
 import io.drivegrowth.core.contract.EpochMillis
+import io.drivegrowth.core.contract.RuleVersion
+import java.math.BigDecimal
+
+/** 기존 종료 영업 시험값의 단일 정의. 저장자는 수락 당시 값을 원본 근거에 보존한다. */
+object ParkingIncomePolicy {
+    val version = RuleVersion("parking-income-v1")
+    const val normalMillis = 30 * 60_000L
+    const val capMillis = 8 * 60 * 60_000L
+    val reducedMultiplier: BigDecimal = BigDecimal("0.30")
+}
 
 data class ParkingIncomeWindow(val fullMillis: Long, val reducedMillis: Long, val accountedThrough: EpochMillis)
 
@@ -10,8 +20,8 @@ fun parkingIncomeWindow(parkedAt: EpochMillis, accountedThrough: EpochMillis, no
     val from = accountedThrough.value - parkedAt.value
     val end = maxOf(accountedThrough.value, now.value)
     val to = end - parkedAt.value
-    val normalEnd = 30 * 60_000L
-    val cap = 8 * 60 * 60_000L
+    val normalEnd = ParkingIncomePolicy.normalMillis
+    val cap = ParkingIncomePolicy.capMillis
     return ParkingIncomeWindow(
         to.coerceAtMost(normalEnd) - from.coerceAtMost(normalEnd),
         to.coerceIn(normalEnd, cap) - from.coerceIn(normalEnd, cap),
@@ -21,4 +31,4 @@ fun parkingIncomeWindow(parkedAt: EpochMillis, accountedThrough: EpochMillis, no
 
 /** 정상 시간으로 환산한 정확한 밀리초. 여러 번 복귀해도 구간별 반올림 손실이 없다. */
 fun ParkingIncomeWindow.equivalentMillis() =
-    fullMillis.toBigDecimal() + reducedMillis.toBigDecimal().multiply(java.math.BigDecimal("0.30"))
+    fullMillis.toBigDecimal() + reducedMillis.toBigDecimal().multiply(ParkingIncomePolicy.reducedMultiplier)

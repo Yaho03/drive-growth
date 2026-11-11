@@ -204,14 +204,14 @@ class DecorationLedgerTest : InstrumentationTestCase() {
     }
     fun testFailedSchema16UpgradePreservesOriginalFileAndVersion() {
         store.close();raw{it.version=16};val file=context.getDatabasePath(name);val before=file.readBytes();store=open()
-        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.balance());store.close();assertTrue(before.contentEquals(file.readBytes()));raw{assertEquals(16,it.version);it.version=17};store=open()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.balance());store.close();assertTrue(before.contentEquals(file.readBytes()));raw{assertEquals(16,it.version);it.version=18};store=open()
     }
     fun testSchema16UpgradeKeepsExistingRowsAndExplicitlyUnintroducedDecoration() {
-        val before=rows().filterNot{it.startsWith("decoration_")};store.close();raw{it.execSQL("DROP TABLE decoration_requests");it.execSQL("DROP TABLE decoration_module");it.version=16};store=open();ok(store.localProfileId())
-        assertEquals(before,rows().filterNot{it.startsWith("decoration_")});assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),store.decorations.state(profile));raw{assertEquals(17,it.version)}
+        val before=rows().filterNot{it.startsWith("decoration_")};store.close();raw{stripDecorationFixture(it);it.version=16};store=open();ok(store.localProfileId())
+        assertEquals(before,rows().filterNot{it.startsWith("decoration_")});assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),store.decorations.state(profile));raw{assertEquals(18,it.version)}
         assertEquals(emptySet<String>(),activate().ownedIds);assertEquals(GameMoney(1000),ok(store.balance()))
     }
-    fun testExistingSchema17MissingTableIsNotSilentlyRecreated() {
+    fun testExistingSchema18MissingTableIsNotSilentlyRecreated() {
         activate();raw{it.execSQL("DROP TABLE decoration_requests")};val before=rows()
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.decorations.state(profile));assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.decorations.activate(profile));assertEquals(before,rows())
     }
