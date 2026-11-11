@@ -871,6 +871,15 @@ main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결
 진행 화면은 확정 주행이 있고 미확정 주행이 없는 스냅샷의 저장 잔여 시간과 입력 출처만 표시한다. 이 조회는 현재 장소, 이번 휴식 인정 여부나 다음 출발 효과를 제공하지 않는다. 제품 `MainActivity`·`HostSession` 등록은 별도이며, 조립 시 같은 프로필의 읽기 허용·동의·근거를 확인해야 한다. 저장 활성화, 주행 명령·지급, SDK 등록은 조회 범위 밖이다.
 
 
+### #40·#57 Debug 휴식 시연 화면
+
+`UnifiedSimulationActivity`는 Main의 공통 조작 허용 상태에서 **휴식 모의 시연 · 별도 원장**을 표시한다. 진입을 한 번 수락하면 화면이 돌아올 때까지 잠근다. 별도 `RestSimulationActivity`는 명시 시작 뒤 `rest-simulation-demo.db`의 SIMULATION 프로필에서 기존 휴식 생산자와 주행·정산 원장을 사용한다. 화면을 여는 것만으로는 DB를 만들지 않는다. 일반 시연 원장과 제품 원장은 분리한다.
+
+화면 이탈 시 처리 중인 표본의 거래를 마치고 다음 표본 생성 전에 멈춘다. 구성 변경은 이탈로 처리하지 않는다. 같은 프로세스에서 보존된 Run과 실패 표본을 명시 재개하며, 이미 마지막 거래가 확정됐다면 저장 결과를 읽는다. 준비 재시도와 원입력 재시도, 확정 뒤 결과 재조회는 각각 해당 단계만 수행한다.
+
+결과 화면은 같은 프로필의 휴식 원장 투영과 원정산에서 확정 건수·부스트 사용·다음 주행 수익·저장 잔여 시간을 읽는다. Quest 진행 조회나 화면용 값을 금융 근거로 사용하지 않는다. 시연 화면은 Debug 전용이며, 실제 장소 판정·제품 휴식 입력·OS 종료 뒤 미확정 표본 재개는 후속 범위다. [장치 및 빌드 기록](06_VERIFICATION.md#debug-휴식-시연-진입과-원결과-검증)
+
+
 ### #55 가게 꾸미기·확장 완료 원결과 조회
 
 `ShopOriginalResultReader(store).decoration(profileId, requestId)`는 `ContractResult<DecorationSettlement?>`를, `expansion(profileId, requestId, fullShopExpansion)`은 `ContractResult<Settlement?>`를 반환한다. 같은 SQLite 거래에서 실제 프로필과 저장 출처를 확인하고 원명령·최초 결과와 전역 요청 ID 소유자를 대조한다. 확장 호출자는 처음 확정한 전체 입력을 전달하고 reader는 공통 정산의 원명령과 최초 결과를 대조한다. 시설 구매 원결과는 기존 `hostCommands.facilityResult`에서 읽는다. 유료 꾸미기의 공통 원정산과 무료 구매·보유품 적용의 금융 정산 없는 typed 결과를 그대로 읽는다.

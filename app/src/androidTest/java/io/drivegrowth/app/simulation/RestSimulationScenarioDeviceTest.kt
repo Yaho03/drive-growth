@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import io.drivegrowth.app.data.AssetTrialDefinitionProvider
+import io.drivegrowth.app.data.SqliteObservedDrivingJournal
 import io.drivegrowth.app.data.questDefinitions
 import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
@@ -36,7 +37,27 @@ class RestSimulationScenarioDeviceTest : InstrumentationTestCase() {
             assertEquals(InputSource.SIMULATION, identity.source)
             ok(onboarding.choose(identity, FirstGrant.CANDIDATES.first()))
             val startingBalance = ok(games.open()).use { ok(it.store.balance()) }
-            val receipts = ok(RestSimulationScenario.run(games))
+            val run = ok(RestSimulationScenario.prepareRun(games))
+            var sampleBoundaries = 0
+            assertNull(ok(run.run(canContinue = { ++sampleBoundaries == 1 })))
+            ok(games.open()).use { game ->
+                val state = ok(game.store.atomic { db -> SqliteObservedDrivingJournal().read(db, identity) })
+                assertEquals(0L, state.anchor?.receivedElapsedMs)
+                assertTrue(state.outbox.isEmpty())
+                assertEquals(0L, ok(game.store.restDriving.state(identity.profileId)).confirmedDrives)
+                assertEquals(startingBalance, ok(game.store.balance()))
+            }
+            val remainingSamples = RestSimulationScenario.frames(definition.rest).count() - 1
+            var issued = 0
+            var allowed = true
+            // 마지막 표본의 처리 권한을 받은 직후 이탈한다. 마지막 거래는 완료로 남아야 한다.
+            val receipts = checkNotNull(ok(run.run(canContinue = {
+                val allowedForThisSample = allowed
+                if (++issued == remainingSamples) allowed = false
+                allowedForThisSample
+            })))
+            assertEquals(remainingSamples, issued)
+            assertEquals(receipts, ok(run.run(canContinue = { false })))
             assertEquals(2, receipts.size)
             val boosted = receipts.last()
             assertEquals(GameMoney(15), boosted.commit.amount)
@@ -52,6 +73,13 @@ class RestSimulationScenarioDeviceTest : InstrumentationTestCase() {
             assertEquals(BuffPhase.ACTIVE, screen.rest?.buffPhase)
             assertEquals("원장 잔여 1100초", screen.rest?.remainingLabel)
             assertTrue(screen.sourceLabel.contains("모의 입력"))
+            val questUnavailable = GameSessionFactory(context, mapOf(InputSource.SIMULATION to name),
+                InputSource.SIMULATION, { ContractResult.Failure(ContractError.POLICY_UNRESOLVED) })
+            val blocked = FactoryProgressionSource(questUnavailable, now, ::readStoredRestProgression).read(emptySet())
+            assertEquals(ContractResult.Failure(ContractError.POLICY_UNRESOLVED), blocked)
+            val restOnly = checkNotNull(ok(readRestDemo(questUnavailable)))
+            assertEquals(projection, restOnly.projection)
+            assertEquals(boosted, restOnly.original.observed)
             var labels = emptyList<String>()
             instrumentation.runOnMainSync {
                 val view = ProgressView(context) {}
