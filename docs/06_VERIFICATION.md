@@ -1874,6 +1874,18 @@ A의 실제 설치 앱 SHA-256은 `6ffac6e4fa0bae025c806c547b559c0d2d43b603e8e18
 로컬 원본 근거는 `/private/tmp/drive-decoration-read-fix-20261110/green/independent-device-review/`, F 검토는 `/private/tmp/drive-decoration-delta-review-f-20261111/`, 최신 결합 로그는 `/private/tmp/drive-decoration-storage-root-validation-20261111.log`에 보존한다. `JAVA_HOME`·`ANDROID_HOME`과 기존 cache를 환경 변수로 지정했고 Gradle `--offline --no-daemon --max-workers=1`, 명령 한정 JVM `-Xmx2048m -XX:TieredStopAtLevel=1 -XX:-UseOnStackReplacement -XX:ReservedCodeCacheSize=512m`, Kotlin in-process를 사용했다. 개인 경로 설정·키·APK·로그는 커밋하지 않는다. 저장소/링크·diff 검사와 원격 게시 결과는 PR에서 실제 확인 후 연결한다.
 
 
+### #55 가게 꾸미기·확장 완료 원결과 조회 검증
+
+원본은 부모 `b3f38c058c76512765655b84935e62749801d7b3` 위 reader와 시험이다. A가 Pleos API 34의 격리 앱에서 실제 SQLite 74개를 실행해 **73 통과·1 실패·오류/생략 0**을 확인했다. 신규 reader는 27/28, 기존 꾸미기·시설·checkpoint는 46/46이었다. 실패는 같은 요청 ID의 다른 종류 SAVED fixture에 필수 차량 Update가 없어 기존 validator가 reader 호출 전에 거절한 경우다.
+
+동일 제품 APK와 fixture만 교정한 시험 APK로 A가 해당 메서드 한 개를 재실행해 **1 통과(0.219초), 실패/오류/생략 0**을 확인했다. 꾸미기·확장 reader가 각각 `STATE_CONFLICT`를 반환했고 사용자 테이블 행·SAVED 원명령은 그대로였으며 정의 공급자는 호출되지 않았다. 두 실행의 결과는 각각 보존한다. C의 후속 독립 검토에서 제품·fixture 필수 수정은 0건이었다.
+
+최신 main `8eb1c5904b34ee7a3a7d07a21f24babe62c9ee1f`에 승인 소스와 교정 시험을 결합했다. 기존 장치 근거의 원제품과 통합 후보의 시험 결과를 구분한다. 이번 결합의 기기 실행, Main 소비, 제품 UI, 프로세스·전원 재실행 및 실차 검증은 미수행이며 #55 및 #28 전체 완료는 별도다.
+
+
+JDK 17.0.6과 Android SDK 35에서 코어 단위 444개·앱 단위 674개(원결과 reader 7개 포함)가 실패·오류·생략 0으로 통과했다. 앱 APK·시험 APK 빌드와 Lint(오류 0·경고 27), 저장소 검사와 diff 검사도 통과했다.
+
+
 ## 전경 휴식 생산자 원입력 재시도 검증
 
 검토 원본은 부모 `79e5d1458a60439007996bb9571eed230374930f` + source patch SHA-256 `9c376a582ed380a37b7fb6eb4f4abf9d78a1cb106c9afd9c54a779f184b0ae86`의 source723이다. root는 최신 꾸미기17 공급과 결합하며 소유5파일이 원본 SHA와 바이트 동일함을 확인했다. 기존 Main/HostSession/SDK/core/DB·규칙 수치는 변경하지 않았다.
@@ -1942,3 +1954,6 @@ SQLite 시험은 정상2시간·감액3시간·상한 제외1시간, 원 매출3
 재시험 시작 때 종료돼 있던 기존 AVD를 데이터 초기화 없이 한 번 기동했다. 제품 APK·데이터6개·권한·창 설정·차량 상태는 직전 반환과 같았고 부팅 횟수/Activity ID 변화는 기록했다. 기동 후 기준 대비 보존19항목과 격리 패키지 정리·장치 반환을 확인했다. 실제 Main Activity 재생성·프로세스/전원·SDK D/P와 공식 전체 폼팩터·실차는 이 시험의 성공 범위가 아니며 #28에 남는다.
 
 원본 근거는 `/private/tmp/drive-rental-result-basis-20261111/independent-device-review/`, `/private/tmp/drive-results-rental-basis-copy-f-20261111/independent-device-review/`, `/private/tmp/drive-results-rental-basis-test-retry-f-20261111/independent-device-review/`에 보존했다. 통합 명령은 JDK17·기존 SDK·Gradle Wrapper에서 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`, `--offline --no-daemon --max-workers=1`·Kotlin in-process를 사용했다. 원격 커밋·CI·머지와 이슈 완료 판단은 연결 PR에서 확인한다.
+
+
+PR #200 반영 main `cf0dc17c8359e5f358e6074667aaa9d6b03533f6`과 이번 시간 근거를 결합해 코어444·앱687개(실패·오류·생략0), Debug/시험 APK·Lint를 다시 확인했다. Gradle은 2분40초에 성공했고 Lint는 오류0·경고27이다. 공용 helper의 원결과 소유자 조회와 schema18 변경은 함께 보존했다. 02의 동시 추가 절 충돌은 두 계약 모두 유지해 해결했으며 이 결합 APK의 새 장치 실행은 하지 않았다.

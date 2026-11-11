@@ -862,3 +862,10 @@ main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결
 `ParkingIncomePolicy`는 기존 30분/30%/8시간 값을 한 곳에 둔다. 기존 parkingIncomeWindow와 equivalentMillis의 공개 시그니처/산식/값은 유지한다. 각 구간은 당시 정책 값과 버전을 보존하며 읽기는 현재 콘텐츠/정책으로 재분류하지 않는다. 금액을 구간별로 재배분하지 않고 기존 Settlement를 유일한 금액 권위로 쓴다. INACTIVE는 accountInactive 경로이며 물리 주차나 실제 앱 이탈의 별도 증거를 뜻하지 않는다. 입력의 관측/종료 영업 원점 검증은 기존 runtime/journal 책임이다.
 
 `RentalResultBasisReader.read(rentalId)`와 `SettlementHistoryEntry.rentalBasis`는 `ContractResult<Observation<RentalResultBasis>>` 경계로 원래 profile/source/rule·대여/정산 ID와 정상/감액/상한 제외 시간·원본 구간을 제공한다. 신규/옛 결과를 섞어 추정하지 않는다. 기존 완료 행의 metadata 없음은 Missing(NO_DATA), 존재하는 원문/숫자/연속 구간/원래 대여·금융 연결 손상은 STORAGE_FAILURE다. schema18에서 표 자체가 사라지면 읽기 실패이며 자동 재생성하지 않는다. 구버전 active 대여도 중간부터 이력을 채우지 않는다. 기존 Main의 정산 조회 경로에 이 입력을 전달하며 `ResultsHostMapper`와 `ResultsView`에서 원래 구간을 표시한다. 열람 저장과 주행 제한 경계는 유지한다.
+
+
+### #55 가게 꾸미기·확장 완료 원결과 조회
+
+`ShopOriginalResultReader(store).decoration(profileId, requestId)`는 `ContractResult<DecorationSettlement?>`를, `expansion(profileId, requestId, fullShopExpansion)`은 `ContractResult<Settlement?>`를 반환한다. 같은 SQLite 거래에서 실제 프로필과 저장 출처를 확인하고 원명령·최초 결과와 전역 요청 ID 소유자를 대조한다. 확장 호출자는 처음 확정한 전체 입력을 전달하고 reader는 공통 정산의 원명령과 최초 결과를 대조한다. 시설 구매 원결과는 기존 `hostCommands.facilityResult`에서 읽는다. 유료 꾸미기의 공통 원정산과 무료 구매·보유품 적용의 금융 정산 없는 typed 결과를 그대로 읽는다.
+
+완료 기록이 없으면 `Success(null)`, 다른 명령 내용이나 소유자가 확인되면 `STATE_CONFLICT`, 저장 손상이 확인되면 `STORAGE_FAILURE`, 다른 프로필이면 `INVALID_INPUT`을 반환한다. 현재 정의·가격·잔액 조회나 거래·checkpoint 변경 없이 원결과를 확인하며 정상 미완료 slot을 보존한다. 기존 `requestUnavailable` 계약과 소유자 검사 순서를 사용하고, 자기 소유자는 해당 원결과를 검증한 뒤에만 제외한다. Main/Shop의 호출·표시 연결은 별도 소비 범위다.
