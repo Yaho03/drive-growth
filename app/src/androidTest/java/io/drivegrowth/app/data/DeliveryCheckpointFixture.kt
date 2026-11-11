@@ -41,5 +41,6 @@ internal fun stripRestFixture(db:SQLiteDatabase) {
 
 /** schema17 도입 전 구조만 재현하는 시험 utility. */
 internal fun stripDecorationFixture(db:SQLiteDatabase) {
+    db.execSQL("DROP TABLE IF EXISTS rental_result_basis")
     for(table in listOf("decoration_requests","decoration_module"))db.execSQL("DROP TABLE IF EXISTS $table")
 }
