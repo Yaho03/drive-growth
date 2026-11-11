@@ -1559,6 +1559,18 @@ checkpoint 모듈/시험5파일·helper/factory·연결4파일은627과 동일�
 최신 main168 정상 통합에서 변경 앱23파일이81과 바이트동일하고 이미 main의 수리guard·Runtime·AppHost를 보존했다. 정확 게시head CI는 연결 PR에서 확인하며 새 게시head 장치재실행으로 쓰지 않는다. 명시 SIMULATION/격리SQLite/DB재개방이고 제품 livefactory/save·execute·finish 소비·전체UI/명령·프로세스/전원·실차/전체 #50/#51/#52/#56/#121/#122 완료는 아니다. #44 Expand 후보도 별도다.
 
 
+### #56 첫 차량 확인 전과 지급 직후의 조작 제한 — 2026-11-11
+
+A가 Pleos API 34 ARM64의 새 격리 패키지에서 `OnboardingMainSimulationGateTest#testSimulationRestrictionBeforeConfirmAndAfterCommitRestoresOneOriginalGrant`를 실행해 1건을 4.237초에 통과했다. 실제 Main·온보딩 호스트·SQLite를 사용했다. 시험은 시연의 SIMULATION gate 상태만 바꾸며 SDK D/P 관측이나 모의 주행 프레임을 원장에 보내지 않는다.
+
+- 첫 차량 확인 전 제한에서는 이전 화면에 있던 확인·이전 버튼 입력이 차단됐고, 선택과 확인 단계가 유지됐다. 지급 요청·잔액·보유 차량은 모두 0이었다.
+- 첫 지급을 SQLite에 확정한 뒤 Main이 응답을 처리하기 전에 제한했다. 제한 중 이전 확인 버튼으로 다시 지급하거나 가게로 이동할 수 없었다. 허용 복귀 후 같은 `initial-grant` 요청과 원정산을 표시했다. 가게 이동 뒤 지급 요청·초기 정산 각 1건, 캐스퍼 1대, 잔액 1,000, 차고 3칸을 확인했다.
+
+시험 기준은 `dce75aea611904d2f94d754e4cbeb080c38e9848`와 [계측 소스 1개](../app/src/androidTest/java/io/drivegrowth/app/host/onboarding/OnboardingMainSimulationGateTest.kt)다. Debug 앱과 계측 APK를 빌드했고, 설치 후 회수 SHA-256은 앱 `f0d804bc755c1781bfc22eb04741c4513a3133eb0f19255c83b19a43df6b6603`, 계측 `1ab2c08b8ff4625c1c7d8c0ab2f8a9e430d254a4ac70c9be193bf5ae30a95354`로 빌드본과 일치했다. 환경·제품 보존 19개 항목을 모두 확인했다. 게시 기준은 #204가 반영된 main `f91089a3ec0a07b80e5074ef1b88468a693c9d65`이며, 시험 파일을 포함한 앱·코어·빌드 입력의 동일성을 확인했다. 장치 결과는 원래 실행 근거다.
+
+실제 SDK D/P 전환, 지급 처리 중 OS 프로세스 사망, 전원·실차와 #56·#51 전체 검증은 후속 범위다.
+
+
 ### 랭킹 모듈·Android JSON 오류 분리 수정 검증 — 2026-11-10
 
 b35c0bf의독립코드APPROVE와실제원본13중12PASS/1FAIL을별도보존한다. rewarded=1.5의Cursor.integer가던진Android checkedJSONException이RuntimeException catch를벗어나outerFailure가된P2다. 원58407d173ae4d5135404243db4b5c8d0d4a66d3e는명시import/catch만추가하고DB/숫자/정책/기존기대값을바꾸지않았다.
