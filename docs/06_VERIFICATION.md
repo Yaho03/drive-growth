@@ -1891,3 +1891,23 @@ A는 다른 frame/receiver/clock/pause와 실제 previous revision의 충돌/원
 계획 정정본 SHA-256은 `74400b30d873aa3e26a4e9a235a0b5b037c97225de0e488b65568f87dc2595b7`이다. 새5의 `rest-source-retry-<source>-<nano>.db`와 기존3의 `driving-source-fixture-<source>-<nano>.db`를 모두 명시하고 이전 계획을 보존했다. 동일 시험 APK는 `07249435f97b1f76f13a5f355753f74c5ab3a925c9b7d2ee81146bd1b37c1c51`, 설치 pull old app은 `8cd900134866021faa2e1d38e3edcf2ac2358727abbe0ea6d329da571f587e8a`, new app은 `030efd3f7a88fd71df7dde3a1a68b9112a8d9a1bca84ef90dd2d3ea1289d609b`다. A 장치 사용은 2026-11-11 01:23:23~01:25:37 KST, 환경/제품19/19 보존·자체 DB/패키지 정리·슬롯 반환을 확인했다. root/F/C는 이 실제 실행에서 adb를 사용하지 않았다.
 
 원본은 `/private/tmp/drive-rest-producer-retry-fix-20261111/independent-device-review/`, F 독립 대조는 `/private/tmp/drive-rest-retry-review-f-20261111/`, root 결합 로그는 `/private/tmp/drive-rest-retry-root-validation-20261111.log`에 보존한다. 최신 main 결합 APK의 실제 장치 실행은0이며 A 원본 쌍과 구분한다. Main의 원입력 보관·명시 등록/활성화·현재 SDK/장소 증거·Rest UI 및 #40/#51/#28 전체는 남는다. #189는 기능 구현 뒤 적용한다.
+
+
+## 대여 정산의 저장된 시간 근거와 화면 검증 — 2026-11-11
+
+정상·감액·상한 제외 시간을 실제 수락 구간과 각 구간에 적용된 당시 정책으로 저장하고 기존 Main 정산 조회→ResultsHostMapper→ResultsView에 연결했다. 금액은 최초 Settlement를 표시하며 시간에서 다시 지급하거나 현재 잔액으로 바꾸지 않는다. 기록이 없는 이전 결과는 확인 불가다. 계약은 [시간 근거 schema18](02_SYSTEM_ARCHITECTURE.md#대여-결과-시간-근거-schema18), 표현은 [시간 상세](09_UI_UX_SPEC.md#영업-정산의-시간-상세)를 따른다.
+
+| 검증 대상 | 실제 결과와 적용 범위 |
+|---|---|
+| 원본 저장 공급 | Pleos 2.1.0/API34/ARM64 격리 앱의 SQLite 111개 통과. 새 시간 근거16·기존 대여14·이력4·runtime9·관측 영업41·꾸미기27. 실패·오류·생략0 |
+| 원본 Results 표시 | 새6 중5통과·시험 준비 오류1, 기존9통과. 좁은 화면에서 상세를 먼저 연 뒤 없는 목록 버튼을 찾는 시험 오류였고 Bundle 단언은 미도달 |
+| 수정한 시험 1개 | 제품 코드와 호스트 APK는 그대로 두고 목록→전체 기록→상세→열람 순으로 시험을 준비했다. 2026-11-11 20:02:40~20:03:35 KST 실행에서 1개 통과(0.480초). Bundle 복원 후 선택·필터·Pending·버튼 비활성·0.001초 표시·이벤트 없음·명시 완료 후 Done까지 확인 |
+| 최신 main 결합 | 기준 main `8eb1c5904b34ee7a3a7d07a21f24babe62c9ee1f`에서 core444·앱680 통과, Debug/시험 APK·Lint 성공(오류0·경고27). 시험 준비만 수정한 뒤 시험 APK 컴파일도 성공. 이 결합 APK를 다시 장치에서 실행한 결과는 아님 |
+
+SQLite 시험은 정상2시간·감액3시간·상한 제외1시간, 원 매출348·당시 잔액448과 정책·원점 보존을 확인했다. 재개방·중복 구간·legacy Missing·손상 거절·쓰기 실패 전체 롤백·원정산 재시도도 포함한다. 실제 SQLite→이력→mapper→View 시험에서도 같은 시간과 금액을 확인했고, 별도 표시 시험은 당시 정책58%·1.001초·긴 구간·좁은 배치를 확인했다. INACTIVE는 자동 영업 반영 구간이며 물리 주차나 실차 관측으로 표시하지 않는다.
+
+저장 시험의 설치 APK는 `4431de6eb91e97692b9d1416d908edaef56c4eb99fc750ce63646890dc796a6b`다. UI 호스트는 `612ea306c020c6209470018f79bae6bb233eae7bc1771023ec8bb5aedcf6350e`, 수정 시험 APK는 `bac6d693d9f4298db2fa5914f3ee06457444a7299bc36eeeaae2e8eab2b0dc49`이며 설치 후 회수 해시와 일치했다. 최초 UI14통과/오류1과 수정1통과를 한 번에 실행한15통과로 합치지 않는다. 독립 검토는 소스 동일성·원문·최종 단언·보존 결과를 대조해 추가 필수 수정0건으로 판단했다. AI 검토이며 사람 승인으로 표시하지 않는다.
+
+재시험 시작 때 종료돼 있던 기존 AVD를 데이터 초기화 없이 한 번 기동했다. 제품 APK·데이터6개·권한·창 설정·차량 상태는 직전 반환과 같았고 부팅 횟수/Activity ID 변화는 기록했다. 기동 후 기준 대비 보존19항목과 격리 패키지 정리·장치 반환을 확인했다. 실제 Main Activity 재생성·프로세스/전원·SDK D/P와 공식 전체 폼팩터·실차는 이 시험의 성공 범위가 아니며 #28에 남는다.
+
+원본 근거는 `/private/tmp/drive-rental-result-basis-20261111/independent-device-review/`, `/private/tmp/drive-results-rental-basis-copy-f-20261111/independent-device-review/`, `/private/tmp/drive-results-rental-basis-test-retry-f-20261111/independent-device-review/`에 보존했다. 통합 명령은 JDK17·기존 SDK·Gradle Wrapper에서 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest`, `--offline --no-daemon --max-workers=1`·Kotlin in-process를 사용했다. 원격 커밋·CI·머지와 이슈 완료 판단은 연결 PR에서 확인한다.

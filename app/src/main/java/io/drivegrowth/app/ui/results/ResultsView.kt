@@ -5,6 +5,7 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
+import io.drivegrowth.app.data.RentalIncomeKind
 import io.drivegrowth.core.contract.*
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -203,7 +204,31 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
             addView(text("차종 궁합 리뷰 상승: ${if (receipt.matchReview) "있음" else "없음"}"))
             addView(text("세차장 리뷰 상승: ${if (receipt.washReview) "있음" else "없음"}"))
             addView(text("단골 여부: ${when (receipt.regularCustomer) { true -> "예"; false -> "아니요"; null -> "확인 불가" }}"))
-            addView(text("감액·상한 적용 내역: 확인할 수 없어요.", color = muted))
+            when (val evidence = value.rentalBasis) {
+                is Observation.Missing -> addView(text("감액·상한 적용 내역: 확인할 수 없어요.", color = muted))
+                is Observation.Available -> {
+                    val basis = evidence.value
+                    addView(text("저장된 영업 시간 근거", 24, bold = true))
+                    addView(text("정상 적용 시간: ${rentalDuration(basis.normalMillis)}"))
+                    addView(text("감액 적용 시간: ${rentalDuration(basis.reducedMillis)}"))
+                    addView(text("상한 제외 시간: ${rentalDuration(basis.cappedMillis)}"))
+                    basis.periods.forEachIndexed { index, period ->
+                        val kind = when (period.kind) {
+                            RentalIncomeKind.DRIVING -> "주행 중 영업"
+                            RentalIncomeKind.PARKED -> "주차 중 영업"
+                            RentalIncomeKind.INACTIVE -> "자동 영업 반영"
+                        }
+                        addView(text("구간 ${index + 1} · $kind", bold = true))
+                        addView(text("${basisTime(period.from)} ~ ${basisTime(period.through)}", color = muted))
+                        addView(text("정상 ${rentalDuration(period.normalMillis)} · 감액 ${rentalDuration(period.reducedMillis)} · 상한 제외 ${rentalDuration(period.cappedMillis)}"))
+                        period.origin?.let { addView(text("수익 계산 기준 시각: ${basisTime(it)}", color = muted)) }
+                        period.policy?.let { policy ->
+                            val percent = policy.reducedMultiplier.movePointRight(2).stripTrailingZeros().toPlainString()
+                            addView(text("적용 기준: 처음 ${rentalDuration(policy.normalMillis)} 정상, 이후 $percent% · 인정 상한 ${rentalDuration(policy.capMillis)}", color = muted))
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -238,6 +263,9 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
         }
     }
 
+    private fun basisTime(value: EpochMillis) = SimpleDateFormat("yyyy.MM.dd HH:mm:ss.SSS 'UTC'", Locale.KOREA).apply {
+        timeZone = java.util.TimeZone.getTimeZone("UTC")
+    }.format(Date(value.value))
     private fun pair(label: Int, value: String) = context.getString(R.string.results_pair, s(label), value)
     private fun money(value: GameMoney) = context.getString(R.string.results_money, NumberFormat.getIntegerInstance(Locale.KOREA).format(value.units))
     private fun moneyChange(value: Settlement): String {

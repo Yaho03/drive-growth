@@ -854,3 +854,11 @@ main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결
 생산자는 같은 previous/next 전체 제안의 재시도에서 계산한 recognition과 batch를 재생한다. `SessionObservedDrivingSource`의 Rest 경로도 최초 reduce 결과·drive ID·전체 입력/실제 previous 원문과 준비된 batch를 단일 메모리 슬롯에 보존한다. capture 실패 뒤 같은 입력은 새 ID/provider batch를 만들지 않는다. 다른 frame·receiver·clock·pause·provider·actual previous/revision은 원 제안을 덮지 않고 STATE_CONFLICT다. capture가 실제 거래로 확정된 뒤 슬롯을 해제하므로 별도 금융 drain 실패가 다음 관측을 옛 제안에 묶지 않는다. 내부 자동 반복·재귀·누적 큐는 없다. provider=null의 기존 저장·지급 본문은 유지한다.
 
 이 경계는 같은 source 인스턴스의 미확정 제안 재시도이며 디스크 큐/프로세스 사망 전 미저장 입력 복원을 새로 보장하지 않는다. 호출자는 실패한 원 frame/clock의 재시도와 수명 종료 순서를 보존해야 한다. 새 producer는 같은 session worker에서 같은 store.atomic 안의 `restDriving.projectionIn(db, identity)`를 먼저 검증하고 `RestAtomicStorage.contexts(db, identity).map { it.value }`의 원 ordinal 순서를 읽어 성공한 전체 목록만 restore한다. contexts 단독·별도 거래 조회·elapsed 재정렬·실패를 빈 목록으로 보정하지 않는다. 실제 Main/HostSession 등록·opt-in·boot/domain/장소 권위 공급·정책·전체 SDK/프로세스 검증은 별도다.
+
+### 대여 결과 시간 근거 schema18
+
+#54의 정상/감액/8시간 상한 설명을 위해 새 배정부터 같은 DB의 선택 metadata 표 `rental_result_basis`에 실제 수락 구간과 최초 정산 연결을 기록한다. 기존 rentals·settlements의 열/명령·금액 산식은 유지한다. 배정의 빈 metadata, account의 수락 구간/정확 weighted delta, settle의 원래 settlementId는 각각 기존 변경과 같은 거래에서 저장하고 실제 쓰기를 검증한다. 기록 실패는 해당 거래 전체를 롤백한다. 연속된 같은 종류/원점/정책 구간은 시간과 정확한 delta 합을 보존해 합친다.
+
+`ParkingIncomePolicy`는 기존 30분/30%/8시간 값을 한 곳에 둔다. 기존 parkingIncomeWindow와 equivalentMillis의 공개 시그니처/산식/값은 유지한다. 각 구간은 당시 정책 값과 버전을 보존하며 읽기는 현재 콘텐츠/정책으로 재분류하지 않는다. 금액을 구간별로 재배분하지 않고 기존 Settlement를 유일한 금액 권위로 쓴다. INACTIVE는 accountInactive 경로이며 물리 주차나 실제 앱 이탈의 별도 증거를 뜻하지 않는다. 입력의 관측/종료 영업 원점 검증은 기존 runtime/journal 책임이다.
+
+`RentalResultBasisReader.read(rentalId)`와 `SettlementHistoryEntry.rentalBasis`는 `ContractResult<Observation<RentalResultBasis>>` 경계로 원래 profile/source/rule·대여/정산 ID와 정상/감액/상한 제외 시간·원본 구간을 제공한다. 신규/옛 결과를 섞어 추정하지 않는다. 기존 완료 행의 metadata 없음은 Missing(NO_DATA), 존재하는 원문/숫자/연속 구간/원래 대여·금융 연결 손상은 STORAGE_FAILURE다. schema18에서 표 자체가 사라지면 읽기 실패이며 자동 재생성하지 않는다. 구버전 active 대여도 중간부터 이력을 채우지 않는다. 기존 Main의 정산 조회 경로에 이 입력을 전달하며 `ResultsHostMapper`와 `ResultsView`에서 원래 구간을 표시한다. 열람 저장과 주행 제한 경계는 유지한다.

@@ -126,6 +126,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             if(!it.moveToFirst()||it.text(0)!=selected?.value||it.text(1)!=terms.rules.value||it.integer(2,0,Long.MAX_VALUE)!=terms.start.value||it.integer(3,0,Long.MAX_VALUE)!=end||it.integer(4,0,Long.MAX_VALUE)!=end+terms.returnMinutes*60000L||it.integer(5,0,Long.MAX_VALUE)!=terms.start.value||it.text(6)!="0"||it.text(7)!=quote.fare.toPlainString()||it.integer(8,0,Long.MAX_VALUE)!=quote.facilityBonus.units||it.text(9)!="RENTED")throw SQLiteException("배정 실제 대여 입력 쓰기 불일치")
             if((if(it.isNull(10))null else it.text(10))!=terms.rounding?.name||it.strictBoolean(11)!=quote.accident||it.strictBoolean(12)!=quote.exactMatchReviewBoost||it.strictBoolean(13)!=quote.carWashReviewBoost||(if(it.isNull(14))null else it.strictBoolean(14))!=terms.regularCustomer)throw SQLiteException("배정 실제 고객/사고/반올림 쓰기 불일치")
         }
+        RentalBasisStorage.begin(db, store, request.id)
         ContractResult.Success(selected)
     }
 
@@ -144,15 +145,25 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             val oldPark=if(it.isNull(3))null else it.integer(3,0,Long.MAX_VALUE)
             val start=it.integer(4,0,Long.MAX_VALUE);val previous=it.text(2).toBigDecimal()
             if(cursor !in start..it.integer(1,start,Long.MAX_VALUE)||previous.signum()<0||previous>(cursor-start).toBigDecimal()||oldPark?.let{p->p>cursor}==true)throw SQLiteException("대여 누적/커서 범위 손상")
+            val basis = RentalBasisStorage.load(db, store, id)
             if (end <= cursor || to.value < from.value) return@atomic ContractResult.Success(EpochMillis(cursor))
             if (from.value > cursor) return@atomic conflict()
             if (parkedSince != null && oldPark!=null && oldPark != parkedSince.value) return@atomic conflict()
-            val increment = parkedSince?.let { start -> parkingIncomeWindow(start, EpochMillis(cursor), EpochMillis(end)).equivalentMillis() } ?: (end-cursor).toBigDecimal()
+            val window = parkedSince?.let { origin -> parkingIncomeWindow(origin, EpochMillis(cursor), EpochMillis(end)) }
+            val increment = window?.equivalentMillis() ?: (end-cursor).toBigDecimal()
+            val normal = window?.fullMillis ?: (end-cursor)
+            val reduced = window?.reducedMillis ?: 0L
+            val period = RentalIncomePeriod(EpochMillis(cursor), EpochMillis(end),
+                if (!physical) RentalIncomeKind.INACTIVE else if (parkedSince == null) RentalIncomeKind.DRIVING else RentalIncomeKind.PARKED,
+                parkedSince, normal, reduced, end-cursor-normal-reduced, increment,
+                if (window == null) null else RentalIncomePolicy(ParkingIncomePolicy.version, ParkingIncomePolicy.normalMillis,
+                    ParkingIncomePolicy.capMillis, ParkingIncomePolicy.reducedMultiplier))
             val amount=(previous+increment).toPlainString();val persistedPark=if(physical)parkedSince?.value else oldPark
             if(db.update("rentals",android.content.ContentValues().apply{put("cursor",end);put("weighted",amount);if(persistedPark==null)putNull("parked_since")else put("parked_since",persistedPark)},"id=?",arrayOf(id.value))!=1)throw SQLiteException("대여 누적 무갱신")
             db.rawQuery("SELECT cursor,weighted,parked_since FROM rentals WHERE id=?",arrayOf(id.value)).use{r->
                 if(!r.moveToFirst()||r.integer(0,0,Long.MAX_VALUE)!=end||r.text(1)!=amount||(if(r.isNull(2))null else r.integer(2,0,Long.MAX_VALUE))!=persistedPark)throw SQLiteException("대여 실제 누적 쓰기 불일치")
             }
+            RentalBasisStorage.append(db, store, basis, period)
             ContractResult.Success(EpochMillis(end))
         }
     }
@@ -262,6 +273,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         db.rawQuery("""SELECT version,start,end,cursor,weighted,fare,bonus,rounding,accident,match_review,wash_review,
             settlement_request,regular_customer FROM rentals WHERE id=?""", arrayOf(id.value)).use { row ->
             if (!row.moveToFirst()) return@atomic missing()
+            val basis = RentalBasisStorage.load(db, store, id)
             val weightedMillis = BigDecimal(row.getString(4))
             val bonus = GameMoney(if (weightedMillis.signum() == 0) 0 else row.getLong(6))
             fun receipt(s: Settlement) = RentalReceipt(s, row.getInt(8)==1, row.getInt(9)==1, row.getInt(10)==1, bonus,
@@ -302,6 +314,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
                     }
                     val event = store.quests.onRentalCompleted(db, id, result.value)
                     if (event is ContractResult.Failure) return@atomic event
+                    RentalBasisStorage.finish(db, store, basis, result.value)
                     ContractResult.Success(receipt(result.value))
                 }
             }

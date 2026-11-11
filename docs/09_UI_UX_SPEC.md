@@ -232,6 +232,11 @@ collection.render(mappedCollectionState, controlsEnabled = allowedByCommonShell)
 실제 실행 범위와 미검증 항목은 [호스트 연결 검증](06_VERIFICATION.md#정산첫-실행-실제-호스트-연결-검증--2026-11-07)을 따른다.
 
 
+### 영업 정산의 시간 상세
+
+- 저장된 정상·감액·상한 제외 시간과 정산 당시의 정책을 표시한다. 자동 영업 반영 구간을 실제 주차로 표시하지 않는다. 금액과 잔액은 당시 정산을 사용한다.
+- 시간 기록이 없는 이전 정산은 확인 불가로 표시한다. 금액에서 시간을 추정하지 않는다. 읽기 실패·주행 제한·열람 요청 대기는 기존 정산 화면의 상태 처리에 따른다.
+
 ### #55 가게·시설·꾸미기 표시 UI 연결점
 
 2026-11-07 `app/ui/shop/ShopView`를 Android Views로 추가했다. `wireframes.svg`와 `ui-v3/4a-shop-home.png`, `4o-facilities.png`, `4u-landscape-shop-home.png`, `4z-landscape-facilities.png`를 직접 확인해 어두운 카드·큰 버튼·전체/차량 보기와 시설 조건 표시를 적용한다. 시안 홈의 누락된 세차장 문구를 이미지로 재사용하지 않고 실제 텍스트로 표시한다. `shop_vehicle.xml`은 이번에 작성한 자체 중립 도형이며 외부 실차·캐릭터·로고를 포함하지 않는다. 3D 자산·자유 배치 엔진은 추가하지 않았다.

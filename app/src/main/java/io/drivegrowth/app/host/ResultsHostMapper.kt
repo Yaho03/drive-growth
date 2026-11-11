@@ -36,13 +36,23 @@ class ResultsHostMapper {
             if (rows.map { it.settlement.settlementId }.distinct().size != rows.size ||
                 rows.map { it.settlement.transaction.requestId }.distinct().size != rows.size ||
                 rows.any { it.settlement.transaction.source != data.identity.source ||
-                    (it.rental != null && it.rental.receipt.settlement != it.settlement) })
+                    (it.rental != null && it.rental.receipt.settlement != it.settlement) ||
+                    !rentalBasisMatches(it, data.identity) })
                 ResultsScreenState.Error("정산 이력의 식별·출처·영업 연결을 확인할 수 없어요")
             else ResultsScreenState.Content(Collections.unmodifiableList(rows.map {
                 ResultPresentation(it.settlement, it.settlement.changedVehicle?.vehicleId?.let(data.vehicleNames::get),
-                    it.viewed, it.rental, it.rentalVehicleId?.let(data.vehicleNames::get))
+                    it.viewed, it.rental, it.rentalVehicleId?.let(data.vehicleNames::get), it.rentalBasis)
             }), ResultsOrigin.STORED, historyAvailable = true)
         }
     }
-
+    private fun rentalBasisMatches(entry: io.drivegrowth.app.data.SettlementHistoryEntry, identity: GameIdentity): Boolean {
+        val basis = (entry.rentalBasis as? io.drivegrowth.core.contract.Observation.Available)?.value ?: return true
+        val rental = entry.rental ?: return false
+        val settlement = entry.settlement
+        return settlement.transaction.kind == io.drivegrowth.core.contract.TransactionKind.RENTAL &&
+            settlement.transaction.requestId.value == "rental/settle/" + rental.rentalId.value &&
+            basis.rentalId == rental.rentalId && basis.settlementId == settlement.settlementId &&
+            basis.profileId == identity.profileId && basis.source == identity.source &&
+            basis.ruleVersion == settlement.transaction.ruleVersion
+    }
 }

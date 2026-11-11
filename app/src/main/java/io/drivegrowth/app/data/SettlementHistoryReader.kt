@@ -12,7 +12,8 @@ import org.json.JSONTokener
 import java.util.Collections
 
 data class SettlementHistoryEntry(val settlement:Settlement,val viewed:Boolean,
-    val rental:CompletedRental?=null,val rentalVehicleId:VehicleId?=null)
+    val rental:CompletedRental?=null,val rentalVehicleId:VehicleId?=null,
+    val rentalBasis:Observation<RentalResultBasis> = Observation.Missing(MissingReason.NO_DATA))
 data class SettlementHistorySnapshot(val identity:GameIdentity,val entries:List<SettlementHistoryEntry>,
     val vehicleNames:Map<VehicleId,String> = emptyMap())
 
@@ -47,7 +48,9 @@ class SettlementHistoryReader(private val store:SqliteGameChangeStore) {
                     val rental=checkCommand(db,profile,rows.text(2),receipt)
                     val car=rental?.let{store.findVehicle(db,it.ownedVehicleId)}
                     if(car!=null && car.ownedVehicleId!=rental.ownedVehicleId)bad("대여 차량 키 불일치")
-                    add(SettlementHistoryEntry(receipt,rows.flag(4),rental,car?.vehicleId))
+                    val basis = rental?.let { RentalResultBasisReader(store).readIn(db, it) }
+                        ?: Observation.Missing(MissingReason.NO_DATA)
+                    add(SettlementHistoryEntry(receipt,rows.flag(4),rental,car?.vehicleId,basis))
                 }
             } }
             ContractResult.Success(SettlementHistorySnapshot(GameIdentity(profile,store.source),Collections.unmodifiableList(entries)))
