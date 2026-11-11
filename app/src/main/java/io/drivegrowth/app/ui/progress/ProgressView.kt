@@ -47,7 +47,8 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
             addView(text(s(R.string.progress_restricted_body))); return@with
         }
         addView(text(s(R.string.progress_title), 32, bold = true))
-        showingDetail = interaction.uiState.selectedKey != null && interaction.state is ProgressScreenState.Content
+        val showingContent = interaction.state is ProgressScreenState.Content
+        showingDetail = showingContent && interaction.uiState.selectedKey != null
         val body = column()
         if (uiState.pendingConflicts.isNotEmpty()) {
             add(body, text(s(R.string.progress_recovery_required), color = amber))
@@ -70,8 +71,12 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
                 if (showingDetail) detail(body) else overview(body, state)
             }
         }
-        val y = if (showingDetail) detailY else listY
-        scroll = object : ScrollView(context) {
+        val y = when {
+            !showingContent -> 0
+            showingDetail -> detailY
+            else -> listY
+        }
+        val bodyScroll = object : ScrollView(context) {
             private var restore = true
             init { isFillViewport = true; addView(body) }
             override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
@@ -79,7 +84,9 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
                 if (restore) { restore = false; scrollTo(0, y) }
             }
         }
-        addView(scroll, LayoutParams(-1, 0, 1f))
+        // 중간 안내 화면이 목록이나 상세의 마지막 위치를 덮어쓰지 않게 한다.
+        if (showingContent) scroll = bodyScroll
+        addView(bodyScroll, LayoutParams(-1, 0, 1f))
         if (focusedTag != null) findViewWithTag<View>(focusedTag)?.requestFocus()
     }
     private fun overview(body: LinearLayout, state: ProgressScreenState.Content) = with(style) {

@@ -4,6 +4,7 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteDatabase
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.achievement.AchievementMetric
 import io.drivegrowth.core.garage.Garage
 import io.drivegrowth.core.progression.VehicleActivity
 import io.drivegrowth.core.rental.*
@@ -206,7 +207,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         ContractResult.Success(completedRentalCount(db))
     }
 
-    private fun completedRentalCount(db: SQLiteDatabase): Int {
+    internal fun completedRentalCount(db: SQLiteDatabase): Int {
         val rentals = HashSet<RequestId>()
         val receipts = HashSet<SettlementId>()
         db.rawQuery(completedSelect, null).use { rows ->
@@ -315,6 +316,8 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
                     val event = store.quests.onRentalCompleted(db, id, result.value)
                     if (event is ContractResult.Failure) return@atomic event
                     RentalBasisStorage.finish(db, store, basis, result.value)
+                    val achievement = store.achievements.observe(db, setOf(AchievementMetric.CUSTOMERS))
+                    if (achievement is ContractResult.Failure) return@atomic achievement
                     ContractResult.Success(receipt(result.value))
                 }
             }
@@ -361,7 +364,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
     }
 
     fun expand(id: RequestId, offer: ShopExpansion) = purchase(id, offer.ruleVersion, offer.price,
-        listOf("expand", offer.fromLevel, offer.currentCapacity, offer.nextCapacity, offer.requiredCustomers, offer.trial)) { db, state, balance ->
+        listOf("expand", offer.fromLevel, offer.currentCapacity, offer.nextCapacity, offer.requiredCustomers, offer.trial), observesExpansion = offer) { db, state, balance ->
         val completed = completedRentalCount(db)
         offer.preview(state.progress.copy(servedCustomers = completed), state.capacity, balance).also {
             if (it is ContractResult.Success) db.execSQL("UPDATE shop SET level=?,capacity=? WHERE id=1",
@@ -370,6 +373,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
     }
 
     private fun purchase(id: RequestId, rules: RuleVersion, price: GameMoney, terms: List<Any>,
+                         observesExpansion: ShopExpansion? = null,
                          apply: (SQLiteDatabase, ShopState, GameMoney) -> ContractResult<*>) = store.atomic { db ->
         val command = JSONArray(terms + listOf(rules.value, price.units)).toString()
         db.rawQuery("SELECT command,result FROM settlements WHERE request_id=?", arrayOf(id.value)).use {
@@ -378,8 +382,20 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         }
         val result = apply(db, shop(db), store.readBalance(db))
         if (result is ContractResult.Failure) return@atomic result
-        store.record(db, GameChange(id, TransactionKind.FACILITY, store.source, rules,
+        val receipt = store.record(db, GameChange(id, TransactionKind.FACILITY, store.source, rules,
             MoneyChange(MoneyDirection.DEBIT, price)), command)
+        if (receipt is ContractResult.Success && observesExpansion != null && store.achievements.authority != null) {
+            val actual = shop(db)
+            if (actual.progress.shopLevel != observesExpansion.fromLevel + 1 || actual.capacity != observesExpansion.nextCapacity ||
+                store.readBalance(db) != receipt.value.balance) throw SQLiteException("업적 원인 확장 쓰기 불일치")
+            db.rawQuery("SELECT settlement_id,command,result FROM settlements WHERE request_id=?", arrayOf(id.value)).use {
+                if (!it.moveToFirst() || it.text(0) != receipt.value.settlementId.value || it.text(1) != command ||
+                    it.text(2) != LedgerJson.settlement(receipt.value).toString()) throw SQLiteException("업적 원인 확장 정산 누락")
+            }
+            val achievement = store.achievements.observe(db, setOf(AchievementMetric.SHOP))
+            if (achievement is ContractResult.Failure) return@atomic achievement
+        }
+        receipt
     }
 
     private fun readResult(db: SQLiteDatabase, id: String) =

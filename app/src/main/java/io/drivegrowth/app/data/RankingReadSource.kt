@@ -164,6 +164,14 @@ class RankingReadSource(private val store: SqliteGameChangeStore, private val so
         for(receipt in receipts.values.filter{it.transaction.requestId !in questIds && it.transaction.money?.direction==MoneyDirection.CREDIT}) {
             if(receipt.transaction.kind in setOf(TransactionKind.DRIVING,TransactionKind.RENTAL,TransactionKind.DELIVERY)) continue
             if(receipt.transaction.kind!=TransactionKind.GARAGE) throw MissingEvidence("포함 또는 제외 원인이 확인되지 않은 입금이 있습니다.")
+            if (receipt.transaction.requestId.value.startsWith(io.drivegrowth.core.achievement.ACHIEVEMENT_CLAIM_PREFIX)) {
+                val original = store.achievements.confirmed(db, receipt.transaction.requestId)
+                if (original != null) {
+                    if (original.settlement != receipt) throw SQLiteException("업적 원정산 불일치")
+                    // PRD 누적 게임머니의 포함 원인에 업적 보상은 등록돼 있지 않다.
+                    continue
+                }
+            }
             val car=receipt.changedVehicle
             if(car?.lifecycle in setOf(VehicleLifecycle.SOLD,VehicleLifecycle.SCRAPPED)) {
                 if(car==null || car.revision.value==0) throw SQLiteException("처분 revision 오류")

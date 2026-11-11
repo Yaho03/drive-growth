@@ -154,6 +154,11 @@ class SettlementHistoryReader(private val store:SqliteGameChangeStore) {
                         val original=required(store.quests.settlement(command.requestId))?:bad("Quest 원결과 누락")
                         if(original.command!=command || original.settlement!=s || QuestJson.command(command).toString()!=raw)bad("Quest 원결과 연결 불일치")
                     }
+                    AchievementJson.TYPE -> {
+                        val original = store.achievements.confirmed(db, s.transaction.requestId) ?: bad("업적 원결과 누락")
+                        if (original.command.profileId != profile || original.settlement != s ||
+                            AchievementJson.command(original.command).toString() != raw) bad("업적 원결과 연결 불일치")
+                    }
                     else->bad("미지원 정산 명령 원문")
                 };null
             }

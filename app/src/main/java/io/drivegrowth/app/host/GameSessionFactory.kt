@@ -59,6 +59,9 @@ class GameSessionFactory internal constructor(context: Context, private val data
         InputSource.entries.associateWith { "game-ledger-${it.name.lowercase()}.db" }, newProfileSource, questDefinitions, System::currentTimeMillis)
     private val context = context.applicationContext
     private var bound: GameIdentity? = null
+    private var achievementTracking = false
+
+    internal fun enableAchievements() { achievementTracking = true }
 
     @Synchronized
     fun open(): ContractResult<GameSession> {
@@ -105,6 +108,20 @@ class GameSessionFactory internal constructor(context: Context, private val data
                         is ContractResult.Success -> ContractResult.Success(MaterialVersions(content.value.catalog.contentVersion, content.value.ruleVersion))
                     }
                 })
+            val achievementAuthority by lazy {
+                when (content) {
+                    is ContractResult.Failure -> content
+                    is ContractResult.Success -> when (val definition = store.trialDefinitions.load()) {
+                        is ContractResult.Failure -> definition
+                        is ContractResult.Success -> when (val achievements = definition.value.achievementDefinitions) {
+                            is ContractResult.Failure -> achievements
+                            is ContractResult.Success -> ContractResult.Success(io.drivegrowth.app.data.AchievementAuthority(
+                                achievements.value, content.value.catalog))
+                        }
+                    }
+                }
+            }
+            if (achievementTracking) store.achievements.authority = { achievementAuthority }
             when (val profile = store.localProfileId()) {
                 is ContractResult.Failure -> { store.close(); profile }
                 is ContractResult.Success -> {

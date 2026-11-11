@@ -1,0 +1,181 @@
+{
+  "dateKst": "2026-11-11",
+  "testedCandidate": {
+    "baseCommit": "46297fa6c07e2366a3018ee75be8c958a2c26c23",
+    "patchSHA256": "41af01c81b81e0a5b71213790574c835b2cc697bb431b189d88d85d0e30eccdf",
+    "sourceManifestSHA256": "a967fdd711b4efc8815057ff35cdebff15733a939abc9801796d9b139971f31b"
+  },
+  "recoveryLabelCandidate": {
+    "patchSHA256": "6d7c6f2c7b86273a65f583bd5b71cd5fe0b85e17f6671ba4e295c524c770f593",
+    "deltaFromTestedCandidateSHA256": "b0211423968151b293ec3e2efe77b7f3945a8c35b8af0326b014d282d84e3390",
+    "buildStatus": "pending",
+    "deviceStatus": "pending"
+  },
+  "build": {
+    "gradleTasks": [
+      ":core:test",
+      ":app:testDebugUnitTest",
+      ":app:assembleDebug",
+      ":app:assembleDebugAndroidTest",
+      ":app:lintDebug"
+    ],
+    "coreUnitTests": {
+      "tests": 447,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "appUnitTests": {
+      "tests": 780,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 34
+    }
+  },
+  "device": {
+    "platform": "Pleos emulator",
+    "androidApi": 34,
+    "abi": "arm64-v8a",
+    "apk": {
+      "app": {
+        "package": "io.drivegrowth.verify.achievementf",
+        "builtSHA256": "f2af1d5f84e7bc0082064037a851efbb74756f49b84ff3564cfea22a05a75da1",
+        "installedSHA256": "f2af1d5f84e7bc0082064037a851efbb74756f49b84ff3564cfea22a05a75da1",
+        "matchesBuilt": true
+      },
+      "test": {
+        "package": "io.drivegrowth.verify.achievementf.test",
+        "builtSHA256": "60de2be1401954078d614dd87b751aa4353b165b580682b4780b5cec15a30714",
+        "installedSHA256": "60de2be1401954078d614dd87b751aa4353b165b580682b4780b5cec15a30714",
+        "matchesBuilt": true
+      }
+    },
+    "runner": "android.test.InstrumentationTestRunner",
+    "selectedClasses": {
+      "io.drivegrowth.app.data.AchievementLedgerTest": 7,
+      "io.drivegrowth.app.host.progression.ProgressionSqliteTest": 12,
+      "io.drivegrowth.app.data.HostCheckpointStoreIntegrationTest": 9,
+      "io.drivegrowth.app.data.ShopOriginalResultReaderDeviceTest": 30
+    },
+    "instrumentation": {
+      "passed": 58,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 13.569
+    },
+    "v18LegacyFixtureCases": 7,
+    "installedV18UpgradeExecuted": false,
+    "preservationChecksPassed": 19,
+    "preservationChecksTotal": 19,
+    "deviceReleased": true
+  },
+  "manualMain": {
+    "inputSource": "SIMULATION",
+    "initialVehicles": 1,
+    "firstGrantCount": 1,
+    "initialBalance": 1000,
+    "ownedAchievementProgress": "1 / 2",
+    "dailyQuestsObserved": 3,
+    "initialRunStopReason": "scroll automation reached the configured limit before completing navigation",
+    "followUp": {
+      "sameInstalledApkHashes": true,
+      "ownedVehicles": 2,
+      "balanceSequence": [
+        1000,
+        500,
+        600
+      ],
+      "rewardAmount": 100,
+      "rewardClaimCount": 1,
+      "linkedCreditSettlementCount": 1,
+      "newProcessConfirmed": true,
+      "claimDisabledAfterRelaunch": true,
+      "comparedEconomicLedgerTablesWithEqualRowsAfterRelaunch": 8,
+      "foregroundObservationRowsAddedAfterRelaunch": {
+        "observed_driving_marker": 1,
+        "observed_driving_state": 1
+      },
+      "preservationChecksPassed": 19
+    }
+  },
+  "scrollCandidate": {
+    "dateKst": "2026-11-12",
+    "baseCommit": "46297fa6c07e2366a3018ee75be8c958a2c26c23",
+    "runner": "android.test.InstrumentationTestRunner",
+    "selectedClass": "io.drivegrowth.app.ui.progress.ProgressScrollDeviceTest",
+    "sameInstalledTestApk": true,
+    "testApkSHA256": "aac9490bed143f00a34fc8da394a312c9afcb13c72bd781bb34b222048ee8bd3",
+    "plannedRedFailures": 2,
+    "plannedRedFailureCountMatched": false,
+    "red": {
+      "patchSHA256": "d2648d719ea4ee60f82d62be402ffa46a5708cbabfd6ff2ca9611e8b90a4cd6f",
+      "installedAppSHA256": "a9e58e266343e99d74f0d0804317353e4e0838411e222e78201b5f8d12067141",
+      "passed": 1,
+      "failures": 3,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 3.35,
+      "positionAssertions": [
+        "testFailureLayoutPreservesContentPosition",
+        "testLoadingLayoutPreservesContentPosition",
+        "testRestrictionHidesContentAndPreservesDetailSelectionAndListPosition"
+      ]
+    },
+    "green": {
+      "patchSHA256": "d089f9f13a763015d61944e9edd443c95d0f0f8a4904afdcc0324c0ac249ab5c",
+      "installedAppSHA256": "93b96092aedfabaa43fee2c5811e7312b23f453c5a35660c43a70cc97ce4dbd6",
+      "passed": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 3.349
+    },
+    "preservationChecksPassed": 19,
+    "preservationChecksTotal": 19,
+    "deviceReleased": true
+  },
+  "publicationCandidate": {
+    "baseCommit": "3213f8d18396c51e1c6acaaf27ccc4a04e9167ed",
+    "patchSHA256": "b17618b17ce4bcb2308421be749975d89acda5250e90918e4051ccf3e6809994",
+    "sourceManifestSHA256": "c7864578cc1b48dcd00c328b4b9d2437070b01d60da36315e1b9b47ca661ee24",
+    "tasks": [
+      ":core:test",
+      ":app:testDebugUnitTest",
+      ":app:assembleDebug",
+      ":app:assembleDebugAndroidTest",
+      ":app:lintDebug",
+      ":app:compileReleaseKotlin"
+    ],
+    "core": {
+      "tests": 447,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "app": {
+      "tests": 787,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 39
+    },
+    "releaseKotlin": "passed",
+    "deviceExecutions": 0,
+    "appApk": {
+      "sha256": "36bc9ea18899bf7b9afa5768627ab3f0478d12f6e8d964e7d452d51b0caa847d",
+      "package": "io.drivegrowth.app.simulation"
+    },
+    "testApk": {
+      "sha256": "240c46f7958b237c445ce42bc46a3c9738b0d19a890dc96ad97ff29c6cd6a611",
+      "package": "io.drivegrowth.app.simulation.test"
+    }
+  }
+}
