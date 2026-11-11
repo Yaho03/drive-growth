@@ -854,3 +854,10 @@ main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결
 생산자는 같은 previous/next 전체 제안의 재시도에서 계산한 recognition과 batch를 재생한다. `SessionObservedDrivingSource`의 Rest 경로도 최초 reduce 결과·drive ID·전체 입력/실제 previous 원문과 준비된 batch를 단일 메모리 슬롯에 보존한다. capture 실패 뒤 같은 입력은 새 ID/provider batch를 만들지 않는다. 다른 frame·receiver·clock·pause·provider·actual previous/revision은 원 제안을 덮지 않고 STATE_CONFLICT다. capture가 실제 거래로 확정된 뒤 슬롯을 해제하므로 별도 금융 drain 실패가 다음 관측을 옛 제안에 묶지 않는다. 내부 자동 반복·재귀·누적 큐는 없다. provider=null의 기존 저장·지급 본문은 유지한다.
 
 이 경계는 같은 source 인스턴스의 미확정 제안 재시도이며 디스크 큐/프로세스 사망 전 미저장 입력 복원을 새로 보장하지 않는다. 호출자는 실패한 원 frame/clock의 재시도와 수명 종료 순서를 보존해야 한다. 새 producer는 같은 session worker에서 같은 store.atomic 안의 `restDriving.projectionIn(db, identity)`를 먼저 검증하고 `RestAtomicStorage.contexts(db, identity).map { it.value }`의 원 ordinal 순서를 읽어 성공한 전체 목록만 restore한다. contexts 단독·별도 거래 조회·elapsed 재정렬·실패를 빈 목록으로 보정하지 않는다. 실제 Main/HostSession 등록·opt-in·boot/domain/장소 권위 공급·정책·전체 SDK/프로세스 검증은 별도다.
+
+
+### #55 가게 꾸미기·확장 완료 원결과 조회
+
+`ShopOriginalResultReader(store).decoration(profileId, requestId)`는 `ContractResult<DecorationSettlement?>`를, `expansion(profileId, requestId, fullShopExpansion)`은 `ContractResult<Settlement?>`를 반환한다. 같은 SQLite 거래에서 실제 프로필과 저장 출처를 확인하고 원명령·최초 결과와 전역 요청 ID 소유자를 대조한다. 확장 호출자는 처음 확정한 전체 입력을 전달하고 reader는 공통 정산의 원명령과 최초 결과를 대조한다. 시설 구매 원결과는 기존 `hostCommands.facilityResult`에서 읽는다. 유료 꾸미기의 공통 원정산과 무료 구매·보유품 적용의 금융 정산 없는 typed 결과를 그대로 읽는다.
+
+완료 기록이 없으면 `Success(null)`, 다른 명령 내용이나 소유자가 확인되면 `STATE_CONFLICT`, 저장 손상이 확인되면 `STORAGE_FAILURE`, 다른 프로필이면 `INVALID_INPUT`을 반환한다. 현재 정의·가격·잔액 조회나 거래·checkpoint 변경 없이 원결과를 확인하며 정상 미완료 slot을 보존한다. 기존 `requestUnavailable` 계약과 소유자 검사 순서를 사용하고, 자기 소유자는 해당 원결과를 검증한 뒤에만 제외한다. Main/Shop의 호출·표시 연결은 별도 소비 범위다.
