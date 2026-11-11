@@ -14,13 +14,17 @@ class DeliveryOfferSourceTest {
     private class Harness {
         val identity=GameIdentity(ProfileId("profile"),InputSource.SIMULATION)
         val day=LocalDate.of(2026,11,10);val content=GameContentFixtures.loaded()
+        var discoveryFailure = false
+        val discoveryInputs = mutableListOf<DeliveryProposed>()
         var saved:DeliveryList?=null;var discoveries=0;var persistFailure=false;var foreign=false
         val queries=object:DeliveryHostQueries {
             override fun identity()=ContractResult.Success(identity)
             override fun read(identity:GameIdentity)=ContractResult.Success(DeliveryHostData(identity,content,GameMoney(100000),1,3,null,null,emptyList()))
             override fun lists(identity:GameIdentity,day:LocalDate)=ContractResult.Success(listOfNotNull(saved))
             override fun saveList(identity:GameIdentity,list:DeliveryList):ContractResult<DeliveryList>{if(persistFailure)return ContractResult.Failure(ContractError.STORAGE_FAILURE);if(saved==null)saved=list;return ContractResult.Success(saved!!)}
-            override fun discover(identity:GameIdentity,proposed:DeliveryProposed):ContractResult<Unit>{discoveries++;return ContractResult.Success(Unit)}
+            override fun discover(identity:GameIdentity,proposed:DeliveryProposed):ContractResult<Unit>{discoveries++
+                discoveryInputs += proposed
+                return if (discoveryFailure) ContractResult.Failure(ContractError.STORAGE_FAILURE) else ContractResult.Success(Unit)}
         }
         private val nav=object:DeliveryNavigationPort {
             override fun read(identity:GameIdentity)=ContractResult.Success(DeliveryNavigationSnapshot(DestinationKey("selected"),"선택 목적지",
@@ -44,5 +48,16 @@ class DeliveryOfferSourceTest {
     @Test fun `목록 저장 실패와 다른 출처 경로를 정상 후보로 숨기지 않는다`() {
         val h=Harness();h.persistFailure=true;assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),h.source.offers(h.identity));assertNull(h.saved)
         h.persistFailure=false;h.foreign=true;assertTrue(h.source.offers(h.identity) is ContractResult.Failure);assertNull(h.saved);assertEquals(0,h.discoveries)
+    }
+
+    @Test fun `발견 저장 실패는 원표시 증거를 남기고 성공한 증거만 소비한다`() {
+        val h = Harness()
+        val original = h.offers().displayedProposal!!
+        h.discoveryFailure = true
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), h.source.displayed(h.identity, original))
+        h.discoveryFailure = false
+        assertEquals(ContractResult.Success(Unit), h.source.displayed(h.identity, original))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), h.source.displayed(h.identity, original))
+        assertEquals(listOf(original, original), h.discoveryInputs)
     }
 }
