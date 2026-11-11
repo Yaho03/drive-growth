@@ -99,6 +99,21 @@ Gradle의 `--version`에 표시되는 내장 Kotlin 2.0.20은 Gradle 자체 스�
 
 현재 컴퓨터의 결과는 06 문서에 기록하고 다른 팀원의 설치·실행 결과와 구분한다. 팀원별 OS·CPU·SDK/AVD 지원·성공 또는 실패 단계·후속 담당은 실제 확인 후 #12에서 채운다. 이 문서의 절차 제공만으로 4명 전원의 환경 준비 완료를 표시하지 않는다.
 
+### 별도 모의 시연 Debug APK
+
+JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌드한다. 산출물은 `app/build/outputs/apk/debug/app-debug.apk`, 패키지는 `io.drivegrowth.app.simulation`이다. 시연 원장 `unified-simulation.db`와 진행 기록은 이 패키지에 저장된다. Release는 기존 `io.drivegrowth.app` 패키지와 차량 입력을 사용한다.
+
+1. 기기 담당과 실행 시간을 조율하고 `SERIAL`에 시험 장치 시리얼을 지정한다. 시연 APK를 설치한 뒤 런처의 **드라이브 키우기 · 모의 시연**을 연다.
+
+   ```sh
+   adb -s "$SERIAL" install -r app/build/outputs/apk/debug/app-debug.apk
+   adb -s "$SERIAL" shell am start -n io.drivegrowth.app.simulation/io.drivegrowth.app.simulation.UnifiedSimulationActivity
+   ```
+
+2. 첫 실행이면 차량을 선택해 첫 지급을 확정하고 가게로 이동한다. 탁송에서 **시연 목적지 확인**을 누르고 수익 의뢰를 확정한 뒤 선택 결과를 확인한다.
+3. **모의주행 시작 · 논리 1시간**을 누른다. 모의 주차까지 진행한 뒤 탁송 결과와 정산 내역을 확인한다. 보류가 표시되면 **같은 모의 입력 재시도**를 사용한다.
+4. 재실행 확인이 필요하면 시연 Activity를 종료하고 다시 연다. `DriveGrowthSimulation`의 `simulation_input`과 `simulation_terminal_restored`를 같은 논리 시각으로 비교한다. 원래 탁송 결과와 확인 대기 상태도 확인한다. 각 시험의 범위는 [시연 검증 기록](06_VERIFICATION.md#통합-모의주행-debug-검증--2026-11-11)을 따른다.
+
 ## 기존 설치 상태
 
 사용자가 **Android SDK와 Pleos/42dot 라이선스, 대용량 이미지 다운로드 및 설치를 명시적으로 승인**했다. Platform 35, Build Tools 35.0.0, Platform Tools, Command-line Tools, ARM64 에뮬레이터를 설치했다. Pleos 이미지의 크기·SHA-1 검증과 설치를 마쳤고, 전용 AVD의 부팅 완료 및 차량 서비스 실행을 확인했다.

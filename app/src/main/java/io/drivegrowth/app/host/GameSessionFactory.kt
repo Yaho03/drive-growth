@@ -49,10 +49,14 @@ class GameSession internal constructor(val identity: GameIdentity, val store: Sq
 /** worker 전용. 기존 모드를 보존하고 NEW 여부는 helper가 발급한 근거에만 맡긴다. */
 class GameSessionFactory internal constructor(context: Context, private val databaseNames: Map<InputSource, String>,
     private val newProfileSource: InputSource,
-    private val questDefinitions: (() -> ContractResult<io.drivegrowth.core.quest.QuestDefinitions>)? = null) {
+    private val questDefinitions: (() -> ContractResult<io.drivegrowth.core.quest.QuestDefinitions>)?,
+    private val clock: () -> Long) {
+    internal constructor(context: Context, databaseNames: Map<InputSource, String>, newProfileSource: InputSource,
+        questDefinitions: (() -> ContractResult<io.drivegrowth.core.quest.QuestDefinitions>)? = null) :
+        this(context, databaseNames, newProfileSource, questDefinitions, System::currentTimeMillis)
     constructor(context: Context, newProfileSource: InputSource = InputSource.VEHICLE,
         questDefinitions: (() -> ContractResult<io.drivegrowth.core.quest.QuestDefinitions>)? = null) : this(context,
-        InputSource.entries.associateWith { "game-ledger-${it.name.lowercase()}.db" }, newProfileSource, questDefinitions)
+        InputSource.entries.associateWith { "game-ledger-${it.name.lowercase()}.db" }, newProfileSource, questDefinitions, System::currentTimeMillis)
     private val context = context.applicationContext
     private var bound: GameIdentity? = null
 
@@ -74,7 +78,7 @@ class GameSessionFactory internal constructor(context: Context, private val data
                 is ContentLoad.Rejected -> ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
             }
             lateinit var store: SqliteGameChangeStore
-            store = SqliteGameChangeStore(context, source, name,
+            store = SqliteGameChangeStore(context, source, name, clock = clock,
                 questDefinitions = questDefinitions,
                 gachaAuthority = {
                     when (content) {

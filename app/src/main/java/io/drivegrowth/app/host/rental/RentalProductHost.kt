@@ -19,9 +19,12 @@ class RentalProductHost(private val worker: Executor, private val main: Executor
         worker.execute(reconnectSource)
     }
     /** 이미 수락된 SDK 관측은 UI pause 뒤에도 영속 처리한다. 호출자는 D와 같은 serial worker다. */
-    fun observed(token: String, frame: DrivingFrame, recorded: ContractResult<DrivingRecordingResult>) {
-        val result = observeSource(frame, recorded)
+    fun observed(token: String, frame: DrivingFrame, recorded: ContractResult<DrivingRecordingResult>): ContractResult<RentalRuntimeSnapshot> {
+        val result = try { observeSource(frame, recorded) }
+            catch (_: SecurityException) { ContractResult.Failure(io.drivegrowth.core.contract.ContractError.PERMISSION_DENIED) }
+            catch (_: RuntimeException) { ContractResult.Failure(io.drivegrowth.core.contract.ContractError.STORAGE_FAILURE) }
         main.execute { if (receiver == token) listener?.invoke(result) }
+        return result
     }
     fun pause() {
         receiver = null; listener = null

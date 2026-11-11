@@ -34,7 +34,7 @@ class SqliteGameChangeStore(
     internal val questDefinitions: (() -> ContractResult<QuestDefinitions>)? = null,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : FirstRentalGiftStore, MaterialChangeStore, RepairChangeStore, InitializationChangeStore, VehicleHistoryStore, Closeable {
-    private val helper = LedgerHelper(context.applicationContext, databaseName, source, initialGachaProgress)
+    private val helper = LedgerHelper(context.applicationContext, databaseName, source, initialGachaProgress, clock)
     /** 실제 중앙 asset 공급. 모듈 내부 시험은 실패 supplier를 주입하며 기존 clock 생성자 계약은 유지한다. */
     internal var trialDefinitions:TrialDefinitionSource = AssetTrialDefinitionProvider(context.applicationContext.assets)
 
@@ -363,7 +363,7 @@ class SqliteGameChangeStore(
 internal enum class LedgerFailureReason { SQLITE, CORRUPT, UNSUPPORTED_SCHEMA, SOURCE_MISMATCH, INVALID_RECORD }
 private class LedgerStorageException(val reason: LedgerFailureReason) : SQLiteException(reason.name)
 
-private class LedgerHelper(context: Context, name: String, private val source: InputSource, private val initialGachaProgress: GachaProgress?) : SQLiteOpenHelper(
+private class LedgerHelper(context: Context, name: String, private val source: InputSource, private val initialGachaProgress: GachaProgress?, private val clock: () -> Long) : SQLiteOpenHelper(
     context, name, null, 18,
     // Android 기본 핸들러의 손상 DB 삭제를 막고 원본을 보존한다.
     DatabaseErrorHandler { throw LedgerStorageException(LedgerFailureReason.CORRUPT) },
@@ -439,7 +439,7 @@ private class LedgerHelper(context: Context, name: String, private val source: I
                 throw LedgerStorageException(LedgerFailureReason.INVALID_RECORD)
             ProfileId(it.text(0))
         }
-        if (QuestLedger.startTracking(db, profile, source, EpochMillis(System.currentTimeMillis()), fresh) is ContractResult.Failure)
+        if (QuestLedger.startTracking(db, profile, source, EpochMillis(clock()), fresh) is ContractResult.Failure)
             throw LedgerStorageException(LedgerFailureReason.INVALID_RECORD)
     }
     override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
