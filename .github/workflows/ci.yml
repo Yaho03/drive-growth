@@ -21,7 +21,8 @@ jobs:
         id: scope
         shell: bash
         run: |
-          if git ls-files app/src core/src | grep -q .; then
+          source_files=$(git ls-files app/src core/src)
+          if [[ -n "$source_files" ]]; then
             echo "android_sources=true" >> "$GITHUB_OUTPUT"
           else
             echo "android_sources=false" >> "$GITHUB_OUTPUT"
