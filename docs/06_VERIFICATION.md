@@ -1582,7 +1582,25 @@ A가 Pleos API 34 ARM64의 새 격리 패키지에서 `OnboardingMainSimulationG
 
 시험 기준은 `dce75aea611904d2f94d754e4cbeb080c38e9848`와 [계측 소스 1개](../app/src/androidTest/java/io/drivegrowth/app/host/onboarding/OnboardingMainSimulationGateTest.kt)다. Debug 앱과 계측 APK를 빌드했고, 설치 후 회수 SHA-256은 앱 `f0d804bc755c1781bfc22eb04741c4513a3133eb0f19255c83b19a43df6b6603`, 계측 `1ab2c08b8ff4625c1c7d8c0ab2f8a9e430d254a4ac70c9be193bf5ae30a95354`로 빌드본과 일치했다. 환경·제품 보존 19개 항목을 모두 확인했다. 게시 기준은 #204가 반영된 main `f91089a3ec0a07b80e5074ef1b88468a693c9d65`이며, 시험 파일을 포함한 앱·코어·빌드 입력의 동일성을 확인했다. 장치 결과는 원래 실행 근거다.
 
-실제 SDK D/P 전환, 지급 처리 중 OS 프로세스 사망, 전원·실차와 #56·#51 전체 검증은 후속 범위다.
+위 계측의 조작 제한은 SIMULATION 입력으로 검증했다. 실제 SDK D/P 결과는 아래 별도 실행을 따른다.
+
+
+### #56 실제 SDK D 정차와 첫 차량 단일 지급 — 2026-11-11
+
+Pleos Connect Emulator 2.1.0 / API 34 / ARM64의 새 격리 앱에서 `io.drivegrowth.app.onboarding56gate/io.drivegrowth.app.MainActivity`를 명시 실행했다. 시험 대상 앱 소스는 `dce75aea611904d2f94d754e4cbeb080c38e9848`이며 기존 #207 격리 앱 APK의 설치 회수 SHA-256은 `f0d804bc755c1781bfc22eb04741c4513a3133eb0f19255c83b19a43df6b6603`으로 준비본과 일치했다. 위 SIMULATION 계측과 별도로 Main 화면에 터치하고, 같은 VEHICLE 프로필의 SQLite 원장을 읽었다.
+
+| 시험 순서 | 실제 관측 |
+|---|---|
+| P에서 후보와 이전 화면 반복 → 캐스퍼 확인 | SDK `gear=PARK ux=false`에서 확인 단계까지 이동했다. 최초 지급 요청·정산·차량 각 0건, 잔액 0이었다. |
+| Virtual Console 연결 → D 정차 | 콘솔 세션 연결 뒤 `bridge_ready`와 `emulator_active`가 true가 됐다. 콘솔 속도는 0 km/h였고, 앱 SDK는 같은 프로세스에서 `speed=OK gear=DRIVE ux=true`를 수신했다. 제한 안내가 표시됐고 탐색과 지급 확인 버튼이 사라졌다. 지급 요청·정산·차량 각 0건, 잔액 0을 유지했다. [D 정차 제한 화면](evidence/issue56-sdk-onboarding/stationary-drive-restricted.png) |
+| P 복귀 | SDK `gear=PARK ux=false`를 다시 수신했다. 같은 프로세스·프로필의 캐스퍼 확인 단계가 유지됐고 지급 기록은 계속 0건이었다. |
+| 확인 위치 연속 터치 3회 | 같은 원장에서 `initial-grant` 요청 1건과 연결 정산 1건, 캐스퍼 1대, 잔액 1,000, 공간 3칸을 확인했다. 화면에서도 지급 당시 금액과 공간이 일치했다. [최초 지급 요약 화면](evidence/issue56-sdk-onboarding/first-grant-summary.png) |
+
+첫 시도는 호스트 HTTP 수집기의 이름 충돌로 콘솔 요청 전에 중단됐다. 두 번째 시도에서는 D 제한과 P 복귀를 확인했으나, 수집기가 완료 문구 한 종류만 기다려 최종 지급 원장을 회수하지 못했다. 표의 결과는 수집기를 교정한 마지막 실행 한 번의 근거다. 마지막 실행은 22:42:23–22:43:49 KST였고, 기어 P와 시작 시점의 콘솔 속도·가속·브레이크·조향을 복원했다. 격리 앱 CAR_SPEED를 회수하고 임시 콘솔 세션·포워딩·시험 앱을 정리했다. 기존 부팅과 제품 APK·데이터 파일 6개를 포함한 **보존 항목 19개가 모두 일치**했다. [설치 해시·신호·원장 집계·원복 근거](evidence/issue56-sdk-onboarding/verification.json)
+
+[PR #204의 별도 시연 실행](#실제-ui와-새-os-프로세스-재실행)은 지급을 끝낸 뒤 새 OS 프로세스에서 같은 첫 차량과 원지급 1건을 확인한 근거다. 이번 실제 SDK 실행은 같은 프로세스의 D 정차·P 복귀를 확인했다. D 이동·가감속, 지급 처리 도중 프로세스 사망, 전원 복구, 공식 폼 팩터·실차 및 #28의 기능 간 통합은 이번 실행에서 검증하지 않았다.
+
+[PRD의 시작 경험](01_PRD.md#시작-경험과-주요-기능)은 첫 차량·초기 재화 1,000·공간 3칸과 첫 영업 완료 뒤의 개업 선물 뽑기권 1장을 구분한다. 공간 확장과 간판은 이후 사용자가 선택하는 첫 성장 기능이다. #204의 시연 흐름과 [#55의 별도 가게 확장·꾸미기 검증](#55-가게-꾸미기확장-완료-원결과-조회-검증)에 각 근거를 연결한다.
 
 
 ### 랭킹 모듈·Android JSON 오류 분리 수정 검증 — 2026-11-10
