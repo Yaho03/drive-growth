@@ -82,7 +82,7 @@ python3 scripts/check_repository.py
 
 실제 호스트의 기본 원장에 시험 정산을 만드는 새 `ResultsHostStorageTest`·`ResultsHostActivityTest`는 제품 데이터 보호를 위해 **격리 패키지에서만 실행**하며 제품 패키지에서는 쓰기 전에 실패합니다. 이 시험까지 포함한 전체 계측 시험을 제품 앱에 무조건 실행하지 않습니다. 격리 빌드·설치·권한·표적 실행 명령은 [실제 연결 검증의 재현 절차](docs/06_VERIFICATION.md#격리-표적-시험-재현)를 따릅니다. 장치 점유를 먼저 조율하고 실제 P·정차·UX 허용 조건을 준비합니다.
 
-Debug 산출물 `app/build/outputs/apk/debug/app-debug.apk`은 제품과 별도인 `io.drivegrowth.app.simulation` 패키지입니다. 런처의 **드라이브 키우기 · 모의 시연**에서 첫 지급, 탁송, 모의주행과 원장 결과를 확인하는 절차는 [별도 모의 시연 실행](docs/05_DEVELOPMENT_SETUP.md#별도-모의-시연-debug-apk)을 따릅니다. CI는 소스 포함 시 `repository-checks`와 `android-checks`를 실행합니다. 실제 로컬·CI 결과와 경고는 [검증 기록](docs/06_VERIFICATION.md)을 확인합니다.
+Debug 산출물 `app/build/outputs/apk/debug/app-debug.apk`은 제품과 별도인 `io.drivegrowth.app.simulation` 패키지입니다. 런처의 **드라이브 키우기 · 모의 시연**에서 첫 지급, 탁송, 모의주행과 원장 결과를 확인하는 절차는 [별도 모의 시연 실행](docs/05_DEVELOPMENT_SETUP.md#별도-모의-시연-debug-apk)을 따릅니다. 결합 APK의 [지정 기기 계측](docs/06_VERIFICATION.md#결합-apk의-지정-계측-시험) 4건에서 terminal 복원, 정상·손상 가게 복원 경계, 독립 휴식 시연을 확인했습니다. 별도 실제 UI 실행에서 첫 지급·꾸미기·탁송·모의주행·정산과 새 OS 프로세스의 원결과 복원을 확인했습니다. 전원·실제 SDK·실차 검증은 남아 있습니다. CI는 소스 포함 시 `repository-checks`와 `android-checks`를 실행합니다. 실제 로컬·CI 결과와 경고는 [검증 기록](docs/06_VERIFICATION.md)을 확인합니다.
 
 ## 검증과 한계
 
