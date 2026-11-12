@@ -78,9 +78,11 @@ internal class SimulationTerminalProof(
                     (state.anchor != null && state.anchor != frame.observation) ||
                     (recorded != null && state != recorded.state) || schedule == null || schedule.pending != null
                 ) return@atomic ContractResult.Success(null)
-                val id = driveId ?: originalDriveId(db, identity, frame) ?: return@atomic ContractResult.Success(null)
-                val original = (driving.committed(db, identity, id) as? ContractResult.Success)?.value
+                val receipt = if (driveId == null) driving.committedEndingAt(db, identity, frame)
+                    else driving.committed(db, identity, driveId)
+                val original = (receipt as? ContractResult.Success)?.value
                 if (original == null || !endsWith(original, frame)) return@atomic ContractResult.Success(null)
+                val id = original.trip.id
                 // 같은 DB 연결·스레드의 거래 안에서 영업 schedule, 방문 원문, 배정 및 정산을 읽는다.
                 val first = (game.store.rental.firstCompletedRental() as? ContractResult.Success)
                     ?: return@atomic ContractResult.Success(null)
@@ -107,21 +109,6 @@ internal class SimulationTerminalProof(
 
     private fun endsWith(receipt: ObservedDrivingReceipt, frame: DrivingFrame): Boolean =
         receipt.trip.segments.lastOrNull()?.to == frame.observation && receipt.trip.zone == frame.zone
-
-    // 주행만 먼저 확정된 재시도의 commit 목록은 비어 있다. 같은 원 입력으로 끝난 영수증 하나만 찾는다.
-    // 호출자는 식별한 ID를 기존 journal의 정산 검증 경로로 다시 조회한다.
-    private fun originalDriveId(db: SQLiteDatabase, identity: GameIdentity, frame: DrivingFrame): String? =
-        db.rawQuery("SELECT drive_id,payload FROM observed_driving_receipts WHERE profile=? AND source=?",
-            arrayOf(identity.profileId.value, identity.source.name)).use { rows ->
-            var id: String? = null
-            while (rows.moveToNext()) {
-                val original = ObservedDrivingJson.receipt(JSONObject(rows.getString(1)))
-                if (!endsWith(original, frame)) continue
-                if (id != null) return@use null
-                id = rows.getString(0)
-            }
-            id
-        }
 
     private fun originalVisits(db: SQLiteDatabase, game: GameSession, schedule: RentalProductState, first: RequestId?): String? =
         db.rawQuery("SELECT id,host_command FROM visits WHERE host_command IS NOT NULL ORDER BY rowid", null).use { rows ->

@@ -11,6 +11,7 @@ import io.drivegrowth.app.ui.garage.GarageStyle
 /** 별도 debug 패키지의 시연 런처. 기존 Main/Views와 원장을 그대로 사용한다. */
 class UnifiedSimulationActivity : MainActivity() {
     private var restButton: Button? = null
+    private var restInMainButton: Button? = null
     private var restOpening = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,9 +38,17 @@ class UnifiedSimulationActivity : MainActivity() {
             visibility = View.GONE
         }
         restButton = entry
+        val restInMain = style.button("휴식 포함 모의주행 · 현재 시연 원장", enabled = false, onClick = ::startRestSimulation).apply {
+            tag = "simulation:rest-start"
+            visibility = View.GONE
+        }
+        restInMainButton = restInMain
         super.setContentView(style.column().apply {
             setBackgroundColor(style.base)
-            addView(entry)
+            addView(style.row().apply {
+                addView(entry, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(restInMain, LinearLayout.LayoutParams(0, -2, 1f))
+            })
             addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
         })
     }
@@ -60,6 +69,11 @@ class UnifiedSimulationActivity : MainActivity() {
         restButton?.apply {
             visibility = if (enabled) View.VISIBLE else View.GONE
             isEnabled = enabled
+        }
+        restInMainButton?.apply {
+            val inMainEnabled = enabled && canStartRestSimulation()
+            visibility = if (inMainEnabled) View.VISIBLE else View.GONE
+            isEnabled = inMainEnabled
         }
     }
 

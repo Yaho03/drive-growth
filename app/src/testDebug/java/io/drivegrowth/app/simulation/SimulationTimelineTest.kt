@@ -38,4 +38,27 @@ class SimulationTimelineTest {
             try { SimulationTimeline(bad.first,bad.second);fail("잘못된 진행을 초기화하면 안 된다") } catch (_:IllegalArgumentException) { }
         }
     }
+    @Test fun explicitRestRunKeepsFiveMinutesOfParkingAndOneHundredSecondsAfterDeparture() {
+        var state = checkNotNull(SimulationTimeline(12_000L).beginRest())
+        val frames = generateSequence(state) { it.next() }.toList()
+        assertEquals(72, frames.size)
+        assertFalse(frames.any { it.arrival })
+        assertTrue(frames.dropLast(1).none { it.controlsAllowed })
+        assertTrue(frames.last().terminal)
+        assertTrue(frames.all { it.runStartMs == 12_000L })
+        val parked = frames.filter { it.inRestArea }
+        assertEquals(300_000L, parked.last().elapsedMs - parked.first().elapsedMs)
+        val nextDrive = frames.filter { it.stage in 68..70 }
+        assertEquals(100_000L, nextDrive.last().elapsedMs - nextDrive.first().elapsedMs)
+        assertTrue(nextDrive.all { it.frame().observation.gear == Observation.Available(Gear.DRIVE) })
+        assertTrue(frames.zipWithNext().all { (a, b) -> b.elapsedMs - a.elapsedMs in 1..60_000L })
+        state = parked[1]
+        val replay = SimulationTimeline(state.elapsedMs, state.stage, restRun = true)
+        assertEquals(state.frame(), replay.frame())
+        assertEquals(state.next(), replay.next())
+        val ordinary = checkNotNull(frames.last().begin())
+        assertFalse(ordinary.restRun)
+        assertEquals(65, generateSequence(ordinary) { it.next() }.count())
+    }
+
 }
