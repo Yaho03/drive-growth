@@ -2964,7 +2964,7 @@ JDK 17·SDK 35에서 `:app:assembleDebug :app:assembleDebugAndroidTest --offline
 
 ## 최종 픽셀 화면 결합의 표시·입력 검증 — 2026-11-13
 
-공용 #267과 HOME #268에 표시 PR #262·#263·#264·#266 및 별도 호스트 변경을 결합한 `b3c09a575e16b023e64dcbe93e263bed0788b7ec`(tree `666784894027662b9dceb0d8710cf7bda1ab0a5c`)에서 검사했다. 네 PR의 변경 파일 65개는 이 결합 커밋의 대응 Git blob과 모두 같았다. 공용 자산 23개는 #267의 main 파일과도 같으며 새 경제·저장 계약을 포함하지 않는다.
+공용 #267과 HOME #268에 표시 PR #262·#263·#264·#266 및 별도 호스트 변경을 결합한 `b3c09a575e16b023e64dcbe93e263bed0788b7ec`(tree `666784894027662b9dceb0d8710cf7bda1ab0a5c`)에서 검사했다. 네 PR의 변경 파일 65개는 이 결합 커밋의 대응 Git blob과 모두 같았다. 공용 파일 23개(PNG 21개·Kotlin 2개)는 #267의 main 파일과도 같으며 새 경제·저장 계약을 포함하지 않는다.
 
 JDK 17·기존 Gradle Wrapper에서 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`가 통과했다. 코어 447개·앱 829개, 실패·오류·생략 0, Lint 오류 0·경고 50개다. [단위 결과](evidence/final-pixel-ui/unit-summary.txt)
 
@@ -2981,9 +2981,43 @@ Pleos 2.1.0 / API34 ARM64의 격리 패키지 `io.drivegrowth.verify.combined28e
 
 | 범위 | 실제 결과 | 원본 근거 |
 | --- | --- | --- |
-| #44 시설과 주행 평가 분리 | 시설 없음/보험·주유소 설치의 같은 관측 프레임을 같은 factory 경로에 넣었다. 기록·보상 거리 각 1,000m, 원주행 결과·수익이 같음. 1/1 통과 | [계측](evidence/final-pixel-ui/device-fixture-44-same-frames/instrumentation.txt) · [소스·APK](evidence/final-pixel-ui/device-fixture-44-same-frames/result.json) |
+| #44 보험·주유소 설치 전후 주행 기록·기본 수익 비교 | 시설 없음/보험·주유소 설치의 같은 관측 프레임을 같은 factory 경로에 넣었다. 기록·보상 거리 각 1,000m, 원주행 결과·수익이 같음. 1/1 통과 | [계측](evidence/final-pixel-ui/device-fixture-44-same-frames/instrumentation.txt) · [소스·APK](evidence/final-pixel-ui/device-fixture-44-same-frames/result.json) |
 | #52 오래된 차량 관리 입력 | 강화 재료·수리·판매·폐차의 검토 뒤 개체/활동 변경, 제한 중 이전 확정 입력, 복귀 뒤 이전 버튼, 늦은 실패 응답을 시험했다. 7개 비교 테이블과 공용 슬롯에 추가 거래가 없고 제한 상태를 유지함. 1/1 통과 | [계측](evidence/final-pixel-ui/device-fixture-52-stale/instrumentation.txt) · [소스·APK](evidence/final-pixel-ui/device-fixture-52-stale/result.json) |
 | #53 변경 확정 후 새 프로세스 | 구매 의뢰 변경의 거래를 확정하고 공용 슬롯을 STARTED로 남긴 PID 998을 종료했다. 새 PID 3895의 Main이 같은 request·route·settlement를 조회하고 추가 차감·지급 없이 복원함. 2/2 통과 | [원실행](evidence/final-pixel-ui/device-fixture-53-started/instrumentation-1.txt) · [재실행](evidence/final-pixel-ui/device-fixture-53-started/instrumentation-2.txt) · [전후 식별값](evidence/final-pixel-ui/device-fixture-53-started/issue53-started-after.json) · [소스·APK](evidence/final-pixel-ui/device-fixture-53-started/result.json) |
 | #57 세 목표 표시 | 현재 일간 대여 1/1·주간 열람 2/3·주간 성장 3/3과 청구 버튼 활성/비활성/활성을 픽셀 Main과 원장으로 대조함. 청구 없이 1/1 통과 | [계측](evidence/final-pixel-ui/device-fixture-57-current-goals/instrumentation.txt) · [소스·APK](evidence/final-pixel-ui/device-fixture-57-current-goals/result.json) |
 
 재현 자료는 [#44·#52 계측 patch](evidence/final-pixel-ui/final-fixtures.patch.gz)(SHA-256 `d319bf2ebe0eceb6ffbd160045a5d5bab432ce01014b62e9d5c30ed99d15637e`), [#53 계측 patch](evidence/final-pixel-ui/fixture-53.patch.gz)(`7c51adaf9c90ed9e678e9583741be45285b2bb2aca8de67e509dbfc0b91f3d42`), [#57 계측 원본](evidence/final-pixel-ui/ProgressionPeriodRecoveryMainTest.kt)(`1f7b7601c6651edb14f7cf1ed95d7be50a400cc3547c20aa105c94e3e82c051d`)이다. patch는 원본 문맥 공백과 SHA-256을 보존하기 위해 gzip으로 보관했다. `gzip -dc <파일.patch.gz> > <파일.patch>`로 복원한 뒤 해당 `b3c09a5`의 일회용 사본에서 각각 적용한다. #57 원본은 기존 동일 이름의 시험 파일을 대신하는 격리 계측이며 일반 테스트에 중복 추가하지 않는다. `:app:assembleDebug :app:assembleDebugAndroidTest`로 빌드한 뒤 각 metadata의 격리 패키지와 selector를 사용했다. 새 제품 UI의 지원 창·실제 SDK 변경과 최종 #28 전체 흐름은 이 시험과 별도로 확인한다.
+
+
+같은 `b3c09a5` 제품 APK의 만차 구매 도착 시험은 처음에 기존 개체 세 대의 revision이 0→1로 바뀌어 전체 스냅샷 비교에서 실패했다. 자동 영업이 같이 진행되는 fixture였으며, revision 비교를 제거하는 대신 출발 전 대여 쉬기를 설정해 그 입력만 격리했다. 제품 코드는 바꾸지 않았다. 수정한 시험은 보유 개체·차량 이력과 탁송 정산의 불변, 보관 차량의 차종·희귀도·취득액, 보관 행 한 건, 활성 의뢰 해제를 유지한 채 **1/1 통과(38.25초)**했다. 도착 전 미획득 안내와 도착 후 보관 결과도 확인했다. 이 계측은 차고 화면의 미노출이나 정산 화면의 수익 구분까지 검증한 것으로 확대하지 않는다.
+
+[수정 전 실패](evidence/final-pixel-ui/device-fixture-53-hold/instrumentation-1.txt) · [수정 후 통과](evidence/final-pixel-ui/device-fixture-v2-53-hold/instrumentation-1.txt) · [소스·설치 APK 해시](evidence/final-pixel-ui/device-fixture-v2-53-hold/result.json) · [보유 3→3·보관 식별값](evidence/final-pixel-ui/device-fixture-v2-53-hold/issue53-hold.json) · [대체 계측 patch](evidence/final-pixel-ui/fixture-53-hold-v2.patch.gz). 이 patch의 복원 SHA-256은 `09f434e7a972117eb5af4b4092a9a31cad542c9957946d7123a66093b4d5fc8b`이며 앞의 #53 patch 대신 같은 `b3c09a5` 사본에 적용한다.
+
+
+### 하단 탐색·HOME 배치 수정의 최종 후보 회귀
+
+중간 후보 `5417c63`에서 HOME 3개와 오래된 탐색 입력 차단은 통과했지만, 탐색 2개는 버튼 119px가 페이지 영역 106px보다 커서 실패했다. 폭 제한 값만으로 해결되지 않아 `MainNavigationBar`가 스크롤 내부 버튼을 측정할 때 실제 가용 폭을 상한으로 전달하고 창 크기 변경 시 다시 측정하게 했다. [중간 후보 원본 실패](evidence/final-pixel-ui/device-5417-ui/instrumentation.txt)
+
+수정 소스 `ce03352830207409cf20ffbcd0cdcf6999e12ead`(tree `ce0c2d15a915620bda7e845bc2437fcf75015aac`)의 같은 격리 APK에서 다음 결과를 확인했다. 이 소스 이후 문서만 수정한 게시 커밋은 코드·시험·빌드 입력의 동일성을 별도로 대조한다.
+
+| 시험 | 실제 결과 | 근거 |
+| --- | --- | --- |
+| 320dp 탐색·HOME 지도 | 탐색 2개와 지도 우선 배치·현재 차량 선택·오래된 입력 차단 3개, 총 5/5 통과. 큰 최소 폭과 320→600→320dp 재측정도 포함 | [계측](evidence/final-pixel-ui/device-ce0335-ui/instrumentation.txt) · [식별값](evidence/final-pixel-ui/device-ce0335-ui/result.json) |
+| 공통 탐색의 제한 전 입력 | 페이지 변경 및 주차 복귀 뒤 이전 버튼이 작동하지 않음. 1/1 통과 | [계측](evidence/final-pixel-ui/device-ce0335-access/instrumentation.txt) · [식별값](evidence/final-pixel-ui/device-ce0335-access/result.json) |
+| 기존 Main의 명시적 모의 주행 | 시연 시작 한 번으로 주행·대여·탁송과 저장된 원결과 재조회까지 1/1 통과. 실제 SDK 이동·도착 시험은 아님 | [계측](evidence/final-pixel-ui/device-ce0335-simulation/instrumentation.txt) · [식별값](evidence/final-pixel-ui/device-ce0335-simulation/result.json) |
+
+설치 APK의 SHA-256은 `495264994e42a11b024391779a3daeceeb93aca932aafc12da838e6f03d13c82`, 시험 APK는 `83c9cb3b60c7c23017dcf26851414ce77ac185d0d5514f915b8d989701e57266`다. 제품 패키지와 분리한 `io.drivegrowth.verify.combined28e`에서 실행했다. 코어 447개·앱 829개는 실패·오류·생략 0, 앱·계측 APK 빌드와 Lint(오류 0·경고 50)가 통과했다. [단위 결과](evidence/final-pixel-ui/candidate-ce0335-unit-summary.txt) · [Lint](evidence/final-pixel-ui/candidate-ce0335-lint-summary.txt) · [소스](evidence/final-pixel-ui/candidate-ce0335-source-id.txt)
+
+이 결과로 앞의 두 탐색 결함은 해결됐지만, 임의 320dp View 시험을 공식 폼 팩터 전체 검증으로 확대하지 않는다. 실제 런처·지원 창·최종 전체 플레이와 기기 반환은 별도 후속 결과로 기록한다.
+
+
+### 세 시설의 주행 수익 비교와 꾸미기 쓰기 실패 재시도
+
+`ce03352` 제품 소스에 격리 계측을 추가해 두 조건을 각각 확인했다. 앞의 UI 시험과 다른 패키지·APK 쌍이며, 각 결과 JSON에 정확한 설치 해시와 시험 patch 해시를 남겼다.
+
+- **#44 세 시설:** 시설 없음, 보험·주유소 설치, 세차장 설치의 같은 관측 프레임에서 주행 원기록·거리·기본 수익이 같은지 비교해 1/1 통과했다. 현재 제품에 별도 운전자 평가 점수를 생성하는 경로는 없어 그 점수까지 시험했다고 주장하지 않는다. [실행](evidence/final-pixel-ui/device-fixture-44-three-facilities/instrumentation.txt) · [식별값](evidence/final-pixel-ui/device-fixture-44-three-facilities/result.json) · [추가 계측 patch](evidence/final-pixel-ui/car-wash-same-frames.patch.gz)
+- **#55 실제 Main의 꾸미기 재시도:** 격리 SIMULATION의 DB 쓰기를 거절시켜 잔액·배치·원장 무변경과 SAVED 원명령을 확인했다. 장애 해제 후 화면의 다시 조회로 같은 request를 재사용했고, blue-sign 한 번 적용·100 한 번 차감·원결과 잔액 760 표시를 대조해 1/1 통과했다(11.394초). [실행](evidence/final-pixel-ui/device-fixture-v3-55-retry/instrumentation.txt) · [식별값](evidence/final-pixel-ui/device-fixture-v3-55-retry/result.json) · [원요청·차감 로그](evidence/final-pixel-ui/device-fixture-v3-55-retry/filtered.txt) · [계측 patch](evidence/final-pixel-ui/fixture-55-v3.patch.gz)
+
+꾸미기 시험의 첫 시도는 시험 클릭 코드가 대기 뒤 다시 찾은 버튼에 `!!`를 사용해 NPE로 중단됐다. 버튼 확인과 클릭을 같은 UI 콜백에서 처리한 두 번째 시도는 내부 오류 코드 `STORAGE_FAILURE`를 일반 화면에서 찾는 잘못된 기대 문구로 실패했다. 실제 사용자용 복구 안내를 확인하도록 고친 v3는 원명령·금액·원장 단언을 유지했다. 제품 오류 처리나 경제 코드를 변경한 것은 아니다. [첫 중단 원문](evidence/final-pixel-ui/device-fixture-55-retry/filtered.txt) · [두 번째 실패](evidence/final-pixel-ui/device-fixture-v2-55-retry/instrumentation.txt)
+
+#44의 추가 patch 복원 SHA-256은 `126aaa2059e46d1dbafe802c93e04a2418c381d25c110d7dbe3955d481696255`, #55는 `3751a6ea5a783917b1d251f28529e29e81fea2823cd4773794a5b54ccdbac9c3`다. #44는 앞의 공통 계측 patch 중 ObservedDrivingJournalTest 부분을 적용한 사본에 덧붙이며, #55는 `ce03352` 사본의 같은 시험 파일에 적용한다. 지원 창·최종 디자인·실차의 전체 검증과 구분한다.

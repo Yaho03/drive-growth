@@ -1,0 +1,187 @@
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.MainNavigationBarTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=5
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.MainNavigationBarTest:
+INSTRUMENTATION_STATUS: test=testNarrowBarKeepsAllPagesReachableAndRevealsSelectedPage
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.MainNavigationBarTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=5
+INSTRUMENTATION_STATUS: stack=java.util.concurrent.ExecutionException: junit.framework.AssertionFailedError: ONBOARDING button width 119 exceeds viewport 106
+	at java.util.concurrent.FutureTask.report(FutureTask.java:122)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:191)
+	at io.drivegrowth.app.MainNavigationBarTest.verifyNarrowBar(MainNavigationBarTest.kt:74)
+	at io.drivegrowth.app.MainNavigationBarTest.testNarrowBarKeepsAllPagesReachableAndRevealsSelectedPage(MainNavigationBarTest.kt:13)
+	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+Caused by: junit.framework.AssertionFailedError: ONBOARDING button width 119 exceeds viewport 106
+	at io.drivegrowth.app.MainNavigationBarTest.verifyNarrowBar$lambda$0$assertFullyVisible(MainNavigationBarTest.kt:54)
+	at io.drivegrowth.app.MainNavigationBarTest.verifyNarrowBar$lambda$0(MainNavigationBarTest.kt:57)
+	at io.drivegrowth.app.MainNavigationBarTest.$r8$lambda$Q8BaV7_vKIHBHgW2x3cguQQUb9w(Unknown Source:0)
+	at io.drivegrowth.app.MainNavigationBarTest$$ExternalSyntheticLambda2.call(D8$$SyntheticClass:0)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2420)
+	at android.os.Handler.handleCallback(Handler.java:958)
+	at android.os.Handler.dispatchMessage(Handler.java:99)
+	at android.os.Looper.loopOnce(Looper.java:205)
+	at android.os.Looper.loop(Looper.java:294)
+	at android.app.ActivityThread.main(ActivityThread.java:8194)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+
+INSTRUMENTATION_STATUS: stream=
+Error in testNarrowBarKeepsAllPagesReachableAndRevealsSelectedPage:
+java.util.concurrent.ExecutionException: junit.framework.AssertionFailedError: ONBOARDING button width 119 exceeds viewport 106
+	at java.util.concurrent.FutureTask.report(FutureTask.java:122)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:191)
+	at io.drivegrowth.app.MainNavigationBarTest.verifyNarrowBar(MainNavigationBarTest.kt:74)
+	at io.drivegrowth.app.MainNavigationBarTest.testNarrowBarKeepsAllPagesReachableAndRevealsSelectedPage(MainNavigationBarTest.kt:13)
+	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+Caused by: junit.framework.AssertionFailedError: ONBOARDING button width 119 exceeds viewport 106
+	at io.drivegrowth.app.MainNavigationBarTest.verifyNarrowBar$lambda$0$assertFullyVisible(MainNavigationBarTest.kt:54)
+	at io.drivegrowth.app.MainNavigationBarTest.verifyNarrowBar$lambda$0(MainNavigationBarTest.kt:57)
+	at io.drivegrowth.app.MainNavigationBarTest.$r8$lambda$Q8BaV7_vKIHBHgW2x3cguQQUb9w(Unknown Source:0)
+	at io.drivegrowth.app.MainNavigationBarTest$$ExternalSyntheticLambda2.call(D8$$SyntheticClass:0)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2420)
+	at android.os.Handler.handleCallback(Handler.java:958)
+	at android.os.Handler.dispatchMessage(Handler.java:99)
+	at android.os.Looper.loopOnce(Looper.java:205)
+	at android.os.Looper.loop(Looper.java:294)
+	at android.app.ActivityThread.main(ActivityThread.java:8194)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+
+INSTRUMENTATION_STATUS: test=testNarrowBarKeepsAllPagesReachableAndRevealsSelectedPage
+INSTRUMENTATION_STATUS_CODE: -1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.MainNavigationBarTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=5
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=testLongLastLabelFitsWithinNarrowViewport
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.MainNavigationBarTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=5
+INSTRUMENTATION_STATUS: stack=java.util.concurrent.ExecutionException: junit.framework.AssertionFailedError: ONBOARDING button width 119 exceeds viewport 106
+	at java.util.concurrent.FutureTask.report(FutureTask.java:122)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:191)
+	at io.drivegrowth.app.MainNavigationBarTest.verifyNarrowBar(MainNavigationBarTest.kt:74)
+	at io.drivegrowth.app.MainNavigationBarTest.testLongLastLabelFitsWithinNarrowViewport(MainNavigationBarTest.kt:19)
+	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+Caused by: junit.framework.AssertionFailedError: ONBOARDING button width 119 exceeds viewport 106
+	at io.drivegrowth.app.MainNavigationBarTest.verifyNarrowBar$lambda$0$assertFullyVisible(MainNavigationBarTest.kt:54)
+	at io.drivegrowth.app.MainNavigationBarTest.verifyNarrowBar$lambda$0(MainNavigationBarTest.kt:57)
+	at io.drivegrowth.app.MainNavigationBarTest.$r8$lambda$Q8BaV7_vKIHBHgW2x3cguQQUb9w(Unknown Source:0)
+	at io.drivegrowth.app.MainNavigationBarTest$$ExternalSyntheticLambda2.call(D8$$SyntheticClass:0)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2420)
+	at android.os.Handler.handleCallback(Handler.java:958)
+	at android.os.Handler.dispatchMessage(Handler.java:99)
+	at android.os.Looper.loopOnce(Looper.java:205)
+	at android.os.Looper.loop(Looper.java:294)
+	at android.app.ActivityThread.main(ActivityThread.java:8194)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+
+INSTRUMENTATION_STATUS: stream=
+Error in testLongLastLabelFitsWithinNarrowViewport:
+java.util.concurrent.ExecutionException: junit.framework.AssertionFailedError: ONBOARDING button width 119 exceeds viewport 106
+	at java.util.concurrent.FutureTask.report(FutureTask.java:122)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:191)
+	at io.drivegrowth.app.MainNavigationBarTest.verifyNarrowBar(MainNavigationBarTest.kt:74)
+	at io.drivegrowth.app.MainNavigationBarTest.testLongLastLabelFitsWithinNarrowViewport(MainNavigationBarTest.kt:19)
+	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+Caused by: junit.framework.AssertionFailedError: ONBOARDING button width 119 exceeds viewport 106
+	at io.drivegrowth.app.MainNavigationBarTest.verifyNarrowBar$lambda$0$assertFullyVisible(MainNavigationBarTest.kt:54)
+	at io.drivegrowth.app.MainNavigationBarTest.verifyNarrowBar$lambda$0(MainNavigationBarTest.kt:57)
+	at io.drivegrowth.app.MainNavigationBarTest.$r8$lambda$Q8BaV7_vKIHBHgW2x3cguQQUb9w(Unknown Source:0)
+	at io.drivegrowth.app.MainNavigationBarTest$$ExternalSyntheticLambda2.call(D8$$SyntheticClass:0)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2420)
+	at android.os.Handler.handleCallback(Handler.java:958)
+	at android.os.Handler.dispatchMessage(Handler.java:99)
+	at android.os.Looper.loopOnce(Looper.java:205)
+	at android.os.Looper.loop(Looper.java:294)
+	at android.app.ActivityThread.main(ActivityThread.java:8194)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+
+INSTRUMENTATION_STATUS: test=testLongLastLabelFitsWithinNarrowViewport
+INSTRUMENTATION_STATUS_CODE: -1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.ui.shop.ShopViewTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=5
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.ui.shop.ShopViewTest:
+INSTRUMENTATION_STATUS: test=testHomeMapAndVehicleAreVisibleBeforeSummaryWithoutScrolling
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.ui.shop.ShopViewTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=5
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=testHomeMapAndVehicleAreVisibleBeforeSummaryWithoutScrolling
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.ui.shop.ShopViewTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=5
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=testPixelMapVehicleTapUsesCurrentOwnedIdAndRevision
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.ui.shop.ShopViewTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=5
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=testPixelMapVehicleTapUsesCurrentOwnedIdAndRevision
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.ui.shop.ShopViewTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=5
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=testGateAndStaleDetachedButtonsCannotSubmit
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.ui.shop.ShopViewTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=5
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=testGateAndStaleDetachedButtonsCannotSubmit
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+Test results for InstrumentationTestRunner=.E.E...
+Time: 1.235
+
+FAILURES!!!
+Tests run: 5,  Failures: 0,  Errors: 2
+
+
+INSTRUMENTATION_CODE: -1

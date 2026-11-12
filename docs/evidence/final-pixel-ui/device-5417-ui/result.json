@@ -1,0 +1,19 @@
+{
+  "head": "5417c63e31cdb3140182c389a5581d39faa17fa2",
+  "tree": "1ab0df987deb522da5a38451cb84207782390b2f",
+  "package": "io.drivegrowth.verify.combined28e",
+  "selector": [
+    "io.drivegrowth.app.MainNavigationBarTest#testNarrowBarKeepsAllPagesReachableAndRevealsSelectedPage",
+    "io.drivegrowth.app.MainNavigationBarTest#testLongLastLabelFitsWithinNarrowViewport",
+    "io.drivegrowth.app.ui.shop.ShopViewTest#testHomeMapAndVehicleAreVisibleBeforeSummaryWithoutScrolling",
+    "io.drivegrowth.app.ui.shop.ShopViewTest#testPixelMapVehicleTapUsesCurrentOwnedIdAndRevision",
+    "io.drivegrowth.app.ui.shop.ShopViewTest#testGateAndStaleDetachedButtonsCannotSubmit"
+  ],
+  "sha256": {
+    "io.drivegrowth.verify.combined28e": "60ab0bf8bcfadd08b8ff86163bba3677d7f23e26cb3a2f86fe29c6434a9e9a2f",
+    "io.drivegrowth.verify.combined28e.test": "a33e5b511031e44339f93f130cfc168b04b876538fdfb04a8dd504f9414c66fe"
+  },
+  "cleanupErrors": [],
+  "signerSHA256": "4241ac4162c67a0e0101009cec5a8810ae78bdf1346d4decdf55b191fc64d60b",
+  "passed": false
+}
