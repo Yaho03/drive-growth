@@ -2,6 +2,7 @@ package io.drivegrowth.app.host.facility
 
 import android.content.Context
 import io.drivegrowth.app.data.AssetTrialDefinitionProvider
+import io.drivegrowth.app.data.TrialDefinitionSource
 import io.drivegrowth.app.host.*
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.progression.VehicleActivity
@@ -17,9 +18,12 @@ interface FacilityDurablePort {
 }
 
 /** 실제 조회만 직접 수행한다. 금융/설정 쓰기는 주입한 기존 한 슬롯 어댑터만 수행한다. */
-class FactoryFacilityHostSource(context:Context,private val games:GameSessionFactory,
-    private val journal:FacilityDurablePort?=null):FacilityHostSource {
-    private val definitions=AssetTrialDefinitionProvider(context.applicationContext.assets)
+class FactoryFacilityHostSource(
+    context: Context,
+    private val games: GameSessionFactory,
+    private val journal: FacilityDurablePort? = null,
+    private val definitions: TrialDefinitionSource = AssetTrialDefinitionProvider(context.applicationContext.assets),
+) : FacilityHostSource {
     private fun <T> use(command:FacilityCommand?=null,action:(GameSession)->ContractResult<T>):ContractResult<T> =
         when(val opened=games.open()) {
             is ContractResult.Failure->opened
@@ -43,8 +47,11 @@ class FactoryFacilityHostSource(context:Context,private val games:GameSessionFac
             is ContractResult.Failure->return r
             is ContractResult.Success->activities[car.ownedVehicleId]=r.value
         }
-        return ContractResult.Success(FacilityFacts(game.identity,definition.version,shop.copy(facilities=Collections.unmodifiableSet(HashSet(shop.facilities))),balance,
-            Collections.unmodifiableList(ArrayList(owned)),Collections.unmodifiableMap(activities),Collections.unmodifiableSet(HashSet(resting)),definition.facilityOffers))
+        return ContractResult.Success(FacilityFacts(
+            game.identity, definition.version, shop.copy(facilities = Collections.unmodifiableSet(HashSet(shop.facilities))),
+            balance, Collections.unmodifiableList(ArrayList(owned)), Collections.unmodifiableMap(activities),
+            Collections.unmodifiableSet(HashSet(resting)), definition.facilityOffers, definition.fuelBonusPerRental,
+        ))
     }
     override fun save(command:FacilityCommand)=use(command) { game->
         val durable=journal?:return@use ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
