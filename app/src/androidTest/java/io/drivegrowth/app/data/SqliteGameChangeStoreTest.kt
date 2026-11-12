@@ -236,7 +236,7 @@ class SqliteGameChangeStoreTest : InstrumentationTestCase() {
         val original = vehicle().copy(rarity = Rarity.RARE, acquisitionCost = GameMoney(350),
             acquisitionSource = VehicleAcquisitionSource.GACHA)
         val add = credit("legacy-add").copy(vehicle = VehicleWrite.Add(original))
-        val grow = credit("legacy-grow").copy(vehicle = VehicleWrite.Update(
+        val grow = credit("legacy-grow").copy(kind = TransactionKind.GARAGE, vehicle = VehicleWrite.Update(
             original.ownedVehicleId, Revision(0), 2, VehicleLifecycle.OWNED, 45))
         val money = credit("legacy-money").copy(ruleVersion = RuleVersion("rental-contract-v0"))
         success(store.commitGameChange(add))

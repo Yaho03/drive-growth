@@ -8,6 +8,9 @@ import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.rental.*
 import java.math.RoundingMode
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @Suppress("DEPRECATION")
 class AchievementLedgerTest : InstrumentationTestCase() {
@@ -130,6 +133,41 @@ class AchievementLedgerTest : InstrumentationTestCase() {
         ok(store.hostCommands.execute(profile, checkpoint))
         ok(store.hostCommands.finish(profile, checkpoint))
         assertEquals(GameMoney(100), ok(store.balance()))
+    }
+
+    fun testTwoConnectionsCannotClaimSameAchievementWithDifferentRequests() {
+        ok(add(1))
+        ok(add(2))
+        val first = command(AchievementMetric.OWNED, "race-first")
+        val second = first.copy(requestId = RequestId(ACHIEVEMENT_CLAIM_PREFIX + "race-second"))
+        val start = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(2)
+        open().use { other ->
+            ok(other.localProfileId())
+            try {
+                val a = pool.submit<ContractResult<AchievementClaimSettlement>> {
+                    start.await()
+                    store.achievements.claim(first)
+                }
+                val b = pool.submit<ContractResult<AchievementClaimSettlement>> {
+                    start.await()
+                    other.achievements.claim(second)
+                }
+                start.countDown()
+                val results = listOf(a.get(30, TimeUnit.SECONDS), b.get(30, TimeUnit.SECONDS))
+                val original = ok(results.single { it is ContractResult.Success })
+                assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), results.single { it is ContractResult.Failure })
+                reopen()
+                assertEquals(GameMoney(100), ok(store.balance()))
+                val claims = ok(SettlementHistoryReader(store).read()).entries.map { it.settlement }
+                    .filter { it.transaction.requestId in setOf(first.requestId, second.requestId) }
+                assertEquals(listOf(original.settlement), claims)
+                assertEquals(original, ok(store.achievements.claim(original.command)))
+                assertEquals(GameMoney(100), ok(store.balance()))
+            } finally {
+                pool.shutdownNow()
+            }
+        }
     }
 
     fun testActualRentalAndExpansionRecordAttainmentWithoutCountingVisitsOrDuplicateSettlement() {

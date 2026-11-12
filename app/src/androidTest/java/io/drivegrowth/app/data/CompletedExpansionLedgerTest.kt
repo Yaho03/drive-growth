@@ -7,6 +7,9 @@ import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.progression.VehicleActivity
 import io.drivegrowth.core.rental.*
 import java.math.RoundingMode
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /** #24 동의된 확장 시험값만 사용한다. 0원 영업은 완료 증거 시험이며 차종별 요금 정책이 아니다. */
 @Suppress("DEPRECATION")
@@ -148,6 +151,43 @@ class CompletedExpansionLedgerTest : InstrumentationTestCase() {
         "UPDATE rentals SET settlement_request='rental/settle/completed-0' WHERE id='completed-1'")
     fun testOrphanRentalReceiptDoesNotBecomeCompletedCustomer() = damaged(
         "DELETE FROM rentals WHERE id='completed-0'")
+    fun testTwoConnectionsCannotExpandTheSameCapacityTwice() {
+        repeat(3) { complete(it) }
+        val alternateId = RequestId("expand-level2-second")
+        val start = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(2)
+        open().use { other ->
+            ok(other.balance())
+            try {
+                val a = pool.submit<ContractResult<Settlement>> {
+                    start.await()
+                    store.rental.expand(expansionId, offer)
+                }
+                val b = pool.submit<ContractResult<Settlement>> {
+                    start.await()
+                    other.rental.expand(alternateId, offer)
+                }
+                start.countDown()
+                val results = listOf(a.get(30, TimeUnit.SECONDS), b.get(30, TimeUnit.SECONDS))
+                val original = ok(results.single { it is ContractResult.Success })
+                assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), results.single { it is ContractResult.Failure })
+                store.close()
+                store = open()
+                val after = rows()
+                val shop = ok(store.rental.shop())
+                assertEquals(2 to 5, shop.progress.shopLevel to shop.capacity)
+                assertEquals(GameMoney(500), ok(store.balance()))
+                val purchases = ok(store.listUnviewedSettlements())
+                    .filter { it.transaction.requestId in setOf(expansionId, alternateId) }
+                assertEquals(listOf(original), purchases)
+                assertEquals(original, ok(store.rental.expand(original.transaction.requestId, offer)))
+                assertEquals(after, rows())
+            } finally {
+                pool.shutdownNow()
+            }
+        }
+    }
+
     fun testCommitFailureRetryAndReplayDoNotDependOnLatestCountOrBalance() {
         repeat(3) { complete(it) };val before=rows()
         store.beforeCommit={throw SQLiteException("확장 전체 쓰기 뒤 실패")}

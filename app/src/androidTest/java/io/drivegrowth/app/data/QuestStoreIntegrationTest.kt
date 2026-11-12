@@ -61,6 +61,12 @@ class QuestStoreIntegrationTest: InstrumentationTestCase() {
         ok(store.markViewed(receipt().settlementId));val c=command();val paid=ok(store.quests.claim(c));assertEquals(GameMoney(1100),paid.settlement.balance)
         ok(store.commitGameChange(GameChange(RequestId("later-spend"),TransactionKind.GARAGE,source,definition.rules,MoneyChange(MoneyDirection.DEBIT,GameMoney(200)))))
         now+=8*86400000L;definitionsAvailable=false;val before=rows();store.close();store=open()
+        val collision = ContractResult.Failure(ContractError.STATE_CONFLICT)
+        val foreign = GameChange(c.requestId, TransactionKind.GARAGE, source, definition.rules,
+            MoneyChange(MoneyDirection.CREDIT, GameMoney(100)))
+        val offer = ShopExpansion(definition.rules, true, 1, 3, 5, 0, GameMoney(1))
+        assertEquals(collision, store.commitGameChange(foreign))
+        assertEquals(collision, store.rental.expand(c.requestId, offer))
         assertEquals(paid,ok(store.quests.claim(c)));assertEquals(GameMoney(900),ok(store.balance()));assertEquals(setOf(c.requestId),ok(store.quests.claimedRequestIds(profile)));assertEquals(before,rows())
     }
     fun testIgnoredViewedFlagCannotRecordEventAndRetriesOnce() {
