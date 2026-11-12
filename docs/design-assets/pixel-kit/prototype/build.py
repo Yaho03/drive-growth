@@ -20,10 +20,10 @@ for r in csv.DictReader(open(KIT / "building/building.csv")):
     v = {k: int(x) for k, x in r.items() if k != "sprite"}
     build[r["sprite"]] = {"left": v["left"], "top": v["top"], "w": v["width"], "h": v["height"],
         "sign": [[v["sign_bl_x"], v["sign_bl_y"]], [v["sign_br_x"], v["sign_br_y"]], [v["sign_tr_x"], v["sign_tr_y"]], [v["sign_tl_x"], v["sign_tl_y"]]]}
-html = (HERE / "template.html").read_text()
+html = (HERE / "template.html").read_text(encoding="utf-8")
 for k, p in imgs.items(): html = html.replace("{{" + k + "}}", uri(p))
 html = html.replace("{{slots}}", json.dumps(slots)).replace("{{building}}", json.dumps(build))
 html = html.replace("{{motion}}", (HERE / "motion.jsx").read_text(encoding="utf-8").replace("</script", "<\\/script"))
 assert "{{" not in html.split("<script>")[1][:400] or True
-(HERE / "prototype.html").write_text(html)
+(HERE / "prototype.html").write_text(html, encoding="utf-8")
 print(len(html) // 1024, "KB")
