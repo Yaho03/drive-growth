@@ -20,6 +20,24 @@ class ShopExpansionMapperTest {
         assertEquals(GameMoney(500),exact.screen.expansion!!.price)
         assertTrue(exact.screen.expansion!!.condition.contains("3/3"))
     }
+    @Test fun allExpansionOffersCheckCustomerBalanceAndCapacityBoundaries() {
+        for (offer in definition.offers) {
+            fun availability(customers: Int = offer.requiredCustomers, balance: Long = offer.price.units,
+                capacity: Int = offer.currentCapacity) =
+                checkNotNull(mapped(customers, balance, capacity, offer.fromLevel).screen.expansion).availability
+
+            for (delta in -1..1) {
+                val expected = if (delta < 0) ShopAvailability.LOCKED else ShopAvailability.AVAILABLE
+                assertEquals("Lv${offer.fromLevel} customers $delta", expected,
+                    availability(customers = offer.requiredCustomers + delta))
+                assertEquals("Lv${offer.fromLevel} balance $delta", expected,
+                    availability(balance = offer.price.units + delta))
+                assertEquals("Lv${offer.fromLevel} capacity $delta",
+                    if (delta == 0) ShopAvailability.AVAILABLE else ShopAvailability.UNKNOWN,
+                    availability(capacity = offer.currentCapacity + delta))
+            }
+        }
+    }
     @Test fun expansionEffectUsesGameCopyAndKeepsDefinitionAndRuleVersions() {
         val snapshot = mapped()
         val option = checkNotNull(snapshot.screen.expansion)

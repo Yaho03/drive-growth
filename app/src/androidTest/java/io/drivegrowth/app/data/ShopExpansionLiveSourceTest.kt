@@ -85,14 +85,57 @@ class ShopExpansionLiveSourceTest : InstrumentationTestCase() {
         assertEquals(GameMoney(500),ok(store.balance()));assertEquals(5,ok(store.rental.shop()).capacity)
     }
     fun testChangedDefinitionBeforeSaveRejectsStaleSelectionWithoutCharge() {
-        repeat(3){complete(it)};val adapter=source();val snapshot=ok(adapter.read());val before=rows()
-        val text=context.assets.open("content/trial-definitions.csv").bufferedReader().use{it.readText()}.replace("2026-11-10-v1","2026-11-10-v2")
-        definition=when(val r=parseTrialDefinition(text,content.catalog.vehicles.map{it.vehicleId}.toSet())) {
-            is ContractResult.Failure->r
-            is ContractResult.Success->ContractResult.Success(r.value.expansions)
-        }
+        repeat(3) { complete(it) }
+        val adapter = source()
+        val original = ok(definition)
+        val snapshot = ok(adapter.read())
+        assertEquals(original.version, snapshot.definitionVersion)
+        assertEquals(ShopAvailability.AVAILABLE, snapshot.screen.expansion?.availability)
+        val before = rows()
+        val text = context.assets.open("content/trial-definitions.csv").bufferedReader().use { it.readText() }
+        val originalHeader = "definition_version,${original.version.value}"
+        assertEquals(1, text.lineSequence().count { it == originalHeader })
+        val changedVersion = ContentVersion("${original.version.value}-changed-fixture")
+        val changedText = text.replaceFirst(originalHeader, "definition_version,${changedVersion.value}")
+        assertFalse("시험 입력의 정의 버전이 실제로 달라져야 합니다", changedText == text)
+        val changed = ok(parseTrialDefinition(changedText, content.catalog.vehicles.map { it.vehicleId }.toSet())).expansions
+        assertEquals(changedVersion, changed.version)
+        assertFalse(original.version == changed.version)
+        assertEquals(original.rules, changed.rules)
+        assertEquals(original.offers, changed.offers)
+        definition = ContractResult.Success(changed)
+        val refreshed = ok(adapter.read())
+        assertEquals(changedVersion, refreshed.definitionVersion)
+        assertEquals(snapshot.screen, refreshed.screen)
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),adapter.prepare(snapshot,request(snapshot)))
         assertEquals(before,rows());assertNull(ok(adapter.pending()))
+    }
+    fun testAboveThresholdAtEachPackagedExpansionStageReplaysWithoutAdditionalCharge() {
+        ok(store.commitGameChange(GameChange(RequestId("above-threshold-fund"), TransactionKind.GARAGE, origin,
+            content.ruleVersion, MoneyChange(MoneyDirection.CREDIT, GameMoney(5000)))))
+        val adapter = source()
+        var completed = 0
+        for (offer in ok(definition).offers) {
+            val target = offer.requiredCustomers + 1
+            for (index in completed until target) complete(index)
+            completed = target
+            val snapshot = ok(adapter.read())
+            assertEquals(target, snapshot.completedRentals)
+            val balance = ok(store.balance())
+            val command = ok(adapter.prepare(snapshot, request(snapshot, "above-expand-${offer.fromLevel}")))
+            val result = ok(adapter.execute(command))
+            assertEquals(MoneyChange(MoneyDirection.DEBIT, offer.price), result.transaction.money)
+            assertEquals(GameMoney(balance.units - offer.price.units), result.balance)
+            val afterFirst = rows()
+            assertEquals(result, ok(adapter.execute(command)))
+            assertEquals(afterFirst, rows())
+            assertEquals(result, ok(adapter.finish(command)))
+            assertNull(ok(adapter.pending()))
+            val current = ok(adapter.read()).screen
+            assertEquals(offer.fromLevel + 1, current.level)
+            assertEquals(offer.nextCapacity, current.capacity)
+            assertEquals(result.balance, current.balance)
+        }
     }
     fun testMoneyRaceRejectsAndOnlyExplicitSavedCancellationClearsSlot() {
         repeat(3){complete(it)};val adapter=source();val snapshot=ok(adapter.read());val command=ok(adapter.prepare(snapshot,request(snapshot)))
