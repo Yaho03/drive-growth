@@ -28,6 +28,29 @@ class FacilityHostMapperTest {
         assertTrue(FacilityHostMapper.options(facts(balance=730),true).all{it.option.availability==ShopAvailability.LOCKED})
         assertTrue(FacilityHostMapper.options(facts(),false).all{it.option.availability==ShopAvailability.UNKNOWN&&it.option.command==null})
     }
+    @Test fun eachFacilityShowsItsOwnProgressAndPurchaseBoundary() {
+        fun verify(facility: Facility, cases: List<FacilityFacts>, conditions: List<String>) {
+            for ((index, facts) in cases.withIndex()) {
+                val option = FacilityHostMapper.options(facts, true).single { it.facility == facility }.option
+                assertEquals(conditions[index], option.condition)
+                if (index == 0) {
+                    assertEquals(ShopAvailability.LOCKED, option.availability)
+                    assertNull(option.command)
+                } else {
+                    assertEquals(ShopAvailability.AVAILABLE, option.availability)
+                    assertEquals(ShopCommand.BuyFacility(offers.getValue(facility)), option.command)
+                }
+            }
+        }
+
+        verify(Facility.FUEL_STATION, (4..6).map { facts(owned = it, customers = 101, level = 4) },
+            listOf("보유 차량 4/5대", "보유 차량 5/5대", "보유 차량 6/5대"))
+        verify(Facility.INSURANCE, (99..101).map { facts(owned = 6, customers = it, level = 4) },
+            listOf("누적 고객 99/100명", "누적 고객 100/100명", "누적 고객 101/100명"))
+        verify(Facility.CAR_WASH, (2..4).map { facts(owned = 6, customers = 101, level = it) },
+            listOf("가게 레벨 2/3", "가게 레벨 3/3", "가게 레벨 4/3"))
+    }
+
     @Test fun fuelBonusUsesSuppliedValueForLockedAvailableAndInstalledStates() {
         val supplied = facts().copy(fuelBonusPerRental = GameMoney(17))
         fun fuel(value: FacilityFacts) = FacilityHostMapper.options(value, true)

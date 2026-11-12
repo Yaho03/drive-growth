@@ -3,6 +3,7 @@ package io.drivegrowth.app.host.garage
 import android.app.UiAutomation
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import android.database.sqlite.SQLiteDatabase
 import android.graphics.Rect
 import android.os.ParcelFileDescriptor
 import android.os.Process
@@ -18,12 +19,16 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.R
+import io.drivegrowth.app.data.HostCheckpointCommand
+import io.drivegrowth.app.data.HostCheckpointPhase
 import io.drivegrowth.app.data.RentalTerms
 import io.drivegrowth.app.host.GameSession
 import io.drivegrowth.app.host.GameSessionFactory
+import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
 import io.drivegrowth.app.simulation.SimulationTimeline
 import io.drivegrowth.app.simulation.UnifiedSimulationActivity
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.garage.FirstGrant
 import io.drivegrowth.core.progression.VehicleActivity
 import io.drivegrowth.core.rental.RentalCategory
 import io.drivegrowth.core.rental.RentalRequest
@@ -46,6 +51,62 @@ class GarageGrowthMainActivityTest :
     }
 
     fun testNewPlayerChoosesFirstExpansionInMainAfterThreeCompletedRentals() {
+        val before = prepareFirstExpansion()
+        tapTag("shop:preview:expand")
+        awaitLabel("레벨 1 → 2 · 공간 3 → 5")
+        assertEquals(before, snapshot())
+        tapTag("shop:confirm")
+        awaitFirstExpansionUi()
+        val after = awaitStored("첫 확장의 durable 완료") { it.shopLevel == 2 && it.checkpoint == null }
+        assertEquals(5, after.capacity)
+        assertEquals(GameMoney(before.balance.units - 500), after.balance)
+        assertEquals(before.vehicles, after.vehicles)
+        val receipt = after.settlements.drop(before.settlements.size).single()
+        assertEquals(MoneyChange(MoneyDirection.DEBIT, GameMoney(500)), receipt.transaction.money)
+        assertEquals(after.balance, receipt.balance)
+        assertEquals(before.settlements + receipt, after.settlements)
+        report("FIRST_EXPANSION", read { it.identity.profileId }, after)
+    }
+
+    fun testFirstExpansionRetriesOriginalRequestAfterStorageFailure() {
+        val before = prepareFirstExpansion()
+        tapTag("shop:preview:expand")
+        awaitLabel("레벨 1 → 2 · 공간 3 → 5")
+        assertEquals(before, snapshot())
+
+        val trigger = "ignore_first_expansion_for_retry_test"
+        writeFixtureSql("CREATE TRIGGER $trigger BEFORE UPDATE ON shop " +
+            "WHEN OLD.level=1 AND NEW.level=2 BEGIN SELECT RAISE(IGNORE); END")
+        val original = try {
+            tapTag("shop:confirm")
+            awaitUi("저장 실패와 다시 조회 버튼") {
+                activityRoot().findViewWithTag<Button>("shop:retry")?.let { it.isShown && it.isEnabled } == true &&
+                    labels().any { it.contains("STORAGE_FAILURE") }
+            }
+            val failed = snapshot()
+            val pending = checkNotNull(failed.checkpoint)
+            assertEquals(HostCheckpointPhase.SAVED, pending.phase)
+            assertEquals(before, failed.copy(checkpoint = null))
+            pending.command as HostCheckpointCommand.Expand
+        } finally {
+            writeFixtureSql("DROP TRIGGER $trigger")
+        }
+
+        tapTag("shop:retry")
+        awaitFirstExpansionUi()
+        val after = awaitStored("원래 확장 요청의 재시도 완료") { it.shopLevel == 2 && it.checkpoint == null }
+        val receipt = after.settlements.drop(before.settlements.size).single()
+        assertEquals(original.requestId, receipt.transaction.requestId)
+        assertEquals(MoneyChange(MoneyDirection.DEBIT, GameMoney(500)), receipt.transaction.money)
+        assertEquals(before.copy(balance = GameMoney(860), settlements = before.settlements + receipt,
+            shopLevel = 2, capacity = 5), after)
+    }
+
+    private fun writeFixtureSql(statement: String) {
+        SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READWRITE).use { it.execSQL(statement) }
+    }
+
+    private fun prepareFirstExpansion(): Snapshot {
         requireFresh()
         for (tag in listOf(R.string.onboarding_start, casper, R.string.onboarding_review,
             R.string.onboarding_confirm, R.string.onboarding_to_shop)) tapTag(tag)
@@ -65,26 +126,15 @@ class GarageGrowthMainActivityTest :
             }
             assertEquals(3, ok(game.store.rental.completedRentalCount()))
         }
+        // 직접 준비한 대여의 선물도 시험 입력으로 확정해 이후 저장 변화가 확장 명령에서만 나오게 한다.
+        val gift = ok(StoredOnboardingHostSource(games).claimGift(read { it.identity }))
+        assertEquals(FirstGrant.GIFT_REQUEST_ID, gift.command.requestId)
         tapText("새로고침")
-        val before = awaitStored("확장 전 첫 영업 선물의 원래 정산 완료") { state ->
-            state.settlements.count { it.transaction.requestId == RequestId("opening-gift") } == 1
-        }
+        val before = snapshot()
+        assertEquals(1, before.settlements.count { it.transaction.requestId == FirstGrant.GIFT_REQUEST_ID })
         assertEquals(1 to 3, before.shopLevel to before.capacity)
         assertEquals(GameMoney(1_360), before.balance)
-        tapTag("shop:preview:expand")
-        awaitLabel("레벨 1 → 2 · 공간 3 → 5")
-        assertEquals(before, snapshot())
-        tapTag("shop:confirm")
-        awaitFirstExpansionUi()
-        val after = awaitStored("첫 확장의 durable 완료") { it.shopLevel == 2 && it.checkpoint == null }
-        assertEquals(5, after.capacity)
-        assertEquals(GameMoney(before.balance.units - 500), after.balance)
-        assertEquals(before.vehicles, after.vehicles)
-        val receipt = after.settlements.drop(before.settlements.size).single()
-        assertEquals(MoneyChange(MoneyDirection.DEBIT, GameMoney(500)), receipt.transaction.money)
-        assertEquals(after.balance, receipt.balance)
-        assertEquals(before.settlements + receipt, after.settlements)
-        report("FIRST_EXPANSION", read { it.identity.profileId }, after)
+        return before
     }
 
     fun testColdMainReadsFirstExpansionWithoutAnotherDebit() {

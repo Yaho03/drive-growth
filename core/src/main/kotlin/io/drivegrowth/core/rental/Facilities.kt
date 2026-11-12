@@ -9,14 +9,13 @@ data class ShopProgress(val ownedVehicles: Int, val servedCustomers: Int, val sh
     init { require(ownedVehicles >= 0 && servedCustomers >= 0 && shopLevel >= 1) }
 }
 
-enum class Facility {
-    FUEL_STATION, INSURANCE, CAR_WASH;
+enum class Facility(val requiredProgress: Int, private val progressOf: (ShopProgress) -> Int) {
+    FUEL_STATION(5, ShopProgress::ownedVehicles),
+    INSURANCE(100, ShopProgress::servedCustomers),
+    CAR_WASH(3, ShopProgress::shopLevel);
 
-    fun unlocked(shop: ShopProgress): Boolean = when (this) {
-        FUEL_STATION -> shop.ownedVehicles >= 5
-        INSURANCE -> shop.servedCustomers >= 100
-        CAR_WASH -> shop.shopLevel >= 3
-    }
+    fun progress(shop: ShopProgress): Int = progressOf(shop)
+    fun unlocked(shop: ShopProgress): Boolean = progress(shop) >= requiredProgress
 }
 
 /** 구입 확정된 시설만 효과를 제공한다. 금액은 버전별 시설 정의의 값을 전달한다. */

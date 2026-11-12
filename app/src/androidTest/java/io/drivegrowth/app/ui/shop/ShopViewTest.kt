@@ -1,11 +1,22 @@
 package io.drivegrowth.app.ui.shop
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Rect
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ScrollView
 import android.widget.TextView
+import io.drivegrowth.app.data.ShopState
+import io.drivegrowth.app.host.GameIdentity
+import io.drivegrowth.app.host.facility.FacilityFacts
+import io.drivegrowth.app.host.facility.FacilityHostMapper
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.rental.Facility
+import io.drivegrowth.core.rental.FacilityOffer
+import io.drivegrowth.core.rental.ShopProgress
 
 /** 장치 슬롯 배정 후 실행할 실제 Android 위젯 시험. fixture는 실제 저장 시험이 아니다. */
 @Suppress("DEPRECATION")
@@ -43,6 +54,97 @@ class ShopViewTest : InstrumentationTestCase() {
                 assertEquals(0, label.layout.getEllipsisCount(0))
             }
         }
+    }
+
+    fun testLockedCarWashWithActualMapperIsReadableAfterScrollInBothNarrowWindows() {
+        val events = mutableListOf<ShopEvent>()
+        val offer = FacilityOffer(Facility.CAR_WASH, RuleVersion("facility-window-test"), true, GameMoney(1_000))
+        val facts = FacilityFacts(GameIdentity(ProfileId("fixture"), InputSource.SIMULATION), ContentVersion("fixture"),
+            ShopState(ShopProgress(2, 0, 2), 5, emptySet()), GameMoney(2_400),
+            emptyList(), emptyMap(), emptySet(), mapOf(Facility.CAR_WASH to offer))
+        val state = FacilityHostMapper.merge(ShopPreviewStates.normal(), facts, true)
+        val view = onUi { ShopView(instrumentation.targetContext, events::add).apply { render(state, true) } }
+        for ((width, height) in listOf(620 to 360, 320 to 568)) {
+            layout(view, width, height)
+            onUi { view.render(state, true) }
+            layout(view, width, height)
+            onUi {
+                val scroll = views(view).filterIsInstance<ScrollView>().single()
+                val condition = views(view).filterIsInstance<TextView>().single { it.text.contains("가게 레벨 2/3") }
+                val card = condition.parent as ViewGroup
+                val title = views(card).filterIsInstance<TextView>().single { it.text.toString() == "세차장" }
+                val locked = views(card).filterIsInstance<TextView>().single { it.text.toString() == "잠김" }
+                fun inScroll(child: View): Rect = Rect(0, 0, child.width, child.height).apply {
+                    scroll.offsetDescendantRectToMyCoords(child, this)
+                }
+                scroll.scrollTo(0, inScroll(title).top)
+                val viewport = Rect(
+                    scroll.scrollX + scroll.paddingLeft,
+                    scroll.scrollY + scroll.paddingTop,
+                    scroll.scrollX + scroll.width - scroll.paddingRight,
+                    scroll.scrollY + scroll.height - scroll.paddingBottom,
+                )
+                for (label in listOf(title, locked, condition)) {
+                    val description = "$width × $height, ${label.text}"
+                    for (ancestor in generateSequence<View>(label) { it.parent as? View }) {
+                        assertTrue("$description: ${ancestor.javaClass.simpleName} layout", ancestor.isLaidOut)
+                        assertEquals("$description: ${ancestor.javaClass.simpleName} visibility", View.VISIBLE, ancestor.visibility)
+                    }
+                    val bounds = inScroll(label)
+                    assertFalse("$description: empty bounds", bounds.isEmpty)
+                    assertTrue("$description: $bounds is outside $viewport", viewport.contains(bounds))
+
+                    val unclipped = Rect(0, 0, label.width, label.height).apply {
+                        view.offsetDescendantRectToMyCoords(label, this)
+                    }
+                    val visible = Rect(0, 0, label.width, label.height)
+                    assertTrue(description, card.getChildVisibleRect(label, visible, null))
+                    assertEquals(description, unclipped, visible)
+                    for (line in 0 until label.layout.lineCount) assertEquals(description, 0, label.layout.getEllipsisCount(line))
+                }
+                assertNull(view.findViewWithTag<Button>("shop:preview:facility-CAR_WASH"))
+                assertTrue(events.isEmpty())
+            }
+        }
+    }
+
+    fun testModeButtonsExposeSelectionAndRedrawTheSceneWithoutChangingFacts() {
+        val events = mutableListOf<ShopEvent>()
+        val state = ShopPreviewStates.normal()
+        val view = onUi { ShopView(instrumentation.targetContext, events::add).apply { render(state, true) } }
+        fun bitmap() = onUi {
+            val scene = view.findViewWithTag<ShopSceneView>("shop:scene")
+            Bitmap.createBitmap(scene.width, scene.height, Bitmap.Config.ARGB_8888).apply { scene.draw(Canvas(this)) }
+        }
+        layout(view, 620, 360)
+        val overall = bitmap()
+        val overallText = onUi { text(view) }
+        try {
+            onUi {
+                assertTrue(button(view, "shop:mode:OVERALL").isSelected)
+                assertFalse(button(view, "shop:mode:VEHICLES").isSelected)
+                assertTrue(button(view, "shop:mode:VEHICLES").performClick())
+            }
+            layout(view, 620, 360)
+            val vehicles = bitmap()
+            try {
+                assertFalse("전경과 차량 중심 화면은 다르게 그려야 한다", overall.sameAs(vehicles))
+            } finally { vehicles.recycle() }
+            onUi {
+                assertEquals(ShopMode.VEHICLES, view.uiState.mode)
+                assertTrue(button(view, "shop:mode:VEHICLES").isSelected)
+                assertFalse(button(view, "shop:mode:OVERALL").isSelected)
+                assertEquals(overallText, text(view))
+                assertTrue(button(view, "shop:mode:OVERALL").performClick())
+            }
+            layout(view, 620, 360)
+            val returned = bitmap()
+            try {
+                assertTrue(overall.sameAs(returned))
+                onUi { assertTrue(button(view, "shop:mode:OVERALL").isSelected) }
+            } finally { returned.recycle() }
+        } finally { overall.recycle() }
+        assertTrue(events.isEmpty())
     }
 
     fun testPreviewCancelAndFailureKeepCommittedFacts() {

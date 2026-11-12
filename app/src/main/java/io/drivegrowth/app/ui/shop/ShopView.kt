@@ -51,9 +51,11 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         sceneScroll = null; controlsScroll = null; removeAllViews()
         setPadding(dp(24), dp(16), dp(24), dp(16))
         if (!interaction.controlsEnabled) { addView(text(s(R.string.shop_restricted), 28)); return@with }
-        if (interaction.state !is ShopScreenState.Content) addView(text(s(R.string.shop_title), 32, bold = true))
         when (val state = interaction.state) {
-            ShopScreenState.Loading -> addView(text(s(R.string.shop_loading)))
+            ShopScreenState.Loading -> {
+                addView(text(s(R.string.shop_title), 32, bold = true))
+                addView(text(s(R.string.shop_loading)))
+            }
             is ShopScreenState.Empty -> problem(s(R.string.shop_empty), state.message, true)
             is ShopScreenState.Failure -> problem(s(R.string.shop_failure), state.message, true)
             is ShopScreenState.Unsupported -> problem(s(R.string.shop_unsupported), state.message, false)
@@ -77,6 +79,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     }
     private fun problem(title: String, body: String, retry: Boolean) = with(style) {
         val content = column().apply {
+            addView(text(s(R.string.shop_title), 32, bold = true))
             addView(text(title, 28, bold = true)); addView(text(body))
             if (retry) add(this, button(s(if (uiState.retryPending) R.string.shop_retry_pending else R.string.shop_retry), !uiState.retryPending) {
                 interaction.retry(); drawScreen()
@@ -94,7 +97,10 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             for (mode in ShopMode.entries) modes.addView(button(
                 s(if (mode == ShopMode.OVERALL) R.string.shop_overall else R.string.shop_vehicles),
                 enabled = uiState.pending == null, primary = uiState.mode == mode,
-            ) { interaction.mode(mode); drawScreen() }.apply { tag = "shop:mode:$mode" },
+            ) { interaction.mode(mode); drawScreen() }.apply {
+                tag = "shop:mode:$mode"
+                isSelected = uiState.mode == mode
+            },
                 LayoutParams(0, -2, 1f).apply { if (mode == ShopMode.VEHICLES) marginStart = dp(8) })
             add(this, modes)
             add(this, ShopSceneView(context, c, uiState.mode))
