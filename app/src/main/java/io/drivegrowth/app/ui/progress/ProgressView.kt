@@ -38,8 +38,12 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
         if (next != wide) { wide = next; post { drawScreen() } }
     }
     private fun s(id: Int) = context.getString(id)
+    private fun rememberScrollPosition(current: ScrollView) {
+        if (scroll !== current || !current.isLaidOut) return
+        if (showingDetail) detailY = current.scrollY else listY = current.scrollY
+    }
     private fun drawScreen(): Unit = with(style) {
-        scroll?.takeIf { it.isLaidOut }?.let { if (showingDetail) detailY = it.scrollY else listY = it.scrollY }
+        scroll?.let(::rememberScrollPosition)
         val focusedTag = findFocus()?.tag
         scroll = null; removeAllViews(); setPadding(dp(24), dp(16), dp(24), dp(16))
         if (!interaction.controlsEnabled) {
@@ -79,6 +83,11 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
         val bodyScroll = object : ScrollView(context) {
             private var restore = true
             init { isFillViewport = true; addView(body) }
+            override fun onDetachedFromWindow() {
+                // The host can remove this View before sending a restricted render.
+                rememberScrollPosition(this)
+                super.onDetachedFromWindow()
+            }
             override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
                 super.onLayout(changed, l, t, r, b)
                 if (restore) { restore = false; scrollTo(0, y) }
