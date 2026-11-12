@@ -10,6 +10,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
@@ -129,6 +130,9 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
             point[1] += button.height / 2
             true
         }
+        val oldScroll = awaitStableDetailScroll(first, key)
+        assertTrue("SCROLL_UNPROVEN_BASELINE: detail must start with a positive offset", oldScroll.y > 0)
+        Log.i("QuestGateE", "SCROLL_BEFORE $oldScroll")
         val before = gateLedger()
         assertEquals(listOf(listOf("1", "1000", "VEHICLE")), before.getValue("account"))
         assertEquals(1, before.getValue("quest_events").size)
@@ -163,12 +167,46 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
         }
         assertEquals(before, gateLedger())
         Log.i("QuestGateE", "REQUEST_PARK")
-        awaitVehicleGate("P recovery shows the same unclaimed detail") { questReady(first, key) }
+        val restored = awaitStableDetailScroll(first, key, oldScroll.view)
         assertEquals(expectedPeriod, questPeriod(definition.cadence, definition.zone, EpochMillis(System.currentTimeMillis())))
         assertEquals(before, gateLedger())
         Log.i("QuestGateE", "P_SAME_QUEST_UNCLAIMED")
         Log.i("QuestGateE", "QUEST_GATE_LEDGER_UNCHANGED firstViewed=1 claim=0 payout=0 balance=1000")
+        Log.i("QuestGateE", "SCROLL_RESTORED $restored")
+        if (restored.maxY == 0) {
+            Log.i("QuestGateE", "SCROLL_UNPROVEN_VIEWPORT: restored detail has no scroll range")
+            fail("SCROLL_UNPROVEN_VIEWPORT: a nonzero offset cannot be tested in this viewport")
+        }
+        assertEquals("same laid-out detail must restore a valid old offset",
+            oldScroll.y.coerceAtMost(restored.maxY), restored.y)
         SystemClock.sleep(700)
+    }
+
+    private data class ScrollPosition(val view: ProgressView, val y: Int, val maxY: Int, val viewportHeight: Int)
+
+    private fun awaitStableDetailScroll(a: MainActivity, key: ProgressKey, expectedView: ProgressView? = null): ScrollPosition {
+        var previous: ScrollPosition? = null
+        awaitVehicleGate("two stable samples of the same attached, laid-out quest detail") {
+            val sample = detailScrollSample(a, key, expectedView)
+            val stable = sample != null && sample.view === previous?.view && sample == previous
+            previous = sample
+            stable
+        }
+        return checkNotNull(previous)
+    }
+
+    private fun detailScrollSample(a: MainActivity, key: ProgressKey, expectedView: ProgressView?): ScrollPosition? {
+        val view = progress(a) ?: return null
+        if (expectedView != null && view !== expectedView) return null
+        if (!view.isAttachedToWindow || !view.isLaidOut || view.isLayoutRequested || !questReady(a, key)) return null
+        val scroll = tree(view).filterIsInstance<ScrollView>().singleOrNull()
+            ?.takeIf { it.isShown && it.isLaidOut && !it.isLayoutRequested && it.height > 0 } ?: return null
+        val child = scroll.getChildAt(0)?.takeIf { it.isLaidOut && !it.isLayoutRequested } ?: return null
+        val claim = scroll.findViewWithTag<Button>("progress-claim")
+            ?.takeIf { it.isLaidOut && !it.isLayoutRequested && it.height > 0 } ?: return null
+        if (!claim.isEnabled) return null
+        val maxY = (child.height - scroll.height + scroll.paddingTop + scroll.paddingBottom).coerceAtLeast(0)
+        return ScrollPosition(view, scroll.scrollY, maxY, scroll.height)
     }
 
     private fun questReady(a: MainActivity, key: ProgressKey): Boolean {
