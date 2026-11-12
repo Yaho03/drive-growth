@@ -1,6 +1,9 @@
 <title>렌터카 가게 시제품</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700;900&family=IBM+Plex+Sans+KR:wght@500;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
 <style>
 /* 한 화면 게임 UI: 위 상태 바 · 가운데 화면 · 아래 탐색. 2차 시안 A의 어두운 둥근 카드와 파란 주요 버튼 */
 :root{
@@ -256,6 +259,12 @@ function renderShop(){
       <button class="btn" data-act="drive">30km 주행 후 주차</button>
       <button class="btn" data-act="arrive" ${S.delivery?"":"disabled"}>탁송 목적지에 도착</button>
       <button class="btn" data-act="nextDay">다음 날로</button>
+      <div class="h2" style="font-size:16px;margin-top:6px">연출 다시 보기 (게임 상태는 안 바뀜)</div>
+      <div class="row" style="gap:6px">${["common","advanced","rare","legend"].map(k=>`<button class="btn" style="min-height:44px;padding:0 12px" data-act="demoGacha" data-arg="${k}">뽑기 ${R[k].n}</button>`).join("")}
+        <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoGacha" data-arg="reduced">움직임 줄이기</button>
+        <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="grant">첫 지급</button>
+        <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="settle">정산 동전</button>
+        <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="expand">가게 확장</button></div>
       <button class="btn danger" data-act="resetAsk">처음부터 다시</button>
       <div class="mut" style="font-size:13px">${S.day}일째 · 오늘 반영 거리 ${S.kmToday} / ${KM_CAP}km</div>
     </div>
@@ -442,13 +451,28 @@ function renderRank(){
     </div></div></div>`;
 }
 
+// ── 연출(4차 Claude Design) 연결 ──
+const TIER_OF = {common:"common", advanced:"uncommon", rare:"rare", legend:"legend"};
+const carData = id => { const m=M[id]; return {src:IMG[m.type], w:SPR[m.type][0], h:SPR[m.type][1], hue:m.hue}; };
+const canMotion = () => typeof window.playMotion === "function";
+function gachaMotion(kind, r, m, isNew, guaranteed, pityBefore){
+  window.playMotion("gacha", {tier:TIER_OF[r], name:m.name, car:carData(m.id), isNew, guaranteed, price:kind==="free"?"무료권":String(TICKET),
+    pity:`희귀 이상 보장까지 ${PITY-pityBefore}회`, pityAfter:`다음 보장까지 ${PITY-S.pity}회`,
+    againPrice: S.free>0?"무료권":String(TICKET),
+    canAgain: S.cars.length<cap() && (S.free>0 || S.money>=TICKET),
+    onAgain:()=>{ window.closeMotion(); ACT.pull(S.free>0?"free":"paid"); },
+    onGarage:()=>{ window.closeMotion(); go("garage"); }});
+}
+
 // ── 동작 ──
 const ACT = {
   obNext(){ ob.step++; render(); }, obBack(){ ob.step=1; render(); }, obPick(id){ ob.pick=id; render(); },
-  obGrant(){ S=fresh(); S.money=1000; S.earned=0; addCar(ob.pick,"common",0,"첫 지급"); ob.step=3; render(); },
+  obGrant(){ S=fresh(); S.money=1000; S.earned=0; addCar(ob.pick,"common",0,"첫 지급"); ob.step=3; render();
+    if(canMotion()) window.playMotion("grant",{money:1000, name:M[ob.pick].name, car:carData(ob.pick), onClose:()=>{ window.closeMotion(); ACT.obDone(); }}); },
   obDone(){ S.started=true; ob.step=0; view="shop"; render(); },
   openCar(id){ detailId=id; view="detail"; render(); window.scrollTo(0,0); },
-  expand(){ const n=EXPAND[S.level+1]; S.money-=n.cost; S.level++; toast(`가게 Lv${S.level}이 되었어요 · 주차 ${cap()}칸`); render(); },
+  expand(){ const n=EXPAND[S.level+1], from=cap(); S.money-=n.cost; S.level++; render();
+    if(canMotion()) window.playMotion("expand",{lv:S.level, from, to:cap(), onClose:()=>window.closeMotion()}); else toast(`가게 Lv${S.level}이 되었어요 · 주차 ${cap()}칸`); },
   hour(){ let n=0;
     for(const c of S.cars){ if(c.st!=="idle"||c.rest) continue; if(Math.random()>.45) continue;
       const m=M[c.model]; const hours=1+Math.floor(Math.random()*3);
@@ -498,6 +522,9 @@ const ACT = {
     S.cars=S.cars.filter(x=>x.id!==id); if(amt){ S.money+=amt; S.earned+=amt; } closeModal(); view="garage"; toast(`${M[c.model].name}을 ${kind==="sell"?"판매":"폐차"}했어요 · +${won(amt)}`); render(); },
   rest(id){ const c=S.cars.find(x=>x.id===id); c.rest=!c.rest; render(); },
   pull(kind){ if(S.cars.length>=cap()) return; if(kind==="free"){ if(!S.free) return; S.free--; } else { if(S.money<TICKET) return; S.money-=TICKET; }
+    if(canMotion()){ const before=S.pity, guaranteed=before>=PITY-1; const r=rollRar(); const pool=unlocked(); const m=pool[Math.floor(Math.random()*pool.length)];
+      const isNew=S.dex[m.id+"|"+r]!=="owned"; S.pity=(r==="rare"||r==="legend")?0:S.pity+1; addCar(m.id,r,kind==="free"?0:TICKET,"뽑기");
+      render(); gachaMotion(kind,r,m,isNew,guaranteed&&(r==="rare"||r==="legend"),before); return; }
     modal(`<div style="display:grid;gap:14px;justify-items:center;text-align:center;padding:20px"><div class="carpic"><span class="ring common"></span><span class="big">?</span></div><div class="h2">차를 고르는 중이에요</div></div>`);
     setTimeout(()=>{ const r=rollRar(); const pool=unlocked(); const m=pool[Math.floor(Math.random()*pool.length)];
       S.pity = (r==="rare"||r==="legend") ? 0 : S.pity+1; addCar(m.id,r,kind==="free"?0:TICKET,"뽑기");
@@ -509,6 +536,15 @@ const ACT = {
         <div class="row"><button class="btn" data-act="close">닫기</button><button class="btn p" data-act="toGarage">차고에서 보기</button></div></div>`);
       render(); }, 900); },
   toGarage(){ closeModal(); go("garage"); },
+  demoGacha(k){ if(!canMotion()) return toast("연출을 불러오는 중이에요"); const reduced=k==="reduced", r=reduced?"rare":k;
+    const m=M[{common:"hyundai_casper",advanced:"hyundai_sonata",rare:"hyundai_ioniq6",legend:"genesis_g90"}[r]];
+    window.playMotion("gacha",{tier:TIER_OF[r], name:m.name, car:carData(m.id), isNew:r!=="common", guaranteed:r==="rare", price:String(TICKET),
+      pity:"희귀 이상 보장까지 12회", pityAfter:r==="rare"||r==="legend"?"다음 보장까지 30회":"희귀 이상 보장까지 11회", canAgain:false,
+      onAgain:()=>{}, onGarage:()=>window.closeMotion()}, {reduced}); },
+  demoMotion(k){ if(!canMotion()) return toast("연출을 불러오는 중이에요"); const close=()=>window.closeMotion();
+    if(k==="grant") window.playMotion("grant",{money:1000, name:"캐스퍼", car:carData("hyundai_casper"), onClose:close});
+    if(k==="settle") window.playMotion("settle",{rows:[["기본 주행 수익",300],["탁송 결과",200],["영업 결과",450]], start:3240, onClose:close});
+    if(k==="expand") window.playMotion("expand",{lv:3, from:5, to:7, onClose:close}); },
   dest(k){ S.dest=k; S.offers=null; render(); },
   accept(oid){ const o=S.offers.list.find(x=>x.id===oid); if(o.kind==="buy"){ if(S.money<o.price) return; S.money-=o.price; }
     S.delivery={offer:o, day:S.day, changed:false, paid:o.price||0}; toast(`${o.dest}까지 의뢰를 받았어요 · 출발 전 확인 완료`); render(); },
@@ -523,7 +559,11 @@ const ACT = {
     d.offer=o; d.changed=true; closeModal(); toast(`${dest.n}(으)로 바꿨어요 · ${M[o.model].name} ${R[o.rar].n}${note}`); render(); },
   giveup(){ const d=S.delivery; if(d.offer.kind==="buy"){ const back=Math.floor(d.paid*.9); S.money+=back; toast(`포기했어요 · ${won(back)} 환급(수수료 10%는 예시)`); } else toast("포기했어요 · 벌금은 없어요");
     S.delivery=null; S.offers=null; render(); },
-  read(){ S.unread=[]; toast("정산을 확인했어요"); render(); },
+  read(){ const names={drive:"기본 주행 수익",delivery:"탁송 결과",rental:"영업 결과",gift:"선물"};
+    const sums={}; S.unread.forEach(x=>{ if(x.amount>0) sums[x.src]=(sums[x.src]||0)+x.amount; });
+    const rows=Object.keys(sums).map(k=>[names[k],sums[k]]), total=rows.reduce((a,r)=>a+r[1],0);
+    const done=()=>{ S.unread=[]; render(); toast("정산을 확인했어요"); };
+    if(canMotion() && rows.length) window.playMotion("settle",{rows:rows.slice(0,4), start:S.money-total, onClose:()=>{ window.closeMotion(); done(); }}); else done(); },
   rankTab(k){ rankTab=k; render(); },
 };
 function confirmDispose(c,kind,amt){ const m=M[c.model];
@@ -537,4 +577,7 @@ function giftModal(){ modal(`<div class="pop" style="display:grid;gap:14px;justi
 ACT.toGacha = ()=>{ closeModal(); go("gacha"); };
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
 render();
+</script>
+<script type="text/babel" data-presets="react">
+{{motion}}
 </script>

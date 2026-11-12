@@ -15,6 +15,7 @@ for r in csv.DictReader(open(KIT / "building/building.csv")):
 html = (HERE / "template.html").read_text()
 for k, p in imgs.items(): html = html.replace("{{" + k + "}}", uri(p))
 html = html.replace("{{slots}}", json.dumps(slots)).replace("{{building}}", json.dumps(build))
+html = html.replace("{{motion}}", (HERE / "motion.jsx").read_text(encoding="utf-8").replace("</script", "<\\/script"))
 assert "{{" not in html.split("<script>")[1][:400] or True
 (HERE / "prototype.html").write_text(html)
 print(len(html) // 1024, "KB")
