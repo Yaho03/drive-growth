@@ -11,9 +11,13 @@ fun interface RentalProductInputs { fun read(identity: GameIdentity): ContractRe
 
 /** 직렬 worker 전용. durable 원문 복구가 현재 정의/clock/난수보다 먼저다. 금융 제출은 하지 않는다. */
 class RentalVisitPreparation(private val identity: () -> ContractResult<GameIdentity>, private val journal: RentalProductJournal,
-    private val inputs: RentalProductInputs, private val random: () -> Random, private val requestId: () -> RequestId) {
+    private val inputs: RentalProductInputs, private val random: (RentalPreparationInputs) -> Random,
+    private val requestId: () -> RequestId,
+    private val saveDraft: (PreparedRentalVisit, RentalPreparationInputs) -> ContractResult<PreparedRentalVisit> =
+        { visit, _ -> journal.save(visit) }) {
     private val planner = RentalVisitPlanner()
-    private var unsaved: PreparedRentalVisit? = null
+    private data class Draft(val visit: PreparedRentalVisit, val authority: RentalPreparationInputs)
+    private var unsaved: Draft? = null
     fun next(): ContractResult<PreparedRentalVisit?> {
         val actual = when (val r = identity()) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
         when (val retained = recover(actual)) {
@@ -22,32 +26,35 @@ class RentalVisitPreparation(private val identity: () -> ContractResult<GameIden
         }
         val cursor = when (val r = journal.cursor(actual)) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
         val current = when (val r = inputs.read(actual)) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
-        val original = when (val r = planner.prepare(actual, current.catalog, current.definition, cursor,
-            current.eligibleThrough, random(), requestId)) {
+        val visit = when (val r = planner.prepare(actual, current.catalog, current.definition, cursor,
+            current.eligibleThrough, random(current), requestId)) {
             is ContractResult.Failure -> return r
             is ContractResult.Success -> r.value ?: return ContractResult.Success(null)
         }
-        unsaved = original
-        return persist(original, journal::save)
+        val draft = Draft(visit, current)
+        unsaved = draft
+        return persist(draft, saveDraft)
     }
 
-    internal fun recover(actual: GameIdentity, save: (PreparedRentalVisit) -> ContractResult<PreparedRentalVisit> = journal::save):
-        ContractResult<PreparedRentalVisit?> {
+    internal fun recover(actual: GameIdentity,
+        save: (PreparedRentalVisit, RentalPreparationInputs) -> ContractResult<PreparedRentalVisit> = saveDraft
+    ): ContractResult<PreparedRentalVisit?> {
         val pending = when (val r = journal.pending(actual)) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
         val original = unsaved
-        if (original != null && original.identity != actual) return conflict()
+        if (original != null && original.visit.identity != actual) return conflict()
         if (pending != null) {
-            if (pending.identity != actual || original != null && original != pending) return conflict()
+            if (pending.identity != actual || original != null && original.visit != pending) return conflict()
             unsaved = null
             return ContractResult.Success(pending)
         }
         return if (original == null) ContractResult.Success(null) else persist(original, save)
     }
 
-    private fun persist(original: PreparedRentalVisit, save: (PreparedRentalVisit) -> ContractResult<PreparedRentalVisit>) =
-        when (val saved = save(original)) {
+    private fun persist(original: Draft,
+        save: (PreparedRentalVisit, RentalPreparationInputs) -> ContractResult<PreparedRentalVisit>) =
+        when (val saved = save(original.visit, original.authority)) {
             is ContractResult.Failure -> saved
-            is ContractResult.Success -> if (saved.value != original) conflict() else {
+            is ContractResult.Success -> if (saved.value != original.visit) conflict() else {
                 unsaved = null
                 ContractResult.Success(saved.value)
             }

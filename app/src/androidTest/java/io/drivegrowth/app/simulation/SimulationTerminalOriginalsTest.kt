@@ -15,6 +15,7 @@ import io.drivegrowth.app.host.rental.SessionRentalProductSource
 import io.drivegrowth.app.runtime.rental.RentalRuntimeSnapshot
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.FirstGrant
+import org.json.JSONObject
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
@@ -79,13 +80,30 @@ class SimulationTerminalOriginalsTest : InstrumentationTestCase() {
             val driving = SessionObservedDrivingSource(host.games, SqliteObservedDrivingJournal(),
                 ObservedDrivingReducer(original.policy) { "terminal-original-driving" }, defs::drivingIncomeRules)
             val rental = SessionRentalProductSource(host.games, { ContractResult.Success(defs) }, original.policy,
-                { ContractResult.Success(step.clock) }, random = { original.rentalRandom(host.games) })
+                { ContractResult.Success(step.clock) }, random = { original.rentalRandom(host.games, it) })
             while (step.stage < 65) {
                 val frame = step.frame()
                 val result = driving.observe(receiver, frame, RecordingClock(step.elapsedMs, step.clock.epoch))
                 ok(result)
                 assertTrue(ok(rental.observe(frame, result)).deferred.isEmpty())
                 step = checkNotNull(step.next())
+            }
+
+            ok(host.games.open()).use { game ->
+                ok(game.store.read { db ->
+                    db.rawQuery("SELECT host_command FROM visits WHERE host_command IS NOT NULL ORDER BY rowid LIMIT 1", null)
+                        .use {
+                            assertTrue(it.moveToFirst())
+                            val command = JSONObject(it.getString(0))
+                            assertEquals("rental-prepared-v2", command.getString("type"))
+                            val first = RentalProductJson.prepared(command)
+                            assertNotNull(first.city)
+                            assertEquals(FirstGrant.CANDIDATES.first(), first.visit.request.desired)
+                            assertEquals(1, first.visit.request.hours)
+                            val terms = first.visit.terms
+                            assertTrue(terms.roll >= terms.customer.accidentPercent())
+                        }
+                })
             }
 
             val blocker = HostCheckpointCommand.Expand(RequestId("fixture-terminal-rental-blocker"),

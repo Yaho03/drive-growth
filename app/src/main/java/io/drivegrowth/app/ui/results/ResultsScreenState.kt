@@ -1,9 +1,13 @@
 package io.drivegrowth.app.ui.results
 
+import io.drivegrowth.app.runtime.rental.product.RentalCity
 import io.drivegrowth.core.contract.ContractError
 import io.drivegrowth.core.contract.ContractResult
+import io.drivegrowth.core.contract.MissingReason
+import io.drivegrowth.core.contract.Observation
 import io.drivegrowth.core.contract.Settlement
 import io.drivegrowth.core.contract.SettlementId
+import io.drivegrowth.core.rental.RentalCategory
 import java.util.Collections
 
 /** 확정 정산을 그대로 보존한다. null 차종명은 조회 공급자가 이름을 제공하지 않은 상태다. */
@@ -11,7 +15,15 @@ data class ResultPresentation(val settlement: Settlement, val vehicleName: Strin
     val viewed: Boolean = false, val rental: io.drivegrowth.core.rental.CompletedRental? = null,
     val rentalVehicleName: String? = null,
     val rentalBasis: io.drivegrowth.core.contract.Observation<io.drivegrowth.app.data.RentalResultBasis> =
-        io.drivegrowth.core.contract.Observation.Missing(io.drivegrowth.core.contract.MissingReason.NO_DATA))
+        Observation.Missing(MissingReason.NO_DATA),
+    val rentalDemand: Observation<RentalDemandPresentation> = Observation.Missing(MissingReason.NO_DATA))
+
+data class RentalDemandPresentation(
+    val desiredVehicleName: String,
+    val purpose: RentalCategory,
+    val city: Observation<RentalCity>,
+)
+
 enum class ResultsOrigin { STORED, FIXTURE }
 enum class ResultsScope { UNVIEWED, ALL }
 

@@ -19,13 +19,13 @@ internal fun RentalVisitCursor.rescheduleAfter(observed: RentalClock, intervalMs
 
 /** E가 금융 제출 전 durable 저장할 전체 입력. 목록·요금은 RentalVisit가 방어 복사한다. */
 data class PreparedRentalVisit(val identity: GameIdentity, val definitionVersion: ContentVersion, val trial: Boolean,
-    val expected: RentalVisitCursor, val next: RentalVisitCursor, val visit: RentalVisit) {
+    val expected: RentalVisitCursor, val next: RentalVisitCursor, val visit: RentalVisit, val city: RentalCity? = null) {
     override fun equals(other: Any?): Boolean = other is PreparedRentalVisit && identity == other.identity &&
-        definitionVersion == other.definitionVersion && trial == other.trial && expected == other.expected && next == other.next &&
+        definitionVersion == other.definitionVersion && trial == other.trial && expected == other.expected && next == other.next && city == other.city &&
         visit.source == other.visit.source && visit.request == other.visit.request && visit.catalog == other.visit.catalog &&
         visit.categories == other.visit.categories && visit.hourlyRates == other.visit.hourlyRates && visit.terms == other.visit.terms
     override fun hashCode(): Int = listOf(identity, definitionVersion, trial, expected, next, visit.source, visit.request,
-        visit.catalog, visit.categories, visit.hourlyRates, visit.terms).hashCode()
+        visit.catalog, visit.categories, visit.hourlyRates, visit.terms, city).hashCode()
 }
 
 /** 명시 앱 비활성 마커. 실제 차량 주차·주행 증거로 변환하지 않는다. */

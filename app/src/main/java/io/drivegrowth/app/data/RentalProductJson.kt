@@ -21,14 +21,22 @@ internal object RentalProductJson {
         val cars=JSONArray().apply{v.catalog.vehicles.forEach{put(JSONObject().put("id",it.vehicleId.value).put("name",it.displayName))}}
         val categories=JSONArray().apply{v.categories.entries.sortedBy{it.key.value}.forEach{put(JSONObject().put("id",it.key.value).put("value",it.value.name))}}
         val rates=JSONArray().apply{v.hourlyRates.entries.sortedBy{it.key.value}.forEach{put(JSONObject().put("id",it.key.value).put("value",it.value.units))}}
-        return JSONObject().put("type","rental-prepared-v1").put("profile",p.identity.profileId.value).put("source",p.identity.source.name).put("definition",p.definitionVersion.value).put("trial",p.trial)
+        return JSONObject().put("type", if (p.city == null) "rental-prepared-v1" else "rental-prepared-v2").put("profile",p.identity.profileId.value).put("source",p.identity.source.name).put("definition",p.definitionVersion.value).put("trial",p.trial)
             .put("expected",cursor(p.expected)).put("next",cursor(p.next)).put("request",v.request.id.value).put("desired",v.request.desired.value).put("hours",v.request.hours)
             .put("catalogVersion",v.catalog.contentVersion.value).put("catalog",cars).put("categories",categories).put("rates",rates)
             .put("rules",terms.rules.value).put("age",terms.customer.age).put("licensed",terms.customer.licensedMonths).put("roll",terms.roll).put("start",terms.start.value)
             .put("return",terms.returnMinutes).put("fuel",terms.fuelBonus.units).put("rounding",terms.rounding?.name?:JSONObject.NULL).put("regular",terms.regularCustomer?:JSONObject.NULL)
+            .apply { p.city?.let { put("city", it.name) } }
     }
     fun prepared(j:JSONObject):PreparedRentalVisit {
-        require(j.getString("type")=="rental-prepared-v1")
+        val city = when (j.getString("type")) {
+            "rental-prepared-v1" -> {
+                require(!j.has("city"))
+                null
+            }
+            "rental-prepared-v2" -> RentalCity.valueOf(j.get("city") as? String ?: throw JSONException("대여 도시 형식"))
+            else -> throw JSONException("준비 방문 종류")
+        }
         val source=InputSource.valueOf(j.getString("source"));val catalog=j.getJSONArray("catalog");val categories=j.getJSONArray("categories");val rates=j.getJSONArray("rates")
         val cars=List(catalog.length()){catalog.getJSONObject(it).let{r->VehicleDefinition(VehicleId(r.getString("id")),r.getString("name"))}}
         require(cars.isNotEmpty()&&cars.map{it.vehicleId}.toSet().size==cars.size)
@@ -36,7 +44,7 @@ internal object RentalProductJson {
         val visit=RentalVisit(source,RentalRequest(RequestId(j.getString("request")),VehicleId(j.getString("desired")),int(j,"hours")),VehicleCatalogSnapshot(ContentVersion(j.getString("catalogVersion")),cars),
             entries(categories){RentalCategory.valueOf(it.getString("value"))},entries(rates){GameMoney(n(it,"value"))},
             RentalTerms(RuleVersion(j.getString("rules")),SimulatedCustomer(int(j,"age"),int(j,"licensed")),int(j,"roll"),EpochMillis(n(j,"start")),int(j,"return"),GameMoney(n(j,"fuel")),if(j.isNull("rounding"))null else RoundingMode.valueOf(j.getString("rounding")),if(j.isNull("regular"))null else boolean(j,"regular")))
-        return PreparedRentalVisit(GameIdentity(ProfileId(j.getString("profile")),source),ContentVersion(j.getString("definition")),boolean(j,"trial"),cursor(j.getJSONObject("expected")),cursor(j.getJSONObject("next")),visit)
+        return PreparedRentalVisit(GameIdentity(ProfileId(j.getString("profile")),source),ContentVersion(j.getString("definition")),boolean(j,"trial"),cursor(j.getJSONObject("expected")),cursor(j.getJSONObject("next")),visit,city)
     }
     fun interval(i:RentalInactiveInterval)=JSONObject().put("marker",i.marker.value).put("since",clock(i.originalSince)).put("from",clock(i.from)).put("to",clock(i.to))
         .apply { if (i.forwardWallJump) put("forwardWallJump", true) }

@@ -111,9 +111,8 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
         }
     }
     private fun source(): SessionRentalProductSource {
-        val seed = visitSeed(ok(definition.rentalVisitDefinition()))
         return SessionRentalProductSource(games, { ContractResult.Success(definition) }, policy,
-            { ContractResult.Success(rawClockSample?.invoke() ?: clock()) }, { Random(seed) }, { RequestId("explicit-simulation-visit-${++requests}") })
+            { ContractResult.Success(rawClockSample?.invoke() ?: clock()) }, { Random(visitSeed(it.definition)) }, { RequestId("explicit-simulation-visit-${++requests}") })
     }
     private fun feed(at: Long, receiver: String = "simulation-receiver-1",
         gear: Gear = Gear.DRIVE): ContractResult<RentalRuntimeSnapshot> {
@@ -688,6 +687,45 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
         assertEquals(RentalInactivePhase.COMPLETED, marker().phase)
     }
 
+    fun testLevelChangeKeepsStoredVisitTimeThenUsesNewDemandInterval() {
+        val minute = 60_000L
+        ok(feed(0))
+        val assigned = ok(feed(1_000)).pending.single()
+        val stored = ok(readJournal.cursor(identity))
+        assertEquals(30 * minute, stored.nextAt.elapsedMs)
+        assertEquals(1, requests)
+
+        raw().use { it.execSQL("UPDATE shop SET level=2,capacity=5") }
+        assertEquals(stored, ok(readJournal.cursor(identity)))
+        ok(feed(stored.nextAt.elapsedMs - 1_000))
+        assertEquals(stored, ok(readJournal.cursor(identity)))
+        assertEquals(1, requests)
+        val accepted = ok(feed(stored.nextAt.elapsedMs))
+        assertTrue(accepted.deferred.isEmpty())
+        assertEquals(assigned.id, accepted.pending.single().id)
+        assertEquals(2, requests)
+
+        val persistedNext = raw().use { db ->
+            db.rawQuery("SELECT host_command FROM visits WHERE host_command IS NOT NULL ORDER BY rowid", null).use {
+                assertTrue(it.moveToFirst())
+                val first = RentalProductJson.prepared(JSONObject(it.getString(0)))
+                assertEquals(assigned.id, first.visit.request.id)
+                assertEquals(stored, first.next)
+                assertNotNull(first.city)
+                assertTrue(it.moveToNext())
+                val second = RentalProductJson.prepared(JSONObject(it.getString(0)))
+                assertEquals(stored, second.expected)
+                assertEquals(stored.nextAt.epoch, second.visit.terms.start)
+                assertEquals(25 * minute, second.next.nextAt.elapsedMs - second.expected.nextAt.elapsedMs)
+                assertEquals(FirstGrant.CANDIDATES.first(), second.visit.request.desired)
+                assertNotNull(second.city)
+                assertFalse(it.moveToNext())
+                second.next
+            }
+        }
+        assertEquals(persistedNext, ok(readJournal.cursor(identity)))
+    }
+
     fun testOrdinaryThirtyFiveMinuteGapResumesNextVisitWithoutBackfilling() {
         ok(feed(0))
         val assigned = ok(feed(1_000)).pending.single()
@@ -768,7 +806,7 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
         ok(feed(29 * minute))
         raw().use {
             it.execSQL("CREATE TRIGGER reject_visit_draft BEFORE UPDATE ON rental_product_state " +
-                "WHEN instr(NEW.payload,'rental-prepared-v1')>0 AND instr(OLD.payload,'rental-prepared-v1')=0 " +
+                "WHEN instr(NEW.payload,'rental-prepared-v2')>0 AND instr(OLD.payload,'rental-prepared-v2')=0 " +
                 "BEGIN SELECT RAISE(ABORT, 'injected visit draft failure'); END")
         }
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), feed(30 * minute))

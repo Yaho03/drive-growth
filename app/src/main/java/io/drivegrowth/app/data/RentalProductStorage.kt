@@ -1,6 +1,7 @@
 package io.drivegrowth.app.data
 
 import android.content.ContentValues
+import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import io.drivegrowth.app.host.GameIdentity
@@ -50,19 +51,45 @@ internal object RentalProductStorage {
         if(db.update("rental_product_state",values(next,raw),"profile=? AND revision=?",arrayOf(before.identity.profileId.value,before.cursor.revision.value.toString()))!=1)throw SQLiteException("자동영업 state CAS 무갱신")
         if((read(db,next.identity) as? ContractResult.Success)?.value?.let{encoded(it)}!=raw)throw SQLiteException("자동영업 state CAS 실제 쓰기 불일치")
     }
-    fun original(db:SQLiteDatabase,p:PreparedRentalVisit):Pair<Boolean,OwnedVehicleId?> = db.rawQuery("SELECT command,assigned,host_command FROM visits WHERE id=?",arrayOf(p.visit.request.id.value)).use {
-        if(!it.moveToFirst())return@use false to null
-        if(it.isNull(2)||it.text(2)!=RentalProductJson.prepared(p).toString())throw SQLiteException("자동영업 최초 whole 방문 원문 누락/불일치")
-        val expected=RentalVisitCommand.encode(p.visit)
-        if(it.text(0)!=expected)throw SQLiteException("자동영업 원래 방문 명령 불일치")
-        val assigned=if(it.isNull(1))null else OwnedVehicleId(it.text(1))
-        db.rawQuery("SELECT owned_id,version,start,end,return_end,rounding,regular_customer FROM rentals WHERE id=?",arrayOf(p.visit.request.id.value)).use { row->
-            val exists=row.moveToFirst()
-            if(assigned==null && exists)throw SQLiteException("재방문 결과에 대여 이력 있음")
-            if(assigned!=null && (!exists||row.text(0)!=assigned.value||row.text(1)!=p.visit.terms.rules.value||row.integer(2,0,Long.MAX_VALUE)!=p.visit.terms.start.value||row.integer(3,0,Long.MAX_VALUE)!=p.visit.terms.start.value+p.visit.request.hours*3600000L||row.integer(4,0,Long.MAX_VALUE)!=p.visit.terms.start.value+p.visit.request.hours*3600000L+p.visit.terms.returnMinutes*60000L))throw SQLiteException("방문 원래 대여 연결 불일치")
-            if(assigned!=null&&((if(row.isNull(5))null else row.text(5))!=p.visit.terms.rounding?.name||(if(row.isNull(6))null else row.integer(6,0,1)==1L)!=p.visit.terms.regularCustomer))throw SQLiteException("방문 원래 반올림/단골 입력 불일치")
+    const val originalColumns = """v.id AS visit_id, v.command AS visit_command,
+        v.assigned AS visit_assigned, v.host_command AS visit_host_command,
+        r.id AS original_rental_id, r.owned_id AS original_owned_id, r.version AS original_rules,
+        r.start AS original_start, r.end AS original_end, r.return_end AS original_return_end,
+        r.rounding AS original_rounding, r.regular_customer AS original_regular"""
+
+    fun original(db: SQLiteDatabase, p: PreparedRentalVisit): Pair<Boolean, OwnedVehicleId?> =
+        db.rawQuery("""SELECT $originalColumns FROM visits v LEFT JOIN rentals r ON r.id=v.id
+            WHERE v.id=?""", arrayOf(p.visit.request.id.value)).use {
+            if (!it.moveToFirst()) false to null else true to original(it, p)
         }
-        true to assigned
+
+    /** 이미 같은 SELECT에서 얻은 방문과 대여만 대조한다. */
+    fun original(row: Cursor, p: PreparedRentalVisit): OwnedVehicleId? {
+        fun column(name: String) = row.getColumnIndexOrThrow(name)
+        if (row.text(column("visit_id")) != p.visit.request.id.value ||
+            row.text(column("visit_host_command")) != RentalProductJson.prepared(p).toString())
+            throw SQLiteException("자동영업 최초 whole 방문 원문 누락/불일치")
+        val v = p.visit
+        if (row.text(column("visit_command")) != RentalVisitCommand.encode(v))
+            throw SQLiteException("자동영업 원래 방문 명령 불일치")
+        val assigned = column("visit_assigned").let { if (row.isNull(it)) null else OwnedVehicleId(row.text(it)) }
+        val rentalExists = !row.isNull(column("original_rental_id"))
+        if (assigned == null) {
+            if (rentalExists) throw SQLiteException("재방문 결과에 대여 이력 있음")
+            return null
+        }
+        val end = v.terms.start.value + v.request.hours * 3_600_000L
+        if (!rentalExists || row.text(column("original_owned_id")) != assigned.value ||
+            row.text(column("original_rules")) != v.terms.rules.value ||
+            row.integer(column("original_start"), 0, Long.MAX_VALUE) != v.terms.start.value ||
+            row.integer(column("original_end"), 0, Long.MAX_VALUE) != end ||
+            row.integer(column("original_return_end"), 0, Long.MAX_VALUE) != end + v.terms.returnMinutes * 60_000L)
+            throw SQLiteException("방문 원래 대여 연결 불일치")
+        val rounding = column("original_rounding").let { if (row.isNull(it)) null else row.text(it) }
+        val regular = column("original_regular").let { if (row.isNull(it)) null else row.flag(it) }
+        if (rounding != v.terms.rounding?.name || regular != v.terms.regularCustomer)
+            throw SQLiteException("방문 원래 반올림/단골 입력 불일치")
+        return assigned
     }
     fun commit(store:SqliteGameChangeStore,db:SQLiteDatabase,p:PreparedRentalVisit):ContractResult<OwnedVehicleId?> {
         val old=original(db,p);if(old.first)return ContractResult.Success(old.second)

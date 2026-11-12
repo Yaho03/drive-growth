@@ -6,7 +6,9 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.data.RentalIncomeKind
+import io.drivegrowth.app.runtime.rental.product.RentalCity
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.rental.RentalCategory
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -195,6 +197,30 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
         card().apply {
             tag = "results:rental-detail"
             addView(text("가상 고객의 렌터카 영업 결과", 24, bold = true))
+            when (val demand = value.rentalDemand) {
+                is Observation.Missing -> addView(text("가상 고객 요청: 기록 없음", color = muted))
+                is Observation.Available -> {
+                    val details = demand.value
+                    val city = when (val recorded = details.city) {
+                        is Observation.Missing -> "기록 없음"
+                        is Observation.Available -> when (recorded.value) {
+                            RentalCity.URBAN -> "도심"
+                            RentalCity.SUBURBAN -> "근교"
+                            RentalCity.TRANSPORT_HUB -> "교통 거점"
+                        }
+                    }
+                    val purpose = when (details.purpose) {
+                        RentalCategory.SMALL -> "근거리 이동"
+                        RentalCategory.SEDAN -> "업무 이동"
+                        RentalCategory.SUV -> "야외 활동"
+                        RentalCategory.VAN -> "단체 이동"
+                        RentalCategory.ECO -> "친환경 이동"
+                    }
+                    addView(text("목적 도시 특성: $city"))
+                    addView(text("용도: $purpose"))
+                    addView(text("희망 차종: ${details.desiredVehicleName}"))
+                }
+            }
             addView(text("대여 차량: ${value.rentalVehicleName ?: "차종명 확인 불가"}"))
             addView(text("대여 차량 식별: ${rental.ownedVehicleId.value}", color = muted))
             val amount = receipt.settlement.transaction.money?.takeIf { it.direction == MoneyDirection.CREDIT }?.amount

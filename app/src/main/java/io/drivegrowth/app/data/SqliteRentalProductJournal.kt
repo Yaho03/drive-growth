@@ -22,7 +22,7 @@ data class RentalInactiveRecovery(val identity:GameIdentity,val marker:RequestId
 
 /** B port 그대로. 현재 시각과 마지막 주행 종료 권위는 공급자가 명시한다. */
 class SqliteRentalProductJournal(private val games:GameSessionFactory,
-    private val definitions:()->ContractResult<RentalVisitDefinition>,
+    private val definitions:(GameSession)->ContractResult<RentalVisitDefinition>,
     private val clock:()->ContractResult<RentalClock>,
     private val policyOrigin:(GameIdentity)->ContractResult<Observation<RentalClock>>,
     private val rawClock:(()->ContractResult<RentalClock>)? = null,
@@ -52,10 +52,10 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
         continuous(a, b) || (rebased && b.isForwardWallJumpFrom(a))
 
     /** 명시 활성화. 과거방문을만들지않고 실제 clock 한 번을 첫 schedule로 고정한다. */
-    fun activate(identity:GameIdentity):ContractResult<RentalVisitCursor> = withDb(identity){_,db->
+    fun activate(identity:GameIdentity):ContractResult<RentalVisitCursor> = withDb(identity){s,db->
         when(val old=state(db,identity)){is ContractResult.Success->return@withDb ContractResult.Success(old.value.cursor);is ContractResult.Failure->if(old.error!=ContractError.DATA_UNAVAILABLE)return@withDb old}
         val at=when(val r=clock()){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value};if(!valid(at))return@withDb data()
-        val d=when(val r=definitions()){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value}
+        val d=when(val r=definitions(s)){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value}
         RentalProductStorage.activate(db,identity,RentalVisitCursor(Revision(0),0,at),d.version,d.trial)
     }
     override fun pending(identity:GameIdentity):ContractResult<PreparedRentalVisit?> = withDb(identity){s,db->
@@ -75,21 +75,28 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
     }
     override fun save(input:PreparedRentalVisit):ContractResult<PreparedRentalVisit> = saveVisit(input, null)
 
-    internal fun saveRetainedVisit(input: PreparedRentalVisit, acceptedThrough: RentalClock): ContractResult<PreparedRentalVisit> =
-        saveVisit(input, acceptedThrough)
+    internal fun saveDraft(input: PreparedRentalVisit, authority: RentalPreparationInputs, acceptedThrough: RentalClock? = null):
+        ContractResult<PreparedRentalVisit> = saveVisit(input, authority, acceptedThrough)
 
-    private fun saveVisit(input:PreparedRentalVisit, acceptedThrough: RentalClock?):ContractResult<PreparedRentalVisit> = withDb(input.identity){s,db->
+    private fun saveVisit(input:PreparedRentalVisit, authority: RentalPreparationInputs?,
+        acceptedThrough: RentalClock? = null):ContractResult<PreparedRentalVisit> = withDb(input.identity){s,db->
         when(val old=original(db,input)){is ContractResult.Failure->return@withDb old;is ContractResult.Success->if(old.value.first)return@withDb ContractResult.Success(input)}
         val st=when(val r=state(db,input.identity)){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value}
         st.pending?.let{return@withDb if(it==input)ContractResult.Success(it) else conflict()}
         when(val r=free(s)){is ContractResult.Failure->return@withDb r;else->Unit}
         if(st.cursor!=input.expected||s.store.requestUnavailable(db,input.visit.request.id))return@withDb conflict()
-        val d=when(val r=definitions()){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value}
+        val d=authority?.definition ?: when(val r=definitions(s)){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value}
         val now=acceptedThrough ?: when(val r=clock()){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value}
-        val catalog=when(val r=s.content){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value.catalog}
+        val catalog=authority?.catalog ?: when(val r=s.content){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value.catalog}
         val v=input.visit;val t=v.terms;val a=input.expected;val b=input.next
         if(!continuous(a.nextAt,now))return@withDb data()
         if(input.definitionVersion!=d.version||input.trial!=d.trial||v.source!=input.identity.source||v.catalog!=catalog||v.categories!=d.categories||v.hourlyRates!=d.rates||t.rules!=d.rules||t.fuelBonus!=d.fuelBonus||t.rounding!=d.rounding||t.start!=a.nextAt.epoch||d.demand[v.request.desired]?.let{it>0}!=true||d.durations[v.request.hours]?.let{it>0}!=true||d.returns[v.request.hours]!=t.returnMinutes||d.customers.none{it.weight>0&&it.customer==t.customer&&it.regularCustomer==t.regularCustomer})return@withDb conflict()
+        val city = input.city
+        if (d.cityWeights.isEmpty()) {
+            if (city != null) return@withDb conflict()
+        } else if (city == null || d.cityWeights[d.categories[v.request.desired]]?.get(city)?.let { it > 0 } != true) {
+            return@withDb conflict()
+        }
         if(a.revision.value==Int.MAX_VALUE||a.sequence==Long.MAX_VALUE||b.revision.value!=a.revision.value+1||b.sequence!=a.sequence+1||!continuous(a.nextAt,b.nextAt)||b.nextAt.epoch.value-a.nextAt.epoch.value!=d.intervalMillis)return@withDb conflict()
         val encoded=RentalProductJson.prepared(input).toString();val frozen=RentalProductJson.prepared(JSONObject(encoded));if(RentalProductJson.prepared(frozen).toString()!=encoded)return@withDb ContractResult.Failure(ContractError.INVALID_INPUT)
         RentalProductStorage.update(db,st,st.copy(pending=frozen,definition=input.definitionVersion,trial=input.trial));ContractResult.Success(frozen)
@@ -395,7 +402,7 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
                 if (at.epoch.value != projected) return data()
                 if (old.elapsedMs >= at.elapsedMs) return ContractResult.Success(cursor)
             }
-            val interval = when (val result = definitions()) {
+            val interval = when (val result = definitions(session)) {
                 is ContractResult.Failure -> return result
                 is ContractResult.Success -> result.value.intervalMillis
             }

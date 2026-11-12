@@ -55,7 +55,7 @@ internal class HostSession(
         else RentalClockReader(simulation::clock)
     private val rentalSource = io.drivegrowth.app.host.rental.SessionRentalProductSource(games, {
         io.drivegrowth.app.data.AssetTrialDefinitionProvider(context.assets).load()
-    }, recordingPolicy, rentalClock::read, random = { simulation?.rentalRandom(games) ?: kotlin.random.Random.Default })
+    }, recordingPolicy, rentalClock::read, random = { simulation?.rentalRandom(games, it) ?: kotlin.random.Random.Default })
     private var ordinaryRentalReplayClock: RestClockDomain? = null // 직렬 worker의 새 시연 세션 복원 경계.
     val rental = io.drivegrowth.app.host.rental.RentalProductHost(worker, main, { frame, recorded ->
         val replayClock = ordinaryRentalReplayClock

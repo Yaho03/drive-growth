@@ -9,6 +9,7 @@ import io.drivegrowth.app.host.rest.RestEvidenceValidator
 import io.drivegrowth.app.runtime.rental.*
 import io.drivegrowth.app.runtime.rental.product.*
 import io.drivegrowth.core.Gear
+import io.drivegrowth.core.content.GameContentSnapshot
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.progression.VehicleActivity
 import java.util.ArrayDeque
@@ -19,7 +20,7 @@ import kotlin.random.Random
 /** 직렬 worker 전용. 실제 원관측 범위만 기존 원장에 전달하며 새 지갑/가격/과거 고객을 만들지 않는다. */
 class SessionRentalProductSource(private val games: GameSessionFactory,
     private val definitions: () -> ContractResult<TrialDefinition>, private val policy: RecordingPolicy,
-    private val rawClock: () -> ContractResult<RentalClock>, private val random: () -> Random = { Random.Default },
+    private val rawClock: () -> ContractResult<RentalClock>, private val random: (RentalPreparationInputs) -> Random = { Random.Default },
     private val nextRequest: () -> RequestId = { RequestId("rental-visit-" + UUID.randomUUID()) }) {
     private val calibration = RentalClockCalibration(policy.maxUtcSkewMs)
     private var bound: GameIdentity? = null
@@ -55,10 +56,21 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
         is ContractResult.Failure -> raw
         is ContractResult.Success -> calibration.project(raw.value)
     }
-    private val journal = SqliteRentalProductJournal(games, {
-        when (val loaded = definitions()) {
-            is ContractResult.Failure -> loaded
-            is ContractResult.Success -> loaded.value.rentalVisitDefinition()
+    private fun visitDefinition(game: GameSession, content: GameContentSnapshot): ContractResult<RentalVisitDefinition> {
+        val trial = when (val result = definitions()) {
+            is ContractResult.Failure -> return result
+            is ContractResult.Success -> result.value
+        }
+        return when (val shop = game.store.rental.shop()) {
+            is ContractResult.Failure -> shop
+            is ContractResult.Success -> trial.rentalVisitDefinition(content, shop.value.progress.shopLevel)
+        }
+    }
+
+    private val journal = SqliteRentalProductJournal(games, { game ->
+        when (val content = game.content) {
+            is ContractResult.Failure -> content
+            is ContractResult.Success -> visitDefinition(game, content.value)
         }
     }, ::clock, { id ->
         if (bound != id) failure(ContractError.STATE_CONFLICT)
@@ -72,19 +84,20 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
     private val runtime = PreparedRentalRuntimeSource(::identity, journal, observed)
     private val preparation = RentalVisitPreparation(::identity, journal, RentalProductInputs { id ->
         val through = eligible ?: return@RentalProductInputs failure(ContractError.DATA_UNAVAILABLE)
-        val definition = when (val r = definitions()) { is ContractResult.Failure -> return@RentalProductInputs r; is ContractResult.Success -> r.value }
-        val planned = when (val r = definition.rentalVisitDefinition()) { is ContractResult.Failure -> return@RentalProductInputs r; is ContractResult.Success -> r.value }
         when (val opened = games.open()) {
             is ContractResult.Failure -> opened
             is ContractResult.Success -> opened.value.use { game ->
                 if (game.identity != id) failure(ContractError.STATE_CONFLICT)
                 else when (val content = game.content) {
                     is ContractResult.Failure -> content
-                    is ContractResult.Success -> ContractResult.Success(RentalPreparationInputs(content.value.catalog, planned, through))
+                    is ContractResult.Success -> when (val planned = visitDefinition(game, content.value)) {
+                        is ContractResult.Failure -> planned
+                        is ContractResult.Success -> ContractResult.Success(RentalPreparationInputs(content.value.catalog, planned.value, through))
+                    }
                 }
             }
         }
-    }, random, nextRequest)
+    }, random, nextRequest, { visit, authority -> journal.saveDraft(visit, authority) })
     private val recovery = RentalInactiveRecoveryConsumer(journal::currentInactive, ::advanceInactive) {
         resumeAt?.let { ContractResult.Success(it) } ?: failure(ContractError.DATA_UNAVAILABLE)
     }
@@ -131,7 +144,7 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
     private fun recoverVisit(acceptedThrough: RentalClock? = null): ContractResult<Unit> {
         val id = bound ?: return failure(ContractError.DATA_UNAVAILABLE)
         val original = if (acceptedThrough == null) preparation.recover(id)
-            else preparation.recover(id) { journal.saveRetainedVisit(it, acceptedThrough) }
+            else preparation.recover(id) { visit, authority -> journal.saveDraft(visit, authority, acceptedThrough) }
         val pending = when (val r = original) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
         if (pending != null) when (val r = runtime.visit(ContractResult.Success(pending.visit))) { is ContractResult.Failure -> return r; is ContractResult.Success -> Unit }
         return ContractResult.Success(Unit)

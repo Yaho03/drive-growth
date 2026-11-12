@@ -2,6 +2,7 @@ package io.drivegrowth.app.data
 
 import io.drivegrowth.app.host.shop.ShopExpansionDefinition
 import io.drivegrowth.app.host.shop.parseShopExpansionDefinition
+import io.drivegrowth.app.runtime.rental.product.RentalCity
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.achievement.*
 import io.drivegrowth.core.rental.*
@@ -58,6 +59,7 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
             is ContractResult.Success->r.value
         }
         val names=setOf("rental_rates","facilities","fuel_bonus","quest_rewards","provenance","delivery_bands","delivery_prices","delivery_proposal","delivery_change","delivery_settlement","driving","rental_visits","rental_categories","rental_durations","rental_customers","rest")
+        val demandSections = setOf("rental_visit_intervals", "rental_city_uses")
         val sections=linkedMapOf<String,MutableList<List<String>>>()
         var current:String?=null
         for(line in lines.drop(marker)) {
@@ -68,13 +70,13 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
                     if (name in sections) sections.getValue(name).add(emptyList())
                     else sections[name] = mutableListOf()
                 } else {
-                    require(name in names && name !in sections)
+                    require(name in (names + demandSections) && name !in sections)
                     sections[name] = mutableListOf()
                 }
                 current = name
             } else sections.getValue(checkNotNull(current)).add(line.split(',').map(String::trim))
         }
-        require(sections.keys - "achievement_rewards" == names)
+        require(sections.keys - "achievement_rewards" - demandSections == names)
         fun number(value:String):Long { require(value.matches(Regex("0|[1-9][0-9]*")));return value.toLong() }
         fun <K,V> records(name:String,header:List<String>,read:(List<String>)->Pair<K,V>):Map<K,V> {
             val rows=sections.getValue(name);require(rows.size>1 && rows.first()==header)
@@ -119,7 +121,38 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
             proposal.i("income_offer_count"),proposal.i("purchase_offer_count"),DeliveryRounding.valueOf(proposal.getValue("rounding"))),
             DeliveryChangeRules(expansion.rules,change.i("cancel_fee_percent")),
             DeliverySettlementRules(expansion.rules,settle.n("arrival_window_ms"),settle.n("hold_window_ms"),settle.i("hold_refund_fee_percent")))
-        val visit=scalar("rental_visits",setOf("interval_ms","max_replay_visits","rounding"));require(visit.n("interval_ms")==1800000L&&visit.i("max_replay_visits")>0)
+        val visit = records("rental_visits", listOf("key", "value")) { it[0] to it[1] }
+        val visitKeys = setOf("interval_ms", "max_replay_visits", "rounding")
+        val hasDemandPolicy = "demand_definition_version" in visit
+        require(visit.keys == if (hasDemandPolicy) visitKeys + "demand_definition_version" else visitKeys)
+        require(sections.keys.intersect(demandSections) == if (hasDemandPolicy) demandSections else emptySet())
+        require(visit.n("interval_ms") == 1_800_000L && visit.i("max_replay_visits") > 0)
+        val demandPolicy = if (hasDemandPolicy) {
+            val version = ContentVersion(visit.getValue("demand_definition_version"))
+            require(version != expansion.version)
+            val intervals = records("rental_visit_intervals", listOf("shop_level", "interval_ms")) {
+                val level = number(it[0])
+                require(level in 1..4)
+                level.toInt() to number(it[1])
+            }
+            require(intervals.keys == (1..4).toSet() && intervals.getValue(1) == visit.n("interval_ms"))
+            val ordered = (1..4).map(intervals::getValue)
+            require(ordered.last() > 0 && ordered.zipWithNext().all { (a, b) -> a > b })
+
+            val purposes = RentalCategory.entries
+            val cities = records("rental_city_uses", listOf("city") + purposes.map { it.name }) { row ->
+                RentalCity.valueOf(row.first()) to purposes.associateWith { purpose ->
+                    val weight = number(row[purpose.ordinal + 1])
+                    require(weight in 1..Int.MAX_VALUE)
+                    weight.toInt()
+                }
+            }
+            require(cities.keys == RentalCity.entries.toSet())
+            val weights = purposes.associateWith { purpose ->
+                RentalCity.entries.associateWith { city -> cities.getValue(city).getValue(purpose) }
+            }
+            TrialRentalDemandPolicy(version, intervals, weights)
+        } else null
         val categoryRows=sections.getValue("rental_categories");require(categoryRows.first()==listOf("vehicle_id","category","basis","demand_weight"))
         val categoryBases=setOf("market-small","body-sedan","body-suv","body-mpv","eco-powertrain")
         val categories=linkedMapOf<VehicleId,RentalCategory>();val categoryBasis=linkedMapOf<VehicleId,String>();val demand=linkedMapOf<VehicleId,Int>()
@@ -137,7 +170,7 @@ internal fun parseTrialDefinition(text:String, knownVehicles:Set<VehicleId>):Con
             val regular=when(row[2]){"true"->true;"false"->false;else->throw IllegalArgumentException("단골 입력")}
             io.drivegrowth.app.runtime.rental.product.RentalCustomerWeight(SimulatedCustomer(age.toInt(),months.toInt()),regular,weight.toInt())
         };require(customerInputs.toSet().size==customerInputs.size)
-        val rental=TrialRentalInputs(categories,categoryBasis,demand,durations.mapValues{it.value.first},durations.mapValues{it.value.second},customerInputs,visit.i("max_replay_visits"),visit.n("interval_ms"),java.math.RoundingMode.valueOf(visit.getValue("rounding")))
+        val rental=TrialRentalInputs(categories,categoryBasis,demand,durations.mapValues{it.value.first},durations.mapValues{it.value.second},customerInputs,visit.i("max_replay_visits"),visit.n("interval_ms"),java.math.RoundingMode.valueOf(visit.getValue("rounding")),demandPolicy)
         val rest=scalar("rest",setOf("min_driving_ms","min_parked_ms","bonus_duration_ms","bonus_percent","pricing_policy"))
         val pricing=RestPricingPolicy.entries.singleOrNull{it.id==rest.getValue("pricing_policy")}?:throw IllegalArgumentException("휴식 가격 기술 정책")
         ContractResult.Success(TrialDefinition(expansion,rates,facilities,GameMoney(number(fuel[0][1])),quests,provenance,delivery,

@@ -6,6 +6,7 @@ import io.drivegrowth.app.host.rest.RestAreaProof
 import io.drivegrowth.app.host.driving.*
 import io.drivegrowth.app.runtime.rental.RentalClock
 import io.drivegrowth.app.runtime.rental.RentalRuntimeSnapshot
+import io.drivegrowth.app.runtime.rental.product.RentalPreparationInputs
 import io.drivegrowth.app.vehicle.navigation.NavigationSnapshot
 import io.drivegrowth.core.contract.*
 import java.util.concurrent.Executor
@@ -23,7 +24,7 @@ internal interface HostSimulation {
     fun observed(frame: DrivingFrame, result: ContractResult<DrivingRecordingResult>): ContractResult<Unit>
     fun rentalResult(result: ContractResult<RentalRuntimeSnapshot>)
     fun inputConsumed(frame: DrivingFrame, recorded: DrivingRecordingResult, rental: RentalRuntimeSnapshot)
-    fun rentalRandom(games: GameSessionFactory): Random
+    fun rentalRandom(games: GameSessionFactory, authority: RentalPreparationInputs): Random
     fun attach(worker: Executor? = null, accept: (DrivingFrame, () -> Unit) -> Unit)
     fun begin()
     fun beginRest()
