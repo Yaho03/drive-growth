@@ -2516,6 +2516,10 @@ JDK 17·기존 Android SDK 35에서 `:core:test` 447개와 `:app:testDebugUnitTe
 
 `readRecordedSettlement`의 원본 함수를 JVM에서 실행했다. SQLite 커서와 JSON 해석은 시험 입력으로 대체해 원명령·정산 ID·거래가 같은 경우의 비교만 검사했다. 정상 결과는 반환됐고 개체 ID가 다르면 거절됐다. 결과의 레벨, 진행량, lifecycle, revision을 각각 하나만 유효 범위 안에서 바꾸면 네 경우 모두 변경된 결과를 반환했다. [02의 저장 연결점](02_SYSTEM_ARCHITECTURE.md#34-저장-확장의-연결점과-기존-데이터-조건)에 실제 SQLite의 재개방·거절·원본 보존 검증 조건을 남겼다. 이 실행에서 SQLite·에뮬레이터·adb·앱 재실행은 사용하지 않았다. 저장 구현과 legacy 복구 정책은 기존 #46/#122에서 추적한다.
 
+후속 [PR #242](https://github.com/Yaho03/drive-growth/pull/242)는 같은 네 불일치를 실제 SQLite에서 재현하고 수정했다. 당시 정상 원결과 재생, 불일치 거절, STARTED 및 원본 보존과 지원 구버전 이전의 범위는 [해당 실행 기록](#122-quest-원자성update-정산-재생과-구버전-apk-이전--2026-11-13)을 따른다.
+
+최신 main `ea1eafefe3621e658b186968731f5eda40077c39`의 독립 worktree에서 JDK 17·기존 Android SDK 35로 다시 실행했다. `./gradlew --offline --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`는 성공했다. core 447개(개체 계약 11개·Garage 18개 포함), 앱 단위 814개가 실패·오류·생략 없이 통과했다. Debug APK 조립 성공, Lint 오류 0건·경고 39건이며 `python3 scripts/check_repository.py`와 `git diff --check`도 통과했다. 최초 Gradle 시작은 샌드박스 루프백 제한으로 실패했고, 루프백이 허용된 환경에서 같은 명령을 재실행했다. [해당 main의 원격 CI](https://github.com/Yaho03/drive-growth/actions/runs/43268127095)는 계정 결제 또는 사용 한도로 저장소 검사 시작 전 실패로 표시됐고 Android 검사는 건너뛰었다. 이 재검증에서는 SQLite 실행·앱 재실행·에뮬레이터·adb를 사용하지 않았다.
+
 ## 대여 정산의 저장된 시간 근거와 화면 검증 — 2026-11-11
 
 정상·감액·상한 제외 시간을 실제 수락 구간과 각 구간에 적용된 당시 정책으로 저장하고 기존 Main 정산 조회→ResultsHostMapper→ResultsView에 연결했다. 금액은 최초 Settlement를 표시하며 시간에서 다시 지급하거나 현재 잔액으로 바꾸지 않는다. 기록이 없는 이전 결과는 확인 불가다. 계약은 [시간 근거 schema18](02_SYSTEM_ARCHITECTURE.md#대여-결과-시간-근거-schema18), 표현은 [시간 상세](09_UI_UX_SPEC.md#영업-정산의-시간-상세)를 따른다.
