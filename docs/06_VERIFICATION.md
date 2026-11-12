@@ -2902,3 +2902,21 @@ Pleos 에뮬레이터 API 34 ARM64, 사용자 10, 1080×600px·120dpi에서 `8ca
 **장치 보호:** 슬롯 시작 인계 대조는 19/19, 종료 대조는 17/19였다. 제품 APK·데이터 파일 6개·권한·크기/밀도·포워드·주차 상태를 보존했다. 필요한 속도 권한은 격리 패키지에만 부여했고 격리 앱과 계측 앱을 제거했다. 첫 재설치 중 장치 패키지 서비스의 `Broken pipe`를 기록했고 새 설치에서 재시험했다. 종료 시 부팅 카운트 25→26 및 같은 OEM 화면의 Activity 인스턴스 교체를 확인했다. 재부팅 명령은 실행하지 않았으며 두 변화의 원인은 확인되지 않았다. 장치는 부팅 완료·P 상태였고 자체 계측과 Gradle 프로세스가 남지 않은 상태에서 슬롯을 반환했다.
 
 2026-11-13 · [#249](https://github.com/Yaho03/drive-growth/pull/249)의 정확 게시 head `1efea1dbde949a46ac42b69e61cb6ff778c31dee`에서 로컬 앱 단위 814개(실패·오류·생략 0), 앱·계측 APK 빌드와 Lint(오류 0·경고 39)를 확인했다. 장치 근거는 위 격리 실행 기준이다. 이 PR을 main `b51d0c471b410a53a51e223b2963ed3c01970412`에 반영했고, 채택한 진행·보상·저장 및 기간 경과 복구 근거로 [#45](https://github.com/Yaho03/drive-growth/issues/45)를 종료했다. [#57](https://github.com/Yaho03/drive-growth/issues/57)은 지정 기간 복원과 실제 D/P 스크롤 근거를 재사용하며 세 목표의 남은 실제 Main 표시를 추적한다. 최종 앱 조합은 [#28](https://github.com/Yaho03/drive-growth/issues/28)에 남는다.
+
+## #57 실제 Main의 현재 기간 세 목표 표시 — 2026-11-13
+
+main `6945c000540105f5db74d3e98aced1d9b235dc5c`의 제품 소스와 [지정 계측 원본](evidence/issue57-period-recovery/selectors/current-goals/ProgressionPeriodRecoveryMainTest.kt)을 사용했다. 실행 소스 트리는 `a50207f675169beebeb56daf689ff9db852f3b6a`, 계측 파일 SHA-256은 `ccb5ccda34478b4720b7c13841117165fdce1d088f4fa57c2347cb41984db828`이다. 게시 부모 `a0a5148c8918d1d69aaff0d6b4958247cdd6e0b0`까지의 차이는 문서이며 제품·시험·빌드 입력은 같다.
+
+JDK 17·SDK 35에서 `:app:assembleDebug :app:assembleDebugAndroidTest --offline`을 실행했다. Pleos Emulator API 34 ARM64, Android 사용자 10의 새 격리 앱 `io.drivegrowth.verify.questperiode`와 계측 앱 `io.drivegrowth.verify.questperiode.test`를 사용했다. 설치 회수 SHA-256은 앱 `b008a084ab43034e6100eead54c19826e59290a4f5b5f83f1ba48b352287a0c8`, 계측 `798a5b2308a64c16d2cb4c00ae8d8471bf3c96aafb4edf8cd380b0c16fc5ff08`로 빌드본과 같았다.
+
+원장을 기존 저장 API와 시험 시계로 준비했다. 새 프로필의 대여 정산 1건, 원정산 열람 2건, 선택 개체 성장 3건을 만들었다. 새 시험 설치에서 `android.test.InstrumentationTestRunner`의 `-e class io.drivegrowth.app.host.progression.ProgressionPeriodRecoveryMainTest#testActualMainDisplaysThreeRemainingCurrentGoalsWithoutClaiming`만 실행했다. 재현 시 위 원본 한 파일을 일회용 사본의 `app/src/androidTest/java/io/drivegrowth/app/host/progression/`에 복사한다. 지정 패키지와 새 DB가 필요한 계측으로 일반 계측 소스셋에 포함하지 않는다.
+
+실제 SDK `speed=OK gear=PARK ux=false`를 받은 동일 Main PID 27183에서 SQLite의 현재 기간 키·진행·보상 문구를 화면과 대조했다. 장치 시간대는 `America/Los_Angeles`였다.
+
+| 목표 | 기간 시작일 | 진행 | 청구 버튼 |
+| --- | --- | --- | --- |
+| 일간 대여 | 2026-11-12 | 1/1 | 활성 |
+| 주간 열람 | 2026-11-09 | 2/3 | 비활성 |
+| 주간 성장 | 2026-11-09 | 3/3 | 활성 |
+
+계측 **1/1 통과(7.806초)**. 청구 버튼 입력 없이 비교 대상 원장과 공용 슬롯 0건을 유지했다. 격리 패키지를 제거했고 인계·종료 보호 대조는 각 19/19였다. #57의 미실행 세 목표 현재 기간·진행·청구 가능 표시 조건을 충족한다. 최종 디자인 결합 후보의 기능 간 검증은 #28에 남는다.
