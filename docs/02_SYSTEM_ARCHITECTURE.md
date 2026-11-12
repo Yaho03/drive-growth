@@ -383,6 +383,8 @@ PR #104 당시 SQLite 변경은 새 필드를 손실시키지 않는 `LedgerJson
 
 #48의 추가 거래는 아래 `MaterialChangeStore`·재료 강화 SQLite 절의 기존 공급을 소비한다. 대상ID/revision·재료ID/revision·활동·버전에서 계산한 새 레벨/진행량을 한 정산의 대상 성장 snapshot과 재료 CONSUMED snapshot에 연결하고 각각의 취득 정보를 보존한다. 같은 개체 중복·활동 제한·revision 충돌·금액 부족이면 전부 미반영이어야 하며, 단일 `GameChange` 두 번으로 나누지 않는다. PR #104 당시 후속이었던 다중 개체 거래를 다시 설계하지 않고 기존 명령·결과·저장·fixture를 재사용한다. 가챠·초기 지급·사고/활동·도감의 현재 공급과 남은 제품 연결은 각 기능 절과 #46/#122/#28을 따른다.
 
+**단일 개체 Update 정산의 후속 확인:** `DeliveryLedger.kt`의 공용 `readRecordedSettlement(db, change)`는 원래 명령·정산 연결을 읽고, Add에서는 차량 snapshot 전체를 비교한다. Update에서는 개체 ID까지 대조한다. 저장 담당은 Update의 결과 레벨·진행량·lifecycle과 원래 명령의 값, 결과 revision과 `expectedRevision + 1`을 대조하는 경계를 검증한다. 정상 과거 결과는 그 뒤에 차량을 성장시키거나 처분해도 당시 snapshot과 정산 ID·잔액을 돌려줘야 한다. 동일한 개체 ID와 원래 명령을 둔 채 결과 필드 하나만 다르게 바꾼 SQLite fixture에서 `STORAGE_FAILURE`와 원장 무변경을 확인한다. 희귀도·취득 정보의 근거가 없는 legacy는 현재 개체로 보정하지 않으며 기존 #46/#122의 복구 정책 조건을 따른다. [JVM 재현과 한계](06_VERIFICATION.md#46-공통-차량-계약과-update-정산-재생-재확인--2026-11-13)
+
 #### #48 레벨업과 재료 강화
 
 `io.drivegrowth.core.garage.VehicleUpgrade`가 `Garage.find`로 대상·재료를 찾고 `VehicleRef`(개체 ID·화면에서 본 revision)와 호출자가 넘긴 활동 상태(`(OwnedVehicleId) -> ContractResult<VehicleActivity>`, `Garage.availableForRental`과 같은 형태)로 검사한다. 계산은 `VehicleCare`의 PRD 시험값이다: 레벨업 비용 = 차종 가격 × 2% × 현재 레벨 × 희귀도 비용 배율(1.0·1.05·1.1·1.15, 중간 곱은 BigInteger로 계산하고 마지막에 한 번 내림), 재료 진행량 = 재료 희귀도별 100·150·250·400%(이월, 20레벨 초과분 버림).
