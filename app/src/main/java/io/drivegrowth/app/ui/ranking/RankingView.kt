@@ -5,6 +5,7 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.host.ranking.*
+import io.drivegrowth.app.ui.progress.ProgressStyle
 import io.drivegrowth.app.ui.shop.ShopStyle
 import io.drivegrowth.core.contract.InputSource
 
@@ -13,9 +14,10 @@ data class RankingUiState(val mode:RankingMode=RankingMode.MY_RECORD,val metric:
     val scrollY:Int=0,val retryPending:Boolean=false) { init { require(scrollY>=0) } }
 sealed interface RankingEvent { data object Retry:RankingEvent }
 
-/** 임시 native View. 실제 내 기록과 합성 시연 순위를 다른 화면/출처로 유지한다. 신호·DB를 직접 읽지 않는다. */
+/** 실제 내 기록과 시연 순위를 보여 주는 View. 합성 시연 순위와 실제 기록의 출처를 분리한다. 신호·DB를 직접 읽지 않는다. */
 class RankingView(context:Context,private val onEvent:(RankingEvent)->Unit):LinearLayout(context) {
-    private val style=ShopStyle(context)
+    private val style=ProgressStyle(context)
+    private val scrollStyle=ShopStyle(context)
     private val demo=DemoRankingProvider()
     private var saved=RankingUiState()
     private var state:RankingState=RankingState.Loading
@@ -45,10 +47,12 @@ class RankingView(context:Context,private val onEvent:(RankingEvent)->Unit):Line
         }
         body.addView(HorizontalScrollView(context).apply{addView(modes)})
         if(saved.mode==RankingMode.DEMO) showDemo(body) else showMine(body)
-        scroll=style.scroll(body,saved.scrollY).also{addView(it,LayoutParams(-1,-1))}
+        scroll=scrollStyle.scroll(body,saved.scrollY).also{addView(it,LayoutParams(-1,-1))}
     }
     private fun showMine(body:LinearLayout){
-        body.addView(style.text("내 기기에 저장된 기록 · 실제 사용자 간 온라인 순위는 제공하지 않습니다.",18,color=style.muted))
+        style.add(body,style.card().apply{
+            addView(style.text("내 기기에 저장된 기록 · 실제 사용자 간 온라인 순위는 제공하지 않습니다.",18,color=style.muted))
+        })
         when(val current=state){
             RankingState.Loading->body.addView(style.text("기록을 조회하고 있습니다."))
             is RankingState.Failure->{body.addView(style.text("기록을 읽지 못했습니다. 다시 조회해 주세요."));retry(body)}
@@ -72,8 +76,10 @@ class RankingView(context:Context,private val onEvent:(RankingEvent)->Unit):Line
         }
     }
     private fun showDemo(body:LinearLayout){
-        body.addView(style.text("시연용 랭킹 (예시 데이터)",24,bold=true))
-        body.addView(style.text("고정 합성 가게만 표시합니다. 내 실제 기록·사용자·위치는 포함하지 않습니다.",18,color=style.muted))
+        style.add(body,style.card(style.amber).apply{
+            addView(style.text("시연용 랭킹 (예시 데이터)",24,color=style.amber,bold=true))
+            addView(style.text("고정 합성 가게만 표시합니다. 내 실제 기록·사용자·위치는 포함하지 않습니다.",18,color=style.muted))
+        })
         val selectors=style.row()
         RankingMetric.entries.forEach{metric->selectors.addView(style.button(metric.title,primary=saved.metric==metric){if(allowed){saved=uiState.copy(metric=metric);paint()}})}
         body.addView(HorizontalScrollView(context).apply{addView(selectors)})
