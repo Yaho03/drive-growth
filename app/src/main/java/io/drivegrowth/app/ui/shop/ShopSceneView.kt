@@ -138,21 +138,21 @@ internal class ShopSceneView(
             Facility.CAR_WASH -> 1355f to 546f
         }
         if (status != ShopAvailability.INSTALLED) {
-            // 합성 원본의 설치 건물과 간판을 가리고 바닥의 예약 부지를 표시한다.
+            // 합성 원본의 구도를 유지하면서 미설치·미확인 시설을 흐리게 표시한다.
             val outline = when (facility) {
                 Facility.FUEL_STATION -> fuelCover
                 Facility.INSURANCE -> insuranceCover
                 Facility.CAR_WASH -> washCover
             }
-            polygon(canvas, outline, if (facility == Facility.FUEL_STATION) 0xff747987.toInt() else 0xff86b350.toInt())
-            canvas.save()
-            canvas.translate(x, y)
-            polygon(canvas, lotPad, 0xffead6a7.toInt())
-            polygon(canvas, lotInterior, 0xffbea072.toInt())
-            canvas.restore()
+            polygon(canvas, outline, 0x99151a28.toInt())
         }
-        badge(canvas, "${facilityName(facility)} · ${facilityStatus(status)}", x, y, 264f,
-            if (status == ShopAvailability.AVAILABLE) PixelStyle.focus else PixelStyle.text, size = 30f)
+        val ink = when (status) {
+            ShopAvailability.LOCKED -> PixelStyle.gold
+            ShopAvailability.AVAILABLE -> PixelStyle.focus
+            ShopAvailability.INSTALLED -> PixelStyle.text
+            ShopAvailability.UNKNOWN -> PixelStyle.muted
+        }
+        badge(canvas, "${facilityName(facility)} · ${facilityStatus(status)}", x, y, 270f, ink, size = 30f)
     }
 
     private fun facilityName(facility: Facility) = context.getString(when (facility) {
@@ -266,8 +266,6 @@ internal class ShopSceneView(
         private val washCover = floatArrayOf(
             1159f, 472f, 1373f, 359f, 1536f, 432f, 1536f, 658f, 1370f, 726f, 1148f, 631f,
         )
-        private val lotPad = floatArrayOf(-130f, 0f, 0f, -65f, 130f, 0f, 0f, 65f)
-        private val lotInterior = floatArrayOf(-111f, 0f, 0f, -55f, 111f, 0f, 0f, 55f)
         private val closedSlot = floatArrayOf(-108f, 26f, 40f, -62f, 108f, -29f, -39f, 58f)
     }
 }
