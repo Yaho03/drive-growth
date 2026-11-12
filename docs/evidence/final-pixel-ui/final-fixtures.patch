@@ -1,0 +1,291 @@
+diff --git a/app/src/androidTest/java/io/drivegrowth/app/data/ObservedDrivingJournalTest.kt b/app/src/androidTest/java/io/drivegrowth/app/data/ObservedDrivingJournalTest.kt
+index e385d7c..3ffc994 100644
+--- a/app/src/androidTest/java/io/drivegrowth/app/data/ObservedDrivingJournalTest.kt
++++ b/app/src/androidTest/java/io/drivegrowth/app/data/ObservedDrivingJournalTest.kt
+@@ -7,6 +7,7 @@ import io.drivegrowth.app.host.driving.*
+ import io.drivegrowth.core.Gear
+ import io.drivegrowth.core.contract.*
+ import io.drivegrowth.core.driving.*
++import io.drivegrowth.core.rental.Facility
+ import java.math.BigDecimal
+ import java.time.ZoneId
+ 
+@@ -87,6 +88,51 @@ class ObservedDrivingJournalTest:InstrumentationTestCase() {
+         ok(send(0));ok(send(100000));ok(send(100001,0.0,Gear.PARK));val result=ok(send(103001,0.0,Gear.PARK));assertEquals(1,result.committed.size);assertEquals(1000L,result.committed.single().commit.recordedMeters);assertTrue(result.state.outbox.isEmpty());assertEquals(GameMoney(10),ok(store.balance()))
+         val before=rows();assertTrue(ok(send(103001,0.0,Gear.PARK)).committed.isEmpty());assertEquals(before,rows())
+     }
++    fun testIdenticalDrivingFramesKeepRecordedTripAndIncomeWithInsuranceAndFuelInstalled() {
++        val zone = Observation.Available(ZoneId.of("UTC"))
++        val frames = listOf(observation(), observation(100_000), observation(100_001, 0.0, Gear.PARK),
++            observation(103_001, 0.0, Gear.PARK)).map { DrivingFrame(it, zone) }
++
++        fun record(dbName: String, installed: Set<Facility>): ObservedDrivingReceipt {
++            val games = GameSessionFactory(context, mapOf(source to dbName), source)
++            ok(games.open()).use { game ->
++                // 설치 상태만 다른 격리 fixture다. 시설 구입·차감은 별도 장치 시험에서 다룬다.
++                ok(game.store.atomic { db ->
++                    for (facility in installed) db.execSQL("INSERT INTO facilities VALUES (?)", arrayOf(facility.name))
++                    ContractResult.Success(Unit)
++                })
++                assertEquals(installed, ok(game.store.rental.shop()).facilities)
++                ok(game.store.activateObservedDriving(game.identity.profileId))
++            }
++            val reducer = ObservedDrivingReducer(RecordingPolicy(200_000, 200_000, 1_000, 3_000, 0.1, 0.5)) {
++                "same-driving-frames"
++            }
++            val input = SessionObservedDrivingSource(games, journal, reducer) {
++                ok(AssetTrialDefinitionProvider(context.assets).load()).drivingIncomeRules()
++            }
++            val receipt = frames.flatMap { frame ->
++                val observation = frame.observation
++                ok(input.observe("same-receiver", frame, RecordingClock(observation.receivedElapsedMs, observation.receivedAt))).committed
++            }.single()
++            assertEquals(1_000L, receipt.commit.recordedMeters)
++            assertEquals(1_000L, receipt.commit.rewardedMeters)
++            assertEquals(rules.incomePerKm, receipt.commit.amount)
++            assertEquals(MoneyChange(MoneyDirection.CREDIT, rules.incomePerKm), receipt.commit.settlement?.transaction?.money)
++            return receipt
++        }
++
++        val bareDb = "$name-bare"
++        val installedDb = "$name-installed"
++        try {
++            val bare = record(bareDb, emptySet())
++            val installed = record(installedDb, setOf(Facility.INSURANCE, Facility.FUEL_STATION))
++            assertEquals(bare.trip, installed.trip)
++            assertEquals(bare.commit.copy(settlement = null), installed.commit.copy(settlement = null))
++        } finally {
++            listOf(bareDb, installedDb).forEach(context::deleteDatabase)
++        }
++    }
++
+     fun testV12UpgradeAddsUnsupportedModuleWithoutBackfillingExistingDrivingDays() {
+         val t=trip();val original=ok(store.driving.settle(rules,t.confirmed(source)!!));store.close();raw{db->stripRentalProductFixture(db);listOf("observed_driving_marker","observed_driving_state","observed_driving_receipts").forEach{db.execSQL("DROP TABLE $it")};db.version=12};store=open()
+         assertEquals(original,ok(store.driving.settle(rules,t.confirmed(source)!!)));assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),store.atomic{journal.read(it,actor)});assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),store.observedDrivingReceipt(t.id));raw{assertEquals(20, it.version)}
+diff --git a/app/src/androidTest/java/io/drivegrowth/app/host/garage/GarageScrapRecoveryMainActivityTest.kt b/app/src/androidTest/java/io/drivegrowth/app/host/garage/GarageScrapRecoveryMainActivityTest.kt
+index fb0ffcd..c2eb55d 100644
+--- a/app/src/androidTest/java/io/drivegrowth/app/host/garage/GarageScrapRecoveryMainActivityTest.kt
++++ b/app/src/androidTest/java/io/drivegrowth/app/host/garage/GarageScrapRecoveryMainActivityTest.kt
+@@ -20,24 +20,32 @@ import io.drivegrowth.app.MainActivity
+ import io.drivegrowth.app.data.HostCheckpointCommand
+ import io.drivegrowth.app.data.HostCheckpointPhase
+ import io.drivegrowth.app.data.RentalTerms
++import io.drivegrowth.app.data.requestId
+ import io.drivegrowth.app.host.GameSession
+ import io.drivegrowth.app.host.GameSessionFactory
+ import io.drivegrowth.app.host.HostNavigation
+ import io.drivegrowth.app.host.HostPage
++import io.drivegrowth.app.host.HostSession
+ import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
+ import io.drivegrowth.app.simulation.SimulationTimeline
++import io.drivegrowth.app.simulation.UnifiedSimulation
+ import io.drivegrowth.app.simulation.UnifiedSimulationActivity
+ import io.drivegrowth.app.ui.garage.GarageEvent
+ import io.drivegrowth.app.ui.garage.GarageView
+ import io.drivegrowth.core.contract.*
+ import io.drivegrowth.core.garage.GachaPull
++import io.drivegrowth.core.garage.VehicleRef
++import io.drivegrowth.core.garage.VehicleRepair
+ import io.drivegrowth.core.progression.VehicleAction
+ import io.drivegrowth.core.progression.VehicleActivity
+ import io.drivegrowth.core.rental.RentalCategory
+ import io.drivegrowth.core.rental.RentalRequest
+ import io.drivegrowth.core.rental.SimulatedCustomer
+ import java.math.RoundingMode
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.Executor
+ import java.util.concurrent.FutureTask
++import java.util.concurrent.TimeUnit
+ 
+ /** 격리 Debug Main의 차량 관리·폐차 복원. 가상 고객과 가챠 seed는 준비 입력이다. */
+ @Suppress("DEPRECATION")
+@@ -136,6 +144,170 @@ class GarageScrapRecoveryMainActivityTest :
+         report("SAVED", identity.profileId, saved)
+     }
+ 
++    /** 실제 Main과 SQLite. 조작 제한과 응답 순서만 기존 시연 입력·worker 표식으로 제어한다. */
++    fun testStaleMaterialRepairSaleAndScrapConfirmationsDoNotWriteNewTransactions() {
++        requireFresh("io.drivegrowth.verify.garage52stale")
++        assertFalse(context.getDatabasePath("game-ledger-simulation.db").exists())
++        assertTrue(simulationPreferences.edit().putInt("stage", initialTimeline.stage)
++            .putLong("elapsed", initialTimeline.elapsedMs).commit())
++        val onboarding = StoredOnboardingHostSource(games)
++        val identity = ok(onboarding.read()).identity
++        ok(onboarding.choose(identity, avante))
++        val (target, material) = read { game ->
++            val first = ok(game.store.listOwnedVehicles()).single()
++            val finance = assign(game, first, 0, accident = false)
++            settle(game, finance, 0)
++            finishReturn(game, finance, 0, VehicleActivity.IDLE)
++            val target = paidCasper(game, "target", Rarity.COMMON)
++            val material = paidCasper(game, "material", Rarity.ADVANCED)
++            ok(game.store.rental.setResting(material.ownedVehicleId, true))
++            target.ownedVehicleId to material.ownedVehicleId
++        }
++
++        selectPage("보유 차량", HostPage.GARAGE)
++        openFirstGarageDetail(target)
++        val session = testField(MainActivity::class.java, "session", activity) as HostSession
++        val simulation = session.simulation as UnifiedSimulation
++        val progress = UnifiedSimulation::class.java.getDeclaredField("progress").apply { isAccessible = true }
++        val management = testField(MainActivity::class.java, "management", activity) as GarageCommandHost
++        val worker = testField(GarageCommandHost::class.java, "worker", management) as Executor
++        val controller = management.controller
++        val restricted = checkNotNull(initialTimeline.begin())
++        fun gate(timeline: SimulationTimeline) {
++            progress.set(simulation, timeline)
++            checkNotNull(simulation.changed).invoke()
++            assertEquals(timeline.controlsAllowed, simulation.controlsAllowed)
++        }
++        fun assertRestricted() {
++            assertEquals("Main 제한 문구", "모의 입력을 처리하고 있어요. 잠시 기다려 주세요.",
++                activityRoot().findViewWithTag<TextView>("simulation:blocked")?.text?.toString())
++            assertNull(activityRoot().mainNavigation())
++            assertFalse(buttons().any { it.text.toString() in setOf("확정", "결과 확인", "보관한 같은 명령으로 결과 확인") })
++        }
++        fun drainWorker() {
++            // 기존 Main 계측과 같은 FIFO 표식. UI 블록 안이면 worker 응답만 먼저 큐에 쌓인다.
++            val marker = CountDownLatch(1)
++            worker.execute { marker.countDown() }
++            assertTrue("차량 관리 worker 표식", marker.await(10, TimeUnit.SECONDS))
++        }
++
++        try {
++            for (action in listOf(VehicleAction.USE_MATERIAL, VehicleAction.SELL, VehicleAction.SCRAP, VehicleAction.REPAIR)) {
++                if (action == VehicleAction.REPAIR) {
++                    read { game ->
++                        val rent = assign(game, current(game, target), 1, accident = true)
++                        assertTrue(settle(game, rent, 1).accident)
++                        finishReturn(game, rent, 1, VehicleActivity.NEEDS_REPAIR)
++                    }
++                    tapText("새로고침")
++                }
++                awaitUi("$action 가능한 최신 차고 상세") {
++                    val garage = views(activityRoot()).filterIsInstance<GarageView>().singleOrNull()
++                    garage?.selectedVehicleId == target && garage.findViewWithTag<Button>(action)?.isEnabled == true
++                }
++                val beforePreview = managementRows()
++                tapTag(action)
++                if (action == VehicleAction.USE_MATERIAL)
++                    tapButton(target = "재료 개체 $material") { it.text.toString().startsWith("${material.value} ·") }
++                awaitUi("$action 원래 명령 검토") {
++                    controller.state is GarageCommandState.Review && buttons().any { it.text.toString() == "확정" && it.isEnabled }
++                }
++                val review = onUi { controller.state as GarageCommandState.Review }
++                assertEquals(action, review.pending.request.action)
++                assertEquals(target, review.pending.request.id)
++                assertNull(checkpoint())
++                assertEquals("$action 검토만으로 원장 무변경", beforePreview, managementRows())
++
++                // 화면 밖에서 같은 SQLite 원장의 조건을 실제 명령으로 바꾼 뒤 비교 기준을 잡는다.
++                read { game ->
++                    val car = current(game, if (action == VehicleAction.USE_MATERIAL) material else target)
++                    val id = RequestId("garage-stale-fixture-${action.name}")
++                    val content = ok(game.content)
++                    if (action == VehicleAction.REPAIR) {
++                        val command = ok(VehicleRepair(content).prepare(game.store, id, InputSource.SIMULATION,
++                            VehicleRef(car.ownedVehicleId, car.revision)))
++                        ok(game.store.commitRepair(command))
++                        assertEquals(VehicleActivity.IDLE, ok(game.store.rental.activity(target)))
++                    } else {
++                        ok(game.store.commitGameChange(GameChange(id, TransactionKind.GARAGE, InputSource.SIMULATION,
++                            content.ruleVersion, null, VehicleWrite.Update(car.ownedVehicleId, car.revision, car.level,
++                                VehicleLifecycle.OWNED, car.levelProgressPercent + 1))))
++                    }
++                    assertEquals(car.revision.value + 1, current(game, car.ownedVehicleId).revision.value)
++                }
++                val changed = managementRows()
++                val old = onUi {
++                    val confirm = buttons().single { it.text.toString() == "확정" && it.isEnabled }
++                    gate(restricted)
++                    assertRestricted()
++                    assertFalse(confirm.isAttachedToWindow)
++                    assertTrue("분리된 확정 버튼의 이전 콜백 전달", confirm.performClick())
++                    assertEquals(review, controller.state)
++                    confirm
++                }
++                drainWorker()
++                instrumentation.waitForIdleSync()
++                assertEquals("$action 이전 입력 뒤 원장 무변경", changed, managementRows())
++                assertNull("$action 이전 입력은 명령을 보존하지 않는다", checkpoint())
++
++                onUi {
++                    gate(initialTimeline)
++                    assertTrue("재허용 뒤에도 이전 버튼은 무효", old.performClick())
++                    assertEquals(review, controller.state)
++                    val confirm = buttons().single { it.text.toString() == "확정" && it.isEnabled }
++                    assertNotSame(old, confirm)
++                    assertTrue(confirm.performClick())
++                    assertEquals(GarageCommandState.Running(review.pending), controller.state)
++                    drainWorker()
++                    assertEquals("worker 응답은 아직 UI에 적용되지 않음", GarageCommandState.Running(review.pending), controller.state)
++                    gate(restricted)
++                    assertTrue("제한 중 늦은 기존 확정 콜백 전달", confirm.performClick())
++                    assertRestricted()
++                }
++
++                awaitUi("$action 원래 미확정 응답이 제한 중 도착") {
++                    controller.state == GarageCommandState.Failure(ContractError.STATE_CONFLICT, review.pending)
++                }
++                onUi { assertRestricted() }
++                assertEquals("$action 늦은 실패 응답 뒤 원장 무변경", changed, managementRows())
++                val saved = checkNotNull(checkpoint())
++                assertEquals(HostCheckpointPhase.SAVED, saved.phase)
++                assertEquals(review.pending.checkpoint(), saved.command)
++
++                onUi { gate(initialTimeline) }
++                awaitLabel("확인한 차량 상태 또는 요청이 달라졌습니다")
++                assertFalse(onUi { buttons().any { it.text.toString() == "결과 확인" } })
++                assertEquals(saved, checkpoint())
++                tapText("저장소에서 미실행 확인 후 요청 취소")
++                awaitLabel("원장이 미실행 요청의 취소를 확인했습니다", prefix = true)
++                assertNull(checkpoint())
++                assertEquals("$action 확인된 미실행 슬롯만 해제", changed, managementRows())
++                tapText("차고로")
++                Log.i("GarageStaleMain", "action=$action request=${saved.command.requestId.value} stale=blocked late=STATE_CONFLICT rows=unchanged")
++            }
++        } finally {
++            onUi { if (!simulation.controlsAllowed) gate(initialTimeline) }
++        }
++    }
++
++    private fun testField(owner: Class<*>, name: String, instance: Any): Any =
++        checkNotNull(owner.getDeclaredField(name).apply { isAccessible = true }.get(instance))
++
++    private fun checkpoint() = read { game -> ok(game.store.hostCommands.load(game.identity.profileId)) }
++
++    private fun managementRows() = read { game ->
++        ok(game.store.read { db ->
++            listOf("account", "vehicles", "settlements", "material_requests", "repair_requests", "rentals", "discoveries")
++                .associateWith { table ->
++                    db.rawQuery("SELECT * FROM $table ORDER BY 1, 2", null).use { rows ->
++                        buildList {
++                            while (rows.moveToNext()) add(List(rows.columnCount) { rows.getString(it) })
++                        }
++                    }
++                }
++        })
++    }
++
+     fun testColdMainExecutesOriginalSavedScrapOnceAndLeavesReceipt() {
+         requirePreparedSimulation()
+         assertTrue("이전 selector의 시연 DB가 필요합니다.", database.exists())
+@@ -308,14 +480,14 @@ class GarageScrapRecoveryMainActivityTest :
+         error(label)
+     }
+ 
+-    private fun requireIsolated() {
+-        assertEquals("폐차 복원 전용 계측 패키지", "io.drivegrowth.verify.garage466scrap", context.packageName)
++    private fun requireIsolated(packageName: String = "io.drivegrowth.verify.garage466scrap") {
++        assertEquals("차고 검증 전용 계측 패키지", packageName, context.packageName)
+         assertTrue((context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0)
+         assertFalse(context.getDatabasePath("game-ledger-vehicle.db").exists())
+     }
+ 
+-    private fun requireFresh() {
+-        requireIsolated()
++    private fun requireFresh(packageName: String = "io.drivegrowth.verify.garage466scrap") {
++        requireIsolated(packageName)
+         assertFalse(database.exists())
+         assertFalse(simulationPreferences.contains("stage"))
+         assertFalse(simulationPreferences.contains("elapsed"))

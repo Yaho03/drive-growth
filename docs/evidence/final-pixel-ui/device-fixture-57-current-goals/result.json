@@ -1,0 +1,14 @@
+{
+  "head": "b3c09a575e16b023e64dcbe93e263bed0788b7ec",
+  "tree": "666784894027662b9dceb0d8710cf7bda1ab0a5c",
+  "testOverlaySHA256": "1f7b7601c6651edb14f7cf1ed95d7be50a400cc3547c20aa105c94e3e82c051d",
+  "package": "io.drivegrowth.verify.questperiode",
+  "selector": "io.drivegrowth.app.host.progression.ProgressionPeriodRecoveryMainTest#testActualMainDisplaysThreeRemainingCurrentGoalsWithoutClaiming",
+  "sha256": {
+    "io.drivegrowth.verify.questperiode": "3b11bbe5efaf85112dc0acc350e281310053b0afa6c3347750288321c1bd679f",
+    "io.drivegrowth.verify.questperiode.test": "204633f971c8ef0d66adddebccb6d6044522cc4e97b24fe93a881ea834178507"
+  },
+  "cleanupErrors": [],
+  "signerSHA256": "4241ac4162c67a0e0101009cec5a8810ae78bdf1346d4decdf55b191fc64d60b",
+  "passed": true
+}

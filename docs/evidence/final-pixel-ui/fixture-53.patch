@@ -1,0 +1,134 @@
+diff --git a/app/src/androidTest/java/io/drivegrowth/app/simulation/PurchaseDeliveryMainFlowTest.kt b/app/src/androidTest/java/io/drivegrowth/app/simulation/PurchaseDeliveryMainFlowTest.kt
+index dfbc853..a525099 100644
+--- a/app/src/androidTest/java/io/drivegrowth/app/simulation/PurchaseDeliveryMainFlowTest.kt
++++ b/app/src/androidTest/java/io/drivegrowth/app/simulation/PurchaseDeliveryMainFlowTest.kt
+@@ -175,8 +175,14 @@ class PurchaseDeliveryMainFlowTest :
+             .writeText(JSONObject().put("pid", Process.myPid()).put("request", request.value).toString())
+     }
+ 
+-    fun testChangeComparisonRejectsMissingTravelThenCommitsOnce() {
+-        requireFresh("io.drivegrowth.verify.issue53change")
++    fun testChangeComparisonRejectsMissingTravelThenCommitsOnce() =
++        commitChange("io.drivegrowth.verify.issue53change", holdReceipt = false)
++
++    fun testCommitChangeAndKeepOriginalReceiptForColdMain() =
++        commitChange("io.drivegrowth.verify.issue53startede", holdReceipt = true)
++
++    private fun commitChange(packageName: String, holdReceipt: Boolean) {
++        requireFresh(packageName)
+         val purchase = buyFromMain(changeFixture = true)
+         val request = purchase.route.active.requestId
+         val original = stored(request)
+@@ -209,7 +215,88 @@ class PurchaseDeliveryMainFlowTest :
+             true
+         }
+         assertChangeResult(original, request, next.after.proposed.offers.single { it.id == next.offerId } as DeliveryOffer.Purchase,
+-            purchase.offer.price)
++            purchase.offer.price, holdReceipt = holdReceipt)
++    }
++
++    fun testPendingPurchaseArrivesIntoHoldingWithoutGrantingVehicle() {
++        requireFresh("io.drivegrowth.verify.issue53startede")
++        val purchase = buyFromMain()
++        val request = purchase.route.active.requestId
++        awaitUi("같은 구매 의뢰가 도착 전 활성 화면에 남음") {
++            session.delivery.state?.screen is DeliveryScreen.Active &&
++                visibleLabels().contains(context.getString(R.string.delivery_active_purchase_note))
++        }
++        val selected = stored(request)
++        assertNull(selected.arrival)
++        assertEquals(purchase.route, read { ok(it.store.delivery.inProgress()) })
++        assertEquals(1, selected.settlements.count { it.transaction.kind == TransactionKind.DELIVERY })
++        assertEquals(1, selected.vehicles.size)
++        assertFalse(prefs.contains("arrivalRoute"))
++        val history = read { game ->
++            val store = game.store
++            val capacity = ok(store.rental.shop()).capacity
++            repeat(capacity - selected.vehicles.size) { i ->
++                val filler = OwnedVehicle(OwnedVehicleId("issue53-hold-filler-$i"), VehicleId("hyundai_casper"),
++                    1, Revision(0), VehicleLifecycle.OWNED, Rarity.COMMON, 0, GameMoney(0), VehicleAcquisitionSource.GACHA)
++                ok(store.commitGameChange(GameChange(RequestId("issue53-hold-fill-$i"), TransactionKind.GARAGE,
++                    InputSource.SIMULATION, ok(game.content).ruleVersion, vehicle = VehicleWrite.Add(filler))))
++            }
++            ok(store.listVehicleHistory()).also { assertEquals(capacity, it.size) }
++        }
++        val full = stored(request)
++        assertEquals(selected.balance, full.balance)
++        instrumentation.runOnMainSync { activity.window.decorView.showSimulationControls() }
++        click("simulation:start")
++        await("같은 경로의 모의 도착 뒤 마지막 P", timeoutMs = 75_000) { prefs.getInt("stage", 0) == 65 }
++        awaitReceipt("구매 차량을 임시 보관했어요.")
++        val after = stored(request)
++        val arrival = requireNotNull(after.arrival)
++        val held = (arrival.outcome as DeliveryOutcome.VehicleHeld).held
++        assertNull(arrival.settlement)
++        assertEquals(purchase.route.route.value, prefs.getString("arrivalRoute", null))
++        assertEquals(purchase.offer.vehicleId, held.vehicle.vehicleId)
++        assertEquals(purchase.offer.rarity, held.vehicle.rarity)
++        assertEquals(purchase.offer.price, held.vehicle.acquisitionCost)
++        assertEquals(full.vehicles, after.vehicles)
++        assertEquals(full.settlements.filter { it.transaction.kind == TransactionKind.DELIVERY },
++            after.settlements.filter { it.transaction.kind == TransactionKind.DELIVERY })
++        read { game ->
++            assertEquals(history, ok(game.store.listVehicleHistory()))
++            assertEquals(listOf(held), ok(game.store.delivery.held()))
++            assertNull(ok(game.store.delivery.inProgress()))
++            assertTrue(CollectionKey(purchase.offer.vehicleId, purchase.offer.rarity) in ok(game.store.discoveredVehicles()))
++        }
++        context.filesDir.resolve("issue53-hold.json").writeText(JSONObject()
++            .put("request", request.value).put("route", purchase.route.route.value)
++            .put("pid", Process.myPid()).put("heldVehicle", held.vehicle.ownedVehicleId.value)
++            .put("ownedBefore", full.vehicles.size).put("ownedAfter", after.vehicles.size).toString())
++    }
++
++    fun testColdMainReopensStartedChangeWithoutAnotherTransaction() {
++        assertEquals("io.drivegrowth.verify.issue53startede", context.packageName)
++        val evidence = JSONObject(context.filesDir.resolve("issue53-started-before.json").readText())
++        assertTrue("새 OS 프로세스", Process.myPid() != evidence.getInt("pid"))
++        val request = RequestId(evidence.getString("request"))
++        val before = stored(request)
++        val route = read { requireNotNull(ok(it.store.delivery.inProgress())) }
++        assertEquals(evidence.getString("original"), before.toString())
++        assertEquals(evidence.getString("route"), route.toString())
++        assertEquals(HostCheckpointPhase.STARTED, before.checkpoint?.phase)
++        activity
++        awaitUi("새 PID의 확정한 탁송 요청 열기") {
++            views(activity.window.decorView).filterIsInstance<Button>().firstOrNull {
++                it.isShown && it.isEnabled && it.text.toString() == "보관한 탁송 요청 확인"
++            }?.performClick() == true
++        }
++        awaitReceipt("목적지 변경이 확정됐어요.")
++        assertEquals(before, stored(request))
++        assertEquals(route, read { ok(it.store.delivery.inProgress()) })
++        acknowledge(before.profile)
++        assertEquals(before.copy(checkpoint = null), stored(request))
++        assertEquals(route, read { ok(it.store.delivery.inProgress()) })
++        context.filesDir.resolve("issue53-started-after.json").writeText(JSONObject()
++            .put("pid", Process.myPid()).put("request", request.value).put("route", route.route.value)
++            .put("settlement", evidence.getString("settlement")).toString())
+     }
+ 
+     fun testSaveReviewedChangeForColdRecovery() {
+@@ -336,7 +423,7 @@ class PurchaseDeliveryMainFlowTest :
+     }
+ 
+     private fun assertChangeResult(before: Original, request: RequestId, offer: DeliveryOffer.Purchase,
+-        paid: GameMoney, originalCheckpoint: HostCommandCheckpoint? = null) {
++        paid: GameMoney, originalCheckpoint: HostCommandCheckpoint? = null, holdReceipt: Boolean = false) {
+         awaitReceipt("목적지 변경이 확정됐어요.")
+         val after = stored(request)
+         val checkpoint = requireNotNull(after.checkpoint)
+@@ -374,6 +461,13 @@ class PurchaseDeliveryMainFlowTest :
+             assertEquals(offer, progress.active.offer)
+             assertTrue(requireNotNull(ok(game.store.delivery.terms())).changeUsed)
+         }
++        if (holdReceipt) {
++            val route = read { requireNotNull(ok(it.store.delivery.inProgress())) }
++            context.filesDir.resolve("issue53-started-before.json").writeText(JSONObject()
++                .put("pid", Process.myPid()).put("request", request.value).put("original", after.toString())
++                .put("route", route.toString()).put("settlement", change.settlementId.value).toString())
++            return
++        }
+         acknowledge(after.profile)
+         assertEquals(after.copy(checkpoint = null), stored(request))
+     }

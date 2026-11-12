@@ -2973,3 +2973,17 @@ Pleos 2.1.0 / API34 ARM64의 격리 패키지 `io.drivegrowth.verify.combined28e
 제품 코드는 같은 결합 소스이며 설치 격리를 위해 applicationId/testApplicationId만 변경했다. 설치 앱 SHA-256은 `2766ca4af2221b619a26a76e71e393d89854f8fd5a32a5e05f12d1dcf0d0278c`, 시험 APK는 `f57c08900bfec08d06f340d68359b880c2ceb838bf2919c0e0439027ea168283`이다. 게시 PR head의 Actions는 사용 한도로 시작되지 않았으며 원격 성공으로 기록하지 않는다.
 
 **이 시점의 별도 결함:** 결합 호스트의 320dp 탐색 시험은 `ONBOARDING button width 119 exceeds viewport 0`으로 실패했고, 제한 전 탐색 callback의 재활성화가 독립 코드 검토에서 발견됐다. 이 호스트 수정은 네 표시 PR에 포함되지 않으며 수정·재검증 전 전체 결합/주행 제한/최종 #28 완료를 주장하지 않는다. 표시 PR의 수용은 기능 이슈 전체 종료와 다르다. 이 실행 뒤의 실제 전체 플레이·새 프로세스·공식 창 시험은 별도 결과로 이어 기록한다.
+
+
+### 결합 소스의 시설·차량 관리·탁송 복원·진행 회귀
+
+위 `b3c09a5` 제품 소스를 유지한 격리 앱에서 다음 시험을 추가했다. 계측용 patch와 패키지 격리만 적용했으며 제품 DB를 삭제하거나 실제 차량 기록을 모의 입력으로 바꾸지 않았다. 아래 값은 모의 입력·시험 원장으로 재현한 실행 결과이며 실차 결과가 아니다.
+
+| 범위 | 실제 결과 | 원본 근거 |
+| --- | --- | --- |
+| #44 시설과 주행 평가 분리 | 시설 없음/보험·주유소 설치의 같은 관측 프레임을 같은 factory 경로에 넣었다. 기록·보상 거리 각 1,000m, 원주행 결과·수익이 같음. 1/1 통과 | [계측](evidence/final-pixel-ui/device-fixture-44-same-frames/instrumentation.txt) · [소스·APK](evidence/final-pixel-ui/device-fixture-44-same-frames/result.json) |
+| #52 오래된 차량 관리 입력 | 강화 재료·수리·판매·폐차의 검토 뒤 개체/활동 변경, 제한 중 이전 확정 입력, 복귀 뒤 이전 버튼, 늦은 실패 응답을 시험했다. 7개 비교 테이블과 공용 슬롯에 추가 거래가 없고 제한 상태를 유지함. 1/1 통과 | [계측](evidence/final-pixel-ui/device-fixture-52-stale/instrumentation.txt) · [소스·APK](evidence/final-pixel-ui/device-fixture-52-stale/result.json) |
+| #53 변경 확정 후 새 프로세스 | 구매 의뢰 변경의 거래를 확정하고 공용 슬롯을 STARTED로 남긴 PID 998을 종료했다. 새 PID 3895의 Main이 같은 request·route·settlement를 조회하고 추가 차감·지급 없이 복원함. 2/2 통과 | [원실행](evidence/final-pixel-ui/device-fixture-53-started/instrumentation-1.txt) · [재실행](evidence/final-pixel-ui/device-fixture-53-started/instrumentation-2.txt) · [전후 식별값](evidence/final-pixel-ui/device-fixture-53-started/issue53-started-after.json) · [소스·APK](evidence/final-pixel-ui/device-fixture-53-started/result.json) |
+| #57 세 목표 표시 | 현재 일간 대여 1/1·주간 열람 2/3·주간 성장 3/3과 청구 버튼 활성/비활성/활성을 픽셀 Main과 원장으로 대조함. 청구 없이 1/1 통과 | [계측](evidence/final-pixel-ui/device-fixture-57-current-goals/instrumentation.txt) · [소스·APK](evidence/final-pixel-ui/device-fixture-57-current-goals/result.json) |
+
+재현 자료는 [#44·#52 계측 patch](evidence/final-pixel-ui/final-fixtures.patch)(SHA-256 `d319bf2ebe0eceb6ffbd160045a5d5bab432ce01014b62e9d5c30ed99d15637e`), [#53 계측 patch](evidence/final-pixel-ui/fixture-53.patch)(`7c51adaf9c90ed9e678e9583741be45285b2bb2aca8de67e509dbfc0b91f3d42`), [#57 계측 원본](evidence/final-pixel-ui/ProgressionPeriodRecoveryMainTest.kt)(`1f7b7601c6651edb14f7cf1ed95d7be50a400cc3547c20aa105c94e3e82c051d`)이다. patch는 해당 `b3c09a5`의 일회용 사본에서 각각 적용한다. #57 원본은 기존 동일 이름의 시험 파일을 대신하는 격리 계측이며 일반 테스트에 중복 추가하지 않는다. `:app:assembleDebug :app:assembleDebugAndroidTest`로 빌드한 뒤 각 metadata의 격리 패키지와 selector를 사용했다. 새 제품 UI의 지원 창·실제 SDK 변경과 최종 #28 전체 흐름은 이 시험과 별도로 확인한다.
