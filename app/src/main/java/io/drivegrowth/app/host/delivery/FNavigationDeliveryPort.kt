@@ -36,7 +36,8 @@ class FNavigationDeliveryPort(
         val binding = selected(identity, raw)
         val destination = raw.destination as? NavigationField.Value
         val distance = raw.remainingEstimatedMeters as? NavigationField.Value
-        val sameDestination = binding != null && binding.identity == identity && destination != null && binding.actualDestination == destination.value &&
+        val sameDestination = raw.connection == NavigationConnection.CONNECTED_OBSERVED && raw.failure == null &&
+            binding != null && binding.identity == identity && destination != null && binding.actualDestination == destination.value &&
             binding.actualStamp == destination.stamp && binding.selectionRevision >= 0
         val classification = classifiedSource(identity, raw)
         val source = (classification as? Observation.Available)?.value
@@ -52,8 +53,8 @@ class FNavigationDeliveryPort(
             stampsMatch && !isFresh -> MissingReason.STALE
             else -> MissingReason.NO_DATA
         }
-        val estimated: Observation<EstimatedRouteDistance> = if (raw.connection == NavigationConnection.CONNECTED_OBSERVED &&
-            sameDestination && sourceMatches && stampsMatch && isFresh && distance!!.value >= 0)
+        val estimated: Observation<EstimatedRouteDistance> = if (sameDestination &&
+            sourceMatches && stampsMatch && isFresh && distance!!.value >= 0)
             Observation.Available(EstimatedRouteDistance(distance.value, source!!)) else Observation.Missing(missing)
         // F는 실제 이동 거리를 공급하지 않는다. 별도 기록 입력이 같은 source인 경우만 그대로 전달한다.
         val moved = observed(identity).let { value -> if (value is Observation.Available && value.value.source != identity.source)
