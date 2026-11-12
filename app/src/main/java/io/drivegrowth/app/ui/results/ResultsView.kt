@@ -212,15 +212,21 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                     addView(text("정상 적용 시간: ${rentalDuration(basis.normalMillis)}"))
                     addView(text("감액 적용 시간: ${rentalDuration(basis.reducedMillis)}"))
                     addView(text("상한 제외 시간: ${rentalDuration(basis.cappedMillis)}"))
+                    if (basis.unobservedMillis > 0) {
+                        addView(text("미관측 제외 시간: ${rentalDuration(basis.unobservedMillis)}"))
+                    }
                     basis.periods.forEachIndexed { index, period ->
                         val kind = when (period.kind) {
                             RentalIncomeKind.DRIVING -> "주행 중 영업"
                             RentalIncomeKind.PARKED -> "주차 중 영업"
                             RentalIncomeKind.INACTIVE -> "자동 영업 반영"
+                            RentalIncomeKind.UNOBSERVED -> "미관측 · 수익 제외"
                         }
                         addView(text("구간 ${index + 1} · $kind", bold = true))
                         addView(text("${basisTime(period.from)} ~ ${basisTime(period.through)}", color = muted))
-                        addView(text("정상 ${rentalDuration(period.normalMillis)} · 감액 ${rentalDuration(period.reducedMillis)} · 상한 제외 ${rentalDuration(period.cappedMillis)}"))
+                        if (period.kind != RentalIncomeKind.UNOBSERVED) {
+                            addView(text("정상 ${rentalDuration(period.normalMillis)} · 감액 ${rentalDuration(period.reducedMillis)} · 상한 제외 ${rentalDuration(period.cappedMillis)}"))
+                        }
                         period.origin?.let { addView(text("수익 계산 기준 시각: ${basisTime(it)}", color = muted)) }
                         period.policy?.let { policy ->
                             val percent = policy.reducedMultiplier.movePointRight(2).stripTrailingZeros().toPlainString()

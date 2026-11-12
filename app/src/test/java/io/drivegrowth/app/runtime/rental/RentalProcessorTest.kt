@@ -26,7 +26,8 @@ class RentalProcessorTest {
         var received: RentalVisit? = null
         override fun assign(visit: RentalVisit): ContractResult<OwnedVehicleId?> { calls += "assign"; received = visit; return ContractResult.Success(assigned) }
         override fun pending(): ContractResult<List<RentalLedger.Pending>> { calls += "pending"; return ContractResult.Success(rows) }
-        override fun account(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?): ContractResult<EpochMillis> {
+        override fun account(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?,
+            unobservedSince: EpochMillis?): ContractResult<EpochMillis> {
             calls += "account:${from.value}:${to.value}:${parkedSince?.value}"
             accountFailure?.let { return ContractResult.Failure(it) }
             val end = minOf(to.value, rows.single().end.value)
@@ -51,6 +52,14 @@ class RentalProcessorTest {
         val db=Ledger();val r=ok(RentalProcessor(InputSource.SIMULATION,db).advance(tick(100,200),clock(200)))
         assertEquals(ContractError.DATA_UNAVAILABLE,r.deferred[id]);assertFalse(db.calls.any{it.startsWith("account")})
     }
+    @Test fun aKnownGapCannotCoverEarlierUnsettledTime() {
+        val db = Ledger()
+        val input = tick(100, 200).copy(unobservedSince = clock(50))
+        val result = ok(RentalProcessor(InputSource.SIMULATION, db).advance(input, clock(200)))
+        assertEquals(ContractError.DATA_UNAVAILABLE, result.deferred[id])
+        assertFalse(db.calls.any { it.startsWith("account") })
+    }
+
     @Test fun accountFailureNeverSettles() {
         val db=Ledger();db.accountFailure=ContractError.STORAGE_FAILURE
         val r=ok(RentalProcessor(InputSource.SIMULATION,db).advance(tick(),clock(3600000)))

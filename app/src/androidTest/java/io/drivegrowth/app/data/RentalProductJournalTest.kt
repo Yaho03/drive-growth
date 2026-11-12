@@ -234,6 +234,79 @@ class RentalProductJournalTest:InstrumentationTestCase() {
         val economic=rows(listOf("account","rentals","vehicles","settlements","quest_events"));assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),journal().advanceInactive(identity,interval));assertEquals(economic,rows(listOf("account","rentals","vehicles","settlements","quest_events")));assertEquals(interval,ok(journal().pendingInactive(identity)))
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),journal().advanceInactive(identity,interval.copy(to=interval.to.copy(bootId="other"))))
     }
+    fun testVerifiedDrivingExitSkipsUnobservedTimeAndReplaysFirstSettlement() {
+        val id = directRental()
+        ok(store.rental.account(id, at(0).epoch, at(1000).epoch, null))
+        val end = ok(store.rental.pending()).single().end
+        origin = Observation.Missing(MissingReason.NO_DATA)
+        now = at(1500)
+        val marker = RequestId("verified-driving-exit")
+        ok(journal().beginVerifiedInactive(identity, marker, now, drivingExit = true))
+        val interval = RentalInactiveInterval(marker, now, now, at(7 * 3600000))
+        now = interval.to
+
+        val economicTables = listOf("account", "vehicles", "settlements", "rentals", "quest_events", "rental_result_basis")
+        val before = rows(economicTables)
+        raw { it.execSQL("CREATE TRIGGER reject_verified_exit_settlement BEFORE UPDATE ON rentals WHEN NEW.phase='RETURNING' BEGIN SELECT RAISE(IGNORE); END") }
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), journal().advanceInactive(identity, interval))
+        assertEquals(before, rows(economicTables))
+        assertEquals(interval, ok(journal().pendingInactive(identity)))
+        raw { it.execSQL("DROP TRIGGER reject_verified_exit_settlement") }
+
+        val result = ok(journal().advanceInactive(identity, interval))
+        val completed = checkNotNull(result.firstCompleted)
+        assertEquals(id, completed.rentalId)
+        val basis = (ok(RentalResultBasisReader(store).read(id)) as Observation.Available).value
+        assertEquals(completed.receipt.settlement.settlementId, basis.settlementId)
+        assertEquals(end, basis.end)
+        assertEquals(listOf(RentalIncomeKind.DRIVING, RentalIncomeKind.UNOBSERVED, RentalIncomeKind.INACTIVE), basis.periods.map { it.kind })
+        val gap = basis.periods[1]
+        assertEquals(at(1000).epoch, gap.from)
+        assertEquals(at(1500).epoch, gap.through)
+        assertNull(gap.origin)
+        assertEquals(500L, basis.unobservedMillis)
+        assertEquals(0L, basis.cappedMillis)
+        assertEquals(at(1500).epoch, basis.periods[2].origin)
+        val creditedAfterExit = end.value - at(1500).epoch.value - 1_800_000L
+        val expected = BigDecimal("1801000") + creditedAfterExit.toBigDecimal() * BigDecimal("0.30")
+        equalNumber(expected.toPlainString(), basis.weightedMillis)
+        val settled = rows(economicTables + "rental_product_inactive")
+        assertEquals(completed, ok(journal().advanceInactive(identity, interval)).firstCompleted)
+        assertEquals(settled, rows(economicTables + "rental_product_inactive"))
+    }
+
+    fun testVerifiedDrivingExitDoesNotReusePriorPhysicalParkingAsEconomicOrigin() {
+        val id = directRental()
+        ok(store.rental.account(id, at(0).epoch, at(1000).epoch, at(0).epoch))
+        origin = Observation.Missing(MissingReason.NO_DATA)
+        now = at(1500)
+        val marker = RequestId("verified-exit-after-old-parking")
+        ok(journal().beginVerifiedInactive(identity, marker, now, drivingExit = true))
+        val interval = RentalInactiveInterval(marker, now, now, at(1_801_500))
+        now = interval.to
+
+        ok(journal().advanceInactive(identity, interval))
+        equalNumber("1801000", weighted(id))
+        assertEquals(at(0).epoch, ok(store.rental.pending()).single().parkedSince)
+    }
+
+    fun testVerifiedParkedExitKeepsOriginalParkedOriginAcrossUnobservedGap() {
+        val id = directRental()
+        ok(store.rental.account(id, at(0).epoch, at(3600000).epoch, at(0).epoch))
+        now = at(3600500)
+        val marker = RequestId("verified-parked-exit")
+        ok(journal().beginVerifiedInactive(identity, marker, now, drivingExit = false))
+        val interval = RentalInactiveInterval(marker, now, now, at(5400500))
+        now = interval.to
+
+        ok(journal().advanceInactive(identity, interval))
+        equalNumber("2880000", weighted(id))
+        val rental = ok(store.rental.pending()).single()
+        assertEquals(at(0).epoch, rental.parkedSince)
+        assertEquals(now.epoch, rental.cursor)
+        assertEquals(at(0), (ok(checkNotNull(ok(journal().currentInactive(identity))).policyOrigin) as Observation.Available).value)
+    }
+
     fun testPolicyExitCreditFailureKeepsOriginalWindowAndRollsBackLikeVerifiedParking() {
         directRental();origin=Observation.Missing(MissingReason.NO_DATA);val marker=RequestId("policy-credit-ignored");ok(journal().beginInactiveWhileDriving(identity,marker,now));val interval=RentalInactiveInterval(marker,now,now,at(7*3600000));now=interval.to
         raw{it.execSQL("CREATE TRIGGER ignore_policy_credit BEFORE UPDATE ON account WHEN NEW.balance!=OLD.balance BEGIN SELECT RAISE(IGNORE); END")};val economic=rows(listOf("account","rentals","vehicles","settlements","quest_events"))

@@ -49,7 +49,8 @@ private class SqliteRentalOperations(store: SqliteGameChangeStore) : RentalRunti
     private val ledger = store.rental
     override fun assign(visit: RentalVisit) = ledger.assign(visit.request, visit.catalog, visit.categories, visit.hourlyRates, visit.terms)
     override fun pending() = ledger.pending()
-    override fun account(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?) = ledger.account(id, from, to, parkedSince)
+    override fun account(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?,
+        unobservedSince: EpochMillis?) = ledger.accountObserved(id, from, to, parkedSince, unobservedSince)
     override fun settle(id: RequestId) = ledger.settle(id)
     override fun finishReturn(id: RequestId, now: EpochMillis) = ledger.finishReturn(id, now)
     override fun firstCompleted() = ledger.firstCompletedRental()

@@ -27,12 +27,16 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
     private var resumeAt: RentalClock? = null
     private var needsResume = true
     private var inactiveRecorded = false
-    private var previous: Pair<RentalClock, Observation<RentalMotion>>? = null
+    private data class AcceptedFrame(val at: RentalClock, val motion: Observation<RentalMotion>,
+        val receiver: String?, val revision: Long, val unobservedSince: RentalClock?)
+    private var previous: AcceptedFrame? = null
     private var latest: VehicleObservation? = null
     private var tripOpen = false
     private var canConfirmEnd = false
     private var parkCandidate: RentalClock? = null
     private var physicalEnd: RentalClock? = null
+    private var lastConfirmedEnd: RentalClock? = null
+    private var observedThrough: RentalClock? = null
     private var eligible: RentalClock? = null
     private var visitFloor: RentalClock? = null
     private var giftAttempt: RequestId? = null
@@ -78,7 +82,9 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
             }
         }
     }, random, nextRequest)
-    private val recovery = RentalInactiveRecoveryConsumer(journal::currentInactive, journal::advanceInactive) {
+    private val recovery = RentalInactiveRecoveryConsumer(journal::currentInactive, { id, interval ->
+        journal.advanceInactiveAfterDrain(id, interval) { drainThrough(interval.originalSince) }
+    }) {
         resumeAt?.let { ContractResult.Success(it) } ?: failure(ContractError.DATA_UNAVAILABLE)
     }
 
@@ -127,17 +133,11 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
         bound = id
         val cursor = when (val r = journal.activate(id)) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
         calibration.restore(cursor.nextAt)
-        if (prior?.basis == RentalInactiveBasis.DRIVING_END)
+        if (prior?.basis == RentalInactiveBasis.DRIVING_END) {
             physicalEnd = ((prior.policyOrigin as? ContractResult.Success)?.value as? Observation.Available)?.value
-        connected = true
-        when (val restored = recoverVisit()) { is ContractResult.Failure -> return restored; is ContractResult.Success -> Unit }
-        if (prior != null && prior.phase != RentalInactivePhase.RECORDED) {
-            when (val restored = recovery.resume(id)) {
-                is ContractResult.Failure -> return restored
-                is ContractResult.Success -> restored.value?.let(::completed)
-            }
-            needsResume = false
+            lastConfirmedEnd = physicalEnd
         }
+        connected = true
         return ContractResult.Success(Unit)
     }
 
@@ -171,17 +171,7 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
             is ContractResult.Failure -> return r
             is ContractResult.Success -> Unit
         }
-        if (state.identity != bound && originalClock != null) return failure(ContractError.STATE_CONFLICT)
-        when (val r = recoverVisit()) {
-            is ContractResult.Failure -> if (originalClock != null || r.error != ContractError.STATE_CONFLICT) return r
-            is ContractResult.Success -> Unit
-        }
         if (state.identity != bound) return failure(ContractError.STATE_CONFLICT)
-        // 저장된 배정이 원래 대여를 복구한 다음, 실제 대여 커서로 필요한 원관측을 고른다.
-        val replay = if (originalClock == null) null else when (val r = simulationReplayTick(state, frame, originalClock, ordinaryTerminal)) {
-            is ContractResult.Failure -> return r
-            is ContractResult.Success -> r.value
-        }
         val now = when (val r = clock()) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
         if (input.receivedElapsedMs > now.elapsedMs || now.elapsedMs - input.receivedElapsedMs > policy.maxAgeMs)
             return failure(ContractError.DATA_UNAVAILABLE)
@@ -189,16 +179,46 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
             is ContractResult.Failure -> return r
             is ContractResult.Success -> r.value
         }
+        if (originalClock != null) {
+            val boundary = if (needsResume) when (val r = journal.currentInactive(state.identity)) {
+                is ContractResult.Failure -> return r
+                is ContractResult.Success -> r.value
+            } else null
+            if (boundary != null && boundary.phase != RentalInactivePhase.COMPLETED) {
+                if (resumeAt == null) resumeAt = at
+                when (val r = recovery.resumeWith(state.identity) { original, interval ->
+                    journal.advanceInactiveAfterDrain(original.identity, interval) {
+                        replayBeforeInactiveSettlement(state, frame, originalClock, ordinaryTerminal, original)
+                    }.also { if (it is ContractResult.Success) resumeAt = interval.to }
+                }) {
+                    is ContractResult.Failure -> return r
+                    is ContractResult.Success -> r.value?.let(::completed)
+                }
+                needsResume = false
+            } else when (val r = recoverVisit()) {
+                is ContractResult.Failure -> return r
+                is ContractResult.Success -> Unit
+            }
+        }
+        // 저장된 복귀 시각보다 앞선 시연 표본은 새 라이브 관측이나 방문으로 사용하지 않는다.
+        if (!needsResume && resumeAt?.let { at.elapsedMs < it.elapsedMs } == true) return runtime.read()
+        val replay = if (originalClock == null) null else when (val r = simulationReplayTick(state, frame, originalClock, ordinaryTerminal)) {
+            is ContractResult.Failure -> return r
+            is ContractResult.Success -> r.value
+        }
         val before = previous
         // 같은 원표본의 금융/도착 재시도는 motion 원점과 이미 보존한 span을 다시 만들지 않는다.
-        if (before?.first != at || latest != input) {
-            val continuous = before != null && at.elapsedMs > before.first.elapsedMs &&
-                at.elapsedMs - before.first.elapsedMs <= policy.maxGapMs
+        if (before?.at != at || latest != input) {
+            val delta = before?.takeIf { it.receiver != null && it.receiver == state.receiver && it.at.bootId == at.bootId }
+                ?.let { at.elapsedMs - it.at.elapsedMs }
+            val continuous = delta != null && delta in 1..policy.maxGapMs
             if (!continuous) { parkCandidate = null; canConfirmEnd = false }
             if (moving) { canConfirmEnd = true; parkCandidate = null; physicalEnd = null }
             if (canConfirmEnd && state.parkSince == input.receivedElapsedMs) parkCandidate = at
             if (tripOpen && state.trip == null && canConfirmEnd && parkCandidate != null && continuous) {
-                physicalEnd = parkCandidate; parkCandidate = null; canConfirmEnd = false
+                physicalEnd = parkCandidate
+                lastConfirmedEnd = physicalEnd
+                parkCandidate = null; canConfirmEnd = false
             }
             latest = input; tripOpen = state.trip != null
             val motion: Observation<RentalMotion> = when {
@@ -206,15 +226,18 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
                 (input.gear as? Observation.Available)?.value == Gear.PARK && physicalEnd != null -> Observation.Available(RentalMotion.Parked(physicalEnd!!.epoch))
                 else -> Observation.Missing(MissingReason.NO_DATA)
             }
-            visitFloor = before?.first ?: at
-            if (continuous) append(RentalTick(input.source, before.first, at, before.second))
-            previous = at to motion
+            visitFloor = before?.at ?: at
+            if (continuous && before != null) {
+                append(RentalTick(input.source, before.at, at, before.motion, before.unobservedSince))
+            }
+            // 수락한 recorder revision이 건너뛰면 그 사이의 관측을 공백으로 단정하지 않는다.
+            val unobservedSince = before?.takeIf {
+                delta != null && delta > policy.maxGapMs && state.revision - it.revision == 1L
+            }?.at
+            previous = AcceptedFrame(at, motion, state.receiver, state.revision, unobservedSince)
         }
         if (needsResume) {
             if (resumeAt == null) resumeAt = at // 실제 SDK 재접속의 첫 원시 frame 경계. 재시도에서 교체하지 않는다.
-            val boundary = when (val r = journal.currentInactive(checkNotNull(bound))) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
-            // 실제 stop 이전에 보존한 관측만 먼저 정산한다. 실패해도 E가 원래 resume to를 준비할 수 있게 한다.
-            if (boundary != null) drain(boundary.since)
             when (val r = recovery.resume(checkNotNull(bound))) {
                 is ContractResult.Failure -> return r
                 is ContractResult.Success -> r.value?.let(::completed)
@@ -223,9 +246,7 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
         }
         if (replay != null) {
             if (replay.to != at) return failure(ContractError.DATA_UNAVAILABLE)
-            when (val r = free()) { is ContractResult.Failure -> return r; is ContractResult.Success -> Unit }
-            // 이미 배정된 대여의 원관측만 소비한다. 과거 방문은 준비하지 않는다.
-            when (val r = runtime.advance(replay)) {
+            when (val r = advanceReplay(replay)) {
                 is ContractResult.Failure -> return r
                 is ContractResult.Success -> if (r.value.deferred.isNotEmpty()) return r
             }
@@ -233,11 +254,40 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
         return drain()
     }
 
+    private fun replayBeforeInactiveSettlement(state: RecordingState, frame: DrivingFrame,
+        originalClock: RestClockDomain, ordinaryTerminal: Boolean, boundary: RentalInactiveRecovery): ContractResult<Unit> {
+        // 저널이 최초 복귀 구간을 준비한 뒤, 원방문과 이탈 전 수락 원관측을 먼저 처리한다.
+        when (val r = recoverVisit()) {
+            is ContractResult.Failure -> return r
+            is ContractResult.Success -> Unit
+        }
+        val through = boundary.observedThrough
+        if (through != null) {
+            val replay = when (val r = simulationReplayTick(state, frame, originalClock, ordinaryTerminal, through)) {
+                is ContractResult.Failure -> return r
+                is ContractResult.Success -> r.value
+            }
+            if (replay != null) when (val r = advanceReplay(replay)) {
+                is ContractResult.Failure -> return r
+                is ContractResult.Success -> r.value.deferred.values.firstOrNull()?.let { return failure(it) }
+            }
+        }
+        return drainThrough(boundary.since)
+    }
+
+    // 이미 배정된 대여의 원관측만 소비한다. 과거 방문은 준비하지 않는다.
+    private fun advanceReplay(tick: RentalTick): ContractResult<RentalRuntimeSnapshot> =
+        when (val slot = free()) {
+            is ContractResult.Failure -> slot
+            is ContractResult.Success -> runtime.advance(tick)
+        }
+
     private fun simulationReplayTick(
         state: RecordingState,
         frame: DrivingFrame,
         originalClock: RestClockDomain,
         ordinaryTerminal: Boolean,
+        through: RentalClock? = null,
     ): ContractResult<RentalTick?> {
         val input = frame.observation
         val unavailable = failure(ContractError.DATA_UNAVAILABLE)
@@ -245,8 +295,13 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
             is ContractResult.Failure -> return result
             is ContractResult.Success -> result.value
         }
-        val to = RentalClock(originalClock.bootId, input.receivedAt, input.receivedElapsedMs)
-        if (now != to) return unavailable
+        val current = RentalClock(originalClock.bootId, input.receivedAt, input.receivedElapsedMs)
+        if (now != current) return unavailable
+        val to = through ?: current
+        if (to.bootId != current.bootId || to.elapsedMs > current.elapsedMs || to.epoch.value > current.epoch.value ||
+            current.elapsedMs - to.elapsedMs != current.epoch.value - to.epoch.value) return unavailable
+        fun isEnd(sample: VehicleObservation) = if (through == null) sample == input else
+            sample.receivedElapsedMs == to.elapsedMs && sample.receivedAt == to.epoch
         val game = when (val opened = games.open()) {
             is ContractResult.Failure -> return opened
             is ContractResult.Success -> opened.value
@@ -274,8 +329,8 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
                 }
                 if (observed != state) return@atomic failure(ContractError.STATE_CONFLICT)
                 val trip = observed.trip ?: run {
-                    if (cursor != null || !ordinaryTerminal || observed.outbox.isNotEmpty() ||
-                        observed.boundary != RecordingClock(to.elapsedMs, to.epoch)) return@atomic unavailable
+                    if ((cursor != null && through == null) || !ordinaryTerminal || observed.outbox.isNotEmpty() ||
+                        observed.boundary != RecordingClock(current.elapsedMs, current.epoch)) return@atomic unavailable
                     when (val original = game.store.observedDriving.committedEndingAt(db, game.identity, frame)) {
                         is ContractResult.Failure -> return@atomic original
                         is ContractResult.Success -> original.value?.trip ?: return@atomic unavailable
@@ -286,25 +341,32 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
                 if (context.trip != trip || context.departureClock != originalClock ||
                     context.segments.size != trip.segments.size) return@atomic unavailable
                 if (cursor == null) {
-                    val last = context.segments.lastOrNull()
+                    val index = if (through == null) context.segments.lastIndex else
+                        context.segments.indexOfLast { isEnd(it.span.to) }
+                    val last = context.segments.getOrNull(index)
                     if (last == null) {
-                        if (trip.departure != input) return@atomic unavailable
+                        if (!isEnd(trip.departure)) return@atomic unavailable
                     } else {
-                        val segment = trip.segments.last()
-                        if (last.index != trip.segments.lastIndex || last.span.from != segment.from ||
-                            last.span.to != segment.to || last.span.to != input || last.clockDomain != originalClock.domain ||
+                        val segment = trip.segments[index]
+                        if (last.index != index || last.span.from != segment.from ||
+                            last.span.to != segment.to || !isEnd(last.span.to) || last.clockDomain != originalClock.domain ||
                             last.span.bootId != originalClock.bootId) return@atomic unavailable
                     }
                     // 이미 확정된 관측 시간에는 손대지 않고 정산·반납만 기존 소비자에 맡긴다.
                     return@atomic ContractResult.Success(RentalTick(input.source, to, to, Observation.Missing(MissingReason.NO_DATA)))
                 }
                 val needed = context.segments.dropWhile { it.span.to.receivedAt.value <= cursor }
+                    .takeWhile { through == null || it.span.to.receivedElapsedMs <= to.elapsedMs }
                 val start = needed.firstOrNull()?.span?.from ?: return@atomic unavailable
-                if (start.receivedAt.value > cursor || needed.last().span.to != input ||
+                if (start.receivedAt.value > cursor || !isEnd(needed.last().span.to) ||
                     needed.zipWithNext().any { (a, b) -> a.span.to != b.span.from } ||
                     trip.gaps.any { gap ->
-                        gap.to.elapsed > start.receivedElapsedMs && gap.to.elapsed <= to.elapsedMs ||
-                            gap.from?.elapsed?.let { it >= start.receivedElapsedMs && it < to.elapsedMs } == true
+                        if (through == null) {
+                            gap.to.elapsed > start.receivedElapsedMs && gap.to.elapsed <= to.elapsedMs ||
+                                gap.from?.elapsed?.let { it >= start.receivedElapsedMs && it < to.elapsedMs } == true
+                        } else {
+                            gap.to.elapsed > start.receivedElapsedMs && (gap.from?.elapsed ?: gap.to.elapsed) < to.elapsedMs
+                        }
                     }) return@atomic unavailable
                 for (evidence in needed) {
                     val span = evidence.span
@@ -323,8 +385,10 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
     }
 
     private fun append(tick: RentalTick) {
+        observedThrough = tick.to
         val last = spans.peekLast()
-        if (last != null && last.to == tick.from && last.motion == tick.motion) {
+        // 재진입 표본이 이탈 직전과 같은 시각이어도 앞선 대기 구간과 합치지 않는다.
+        if (last != null && last.to == tick.from && last.motion == tick.motion && resumeAt != tick.from) {
             spans.removeLast(); spans.addLast(last.copy(to = tick.to))
         } else if (spans.size < 64) spans.addLast(tick) // 기술 버퍼이며 고객 수/금액 규칙이 아니다.
         else issue = ContractError.DATA_UNAVAILABLE // 원래 범위를 버리고 현재부터 정상 재개하지 않는다.
@@ -349,7 +413,7 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
                 val limit = when (val r = definition.rentalReplayLimit()) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
                 if (visits >= limit) { issue = ContractError.DATA_UNAVAILABLE; break }
                 if (from != cursor.nextAt) {
-                    snapshot = when (val r = runtime.advance(tick.copy(from = from, to = cursor.nextAt))) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
+                    snapshot = when (val r = runtime.advance(tick.slice(from, cursor.nextAt))) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
                     completed(snapshot); if (snapshot.deferred.isNotEmpty()) return ContractResult.Success(snapshot)
                 }
                 eligible = tick.to
@@ -357,13 +421,23 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
                 when (val r = runtime.visit(ContractResult.Success(prepared.visit))) { is ContractResult.Failure -> return r; is ContractResult.Success -> Unit }
                 from = cursor.nextAt; visits++
             }
-            snapshot = when (val r = runtime.advance(tick.copy(from = from))) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
+            snapshot = when (val r = runtime.advance(tick.slice(from, tick.to))) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
             completed(snapshot); if (snapshot.deferred.isNotEmpty()) return ContractResult.Success(snapshot)
             spans.removeFirst()
         }
         completed(snapshot)
         return ContractResult.Success(snapshot)
     }
+    private fun RentalTick.slice(start: RentalClock, end: RentalClock) =
+        copy(from = start, to = end, unobservedSince = unobservedSince.takeIf { start == from })
+
+    private fun drainThrough(boundary: RentalClock): ContractResult<Unit> =
+        when (val result = drain(boundary)) {
+            is ContractResult.Failure -> result
+            is ContractResult.Success -> result.value.deferred.values.firstOrNull()?.let { failure(it) }
+                ?: ContractResult.Success(Unit)
+        }
+
     private fun completed(snapshot: RentalRuntimeSnapshot) {
         val id = snapshot.firstCompleted?.rentalId ?: return
         if (giftAttempt == id) return
@@ -382,17 +456,15 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
         val actor = bound ?: return failure(ContractError.DATA_UNAVAILABLE)
         val prior = when (val r = journal.currentInactive(actor)) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
         if (prior != null && prior.phase != RentalInactivePhase.COMPLETED) return failure(ContractError.STATE_CONFLICT)
-        // lifecycle 시각까지 SDK heartbeat를 합성하지 않는다. 앞선 미관측 gap은 E cursor 검사가 보류한다.
-        drain()
         val mode = rentalExitMode(false, actor.source, since, latest, tripOpen, physicalEnd, policy)
             ?: return failure(ContractError.DATA_UNAVAILABLE)
         val marker = RequestId("rental-inactive-" + UUID.randomUUID())
-        val result = when (mode) {
-            RentalExitMode.DRIVING -> journal.beginInactiveWhileDriving(actor, marker, since)
-            RentalExitMode.KNOWN_PARKED -> journal.beginInactive(actor, marker, since)
-        }
-        if (result is ContractResult.Success) inactiveRecorded = true
-        return result
+        val drained = drainThrough(since)
+        val result = journal.beginVerifiedInactive(actor, marker, since, drivingExit = mode == RentalExitMode.DRIVING,
+            observedThrough = observedThrough, lastConfirmedEnd = lastConfirmedEnd)
+        if (result is ContractResult.Failure) return result
+        inactiveRecorded = true
+        return drained
     }
     private fun failure(error: ContractError) = ContractResult.Failure(error)
 }

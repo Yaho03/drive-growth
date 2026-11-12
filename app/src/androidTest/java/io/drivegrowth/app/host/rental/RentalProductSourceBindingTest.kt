@@ -1,5 +1,6 @@
 package io.drivegrowth.app.host.rental
 
+import android.database.sqlite.SQLiteDatabase
 import android.test.InstrumentationTestCase
 import io.drivegrowth.app.data.*
 import io.drivegrowth.app.host.*
@@ -13,6 +14,11 @@ import io.drivegrowth.core.Gear
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.FirstGrant
 import io.drivegrowth.core.progression.VehicleActivity
+import io.drivegrowth.core.rental.RentalRequest
+import io.drivegrowth.core.rental.SimulatedCustomer
+import org.json.JSONObject
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.Instant
 import java.time.ZoneId
 import java.util.UUID
@@ -33,7 +39,7 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
     private var requests = 0
     private val base = Instant.parse("2026-11-10T03:00:00Z").toEpochMilli()
     // 한 시간 대여를 제어 clock으로 진행시키는 시험 정책. 제품의 2500ms 신선도/연속성 정책은 변경하지 않는다.
-    private val policy = RecordingPolicy(7_200_000, 7_200_000, 1000, 3000, 0.1, 0.5)
+    private var policy = RecordingPolicy(7_200_000, 7_200_000, 1000, 3000, 0.1, 0.5)
     private fun clock() = RentalClock("explicit-simulation-boot", EpochMillis(base + elapsed), elapsed)
     private fun <T> ok(result: ContractResult<T>): T {
         assertTrue(result.toString(), result is ContractResult.Success)
@@ -49,12 +55,17 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
         val initial = ok(onboarding.read()); identity = initial.identity
         ok(onboarding.choose(identity, FirstGrant.CANDIDATES.first()))
         ok(games.open()).use { ok(it.store.activateObservedDriving(identity.profileId)) }
-        driving = SessionObservedDrivingSource(games, SqliteObservedDrivingJournal(),
-            ObservedDrivingReducer(policy) { "explicit-simulation-drive" }, { definition.drivingIncomeRules() })
-        producer = source()
+        bindRecorder()
         readJournal = SqliteRentalProductJournal(games, { error("조회는 현재 정의를 읽지 않는다") },
             { error("조회는 현재 clock을 읽지 않는다") }, { error("조회는 현재 원점을 읽지 않는다") })
     }
+    private fun bindRecorder() {
+        var trips = 0
+        driving = SessionObservedDrivingSource(games, SqliteObservedDrivingJournal(),
+            ObservedDrivingReducer(policy) { "explicit-simulation-drive-${++trips}" }, { definition.drivingIncomeRules() })
+        producer = source()
+    }
+
     override fun tearDown() { names.values.forEach(context::deleteDatabase); super.tearDown() }
     private fun factory() = GameSessionFactory(context, names, InputSource.SIMULATION) {
         when (val loaded = AssetTrialDefinitionProvider(context.assets).load()) {
@@ -81,10 +92,12 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
         return SessionRentalProductSource(games, { ContractResult.Success(definition) }, policy,
             { ContractResult.Success(clock()) }, { Random(seed) }, { RequestId("explicit-simulation-visit-${++requests}") })
     }
-    private fun feed(at: Long, receiver: String = "simulation-receiver-1"): ContractResult<RentalRuntimeSnapshot> {
+    private fun feed(at: Long, receiver: String = "simulation-receiver-1",
+        gear: Gear = Gear.DRIVE): ContractResult<RentalRuntimeSnapshot> {
         elapsed = at
-        val input = VehicleObservation(identity.source, elapsed, clock().epoch, Observation.Available(1.0),
-            Observation.Available(Gear.DRIVE), Observation.Available(true))
+        val parked = gear == Gear.PARK
+        val input = VehicleObservation(identity.source, elapsed, clock().epoch, Observation.Available(if (parked) 0.0 else 1.0),
+            Observation.Available(gear), Observation.Available(!parked))
         val frame = DrivingFrame(input, Observation.Available(ZoneId.of("UTC")))
         val original = driving.observe(receiver, frame, RecordingClock(elapsed, input.receivedAt))
         ok(original)
@@ -248,6 +261,91 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
         assertEquals(1, visits.size)
         assertTrue(visits.single().startsWith("visits:${id.value}|"))
         assertEquals(0, requests)
+    }
+
+    fun testOrdinaryReplayRecoversOriginalVisitAndPreExitSpanBeforePreparedSettlement() =
+        assertOrdinaryReplayExitRecovery(prepareFirst = true)
+
+    fun testOrdinaryReplayPreparesRecordedExitAtFirstNewReceiverSample() =
+        assertOrdinaryReplayExitRecovery(prepareFirst = false)
+
+    fun testOrdinaryReplayRetainsRecordedExitFirstSampleAfterReplayWriteFailure() =
+        assertOrdinaryReplayExitRecovery(prepareFirst = false, failFirstReplay = true)
+
+    private fun assertOrdinaryReplayExitRecovery(prepareFirst: Boolean, failFirstReplay: Boolean = false) {
+        val rest = enableRestRecorder()
+        val (initial, original) = record(0, rest)
+        assertTrue(ok(producer.observe(initial, original)).pending.isEmpty())
+        record(1000, rest)
+        val preExitThrough = clock()
+        val visitDefinition = ok(definition.rentalVisitDefinition())
+        val journal = SqliteRentalProductJournal(games, { ContractResult.Success(visitDefinition) },
+            { ContractResult.Success(clock()) }, { error("저장된 이탈 원점을 재계산하지 않는다") })
+        val catalog = ok(games.open()).use { ok(it.content).catalog }
+        val id = RequestId("original-visit-before-prepared-exit")
+        val visit = checkNotNull(ok(RentalVisitPlanner().prepare(identity, catalog, visitDefinition,
+            ok(journal.cursor(identity)), preExitThrough, Random(visitSeed(visitDefinition)), { id })))
+        ok(journal.save(visit))
+
+        elapsed = 1500
+        val since = clock()
+        val markerId = RequestId("prepared-exit-before-ordinary-replay")
+        ok(journal.beginVerifiedInactive(identity, markerId, since, drivingExit = true, observedThrough = preExitThrough))
+        val receiver = "ordinary-recovered-receiver"
+        val (firstFrame, firstRecorded) = record(120_000, rest, receiver)
+        val command = RentalInactiveInterval(markerId, since, since, clock())
+        if (prepareFirst) {
+            assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),
+                journal.advanceInactiveAfterDrain(identity, command) { ContractResult.Failure(ContractError.STORAGE_FAILURE) })
+        }
+        val originalBoundary = marker()
+        assertEquals(if (prepareFirst) RentalInactivePhase.PREPARED else RentalInactivePhase.RECORDED, originalBoundary.phase)
+        assertEquals(if (prepareFirst) command else null, originalBoundary.interval)
+        assertEquals(visit, ok(journal.pending(identity)))
+
+        reopenRental()
+        val (frame, recorded) = if (failFirstReplay) {
+            raw().use { db ->
+                db.execSQL("CREATE TRIGGER reject_pre_exit_replay BEFORE UPDATE OF cursor ON rentals " +
+                    "WHEN NEW.cursor=${preExitThrough.epoch.value} BEGIN SELECT RAISE(IGNORE); END")
+            }
+            try {
+                assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),
+                    producer.observeOrdinarySimulationReplay(firstFrame, firstRecorded, restClock))
+                assertEquals(originalBoundary.copy(phase = RentalInactivePhase.PREPARED, interval = command), marker())
+                assertEquals(0, BigDecimal.ZERO.compareTo(weighted(id)))
+            } finally {
+                raw().use { it.execSQL("DROP TRIGGER reject_pre_exit_replay") }
+            }
+            record(121_000, rest, receiver)
+        } else firstFrame to firstRecorded
+        val recordingBefore = ok(recorded).state
+        val result = ok(producer.observeOrdinarySimulationReplay(frame, recorded, restClock))
+        assertTrue(result.deferred.isEmpty())
+        assertNull(ok(journal.pending(identity)))
+        assertEquals(originalBoundary.copy(phase = RentalInactivePhase.COMPLETED, interval = command), marker())
+        assertEquals(frame.observation.receivedAt, result.pending.single { it.id == id }.cursor)
+        val expectedWeight = if (failFirstReplay) "120500" else "119500"
+        assertEquals(0, BigDecimal(expectedWeight).compareTo(weighted(id)))
+        ok(games.open()).use { game ->
+            ok(game.store.atomic { db ->
+                assertEquals(recordingBefore, ok(game.store.observedDriving.read(db, identity)))
+                val periods = checkNotNull(RentalBasisStorage.load(db, game.store, id)).periods
+                val expectedKinds = listOf(RentalIncomeKind.DRIVING, RentalIncomeKind.UNOBSERVED, RentalIncomeKind.INACTIVE)
+                assertEquals(if (failFirstReplay) expectedKinds + RentalIncomeKind.DRIVING else expectedKinds,
+                    periods.map { it.kind })
+                assertEquals(preExitThrough.epoch, periods[0].through)
+                assertEquals(preExitThrough.epoch, periods[1].from)
+                assertEquals(since.epoch, periods[1].through)
+                assertEquals(since.epoch, periods[2].from)
+                assertEquals(command.to.epoch, periods[2].through)
+                ContractResult.Success(Unit)
+            })
+        }
+        val rows = rentalRows()
+        assertEquals(1, rows.count { it.startsWith("visits:${id.value}|") })
+        assertTrue(ok(producer.observeOrdinarySimulationReplay(frame, recorded, restClock)).deferred.isEmpty())
+        assertEquals(rows, rentalRows())
     }
 
     fun testOrdinarySimulationReplayRetriesSettlementAfterCoverageCommitted() {
@@ -496,5 +594,175 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
         assertEquals(ContractError.DATA_UNAVAILABLE, resumed.deferred[original.id])
         assertNull(resumed.firstCompleted)
         ok(games.open()).use { assertEquals(GameMoney(1000), ok(it.store.balance())) }
+    }
+
+    fun testExitBetweenAcceptedFramesResumesActiveRentalWithoutCreditingTheGap() {
+        ok(feed(0))
+        val assigned = ok(feed(1000)).pending.single()
+        val beforeExit = ok(feed(60_000)).pending.single()
+        assertEquals(base + 60_000, beforeExit.cursor.value)
+        elapsed = 60_500
+        val exitedAt = clock()
+        ok(driving.pause("simulation-receiver-1", RecordingClock(elapsed, exitedAt.epoch)))
+        producer.pauseObservations()
+        ok(producer.inactive(false, ContractResult.Success(exitedAt)))
+
+        producer.reconnect()
+        val resumed = ok(feed(120_000, "simulation-receiver-2")).pending.single()
+        assertEquals(assigned.id, resumed.id)
+        assertEquals(base + 120_000, resumed.cursor.value)
+        assertNull(resumed.parkedSince)
+        val recovered = checkNotNull(ok(readJournal.currentInactive(identity)))
+        assertEquals(RentalInactivePhase.COMPLETED, recovered.phase)
+        assertEquals(exitedAt, recovered.since)
+        assertEquals(clock(), checkNotNull(recovered.interval).to)
+    }
+
+    private fun stop(at: Long, receiver: String): ContractResult<Unit> {
+        elapsed = at
+        ok(driving.pause(receiver, RecordingClock(elapsed, clock().epoch)))
+        producer.pauseObservations()
+        return producer.inactive(false, ContractResult.Success(clock()))
+    }
+
+    private fun marker() = checkNotNull(ok(readJournal.currentInactive(identity)))
+    private fun raw() = SQLiteDatabase.openDatabase(
+        context.getDatabasePath(names.getValue(InputSource.SIMULATION)).path, null, SQLiteDatabase.OPEN_READWRITE)
+
+    private fun weighted(id: RequestId): BigDecimal = raw().use { db ->
+        db.rawQuery("SELECT weighted FROM rentals WHERE id=?", arrayOf(id.value)).use {
+            assertTrue(it.moveToFirst())
+            it.getString(0).toBigDecimal()
+        }
+    }
+
+    fun testFailedAcceptedSpanIsRetriedBeforePreparedInactiveWindowCanSkipItsTail() {
+        val first = "simulation-receiver-1"
+        val second = "simulation-receiver-2"
+        ok(feed(0))
+        val assigned = ok(feed(1000)).pending.single()
+        raw().use {
+            it.execSQL("CREATE TRIGGER reject_accepted_span BEFORE UPDATE OF cursor ON rentals " +
+                "WHEN NEW.cursor=${base + 60_000} BEGIN SELECT RAISE(IGNORE); END")
+        }
+        assertEquals(ContractError.STORAGE_FAILURE, ok(feed(60_000)).deferred[assigned.id])
+        stop(60_500, first)
+        val exit = marker()
+        assertEquals(60_500L, exit.since.elapsedMs)
+        assertEquals(RentalInactivePhase.RECORDED, exit.phase)
+        producer.reconnect()
+
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), feed(120_000, second))
+        val blocked = marker()
+        assertEquals(exit.marker, blocked.marker)
+        assertEquals(RentalInactivePhase.PREPARED, blocked.phase)
+        val command = checkNotNull(blocked.interval)
+        assertEquals(exit.since, command.from)
+        assertEquals(clock(), command.to)
+        assertEquals(0, BigDecimal("1000").compareTo(weighted(assigned.id)))
+        ok(games.open()).use { game ->
+            assertEquals(assigned.cursor, ok(game.store.rental.pending()).single().cursor)
+            assertNull(ok(game.store.rental.firstCompletedRental()))
+            assertEquals(GameMoney(1000), ok(game.store.balance()))
+        }
+
+        raw().use { it.execSQL("DROP TRIGGER reject_accepted_span") }
+        // 앞선 관측을 재생하지 않는 복구 호출도 저장된 경계를 건너뛸 수 없다.
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), readJournal.advanceInactive(identity, command))
+        assertEquals(blocked, marker())
+        assertEquals(base + 121_000, ok(feed(121_000, second)).pending.single().cursor.value)
+        assertEquals(blocked.copy(phase = RentalInactivePhase.COMPLETED), marker())
+        assertEquals(0, BigDecimal("120500").compareTo(weighted(assigned.id)))
+        raw().use { db ->
+            db.rawQuery("SELECT payload FROM rental_result_basis WHERE rental_id=?", arrayOf(assigned.id.value)).use {
+                assertTrue(it.moveToFirst())
+                val periods = JSONObject(it.getString(0)).getJSONArray("periods")
+                assertEquals(4, periods.length())
+                assertEquals("DRIVING", periods.getJSONObject(0).getString("kind"))
+                assertEquals(base + 60_000, periods.getJSONObject(0).getLong("through"))
+                val gap = periods.getJSONObject(1)
+                assertEquals("UNOBSERVED", gap.getString("kind"))
+                assertEquals(base + 60_000, gap.getLong("from"))
+                assertEquals(base + 60_500, gap.getLong("through"))
+                assertEquals("0", gap.getString("weighted"))
+                assertEquals(base + 120_000, periods.getJSONObject(2).getLong("through"))
+            }
+        }
+    }
+
+    fun testObservedSpansAfterMaxGapKeepTheirDrivingAndParkingRatesOnResume() {
+        policy = policy.copy(maxGapMs = 3_000)
+        bindRecorder()
+        ok(feed(0))
+        val assigned = ok(feed(1000)).pending.single()
+        ok(feed(2000))
+        ok(feed(7000))
+        assertEquals(base + 8000, ok(feed(8000)).pending.single().cursor.value)
+        ok(feed(9000, gear = Gear.PARK))
+        ok(feed(12000, gear = Gear.PARK))
+        ok(feed(13000, gear = Gear.PARK))
+        ok(feed(1_820_000, gear = Gear.PARK))
+        val lastParked = ok(feed(1_821_000, gear = Gear.PARK))
+        assertTrue(lastParked.deferred.isEmpty())
+        assertEquals(base + 1_821_000, lastParked.pending.single().cursor.value)
+        assertEquals(0, BigDecimal("8300").compareTo(weighted(assigned.id)))
+        raw().use { db ->
+            db.rawQuery("SELECT payload FROM rental_result_basis WHERE rental_id=?", arrayOf(assigned.id.value)).use {
+                assertTrue(it.moveToFirst())
+                val periods = JSONObject(it.getString(0)).getJSONArray("periods")
+                assertEquals(listOf("DRIVING", "UNOBSERVED", "DRIVING", "PARKED", "UNOBSERVED", "PARKED"),
+                    (0 until periods.length()).map { i -> periods.getJSONObject(i).getString("kind") })
+                assertEquals(base + 2000, periods.getJSONObject(1).getLong("from"))
+                assertEquals(base + 7000, periods.getJSONObject(1).getLong("through"))
+                assertEquals(base + 13000, periods.getJSONObject(4).getLong("from"))
+                assertEquals(base + 1_820_000, periods.getJSONObject(4).getLong("through"))
+                assertEquals(1_000L, periods.getJSONObject(5).getLong("reduced"))
+            }
+        }
+
+        ok(stop(1_821_500, "simulation-receiver-1"))
+        producer.reconnect()
+        val resumed = ok(feed(1_830_000, "simulation-receiver-2"))
+        assertEquals(base + 1_830_000, resumed.pending.single().cursor.value)
+        assertEquals(RentalInactivePhase.COMPLETED, marker().phase)
+        assertEquals(EpochMillis(base + 9000), resumed.pending.single().parkedSince)
+        assertEquals(0, BigDecimal("10850").compareTo(weighted(assigned.id)))
+    }
+
+    fun testConfirmedParkThenNewDriveStartsAnotherNormalThirtyMinutes() {
+        val first = "simulation-receiver-1"
+        val second = "simulation-receiver-2"
+        val third = "simulation-receiver-3"
+        val fourth = "simulation-receiver-4"
+        val rental = RequestId("six-hour-rental-before-first-observation")
+        val terms = ok(definition.rentalVisitDefinition())
+        ok(games.open()).use { game ->
+            val car = ok(game.store.listOwnedVehicles()).single()
+            ok(game.store.rental.assign(RentalRequest(rental, car.vehicleId, 6), ok(game.content).catalog,
+                terms.categories, terms.rates, RentalTerms(terms.rules, SimulatedCustomer(30, 48), 99,
+                    clock().epoch, 60, GameMoney(0), RoundingMode.DOWN, false)))
+        }
+        ok(feed(0)); ok(feed(1000))
+        ok(stop(1500, first))
+        val firstOrigin = clock()
+        producer.reconnect()
+        ok(feed(1_900_000, second))
+        ok(feed(1_901_000, second)); ok(stop(1_901_500, second))
+        assertEquals(firstOrigin, (ok(marker().policyOrigin) as Observation.Available).value)
+        producer.reconnect()
+        ok(feed(1_902_000, third)); ok(feed(1_903_000, third))
+        ok(feed(1_904_000, third, Gear.PARK))
+        ok(feed(1_907_000, third, Gear.PARK))
+        ok(feed(1_908_000, third)); ok(feed(1_909_000, third))
+
+        val creditedBeforeExit = weighted(rental)
+        ok(stop(1_909_500, third))
+        val newOrigin = clock()
+        assertEquals(newOrigin, (ok(marker().policyOrigin) as Observation.Available).value)
+        producer.reconnect()
+        ok(feed(3_709_501, fourth))
+        assertEquals(RentalInactivePhase.COMPLETED, marker().phase)
+        assertEquals(newOrigin, checkNotNull(marker().interval).from)
+        assertEquals(0, BigDecimal("1800000.30").compareTo(weighted(rental) - creditedBeforeExit))
     }
 }

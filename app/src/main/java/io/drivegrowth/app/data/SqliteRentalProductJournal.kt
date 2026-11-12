@@ -15,7 +15,7 @@ enum class RentalInactivePhase { RECORDED, PREPARED, COMPLETED }
 /** 복구 조회 결과다. 원점 조회 실패를 저장 손상과 구분하고, 실제 P/새 시각으로 보충하지 않는다. */
 data class RentalInactiveRecovery(val identity:GameIdentity,val marker:RequestId,val since:RentalClock,
     val basis:RentalInactiveBasis,val policyOrigin:ContractResult<Observation<RentalClock>>,
-    val phase:RentalInactivePhase,val interval:RentalInactiveInterval?) {
+    val phase:RentalInactivePhase,val interval:RentalInactiveInterval?,val observedThrough:RentalClock? = null) {
     init { require((phase==RentalInactivePhase.RECORDED)==(interval==null)) }
 }
 
@@ -113,6 +113,15 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
         val canonical=JSONObject().put("marker",marker.value).put("since",RentalProductJson.clock(since)).put("origin",authority)
             .put("command",command?.let(RentalProductJson::interval)?:JSONObject.NULL).put("done",done)
         if(j.has("basis"))canonical.put("basis",basis)
+        if (j.has("verifiedExit")) {
+            if (!j.has("basis") || j.get("verifiedExit") != true) throw SQLiteException("비활성 앱 이탈 근거 형식")
+            canonical.put("verifiedExit", true)
+        }
+        if (j.has("observedThrough")) {
+            val through = RentalProductJson.clock(j.getJSONObject("observedThrough"))
+            if (!j.has("verifiedExit") || !continuous(through, since)) throw SQLiteException("이탈 전 수락 관측 경계 형식")
+            canonical.put("observedThrough", RentalProductJson.clock(through))
+        }
         if(canonical.toString()!=raw)throw SQLiteException("비활성 전체 원문 손상")
         j
     }
@@ -123,12 +132,27 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
         if(inactive(db,id,RequestId(j.getString("marker")))?.toString()!=raw)throw SQLiteException("비활성 실제 쓰기 불일치")
     }
     override fun beginInactive(identity:GameIdentity,marker:RequestId,since:RentalClock)=begin(identity,marker,since,false)
-    /** 실제 onStop에 주행 중임을 확인한 B 공급자만 호출한다. P·물리 주행 종료·휴식 근거가 아니다. */
     fun beginInactiveWhileDriving(identity:GameIdentity,marker:RequestId,since:RentalClock)=begin(identity,marker,since,true)
-    private fun begin(identity:GameIdentity,marker:RequestId,since:RentalClock,drivingExit:Boolean):ContractResult<Unit> = withDb(identity){_,db->
+
+    /** 실제 앱 이탈과 최신 차량 문맥을 확인한 제품 source만 호출한다. */
+    internal fun beginVerifiedInactive(identity: GameIdentity, marker: RequestId, since: RentalClock, drivingExit: Boolean,
+        observedThrough: RentalClock? = null, lastConfirmedEnd: RentalClock? = null) =
+        begin(identity, marker, since, drivingExit, verifiedExit = true,
+            observedThrough = observedThrough, lastConfirmedEnd = lastConfirmedEnd)
+
+    private fun begin(identity:GameIdentity,marker:RequestId,since:RentalClock,drivingExit:Boolean,
+        verifiedExit:Boolean = false, observedThrough: RentalClock? = null,
+        lastConfirmedEnd: RentalClock? = null):ContractResult<Unit> = withDb(identity){_,db->
         val st=when(val r=state(db,identity)){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value}
         val basis=if(drivingExit)"APPLICATION_EXIT_DRIVING" else "DRIVING_END"
-        inactive(db,identity,marker)?.let{return@withDb if(RentalProductJson.clock(it.getJSONObject("since"))==since&&(if(it.has("basis"))it.getString("basis") else "DRIVING_END")==basis)ContractResult.Success(Unit) else conflict()}
+        if (observedThrough != null && !continuous(observedThrough, since)) return@withDb data()
+        inactive(db, identity, marker)?.let {
+            val savedBasis = if (it.has("basis")) it.getString("basis") else "DRIVING_END"
+            val savedThrough = it.optJSONObject("observedThrough")?.let(RentalProductJson::clock)
+            return@withDb if (RentalProductJson.clock(it.getJSONObject("since")) == since &&
+                savedBasis == basis && it.has("verifiedExit") == verifiedExit &&
+                savedThrough == observedThrough) ContractResult.Success(Unit) else conflict()
+        }
         var previousExit:RentalClock?=null
         st.inactive?.let{
             val old=inactive(db,identity,RequestId(it))?:throw SQLiteException("비활성 현재 marker 누락")
@@ -139,7 +163,13 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
         val now=when(val r=clock()){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value};if(!continuous(since,now))return@withDb data()
         val prior=previousExit
         val origin=if(drivingExit&&prior==null)JSONObject().put("applicationExit",RentalProductJson.clock(since))
-        else when(val r=policyOrigin(identity)) {
+        else if (drivingExit && verifiedExit) {
+            // 직전 이탈 뒤 확인된 물리 종료를 거친 새 주행에서만 원점을 바꾼다.
+            val previous = checkNotNull(prior)
+            if (lastConfirmedEnd != null && !continuous(lastConfirmedEnd, since)) return@withDb data()
+            val newDrive = lastConfirmedEnd != null && lastConfirmedEnd.elapsedMs > previous.elapsedMs
+            JSONObject().put("applicationExit", RentalProductJson.clock(if (newDrive) since else previous))
+        } else when(val r=policyOrigin(identity)) {
             is ContractResult.Failure->JSONObject().put("error",r.error.name)
             is ContractResult.Success->when(val o=r.value) {
                 is Observation.Missing->if(drivingExit&&prior!=null)JSONObject().put("applicationExit",RentalProductJson.clock(prior)) else JSONObject().put("missing",o.reason.name)
@@ -154,6 +184,8 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
             }
         }
         val j=JSONObject().put("marker",marker.value).put("since",RentalProductJson.clock(since)).put("origin",origin).put("command",JSONObject.NULL).put("done",false).put("basis",basis)
+        if (verifiedExit) j.put("verifiedExit", true)
+        observedThrough?.let { j.put("observedThrough", RentalProductJson.clock(it)) }
         writeInactive(db,identity,j,true);RentalProductStorage.update(db,st,st.copy(inactive=marker.value));ContractResult.Success(Unit)
     }
     /** 응답 유실/재실행 때 새 to를 만들기 전에 이 원래 준비 구간부터 복구한다. */
@@ -183,14 +215,20 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
         val phase=if(j.getBoolean("done"))RentalInactivePhase.COMPLETED else if(interval==null)RentalInactivePhase.RECORDED else RentalInactivePhase.PREPARED
         // basis 없는 구형 원문은 기존 strict decoder가 검증한 DRIVING_END 형식뿐이다.
         val basis=if(j.has("basis"))RentalInactiveBasis.valueOf(j.getString("basis")) else RentalInactiveBasis.DRIVING_END
-        ContractResult.Success(RentalInactiveRecovery(identity,marker,RentalProductJson.clock(j.getJSONObject("since")),basis,authority,phase,interval))
+        val observedThrough = j.optJSONObject("observedThrough")?.let(RentalProductJson::clock)
+        ContractResult.Success(RentalInactiveRecovery(identity,marker,RentalProductJson.clock(j.getJSONObject("since")),
+            basis,authority,phase,interval,observedThrough))
     }
     private fun snapshot(s:SqliteGameChangeStore):ContractResult<RentalRuntimeSnapshot> {
         val pending=when(val r=s.rental.pending()){is ContractResult.Failure->return r;is ContractResult.Success->r.value}
         return when(val r=s.rental.firstCompletedRental()){is ContractResult.Failure->r;is ContractResult.Success->ContractResult.Success(RentalRuntimeSnapshot(pending,r.value))}
     }
-    override fun advanceInactive(identity:GameIdentity,interval:RentalInactiveInterval):ContractResult<RentalRuntimeSnapshot> {
-        // 준비는 금융 실행과 분리한다. 다른 금융slot이 막아도 원래 복귀시각을 잃지 않는다.
+    override fun advanceInactive(identity: GameIdentity, interval: RentalInactiveInterval): ContractResult<RentalRuntimeSnapshot> =
+        advanceInactiveAfterDrain(identity, interval) { ContractResult.Success(Unit) }
+
+    internal fun advanceInactiveAfterDrain(identity: GameIdentity, interval: RentalInactiveInterval,
+        drain: () -> ContractResult<Unit>): ContractResult<RentalRuntimeSnapshot> {
+        // 준비된 원본 복귀 시각을 먼저 기록한다. 앞선 관측 처리와 종료 정산은 준비 뒤에 실행한다.
         val prepared=withDb(identity){_,db->
             val j=inactive(db,identity,interval.marker)?:return@withDb data();val encoded=RentalProductJson.interval(interval)
             if(!j.isNull("command"))return@withDb if(j.getJSONObject("command").toString()==encoded.toString())ContractResult.Success(Unit) else conflict()
@@ -201,6 +239,10 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
             j.put("command",encoded);writeInactive(db,identity,j,false);ContractResult.Success(Unit)
         }
         if(prepared is ContractResult.Failure)return prepared
+        when (val drained = drain()) {
+            is ContractResult.Failure -> return drained
+            is ContractResult.Success -> Unit
+        }
         return withDb(identity){s,db->
             val j=inactive(db,identity,interval.marker)?:return@withDb data()
             if(j.getBoolean("done"))return@withDb snapshot(s.store)
@@ -208,10 +250,18 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
             val origin=j.getJSONObject("origin");val key=when{origin.has("clock")->"clock";origin.has("applicationExit")->"applicationExit";else->null}
             if(key==null)return@withDb if(origin.has("error"))ContractResult.Failure(ContractError.valueOf(origin.getString("error"))) else data()
             val policy=RentalProductJson.clock(origin.getJSONObject(key));if(!continuous(policy,interval.originalSince))return@withDb data()
+            val verifiedExitBasis = if (j.has("verifiedExit")) RentalInactiveBasis.valueOf(j.getString("basis")) else null
+            val observedThrough = j.optJSONObject("observedThrough")?.let(RentalProductJson::clock)?.epoch?.value
             val active=when(val r=s.store.rental.pending()){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value}
             for(rental in active) {
                 if(rental.phase==VehicleActivity.RENTED) {
-                    val cursor=when(val r=s.store.rental.accountInactive(rental.id,interval.from.epoch,interval.to.epoch,policy.epoch)){is ContractResult.Failure->return@withDb r;is ContractResult.Success->r.value}
+                    // 프로세스 재생성으로 대기열을 잃은 경우에도 수락 구간을 무수익으로 건너뛰지 않는다.
+                    if (observedThrough != null && rental.cursor.value < minOf(rental.end.value, observedThrough)) return@withDb conflict()
+                    val cursor = when (val r = s.store.rental.accountInactive(rental.id, interval.from.epoch,
+                        interval.to.epoch, policy.epoch, verifiedExitBasis)) {
+                        is ContractResult.Failure -> return@withDb r
+                        is ContractResult.Success -> r.value
+                    }
                     if(cursor.value>=rental.end.value)when(val r=s.store.rental.settle(rental.id)){is ContractResult.Failure->return@withDb r;else->Unit}
                 }
                 if(interval.to.epoch.value>=rental.returnEnd.value)when(val r=s.store.rental.finishReturn(rental.id,interval.to.epoch)){is ContractResult.Failure->return@withDb r;else->Unit}
