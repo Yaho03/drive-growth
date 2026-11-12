@@ -125,14 +125,12 @@ function mountTown(){
  // 1 미만이면 두 그림이 겹친다(가로는 몸통 폭, 세로는 키 기준)
  const overlap=(i,j,a,b)=>Math.max(Math.abs(a.x-b.x)/((size[i][0]+size[j][0])/2*.75),Math.abs(a.y-b.y)/((size[i][1]+size[j][1])/2*.8));
  st.forEach((s,i)=>{if(!s.pos)s.pos=pose(TOWN_ACTORS[i],s.clock);});
- function tick(now){
-  if(!vp.isConnected)return;
-  const dt=(townMotion&&!document.hidden)?Math.min((now-prev)/1000,.1):0;prev=now;
+ function advanceActors(dt){
   actorClock+=dt;
   // 1) 다음 위치 후보와 막힘 여부
   const cand=TOWN_ACTORS.map((p,i)=>pose(p,st[i].clock+dt));
   const blockedBy=TOWN_ACTORS.map((p,i)=>{
-   if(!cand[i].walking||dt===0)return -1;
+   if(!cand[i].walking)return -1;
    for(let j=0;j<TOWN_ACTORS.length;j++){
     if(j===i)continue;
     const vNext=overlap(i,j,cand[i],st[j].pos),vNow=overlap(i,j,st[i].pos,st[j].pos);
@@ -163,7 +161,12 @@ function mountTown(){
    });
    st[i].nx+=(px-st[i].nx)*.15;st[i].ny+=(py-st[i].ny)*.15;
   });
-  // 4) 그리기
+ }
+ function tick(now){
+  if(!vp.isConnected)return;
+  const dt=(townMotion&&!document.hidden)?Math.min((now-prev)/1000,.1):0;prev=now;
+  // 정지 중 다시 그릴 때는 기다림과 비켜 서기 상태도 유지한다.
+  if(dt>0)advanceActors(dt);
   TOWN_ACTORS.forEach((p,i)=>{
    const el=elements[i],s=st[i],ps=s.pos,walking=ps.walking&&!s.stopped,flip=ps.flip;
    const x=Math.round(ps.x+s.nx),y=Math.round(ps.y+s.ny);
