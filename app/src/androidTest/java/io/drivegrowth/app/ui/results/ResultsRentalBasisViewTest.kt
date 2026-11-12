@@ -55,6 +55,16 @@ class ResultsRentalBasisViewTest : InstrumentationTestCase() {
         ResultsView(instrumentation.targetContext, events::add).apply { render(state, true); restoreSelection(state.results.single().settlement.settlementId) }
     }
 
+    fun testUnobservedTimeIsShownSeparatelyFromCapExclusions() {
+        val gap = RentalIncomePeriod(EpochMillis(0), EpochMillis(1000), RentalIncomeKind.UNOBSERVED,
+            null, 0, 0, 0, BigDecimal.ZERO, null)
+        val view = open(content(Observation.Available(basis(listOf(gap, driving(1000, 5001))))))
+        val text = ui { shown(view) }
+        assertTrue(text.contains("미관측 제외 시간: 1초"))
+        assertTrue(text.contains("상한 제외 시간: 0초"))
+        assertTrue(text.contains("미관측 · 수익 제외"))
+    }
+
     fun testActualStoredMixedBasisRendersAfterReopenAndReadDoesNotWrite() {
         val context = instrumentation.targetContext; val name = "results-basis-view-${System.nanoTime()}.db"
         var store = SqliteGameChangeStore(context, InputSource.SIMULATION, name)

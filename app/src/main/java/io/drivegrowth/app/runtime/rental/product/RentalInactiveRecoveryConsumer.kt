@@ -15,7 +15,12 @@ class RentalInactiveRecoveryConsumer(
 ) {
     private var waiting: Pair<RentalInactiveRecovery, RentalInactiveInterval>? = null
 
-    fun resume(identity: GameIdentity): ContractResult<RentalRuntimeSnapshot?> {
+    fun resume(identity: GameIdentity): ContractResult<RentalRuntimeSnapshot?> =
+        resumeWith(identity) { original, interval -> advance(original.identity, interval) }
+
+    internal fun resumeWith(identity: GameIdentity,
+        advanceOriginal: (RentalInactiveRecovery, RentalInactiveInterval) -> ContractResult<RentalRuntimeSnapshot>,
+    ): ContractResult<RentalRuntimeSnapshot?> {
         val old = waiting
         if (old != null && old.first.identity != identity) return failure(ContractError.STATE_CONFLICT)
         val current = when (val result = read(identity)) {
@@ -45,7 +50,7 @@ class RentalInactiveRecoveryConsumer(
             return ContractResult.Success(null)
         }
         waiting = current to command // 준비 쓰기 실패도 같은 최초 resume 입력을 유지한다.
-        return when (val result = advance(identity, command)) {
+        return when (val result = advanceOriginal(current, command)) {
             is ContractResult.Failure -> result
             is ContractResult.Success -> { waiting = null; result }
         }
@@ -53,7 +58,7 @@ class RentalInactiveRecoveryConsumer(
 
     private fun sameBoundary(a: RentalInactiveRecovery, b: RentalInactiveRecovery) =
         a.identity == b.identity && a.marker == b.marker && a.since == b.since &&
-            a.basis == b.basis && a.policyOrigin == b.policyOrigin
+            a.basis == b.basis && a.policyOrigin == b.policyOrigin && a.observedThrough == b.observedThrough
 
     private fun continuous(a: RentalClock, b: RentalClock) = a.bootId.isNotBlank() && a.bootId == b.bootId &&
         a.epoch.value >= 0 && a.elapsedMs >= 0 && b.epoch.value >= a.epoch.value && b.elapsedMs >= a.elapsedMs &&

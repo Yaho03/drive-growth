@@ -52,15 +52,18 @@ internal object RentalBasisStorage {
         if (load(db, store, id) != record) throw SQLiteException("새 대여 시간 근거 삽입 누락")
     }
 
-    fun append(db: SQLiteDatabase, store: SqliteGameChangeStore, previous: Record?, period: RentalIncomePeriod) {
+    fun append(db: SQLiteDatabase, store: SqliteGameChangeStore, previous: Record?, additions: List<RentalIncomePeriod>) {
         if (previous == null) return // legacy를 중간부터 채우지 않는다.
-        val last = previous.periods.lastOrNull()
-        val periods = if (last != null && last.through == period.from && last.kind == period.kind &&
-            last.origin == period.origin && last.policy == period.policy) {
-            previous.periods.dropLast(1) + last.copy(through = period.through,
-                normalMillis = last.normalMillis + period.normalMillis, reducedMillis = last.reducedMillis + period.reducedMillis,
-                cappedMillis = last.cappedMillis + period.cappedMillis, weightedMillis = last.weightedMillis + period.weightedMillis)
-        } else previous.periods + period
+        val periods = previous.periods.toMutableList()
+        for (period in additions) {
+            val last = periods.lastOrNull()
+            if (last != null && last.through == period.from && last.kind == period.kind &&
+                last.origin == period.origin && last.policy == period.policy) {
+                periods[periods.lastIndex] = last.copy(through = period.through,
+                    normalMillis = last.normalMillis + period.normalMillis, reducedMillis = last.reducedMillis + period.reducedMillis,
+                    cappedMillis = last.cappedMillis + period.cappedMillis, weightedMillis = last.weightedMillis + period.weightedMillis)
+            } else periods.add(period)
+        }
         save(db, store, previous, previous.copy(periods = periods))
     }
 

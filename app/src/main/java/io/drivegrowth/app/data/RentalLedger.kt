@@ -132,13 +132,21 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
     }
 
     /** 호출자가 확인한 연속 주행/주차 구간. 화면 가시성만으로 주행을 추정하지 않는다. */
-    fun account(id:RequestId,from:EpochMillis,to:EpochMillis,parkedSince:EpochMillis?)=accountBasis(id,from,to,parkedSince,true)
+    fun account(id:RequestId,from:EpochMillis,to:EpochMillis,parkedSince:EpochMillis?) =
+        accountObserved(id, from, to, parkedSince, null)
 
-    /** 원점은 마지막 주행 종료다. 앱 onStop을 물리 주차로 저장하지 않는다. */
-    fun accountInactive(id:RequestId,from:EpochMillis,to:EpochMillis,policyOrigin:EpochMillis)=accountBasis(id,from,to,policyOrigin,false)
+    internal fun accountObserved(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?,
+        unobservedSince: EpochMillis?) =
+        accountBasis(id, from, to, parkedSince, physical = true, unobservedSince = unobservedSince)
 
-    private fun accountBasis(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?, physical:Boolean) = store.atomic { db ->
-        if (from.value < 0 || to.value < 0 || (parkedSince != null && parkedSince.value !in 0..from.value))
+    /** 검증된 이탈 기록의 종료 전 공백은 저널에서 수락 관측 커서를 확인한 뒤 기록한다. */
+    internal fun accountInactive(id: RequestId, from: EpochMillis, to: EpochMillis, policyOrigin: EpochMillis,
+        verifiedExit: RentalInactiveBasis? = null) = accountBasis(id, from, to, policyOrigin, false, verifiedExit)
+
+    private fun accountBasis(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?,
+        physical: Boolean, verifiedExit: RentalInactiveBasis? = null, unobservedSince: EpochMillis? = null) = store.atomic { db ->
+        if (from.value < 0 || to.value < 0 || (parkedSince != null && parkedSince.value !in 0..from.value) ||
+            (unobservedSince != null && unobservedSince.value !in 0L until from.value))
             return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
         db.rawQuery("SELECT cursor,end,weighted,parked_since,start FROM rentals WHERE id=?", arrayOf(id.value)).use {
             if (!it.moveToFirst()) return@atomic missing()
@@ -148,23 +156,36 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             if(cursor !in start..it.integer(1,start,Long.MAX_VALUE)||previous.signum()<0||previous>(cursor-start).toBigDecimal()||oldPark?.let{p->p>cursor}==true)throw SQLiteException("대여 누적/커서 범위 손상")
             val basis = RentalBasisStorage.load(db, store, id)
             if (end <= cursor || to.value < from.value) return@atomic ContractResult.Success(EpochMillis(cursor))
-            if (from.value > cursor) return@atomic conflict()
-            if (parkedSince != null && oldPark!=null && oldPark != parkedSince.value) return@atomic conflict()
-            val window = parkedSince?.let { origin -> parkingIncomeWindow(origin, EpochMillis(cursor), EpochMillis(end)) }
-            val increment = window?.equivalentMillis() ?: (end-cursor).toBigDecimal()
-            val normal = window?.fullMillis ?: (end-cursor)
-            val reduced = window?.reducedMillis ?: 0L
-            val period = RentalIncomePeriod(EpochMillis(cursor), EpochMillis(end),
-                if (!physical) RentalIncomeKind.INACTIVE else if (parkedSince == null) RentalIncomeKind.DRIVING else RentalIncomeKind.PARKED,
-                parkedSince, normal, reduced, end-cursor-normal-reduced, increment,
-                if (window == null) null else RentalIncomePolicy(ParkingIncomePolicy.version, ParkingIncomePolicy.normalMillis,
-                    ParkingIncomePolicy.capMillis, ParkingIncomePolicy.reducedMultiplier))
-            val amount=(previous+increment).toPlainString();val persistedPark=if(physical)parkedSince?.value else oldPark
+            if (from.value > cursor && verifiedExit == null && (unobservedSince == null || cursor < unobservedSince.value))
+                return@atomic conflict()
+            // 주행 중 이탈의 경제 원점은 이전 물리 주차 원점과 독립이다.
+            if (parkedSince != null && oldPark != null && oldPark != parkedSince.value &&
+                verifiedExit != RentalInactiveBasis.APPLICATION_EXIT_DRIVING) return@atomic conflict()
+            val creditedFrom = maxOf(cursor, minOf(from.value, end))
+            val periods = buildList {
+                if (cursor < creditedFrom) {
+                    add(RentalIncomePeriod(EpochMillis(cursor), EpochMillis(creditedFrom),
+                        RentalIncomeKind.UNOBSERVED, null, 0, 0, 0, BigDecimal.ZERO, null))
+                }
+                if (creditedFrom < end) {
+                    val window = parkedSince?.let { parkingIncomeWindow(it, EpochMillis(creditedFrom), EpochMillis(end)) }
+                    val normal = window?.fullMillis ?: (end - creditedFrom)
+                    val reduced = window?.reducedMillis ?: 0L
+                    add(RentalIncomePeriod(EpochMillis(creditedFrom), EpochMillis(end),
+                        if (!physical) RentalIncomeKind.INACTIVE else if (parkedSince == null) RentalIncomeKind.DRIVING else RentalIncomeKind.PARKED,
+                        parkedSince, normal, reduced, end - creditedFrom - normal - reduced,
+                        window?.equivalentMillis() ?: (end - creditedFrom).toBigDecimal(),
+                        if (window == null) null else RentalIncomePolicy(ParkingIncomePolicy.version, ParkingIncomePolicy.normalMillis,
+                            ParkingIncomePolicy.capMillis, ParkingIncomePolicy.reducedMultiplier)))
+                }
+            }
+            val increment = periods.fold(BigDecimal.ZERO) { total, period -> total + period.weightedMillis }
+            val amount=(previous+increment).toPlainString();val persistedPark=if(physical && creditedFrom < end)parkedSince?.value else oldPark
             if(db.update("rentals",android.content.ContentValues().apply{put("cursor",end);put("weighted",amount);if(persistedPark==null)putNull("parked_since")else put("parked_since",persistedPark)},"id=?",arrayOf(id.value))!=1)throw SQLiteException("대여 누적 무갱신")
             db.rawQuery("SELECT cursor,weighted,parked_since FROM rentals WHERE id=?",arrayOf(id.value)).use{r->
                 if(!r.moveToFirst()||r.integer(0,0,Long.MAX_VALUE)!=end||r.text(1)!=amount||(if(r.isNull(2))null else r.integer(2,0,Long.MAX_VALUE))!=persistedPark)throw SQLiteException("대여 실제 누적 쓰기 불일치")
             }
-            RentalBasisStorage.append(db, store, basis, period)
+            RentalBasisStorage.append(db, store, basis, periods)
             ContractResult.Success(EpochMillis(end))
         }
     }

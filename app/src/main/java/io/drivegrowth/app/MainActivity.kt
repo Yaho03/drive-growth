@@ -55,6 +55,7 @@ import io.drivegrowth.app.ui.garage.GarageEvent
 import io.drivegrowth.app.ui.garage.GarageScreenState
 import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.garage.GarageView
+import io.drivegrowth.app.runtime.rental.product.RentalAppExit
 import io.drivegrowth.app.vehicle.ForegroundInteraction
 import io.drivegrowth.app.vehicle.VehicleInput
 import io.drivegrowth.core.contract.ContractError
@@ -73,6 +74,7 @@ open class MainActivity : Activity() {
     private var input: VehicleInput? = null
     private var drivingStatus: String? = null
     private var rentalFingerprint: Any? = null
+    private val rentalAppExit = RentalAppExit()
     private var navigation = HostNavigation()
     private var screen: HostQueryState = HostQueryState.Restricted
     private lateinit var management: GarageCommandHost
@@ -325,6 +327,7 @@ open class MainActivity : Activity() {
     }
 
     private fun startObserving() {
+        rentalAppExit.clear()
         setVisible(true)
         if (active) return
         active = true
@@ -439,8 +442,15 @@ open class MainActivity : Activity() {
         input = null
     }
 
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (active && isTaskRoot) rentalAppExit.userLeaveHint()
+    }
+
     override fun onStop() {
-        session.rental.inactive(isChangingConfigurations, session.rentalClock.read())
+        if (rentalAppExit.consumeStop(isChangingConfigurations)) {
+            session.rental.inactive(false, session.rentalClock.read())
+        }
         super.onStop()
     }
 
@@ -973,7 +983,8 @@ open class MainActivity : Activity() {
         // 다중 창에서 Task를 뒤로 보내도 RESUMED·표시가 유지되는 경우를 함께 처리한다.
         stopObserving()
         setVisible(false)
-        session.rental.inactive(false, session.rentalClock.read()) // 실제 사용자 숨김. 뒤따르는 onStop은 원마커를 보존한다.
+        rentalAppExit.clear()
+        session.rental.inactive(false, session.rentalClock.read())
         moveTaskToBack(true)
     }
 }

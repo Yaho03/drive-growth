@@ -24,9 +24,9 @@ sealed interface RentalMotion {
     data class Parked(val originalSince: EpochMillis) : RentalMotion
 }
 
-/** from..to 전체가 같은 주행 또는 원래 연속 주차라는 증거. 공백은 Missing이다. */
+/** from..to는 수락한 연속 구간이다. unobservedSince..from은 같은 수신기의 확인된 앞 공백이다. */
 data class RentalTick(val source: InputSource, val from: RentalClock, val to: RentalClock,
-                      val motion: Observation<RentalMotion>)
+                      val motion: Observation<RentalMotion>, val unobservedSince: RentalClock? = null)
 
 /** 대여별 확정 경계다. 한 대여의 보류가 다른 대여의 이미 확정된 결과를 취소하지 않는다. */
 data class RentalRuntimeSnapshot(
@@ -38,7 +38,8 @@ data class RentalRuntimeSnapshot(
 internal interface RentalRuntimeLedger {
     fun assign(visit: RentalVisit): ContractResult<OwnedVehicleId?>
     fun pending(): ContractResult<List<RentalLedger.Pending>>
-    fun account(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?): ContractResult<EpochMillis>
+    fun account(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?,
+        unobservedSince: EpochMillis?): ContractResult<EpochMillis>
     fun settle(id: RequestId): ContractResult<RentalReceipt>
     fun finishReturn(id: RequestId, now: EpochMillis): ContractResult<VehicleActivity>
     fun firstCompleted(): ContractResult<CompletedRental?>
