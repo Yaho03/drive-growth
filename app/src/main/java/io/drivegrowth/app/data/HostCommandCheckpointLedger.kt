@@ -114,9 +114,10 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
             db.execSQL("UPDATE host_command_checkpoint SET phase=0,digest=? WHERE id=1",arrayOf(HostCheckpointJson.digest(HostCheckpointJson.encode(profileId,command),0)))
             if(read(db,profileId)!=HostCommandCheckpoint(profileId,command,HostCheckpointPhase.SAVED))throw SQLiteException("탁송 비확정 SAVED 복귀 누락")
         }
-        if (command is HostCheckpointCommand.Achievement && result is ContractResult.Success &&
+        if ((command is HostCheckpointCommand.Quest || command is HostCheckpointCommand.Achievement) &&
+            result is ContractResult.Success &&
             read(db, profileId) != HostCommandCheckpoint(profileId, command, HostCheckpointPhase.STARTED))
-            throw SQLiteException("업적 확정 뒤 STARTED 실제 상태 불일치")
+            throw SQLiteException("진행 보상 확정 뒤 STARTED 실제 상태 불일치")
         if(command is HostCheckpointCommand.Decoration&&result is ContractResult.Success&&read(db,profileId)!=HostCommandCheckpoint(profileId,command,HostCheckpointPhase.STARTED))
             throw SQLiteException("꾸미기 확정 뒤 STARTED 실제 상태 불일치")
         result
@@ -150,7 +151,7 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
         if(decorationBefore is ContractResult.Failure)return@atomic decorationBefore
         if (db.delete("host_command_checkpoint", "id=1", null) != 1) throw SQLiteException("checkpoint 삭제 대상 누락")
         if(decorationBefore!=null&&store.decorations.state(profileId)!=decorationBefore)throw SQLiteException("꾸미기 checkpoint의 비금융 상태 변경")
-        if((FacilityCheckpointStorage.supports(command)||command is HostCheckpointCommand.Decoration||command is HostCheckpointCommand.Achievement)&&read(db,profileId)!=null)throw SQLiteException("시설/쉬기 checkpoint 실제 삭제 누락")
+        if((FacilityCheckpointStorage.supports(command)||command is HostCheckpointCommand.Decoration||command is HostCheckpointCommand.Achievement||command is HostCheckpointCommand.Quest)&&read(db,profileId)!=null)throw SQLiteException("checkpoint 실제 삭제 누락")
         result
     }
 
@@ -179,7 +180,7 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
         if(decorationBefore is ContractResult.Failure)return@atomic decorationBefore
         if (db.delete("host_command_checkpoint", "id=1", null) != 1) throw SQLiteException("checkpoint 취소 대상 누락")
         if(decorationBefore!=null&&store.decorations.state(profileId)!=decorationBefore)throw SQLiteException("꾸미기 checkpoint의 비금융 상태 변경")
-        if((FacilityCheckpointStorage.supports(command)||command is HostCheckpointCommand.Decoration||command is HostCheckpointCommand.Achievement)&&read(db,profileId)!=null)throw SQLiteException("시설/쉬기 checkpoint 실제 취소 누락")
+        if((FacilityCheckpointStorage.supports(command)||command is HostCheckpointCommand.Decoration||command is HostCheckpointCommand.Achievement||command is HostCheckpointCommand.Quest)&&read(db,profileId)!=null)throw SQLiteException("checkpoint 실제 취소 누락")
         ContractResult.Success(Unit)
     }
 

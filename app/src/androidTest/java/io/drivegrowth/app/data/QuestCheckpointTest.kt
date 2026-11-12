@@ -3,6 +3,7 @@ package io.drivegrowth.app.data
 import android.database.sqlite.SQLiteDatabase
 import android.test.InstrumentationTestCase
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.decoration.*
 import io.drivegrowth.core.quest.*
 import java.time.Instant
 import java.time.ZoneId
@@ -26,7 +27,7 @@ class QuestCheckpointTest:InstrumentationTestCase() {
     }
     override fun tearDown(){store.close();context.deleteDatabase(name);super.tearDown()}
     private fun raw(f:(SQLiteDatabase)->Unit)=SQLiteDatabase.openDatabase(context.getDatabasePath(name).path,null,SQLiteDatabase.OPEN_READWRITE).use(f)
-    private fun rows():List<String> = buildList{raw{db->for(t in listOf("account","settlements","quest_events","quest_tracking","quest_claims","host_command_checkpoint"))db.rawQuery("SELECT * FROM $t ORDER BY 1",null).use{r->while(r.moveToNext())add(t+":"+(0 until r.columnCount).joinToString("|"){if(r.isNull(it))"<null>"else r.getString(it)})}}}
+    private fun rows(vararg extra: String):List<String> = buildList{raw{db->for(t in listOf("account","settlements","quest_events","quest_tracking","quest_claims","host_command_checkpoint") + extra)db.rawQuery("SELECT * FROM $t ORDER BY 1",null).use{r->while(r.moveToNext())add(t+":"+(0 until r.columnCount).joinToString("|"){if(r.isNull(it))"<null>"else r.getString(it)})}}}
     private fun command():HostCheckpointCommand.Quest {
         val p=ok(store.quests.read(profile,Observation.Available(EpochMillis(now)))).single{it.definition.id=="daily-result-viewed"}
         return HostCheckpointCommand.Quest(QuestClaimCommand(RequestId("quest/claim/actual-journal"),profile,source,p.definition,p.period,p.revision!!))
@@ -42,6 +43,98 @@ class QuestCheckpointTest:InstrumentationTestCase() {
         assertEquals(first,(ok(store.hostCommands.execute(profile,c)) as HostCheckpointResult.Quest).value);assertEquals(before,rows());assertEquals(GameMoney(900),ok(store.balance()))
         assertEquals(first,(ok(store.hostCommands.finish(profile,c)) as HostCheckpointResult.Quest).value);assertNull(ok(store.hostCommands.load(profile)))
     }
+    fun testQuestAndLegacyGeneralRequestRejectCrossOwnerReuse() {
+        val legacy = GameChange(RequestId("legacy-general"), TransactionKind.GARAGE, source,
+            definition.rules, MoneyChange(MoneyDirection.CREDIT, GameMoney(7)))
+        val receipt = ok(store.commitGameChange(legacy))
+        val id = RequestId("quest/claim/legacy-general")
+        // 예약 규칙이 생기기 전의 정합적인 공용 명령·결과를 재현한다.
+        raw { db ->
+            db.execSQL("UPDATE settlements SET request_id=?,command=?,result=? WHERE request_id=?",
+                arrayOf(id.value, LedgerJson.command(legacy.copy(requestId = id)).toString(),
+                    LedgerJson.settlement(receipt.copy(transaction = receipt.transaction.copy(requestId = id))).toString(),
+                    legacy.requestId.value))
+        }
+        val legacyClaim = command().value.copy(requestId = id)
+        val occupied = rows()
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), store.quests.claim(legacyClaim))
+        assertEquals(occupied, rows())
+        assertEquals(receipt.settlementId, ok(store.commitGameChange(legacy.copy(requestId = id))).settlementId)
+        assertEquals(occupied, rows())
+
+        val claim = command()
+        val original = execute(claim)
+        val typed = rows()
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
+            store.commitGameChange(legacy.copy(requestId = claim.value.requestId)))
+        assertEquals(original, ok(store.quests.claim(claim.value)))
+        assertEquals(typed, rows())
+    }
+
+    fun testLateQuestClaimSlotResetRollsBackRewardAndKeepsSavedCommand() {
+        val claim = command()
+        ok(store.hostCommands.save(profile, claim))
+        val digest = HostCheckpointJson.digest(HostCheckpointJson.encode(profile, claim), 0)
+        raw { db ->
+            db.execSQL("""
+                CREATE TRIGGER reset_quest_slot AFTER INSERT ON quest_claims
+                BEGIN UPDATE host_command_checkpoint SET phase=0,digest='$digest' WHERE id=1; END
+            """.trimIndent())
+        }
+        val before = rows()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.hostCommands.execute(profile, claim))
+        assertEquals(before, rows())
+        assertEquals(GameMoney(1000), ok(store.balance()))
+        assertNull(ok(store.quests.settlement(claim.value.requestId)))
+        assertEquals(HostCommandCheckpoint(profile, claim, HostCheckpointPhase.SAVED), ok(store.hostCommands.load(profile)))
+
+        raw { db ->
+            db.execSQL("DROP TRIGGER reset_quest_slot")
+            db.execSQL("""
+                CREATE TRIGGER restore_quest_slot AFTER DELETE ON host_command_checkpoint
+                BEGIN INSERT INTO host_command_checkpoint VALUES(OLD.id,OLD.payload,OLD.phase,OLD.digest); END
+            """.trimIndent())
+        }
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.hostCommands.cancelUnstarted(profile, claim))
+        assertEquals(before, rows())
+
+        val original = ok(store.hostCommands.execute(profile, claim))
+        assertEquals(GameMoney(1100), ok(store.balance()))
+        val committed = rows()
+        assertEquals(original, ok(store.hostCommands.execute(profile, claim)))
+        assertEquals(committed, rows())
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.hostCommands.finish(profile, claim))
+        assertEquals(committed, rows())
+        raw { it.execSQL("DROP TRIGGER restore_quest_slot") }
+        assertEquals(original, ok(store.hostCommands.finish(profile, claim)))
+        assertNull(ok(store.hostCommands.load(profile)))
+    }
+
+    fun testPaidDecorationReplayAfterQuestRewardAndReopenPreservesOriginal() {
+        val decorations = trialDecorationDefinitions()
+        val paid = HostCheckpointCommand.Decoration(DecorationCommand(RequestId("buy-before-quest"), profile, source,
+            "blue-sign", DecorationAction.BUY_AND_APPLY, decorations.ruleVersion, Revision(0), GameMoney(100)))
+        raw { it.execSQL("UPDATE shop SET level=2,capacity=5 WHERE id=1") }
+        ok(store.decorations.activate(profile))
+        ok(store.hostCommands.save(profile, paid))
+        val original = ok(store.hostCommands.execute(profile, paid)) as HostCheckpointResult.Decoration
+        assertEquals(GameMoney(900), original.value.state.balance)
+        assertEquals(original, ok(store.hostCommands.finish(profile, paid)))
+
+        val claim = command()
+        val reward = execute(claim)
+        ok(store.hostCommands.finish(profile, claim))
+        assertEquals(GameMoney(1000), reward.settlement.balance)
+        store.close()
+        store = open()
+        store.decorationDefinitions = { ContractResult.Failure(ContractError.DATA_UNAVAILABLE) }
+        val before = rows("decoration_module", "decoration_requests", "shop")
+        assertEquals(original.value, ok(store.decorations.commit(paid.value)))
+        assertEquals(original.value, ok(store.decorations.settlement(paid.value)))
+        assertEquals(GameMoney(1000), ok(store.decorations.state(profile)).balance)
+        assertEquals(before, rows("decoration_module", "decoration_requests", "shop"))
+    }
+
     fun testFinishCannotExecuteUnstartedClaim() {
         val c=command();ok(store.hostCommands.save(profile,c));val before=rows();assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),store.hostCommands.finish(profile,c));assertEquals(before,rows());assertNull(ok(store.quests.settlement(c.value.requestId)))
     }

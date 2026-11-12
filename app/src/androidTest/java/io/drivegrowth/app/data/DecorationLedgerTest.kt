@@ -127,6 +127,57 @@ class DecorationLedgerTest : InstrumentationTestCase() {
             assertEquals(1,settlementCount(RequestId("race-a"))+settlementCount(RequestId("race-b")))
         } finally {pool.shutdownNow();other.close()}
     }
+    fun testDecorationAndGeneralDebitCompeteForTheSameLastBalance() {
+        activate()
+        unlock()
+        ok(store.commitGameChange(GameChange(RequestId("reduce-balance"), TransactionKind.GARAGE, source,
+            RuleVersion("fixture"), MoneyChange(MoneyDirection.DEBIT, GameMoney(900)))))
+        val decoration = command("last-balance-decoration")
+        val debit = GameChange(RequestId("last-balance-general"), TransactionKind.GARAGE, source,
+            RuleVersion("fixture"), MoneyChange(MoneyDirection.DEBIT, GameMoney(100)))
+        open().use { other ->
+            assertEquals(profile, ok(other.localProfileId()))
+            val ready = CountDownLatch(2)
+            val start = CountDownLatch(1)
+            val pool = Executors.newFixedThreadPool(2)
+            try {
+                val a = pool.submit<ContractResult<DecorationSettlement>> {
+                    ready.countDown()
+                    check(start.await(10, TimeUnit.SECONDS))
+                    store.decorations.commit(decoration)
+                }
+                val b = pool.submit<ContractResult<Settlement>> {
+                    ready.countDown()
+                    check(start.await(10, TimeUnit.SECONDS))
+                    other.commitGameChange(debit)
+                }
+                assertTrue(ready.await(10, TimeUnit.SECONDS))
+                start.countDown()
+                val decorationResult = a.get(30, TimeUnit.SECONDS)
+                val debitResult = b.get(30, TimeUnit.SECONDS)
+                val state = ok(store.decorations.state(profile))
+                if (decorationResult is ContractResult.Success) {
+                    assertEquals(ContractResult.Failure(ContractError.INSUFFICIENT_FUNDS), debitResult)
+                    assertEquals(setOf("blue-sign"), state.ownedIds)
+                    assertEquals("blue-sign", state.selectedId)
+                    assertEquals(Revision(1), state.revision)
+                    assertEquals(decorationResult.value, ok(store.decorations.settlement(decoration)))
+                } else {
+                    assertEquals(ContractResult.Failure(ContractError.INSUFFICIENT_FUNDS), decorationResult)
+                    assertEquals(GameMoney(0), ok(debitResult).balance)
+                    assertTrue(state.ownedIds.isEmpty())
+                    assertNull(state.selectedId)
+                    assertEquals(Revision(0), state.revision)
+                    assertNull(ok(store.decorations.settlement(decoration)))
+                }
+                assertEquals(GameMoney(0), ok(store.balance()))
+                assertEquals(1, settlementCount(decoration.requestId) + settlementCount(debit.requestId))
+            } finally {
+                pool.shutdownNow()
+            }
+        }
+    }
+
     fun testEveryRequiredWriteFailureRollsBackMoneyOwnershipSelectionAndCheckpoint() {
         activate();unlock();val c=command();ok(store.hostCommands.save(profile,wrap(c)))
         for((table,event) in listOf("host_command_checkpoint" to "UPDATE","account" to "UPDATE","settlements" to "INSERT","decoration_module" to "UPDATE","decoration_requests" to "INSERT")) {
