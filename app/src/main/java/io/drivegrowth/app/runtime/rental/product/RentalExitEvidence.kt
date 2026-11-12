@@ -11,7 +11,7 @@ enum class RentalExitMode { DRIVING, KNOWN_PARKED }
 /** 실제 stop에서만 호출한다. Missing 원점은 Driving 선택의 근거가 아니다. */
 fun rentalExitMode(configurationChange: Boolean, source: InputSource, since: RentalClock,
     latest: VehicleObservation?, actualTripOpen: Boolean, lastDriveEnd: RentalClock?,
-    policy: RecordingPolicy): RentalExitMode? {
+    policy: RecordingPolicy, rebasedClock: Boolean = false): RentalExitMode? {
     if (configurationChange || latest == null || latest.source != source ||
         since.elapsedMs < latest.receivedElapsedMs || since.elapsedMs - latest.receivedElapsedMs > policy.maxAgeMs)
         return null
@@ -23,7 +23,8 @@ fun rentalExitMode(configurationChange: Boolean, source: InputSource, since: Ren
     if (gear == Gear.PARK && abs(speed) <= policy.stationaryMps && lastDriveEnd != null &&
         lastDriveEnd.bootId == since.bootId && lastDriveEnd.elapsedMs <= since.elapsedMs &&
         lastDriveEnd.epoch.value <= since.epoch.value &&
-        since.elapsedMs - lastDriveEnd.elapsedMs == since.epoch.value - lastDriveEnd.epoch.value)
+        (since.elapsedMs - lastDriveEnd.elapsedMs == since.epoch.value - lastDriveEnd.epoch.value ||
+            (rebasedClock && since.isForwardWallJumpFrom(lastDriveEnd))))
         return RentalExitMode.KNOWN_PARKED
     return null
 }

@@ -18,7 +18,7 @@ class RentalInactiveRecoveryConsumer(
     fun resume(identity: GameIdentity): ContractResult<RentalRuntimeSnapshot?> =
         resumeWith(identity) { original, interval -> advance(original.identity, interval) }
 
-    internal fun resumeWith(identity: GameIdentity,
+    internal fun resumeWith(identity: GameIdentity, forwardWallAt: RentalClock? = null,
         advanceOriginal: (RentalInactiveRecovery, RentalInactiveInterval) -> ContractResult<RentalRuntimeSnapshot>,
     ): ContractResult<RentalRuntimeSnapshot?> {
         val old = waiting
@@ -32,12 +32,16 @@ class RentalInactiveRecoveryConsumer(
             return failure(ContractError.STATE_CONFLICT)
         val command = when (current.phase) {
             RentalInactivePhase.RECORDED -> old?.second ?: run {
-                val now = when (val result = clock()) {
+                val now = forwardWallAt ?: when (val result = clock()) {
                     is ContractResult.Failure -> return result
                     is ContractResult.Success -> result.value
                 }
-                if (!continuous(current.since, now)) return failure(ContractError.DATA_UNAVAILABLE)
-                RentalInactiveInterval(current.marker, current.since, current.since, now)
+                val forward = forwardWallAt != null
+                if (forward) {
+                    if (!current.verifiedExit || !now.isForwardWallJumpFrom(current.since))
+                        return failure(ContractError.DATA_UNAVAILABLE)
+                } else if (!continuous(current.since, now)) return failure(ContractError.DATA_UNAVAILABLE)
+                RentalInactiveInterval(current.marker, current.since, current.since, now, forward)
             }
             RentalInactivePhase.PREPARED, RentalInactivePhase.COMPLETED ->
                 current.interval ?: return failure(ContractError.STORAGE_FAILURE)
@@ -56,9 +60,14 @@ class RentalInactiveRecoveryConsumer(
         }
     }
 
+    internal fun discardUnverifiedForward(command: RentalInactiveInterval) {
+        if (command.forwardWallJump && waiting?.second == command) waiting = null
+    }
+
     private fun sameBoundary(a: RentalInactiveRecovery, b: RentalInactiveRecovery) =
         a.identity == b.identity && a.marker == b.marker && a.since == b.since &&
-            a.basis == b.basis && a.policyOrigin == b.policyOrigin && a.observedThrough == b.observedThrough
+            a.basis == b.basis && a.policyOrigin == b.policyOrigin && a.observedThrough == b.observedThrough &&
+            a.verifiedExit == b.verifiedExit && a.rebasedClock == b.rebasedClock
 
     private fun continuous(a: RentalClock, b: RentalClock) = a.bootId.isNotBlank() && a.bootId == b.bootId &&
         a.epoch.value >= 0 && a.elapsedMs >= 0 && b.epoch.value >= a.epoch.value && b.elapsedMs >= a.elapsedMs &&
