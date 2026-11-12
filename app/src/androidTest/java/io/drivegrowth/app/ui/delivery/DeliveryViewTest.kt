@@ -4,6 +4,7 @@ import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ScrollView
 import android.widget.TextView
 
 @Suppress("DEPRECATION")
@@ -78,6 +79,26 @@ class DeliveryViewTest : InstrumentationTestCase() {
         assertFalse(nodes(view).filterIsInstance<TextView>().any { it.text.contains("지급 완료") })
         assertTrue(view.complete(requests.single(), data.activeFrame))
         assertTrue(nodes(view).filterIsInstance<TextView>().any { it.text.contains("도착") })
+    }
+
+    fun testHostControlsShareOfferScrollAndDisappearWhenRestricted() = onUi {
+        val context = instrumentation.targetContext
+        val view = DeliveryView(context, onRequest = {},
+            navigationControls = { Button(context).apply { tag = "test:navigation" } },
+            hostStatus = { Button(context).apply { tag = "test:receipt" } },
+        )
+        val offers = DeliveryPreviewStates.offers
+        view.render(offers, true)
+        val scroll = nodes(view).filterIsInstance<ScrollView>().single()
+        val tags = nodes(scroll).map { it.tag }
+        val offer = tags.indexOf("delivery:offer:offer-1")
+        assertTrue(tags.indexOf("test:receipt") in 0 until offer)
+        assertTrue(tags.indexOf("test:navigation") > offer)
+
+        view.render(offers, false)
+        assertNull(view.findViewWithTag<Button>("test:navigation"))
+        assertNull(view.findViewWithTag<Button>("test:receipt"))
+        assertNull(view.findViewWithTag<Button>("delivery:offer:offer-1"))
     }
 
     fun testReviewBackNeverSubmitsAbandonAndMissingAmountsDisableConfirmation() = onUi {

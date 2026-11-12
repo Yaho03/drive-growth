@@ -16,6 +16,8 @@ class DeliveryView(
     context: Context,
     private val onRequest: (DeliveryRequest) -> Unit,
     restored: DeliveryInteractionState = DeliveryInteractionState(),
+    private val navigationControls: () -> View? = { null },
+    private val hostStatus: () -> View? = { null },
 ) : LinearLayout(context) {
     private val style = GarageStyle(context)
     private val session = DeliveryInteraction(restored)
@@ -84,10 +86,11 @@ class DeliveryView(
 
     private fun drawScreen(): Unit = with(style) {
         val version = session.frame?.version
-        if (version == drawnVersion) scroll?.takeIf { it.isLaidOut }?.let { savedY = it.scrollY }
+        val sameFrame = version == drawnVersion
+        if (sameFrame) scroll?.takeIf { it.isLaidOut }?.let { savedY = it.scrollY }
         else savedY = 0
+        val focused = if (sameFrame) findFocus()?.tag else null
         drawnVersion = version
-        val focused = findFocus()?.tag
         drawGeneration++
         removeAllViews()
         scroll = null
@@ -102,7 +105,10 @@ class DeliveryView(
         scroll = style.scroll(body, savedY)
         addView(scroll, LayoutParams(-1, 0, 1f))
         if (session.pending != null) note(body, R.string.delivery_pending)
-        when (val state = session.frame?.screen) {
+        val state = session.frame?.screen
+        hostStatus()?.let { body.addView(it) }
+        if (state !is DeliveryScreen.Offers) navigationControls()?.let { body.addView(it) }
+        when (state) {
             null, DeliveryScreen.Loading -> note(body, R.string.delivery_loading)
             is DeliveryScreen.Unsupported -> {
                 heading(body, R.string.delivery_unavailable)
@@ -132,6 +138,7 @@ class DeliveryView(
                 active(body, state.delivery, actions = false)
             }
         }
+        if (state is DeliveryScreen.Offers) navigationControls()?.let { body.addView(it) }
         if (focused != null) findViewWithTag<View>(focused)?.takeIf { it.isEnabled }?.requestFocus()
     }
 
