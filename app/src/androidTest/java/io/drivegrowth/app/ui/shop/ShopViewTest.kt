@@ -268,6 +268,26 @@ class ShopViewTest : InstrumentationTestCase() {
             view.render(state,false);assertNull(view.findViewWithTag<View>("shop:scene"))
         }
     }
+    fun testPixelMapVehicleTapUsesCurrentOwnedIdAndRevision() = onUi {
+        val opened = mutableListOf<Pair<OwnedVehicleId, Revision>>()
+        val view = ShopView(instrumentation.targetContext) { fail("지도 탐색에서 거래 요청 발생") }
+        view.onOpenVehicle = { id, revision -> opened += id to revision }
+        val state = ShopPreviewStates.normal()
+        val id = state.vehicles.first().id
+        val tag = "shop:map-vehicle:${id.value}"
+        view.render(state, true)
+        val stale = view.findViewWithTag<View>(tag)
+        val newer = state.copy(revision = Revision(state.revision.value + 1))
+        view.render(newer, true)
+        stale.performClick()
+        assertTrue(opened.isEmpty())
+        assertTrue(view.findViewWithTag<View>(tag).performClick())
+        assertEquals(listOf(id to newer.revision), opened)
+        view.render(newer.copy(capacity = null), true)
+        assertNull(view.findViewWithTag<View>(tag))
+        assertNotNull(view.findViewWithTag<Button>("shop:list-vehicle:${id.value}"))
+    }
+
     fun testSceneModeAndScrollRestoreDoNotCreateTransactionsOrPreviewSuccess() = onUi {
         val events=mutableListOf<ShopEvent>();val state=ShopPreviewStates.normal()
         val view=ShopView(instrumentation.targetContext,events::add)

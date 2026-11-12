@@ -3,6 +3,8 @@
     <string name="shop_scene_spaces">주차 공간 %1$d칸</string>
     <string name="shop_scene_spaces_unknown">주차 구획 정보 미제공</string>
     <string name="shop_scene_more">전경 밖 공급 차량 %1$d대 · 아래 목록에서 확인</string>
-    <string name="shop_scene_capacity_more">전경은 최대 12개 구획을 표시합니다. 전체 공간은 위 확정 값을 확인해 주세요.</string>
+    <string name="shop_scene_capacity_more">전경은 최대 10개 구획을 표시합니다. 전체 공간은 위 확정 값을 확인해 주세요.</string>
     <string name="shop_scene_layout_note">차량과 시설의 위치는 표시용입니다.</string>
+    <string name="shop_scene_slot_closed">확장 예정</string>
+    <string name="shop_scene_vehicle_detail">%1$s 자세히 · %2$s</string>
 </resources>
