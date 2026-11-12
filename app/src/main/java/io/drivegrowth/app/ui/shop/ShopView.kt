@@ -3,6 +3,7 @@ package io.drivegrowth.app.ui.shop
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -25,8 +26,10 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         requireNotNull(context.assets.open("pixel/town.png").use { BitmapFactory.decodeStream(it) })
     }
     private var sceneGeneration = 0L
+    internal var facilityPanel: View? = null
     internal var onOpenVehicle: ((OwnedVehicleId, Revision) -> Unit)? = null
     private var wide = false
+    private var short = false
     private var sceneScroll: ScrollView? = null
     private var controlsScroll: ScrollView? = null
     private var sceneY = 0
@@ -50,8 +53,13 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     fun handleBack(): Boolean { val handled = interaction.cancel(); if (handled) drawScreen(); return handled }
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        val next = w >= style.dp(840)
-        if (next != wide) { wide = next; post { drawScreen() } }
+        val nextWide = w >= style.dp(840)
+        val nextShort = h in 1 until style.dp(360)
+        if (nextWide != wide || nextShort != short) {
+            wide = nextWide
+            short = nextShort
+            post { drawScreen() }
+        }
     }
     private fun s(id: Int, vararg args: Any) = context.getString(id, *args)
     private fun money(value: GameMoney?) = value?.let { s(R.string.shop_money, NumberFormat.getIntegerInstance(Locale.KOREA).format(it.units)) } ?: s(R.string.shop_unknown)
@@ -72,7 +80,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             is ShopScreenState.Failure -> problem(s(R.string.shop_failure), state.message, true)
             is ShopScreenState.Unsupported -> problem(s(R.string.shop_unsupported), state.message, false)
             is ShopScreenState.Content -> {
-                addView(text(s(if (state.origin == ShopOrigin.FIXTURE) R.string.shop_fixture else R.string.shop_committed), 16, color = muted))
+                if (!short) addView(originLabel(state))
                 val area = if (wide) row() else column()
                 addView(area, LayoutParams(-1, 0, 1f))
                 if (wide) {
@@ -99,8 +107,24 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         }
         addView(scroll(content, 0), LayoutParams(-1, 0, 1f))
     }
+    private fun originLabel(content: ShopScreenState.Content) = style.text(
+        s(if (content.origin == ShopOrigin.FIXTURE) R.string.shop_fixture else R.string.shop_committed),
+        16, color = style.muted,
+    )
+
     private fun scene(c: ShopScreenState.Content, generation: Long) = with(style) {
         column().apply {
+            val openVehicle = onOpenVehicle?.takeIf { uiState.pending == null }?.let { open ->
+                { id: OwnedVehicleId ->
+                    if (sceneGeneration == generation && interaction.controlsEnabled && uiState.pending == null)
+                        open(id, c.revision)
+                }
+            }
+            val map = ShopSceneView(context, c, uiState.mode, townBackground, sprites, openVehicle)
+            if (short) {
+                addView(map)
+                addView(originLabel(c))
+            }
             addView(text(c.name, 30, bold = true))
             addView(text(s(R.string.shop_level, c.level?.toString() ?: s(R.string.shop_unknown)) + " · " +
                 s(R.string.shop_capacity, c.ownedCount?.toString() ?: s(R.string.shop_unknown), c.capacity?.toString() ?: s(R.string.shop_unknown)), 22))
@@ -115,13 +139,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             },
                 LayoutParams(0, -2, 1f).apply { if (mode == ShopMode.VEHICLES) marginStart = dp(8) })
             add(this, modes)
-            val openVehicle = onOpenVehicle?.takeIf { uiState.pending == null }?.let { open ->
-                { id: OwnedVehicleId ->
-                    if (sceneGeneration == generation && interaction.controlsEnabled && uiState.pending == null)
-                        open(id, c.revision)
-                }
-            }
-            add(this, ShopSceneView(context, c, uiState.mode, townBackground, sprites, openVehicle))
+            if (!short) add(this, map)
             addView(text(c.appearance.sign, 24, bold = true))
             addView(text(s(R.string.shop_scene_layout_note), 16, color = muted))
             val model = shopSceneModel(c)
@@ -190,6 +208,10 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                 val supplied = c.facilities.find { it.facility == facility }
                 if (supplied == null) add(this, card().apply { addView(text(title, 24, bold = true)); addView(text(s(R.string.shop_unknown))) })
                 else add(this, option(c, supplied.option, title))
+            }
+            facilityPanel?.let { panel ->
+                (panel.parent as? ViewGroup)?.removeView(panel)
+                add(this, panel)
             }
             add(this, text(s(R.string.shop_decorations), 28, bold = true))
             if (c.decorations.isEmpty()) add(this, text(s(R.string.shop_no_decorations)))
