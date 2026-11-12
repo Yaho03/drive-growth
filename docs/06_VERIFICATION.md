@@ -3060,3 +3060,21 @@ Pleos 에뮬레이터에서 별도 SIMULATION factory 대신 실제 Vehicle SDK 
 - 이 실행에서 무료 뽑기권은 한 장 지급됐지만 가챠 거래와 퀘스트 청구는 모두 0건이다. 그 두 기능을 사용한 연속 플레이 성공으로 확대하지 않는다.
 
 [원장 전후 대조](evidence/final-pixel-ui/play-5417/manual-ledger-diff.json) · [독립 전체 DB 대조](evidence/final-pixel-ui/play-5417/independent-db-diff.json) · [설치 해시](evidence/final-pixel-ui/play-5417/install-sha256.txt) · [탁송 수익](evidence/final-pixel-ui/play-5417/65-delivery-detail.png) · [기본 주행 수익](evidence/final-pixel-ui/play-5417/69-driving-detail.png) · [새 프로세스 원결과](evidence/final-pixel-ui/play-5417/57-cold-original.png) · [열람 후](evidence/final-pixel-ui/play-5417/73-viewed.png). 설치 APK SHA-256은 `60ab0bf8bcfadd08b8ff86163bba3677d7f23e26cb3a2f86fe29c6434a9e9a2f`다.
+
+
+### 같은 프로필의 무료권·구매 탁송·시설·퀘스트 연결
+
+시험 소스 `3bd7d92`에 별도 계측을 추가한 격리 Debug 앱에서 **1/1 통과(84.788초)**했다. 같은 SIMULATION 프로필·SQLite를 유지하며 제품 Main/View/Host의 표시·활성 버튼을 `performClick()`으로 실행했다. 중간에 아래 준비 거래가 있으므로 자연 플레이만으로 모든 해금을 달성한 시연이나 최종 #28 전체 완료로 해석하지 않는다.
+
+| 화면 동작 | 실제 원장 결과 |
+| --- | --- |
+| 첫 영업 선물의 무료권 사용 | 무료권 1→0, 잔액 1,480 유지, 취득액 0인 개체 지급 |
+| 구매 탁송 선택·확정·모의 도착 | 1,200 한 번 차감, 같은 요청의 도착 차량 지급, 도착 시 추가 금융 변경 없음 |
+| HOME 주유소 미리보기·확정 | FUEL_STATION 구매 한 건, 500 한 번 차감 |
+| 첫 지급 정산 열람 후 일간 퀘스트 | daily-result-viewed 청구 한 건, 100 한 번 입금, 최종 잔액 10,118·공용 대기 슬롯 0 |
+
+구매 탁송 전에 공개 원장 API로 시험 재화 10,000을 입금했다. 주유소 앞에서는 같은 API로 완료 대여 3건, Lv2·5칸 확장(500 차감), 준비 차량 2대를 만들어 보유 5대 조건을 마련했다. SQL 직접 삽입은 없지만 이 준비는 사용자의 화면 플레이가 아니다. 실제 SDK 입력·좌표 터치·새 PID·공식 창 시험은 별도 근거를 따른다.
+
+v1은 시연 시작 버튼 대기에서, v2는 시설 확인 버튼 대기에서 끝났다. v3는 HOME를 새로 조회하고 같은 UI 이벤트에서 현재 FUEL_STATION 선택·확인 가능 여부를 확인한 뒤 입력했다. 제품 코드는 바꾸지 않았고 실제 원장·단일 차감·슬롯 해제 단언을 유지했다. 실패 원문을 성공으로 덮지 않는다.
+
+[첫 실행](evidence/final-pixel-ui/continuation/device-continuation-local-economy/instrumentation.txt) · [두 번째 실행](evidence/final-pixel-ui/continuation/device-continuation-v2-local-economy/instrumentation.txt) · [최종 통과](evidence/final-pixel-ui/continuation/device-continuation-v3-local-economy/instrumentation.txt) · [소스·설치 해시](evidence/final-pixel-ui/continuation/device-continuation-v3-local-economy/result.json) · [단계 로그](evidence/final-pixel-ui/continuation/device-continuation-v3-local-economy/filtered.txt) · [독립 원장 대조](evidence/final-pixel-ui/continuation/independent-review.json). 계측 재현은 `3bd7d92` 사본에 [시험 소스](evidence/final-pixel-ui/continuation/LocalEconomyContinuationTest.kt.gz)를 압축 해제해 같은 상대 경로에 놓고 [격리 설정](evidence/final-pixel-ui/continuation/continuation-isolation.gradle.gz)을 사용한다. 원본 경로·해시는 독립 대조 기록에 있다. APK·회수 DB는 저장소에 넣지 않았다.
