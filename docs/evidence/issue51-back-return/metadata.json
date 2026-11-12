@@ -14,7 +14,8 @@
     "recent-task-lifecycle.txt": "2970c196b36848aba6dc3ff63a1b7733a4d9ca76e3e1498288e0565c9198aafc",
     "regression.txt": "9efb9e2c6f9a2b5aa3b4ac681b4e03e3c209145aac359b05de4481825c6c083a",
     "04-d-stop-back-return-trace.txt": "efd52954e38fe48850d84095a751f07382e7df8925c50f4ac8b2a4df12efd487",
-    "green-unit.xml": "02324791350c2400ebdc1ed5f214d86c3b9112760bd08aeff4011424a4cafaae",
-    "red-unit.xml": "9dd4a5697a6e75d54291ccd1a96c6e312b1ff94aaac6e48c6ee4ef2a3def16f3"
-  }
+    "green-unit.xml": "fea0c6784b691b3590aaa6fd91db66d8389e8b78c448f438882a6a2106cb36d2",
+    "red-unit.xml": "dda70fa4a9aec6b5c4f831e1d1deaa1639acdabec84610ff22d4fd7df4a4201a"
+  },
+  "redaction": "공개 XML의 hostname만 redacted로 치환했다. 원본은 격리 시험 폴더에 보존한다."
 }
