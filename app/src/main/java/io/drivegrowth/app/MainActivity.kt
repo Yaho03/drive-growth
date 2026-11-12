@@ -829,7 +829,7 @@ open class MainActivity : Activity() {
             details.addView(style.text("보관 기한 ${date.format(Instant.ofEpochMilli(held.deadline.value))} (한국시간)"))
         }
         if (heldVehicles.isNotEmpty())
-            details.addView(style.button("보관 차량 처리 조건 다시 확인") { session.delivery.refresh() })
+            details.addView(style.button("보관 차량 처리 조건 다시 확인", enabled = !session.delivery.isSavingDisplayedOffers) { session.delivery.refresh() })
         state?.receipt?.let { receipt ->
             val message = when (receipt) {
                 is DeliveryHostReceipt.Selected -> "의뢰 선택이 확정됐어요."
