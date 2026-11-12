@@ -101,18 +101,28 @@ Gradle의 `--version`에 표시되는 내장 Kotlin 2.0.20은 Gradle 자체 스�
 
 ### 별도 모의 시연 Debug APK
 
-JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌드한다. 산출물은 `app/build/outputs/apk/debug/app-debug.apk`, 패키지는 `io.drivegrowth.app.simulation`이다. 시연 원장 `unified-simulation.db`와 진행 기록은 이 패키지에 저장된다. Release는 기존 `io.drivegrowth.app` 패키지와 차량 입력을 사용한다.
+JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌드한다. 기본 Debug 산출물은 `app/build/outputs/apk/debug/app-debug.apk`, 패키지는 `io.drivegrowth.app.simulation`이다. 시연 원장 `unified-simulation.db`와 진행 기록은 이 패키지에 저장된다. Release는 `io.drivegrowth.app` 패키지와 차량 입력을 사용한다.
 
-1. 기기 담당과 실행 시간을 조율하고 `SERIAL`에 시험 장치 시리얼을 지정한다. 시연 APK를 설치한 뒤 런처의 **드라이브 키우기 · 모의 시연**을 연다.
+시연 화면의 **시연 · 모의 입력**과 **SIMULATION** 표시는 게임에 공급하는 모의 차량·내비 입력을 뜻한다. 시연 중 발생한 게임 기록은 시연 원장에만 남으며 차량을 조작하지 않는다. 이 절차는 고정 시연 목적지의 도착을 재현한다. 실제 SDK로 주행 후 목적지를 변경하는 경로는 현재 시연에서 지원하지 않는다.
+
+1. 기기 담당과 실행 시간을 조율하고 `SERIAL`에 시험 장치 시리얼을 지정한다. 시연 APK를 설치한 뒤 런처의 **드라이브 키우기 · 모의 시연**을 연다. 두 번째 명령으로도 같은 화면을 열 수 있다.
 
    ```sh
    adb -s "$SERIAL" install -r app/build/outputs/apk/debug/app-debug.apk
    adb -s "$SERIAL" shell am start -n io.drivegrowth.app.simulation/io.drivegrowth.app.simulation.UnifiedSimulationActivity
    ```
 
-2. 첫 실행이면 차량을 선택해 첫 지급을 확정하고 가게로 이동한다. 탁송에서 **시연 목적지 확인**을 누르고 수익 의뢰를 확정한 뒤 선택 결과를 확인한다.
-3. **모의주행 시작 · 논리 1시간**을 누른다. 모의 주차까지 진행한 뒤 탁송 결과와 정산 내역을 확인한다. 보류가 표시되면 **같은 모의 입력 재시도**를 사용한다.
-4. 재실행 확인이 필요하면 시연 Activity를 종료하고 다시 연다. `DriveGrowthSimulation`의 `simulation_input`과 `simulation_terminal_restored`를 같은 논리 시각으로 비교한다. 원래 탁송 결과와 확인 대기 상태도 확인한다. 각 시험의 범위는 [시연 검증 기록](06_VERIFICATION.md#통합-모의주행-debug-검증--2026-11-11)을 따른다.
+2. 첫 실행이면 **첫 차량 고르기**에서 차량을 선택한다. **선택 내용 확인** → **이 차량으로 시작**으로 첫 지급을 확정하고 **가게로**를 누른다.
+3. **탁송**에서 **시연 목적지 확인**을 누른다. **수익 탁송** 의뢰를 골라 **수익 탁송 선택 확정**을 누르고 선택 결과를 확인한다.
+4. **시연 · 모의 입력 ▸**을 펼쳐 **모의주행 시작**을 누른다. 모의 주행 1시간이 논리 시각으로 자동 진행된다. 주행 중에는 게임 조작이 제한되므로 모의 주차가 끝날 때까지 기다린다. **같은 모의 입력 다시 시도**가 표시되면 그 버튼을 누른다.
+5. 주차 후 **탁송**에서 완료 결과를, **미확인 정산**에서 수익 내역을 확인한다. **보유 차량**에서 첫 차량을, **가게**의 **시설**에서 각 시설의 상태와 해금 조건을 확인한다.
+6. 새 프로세스에서 저장 결과를 확인하려면 시연 패키지만 종료하고 1단계의 실행 명령으로 다시 연다. 앱 데이터를 유지한 채 탁송 결과의 확인 대기 여부와 정산 기록을 확인한다. 이미 열람한 정산은 **전체 기록**에서 확인할 수 있다.
+
+   ```sh
+   adb -s "$SERIAL" shell am force-stop io.drivegrowth.app.simulation
+   ```
+
+재실행 로그를 대조할 때는 `DriveGrowthSimulation`의 `simulation_input`과 `simulation_terminal_restored`를 같은 논리 시각으로 비교한다. 각 시험의 범위는 [시연 검증 기록](06_VERIFICATION.md#통합-모의주행-debug-검증--2026-11-11)을 따른다.
 
 ## 기존 설치 상태
 

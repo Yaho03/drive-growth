@@ -3032,3 +3032,20 @@ Pleos 에뮬레이터에서 별도 SIMULATION factory 대신 실제 Vehicle SDK 
 같은 후보에서 실제 Back 입력으로 온보딩→HOME→앱 본문 숨김을 확인했다. 명시적 Main 재진입은 같은 PID 23414로 복귀했다. 이 실행은 실제 런처 아이콘 반복 시작의 대체 근거가 아니다. [숨김 화면](evidence/final-pixel-ui/play-ce0335-back/05-top-hidden.png) · [복귀 화면](evidence/final-pixel-ui/play-ce0335-back/06-top-return.png) · [전 PID](evidence/final-pixel-ui/play-ce0335-back/pid-top-before.txt) · [후 PID](evidence/final-pixel-ui/play-ce0335-back/pid-top-after.txt)
 
 이 시험 묶음 종료 시 제품 APK·데이터 6개·권한·전역 화면 설정·차량 상태 등 보존 대조 19/19가 일치했다. 격리 패키지·계측·포워딩을 정리했다. 뒤이어 시행하는 최종 표시 패치·지원 창 시험은 별도 소스·장치 반환 기록을 남긴다. [보존 결과](evidence/final-pixel-ui/preservation-ce0335.json)
+
+
+### 가게 표시 정리·확장 경계·설치용 Debug 산출물
+
+최종 제품 소스 `0b43637880e4a46cde827da96b1c419a58853629`에서 가게 카드의 내부 정의/규칙 ID 두 곳만 일반 화면에서 제거했다. 가격·조건·시험값 안내와 명령 버전은 유지한다. 코어 **447개·앱 830개**는 실패·오류·생략 0이며 Debug 앱·계측 APK와 Lint(오류 0·경고 50)가 통과했다. [소스](evidence/final-pixel-ui/candidate-0b4363-source-id.txt) · [단위 결과](evidence/final-pixel-ui/candidate-0b4363-unit-summary.txt) · [Lint](evidence/final-pixel-ui/candidate-0b4363-lint-summary.txt)
+
+같은 제품 APK의 HOME 표시·세차장 조건·지도 우선 배치·현재 개체 선택 계측 **4/4**가 통과했다. 실제 앱 task를 420×380px와 300×438px로 바꿔 지도·확장 비용 500·조건·시험값 안내를 확인했다. 이는 공식 FormFactorConsole 프리셋 또는 시스템 분할/회전의 전체 검증이 아니다. [계측](evidence/final-pixel-ui/device-0b4363-shop/instrumentation.txt) · [설치 해시](evidence/final-pixel-ui/device-0b4363-shop/result.json) · [기본 창](evidence/final-pixel-ui/play-home-polish-v2/04-home-default.png) · [좁은 창](evidence/final-pixel-ui/play-home-polish-v2/08-narrow-home-scrolled.png) · [세로 비율 창](evidence/final-pixel-ui/play-home-polish-v2/11-portrait-home.png)
+
+시험 소스 `3bd7d925c1133fd5a45ecf3cc5ee8d72faabbdfb`는 위 제품 코드에 **시험 파일 2개만** 보완했다. 확장 mapper 5/5와 실제 SQLite 계측 2/2가 통과했다. 정의 버전 변경 시험은 현재 패키징 버전을 읽어 실제로 다른 값으로 만들고 규칙·제안·화면은 동일함을 확인한 뒤 `STATE_CONFLICT`와 원장·대기 슬롯 무변경을 단언한다. 세 확장 단계의 고객·잔액·공간 직전/정확/초과를 비교하며, 실제 완료 대여 4·11·26건의 확정 뒤 동일 요청 재실행은 원정산을 반환하고 추가 차감하지 않았다. [단위 원본](evidence/final-pixel-ui/candidate-3bd7d92-mapper-results.xml) · [SQLite 2개](evidence/final-pixel-ui/device-3bd7d92-expansion/instrumentation.txt) · [소스·APK](evidence/final-pixel-ui/device-3bd7d92-expansion/result.json)
+
+제품 설치 APK는 두 소스에서 동일한 `ef338238e45ece44a54a07decd3331092f9f88dab5f38bfeacc1d664f6bd4b03`이다. HOME 시험 APK는 `b0bcb2e0f1b8c879d5444cc963d5d216995d27fe8dd4c85f92257f92b9fbae91`, 확장 추가 시험 APK는 `422d611eaefa51874cfa14817ea9897c0504ba49107717a2fa2911b0a19cf246`이다. 새 단위 하나의 추가를 앱 전체 831개 재실행으로 기록하지 않는다.
+
+앞선 `ce03352` 격리 모의 앱의 실제 AppGrid 아이콘 두 번 터치에서 `UnifiedSimulationActivity`가 실행됐고 최상위 Back 뒤 같은 PID 12719·task 1005032·ActivityRecord로 복귀했다. 해당 시험의 설치 APK는 `49526499…`이며 최신 APK에서 아이콘 시험을 반복했다고 표시하지 않는다. 이후 제품 변경은 위 가게 표시 문구뿐이고 런처·수명주기 코드는 같다. [아이콘 시험 결과](evidence/final-pixel-ui/play-launcher-grid-v2/result.txt) · [첫 실행](evidence/final-pixel-ui/play-launcher-grid-v2/01-launched.png) · [Back 숨김](evidence/final-pixel-ui/play-launcher-grid-v2/01-top-back.png) · [아이콘 복귀](evidence/final-pixel-ui/play-launcher-grid-v2/02-launched.png) · [설치 APK](evidence/final-pixel-ui/play-launcher-grid-v2/install-sha256.txt)
+
+사용자 설치용 표준 Debug APK도 `3bd7d92`에서 빌드했다. 패키지 `io.drivegrowth.app.simulation`, 버전 `0.1.0`/1, 런처 `UnifiedSimulationActivity`, SHA-256 `6a41e671741781d706025138bf07f964f141210138f162249c39c18f834eb745`이다. 장치에서 실행한 격리 패키지와 DEX·assets는 동일하며 Manifest와 resources의 패키지 차이가 있다. 표준 APK 자체의 설치는 이 실행에서 하지 않았고 Release/실차 검증으로 표시하지 않는다. [산출물 대조](evidence/final-pixel-ui/standard-debug-artifact-comparison.json)
+
+이 묶음의 장치 반환에서 제품 APK·기존 데이터 6개·권한·화면 설정·차량 P·전면 지도 등 **19/19**가 일치했다. [반환 결과](evidence/final-pixel-ui/final-device-return-preservation.json). 같은 프로필의 무료권→구매 탁송→시설 확정→퀘스트 청구 연속 실행, 공식 창 프리셋·시스템 분할·회전과 실제 SDK 변경 성공은 이 결과에 포함되지 않는다. 실제 SDK 변경은 현재 미지원 경로이며, 나머지 실행 가능한 통합 검증은 #28에서 이어간다.

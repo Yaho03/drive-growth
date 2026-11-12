@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.drivegrowth.app.host.shop.ShopExpansionMapperTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-12T20:26:45" hostname="choehwanseog-ui-MacBookPro-1136.local" time="0.049">
+  <properties/>
+  <testcase name="expansionEffectUsesGameCopyAndKeepsDefinitionAndRuleVersions" classname="io.drivegrowth.app.host.shop.ShopExpansionMapperTest" time="0.042"/>
+  <testcase name="wholeExpandCommandKeepsSourceAndReservationBoundary" classname="io.drivegrowth.app.host.shop.ShopExpansionMapperTest" time="0.003"/>
+  <testcase name="allExpansionOffersCheckCustomerBalanceAndCapacityBoundaries" classname="io.drivegrowth.app.host.shop.ShopExpansionMapperTest" time="0.003"/>
+  <testcase name="visitsDoNotReplaceCompletedCountAndInsufficientMoneyStaysLocked" classname="io.drivegrowth.app.host.shop.ShopExpansionMapperTest" time="0.001"/>
+  <testcase name="unknownCapacityAndUnsupportedFacilitiesAndDecorationsCannotSubmit" classname="io.drivegrowth.app.host.shop.ShopExpansionMapperTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

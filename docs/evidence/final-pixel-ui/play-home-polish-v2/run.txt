@@ -1,0 +1,1 @@
+{'pid': '7233', 'task': '1005034', 'narrowPx': [420, 380], 'expectedCostShown': True, 'technicalIdsAbsent': True}
