@@ -129,6 +129,7 @@ open class MainActivity : Activity() {
     private lateinit var body: FrameLayout
     private lateinit var chrome: LinearLayout
     private var active = false
+    private val backObservation = BackObservationBoundary()
     private lateinit var panel: LinearLayout
     private val watchdog = object : Runnable {
         override fun run() {
@@ -310,13 +311,14 @@ open class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        backObservation.resumed()
         startObserving()
     }
 
     @android.annotation.TargetApi(29)
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
         super.onTopResumedActivityChanged(isTopResumedActivity)
-        if (isTopResumedActivity) startObserving()
+        if (backObservation.topResumedChanged(isTopResumedActivity)) startObserving()
     }
 
     private fun startObserving() {
@@ -1051,6 +1053,7 @@ open class MainActivity : Activity() {
             if (!navigation.back()) { updateAccess(); render(); return }
         }
         // 다중 창에서 Task를 뒤로 보내도 RESUMED·표시가 유지되는 경우를 함께 처리한다.
+        backObservation.sentToBack()
         stopObserving()
         setVisible(false)
         rentalAppExit.clear()
