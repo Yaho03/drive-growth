@@ -209,7 +209,8 @@ open class MainActivity : Activity() {
                 session.deliveryUi = delivery.saveUiState()
                 session.delivery.onRequest(request)
             }
-        }, session.deliveryUi, navigationControls = ::deliveryNavigationControls, hostStatus = ::deliveryHostStatus)
+        }, session.deliveryUi, navigationControls = ::deliveryNavigationControls, hostStatus = ::deliveryHostStatus,
+            canConfirmOffer = { !session.delivery.isSavingDisplayedOffers })
         gacha = GachaView(this, ::onGachaEvent, session.gacha.uiState)
         results.restoreUiState(session.results.uiState)
         queries = session.queries
