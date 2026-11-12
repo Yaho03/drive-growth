@@ -1,0 +1,3 @@
+03-p-back: pid=18321 handler=True moveTaskToBack=False observationWhileHidden=0 observationAfterLaunch=0 signalRestored=False PASS
+04-d-stop-back: pid=18321 handler=True moveTaskToBack=True observationWhileHidden=0 observationAfterLaunch=1 signalRestored=True PASS
+05-d-moving-back: pid=18321 handler=True moveTaskToBack=True observationWhileHidden=0 observationAfterLaunch=1 signalRestored=True PASS
