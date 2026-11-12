@@ -9,7 +9,8 @@ import io.drivegrowth.core.garage.CollectionState
 
 /** 차종 × 희귀도 기록을 스크롤로 표시한다. 보유 이력과 해금은 서로 독립된 입력이다. */
 class CollectionView(context: Context, private val onRetry: () -> Unit) : LinearLayout(context) {
-    private val style = GarageStyle(context)
+    private val style = GarageStyle(context, pixelPanel = true)
+    private val artwork = VehicleArtwork(context, style)
     private var state: CollectionScreenState = CollectionScreenState.Loading
     private var enabled = false
     private var retryPending = false
@@ -80,13 +81,15 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
 
     private fun entryCard(value: CollectionPresentation) = with(style) {
         card().apply {
-            addView(text(rarity(value.entry.key.rarity), 24, rarityColor(value.entry.key.rarity), true))
+            val key = value.entry.key
+            addView(text(rarity(key.rarity), 20, rarityColor(key.rarity), bold = true))
+            addView(artwork.view(key.vehicleId, key.rarity, 76, value.entry.state), LayoutParams(-1, dp(76)))
             addView(text(s(when (value.entry.state) {
                 CollectionState.UNDISCOVERED -> R.string.garage_undiscovered
                 CollectionState.DISCOVERED -> R.string.garage_discovered
                 CollectionState.OWNED -> R.string.garage_ever_owned
-            }), 24, bold = true))
-            addView(text(value.unlockLabel ?: s(R.string.garage_unlock_missing), color = muted))
+            }), 20, bold = true))
+            addView(text(value.unlockLabel ?: s(R.string.garage_unlock_missing), 16, muted))
         }
     }
 }
