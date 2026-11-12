@@ -4,6 +4,7 @@ import android.content.pm.PackageManager
 import android.os.Process
 import android.os.SystemClock
 import android.test.ActivityInstrumentationTestCase2
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -11,16 +12,25 @@ import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.R
+import io.drivegrowth.app.data.AssetTrialDefinitionProvider
+import io.drivegrowth.app.data.DeliveryCheckpointOperation
+import io.drivegrowth.app.data.HostCheckpointCommand
+import io.drivegrowth.app.data.HostCheckpointPhase
+import io.drivegrowth.app.data.HostCommandCheckpoint
 import io.drivegrowth.app.host.GameSession
 import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.host.HostSession
 import io.drivegrowth.app.ui.delivery.DeliveryScreen
 import io.drivegrowth.app.ui.garage.GarageStyle
+import io.drivegrowth.app.vehicle.ForegroundInteraction
+import io.drivegrowth.app.vehicle.TRIAL_INTERACTION_POLICY
 import io.drivegrowth.app.vehicle.navigation.NavigationConnection
 import io.drivegrowth.app.vehicle.navigation.NavigationField
 import io.drivegrowth.app.vehicle.navigation.NavigationSource
+import io.drivegrowth.core.Gear
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.delivery.DeliveryOffer
+import io.drivegrowth.core.driving.VehicleInteractionGate
 import io.drivegrowth.core.garage.CollectionKey
 import org.json.JSONArray
 import org.json.JSONObject
@@ -112,6 +122,117 @@ class Issue37NativeMainPurchaseTest :
         record("change_rejected", "pid" to Process.myPid(), "sdkRoute" to sdk.route,
             "generation" to sdk.generation, "sdkMeters" to sdk.meters, "request" to fixture.request,
             "appRoute" to fixture.appRoute, "ledgerSha256" to fixture.ledgerSha256, "arrival" to "Missing")
+    }
+
+    /** 별도 실행자가 Pleos의 차량 제어로 정지 D와 P를 전환한다. SDK·gate를 주입하지 않는다. */
+    fun testActualDriveParkHidesDeliveryReviewAndPreservesSavedRequest() {
+        val fixture = coldFixture()
+        openOriginalActive(fixture)
+        awaitSdkQuote { it.route == fixture.sdkRoute }
+        awaitUi("P에서 포기 검토 열기") { button("delivery:review-abandon")?.performClick() == true }
+        awaitUi("P의 원의뢰와 검토 버튼") {
+            val review = session.delivery.state?.screen as? DeliveryScreen.AbandonReview ?: return@awaitUi false
+            review.delivery.active.requestId.value == fixture.request && button("delivery:abandon") != null
+        }
+        val prior = ledger(includeObservationBinding = false)
+        requestVehicleGate("REQUEST_DRIVE_STATIONARY review", Gear.DRIVE) { deliveryRestricted() }
+        assertEquals(prior, ledger(includeObservationBinding = false))
+
+        requestVehicleGate("REQUEST_PARK review", Gear.PARK) {
+            val current = session.delivery.state?.screen as? DeliveryScreen.Active ?: return@requestVehicleGate false
+            current.delivery.active.requestId.value == fixture.request && button("delivery:review-abandon") != null
+        }
+        assertOriginalPurchase(fixture)
+
+        requestVehicleGate("REQUEST_DRIVE_STATIONARY pending", Gear.DRIVE) { deliveryRestricted() }
+        // 실제 D 제한을 확인한 뒤 미실행 원명령의 저장 경계만 fixture로 준비한다.
+        val request = RequestId(fixture.request)
+        val pending = read { game ->
+            val rule = ok(ok(AssetTrialDefinitionProvider(context.assets).load()).deliveryChangeRules())
+            val command = HostCheckpointCommand.Delivery(ok(game.content).catalog.contentVersion,
+                game.identity.source, DeliveryCheckpointOperation.Abandon(rule, request))
+            ok(game.store.hostCommands.save(game.identity.profileId, command))
+            HostCommandCheckpoint(game.identity.profileId, command, HostCheckpointPhase.SAVED)
+        }
+        instrumentation.runOnMainSync { assertTrue(deliveryRestricted()) }
+        assertEquals(pending, read { ok(it.store.hostCommands.load(pending.profileId)) })
+        assertEquals(prior - "host_command_checkpoint", ledger(includeObservationBinding = false) - "host_command_checkpoint")
+
+        requestVehicleGate("REQUEST_PARK pending", Gear.PARK) {
+            val saved = labelledButton("보관한 탁송 요청 확인")
+            if (saved != null) saved.performClick()
+            button("delivery:acknowledge") != null && "의뢰 포기가 확정됐어요." in labels()
+        }
+        val after = read { game ->
+            assertEquals(pending.copy(phase = HostCheckpointPhase.STARTED), ok(game.store.hostCommands.load(pending.profileId)))
+            val rows = ok(game.store.listUnviewedSettlements()).filter { it.transaction.kind == TransactionKind.DELIVERY }
+            val refund = rows.single { it.transaction.requestId == RequestId("delivery/${request.value}/settle") }
+            assertEquals(2, rows.size)
+            assertEquals(MoneyChange(MoneyDirection.CREDIT, GameMoney(fixture.price - fixture.price / 10)), refund.transaction.money)
+            assertNull(refund.changedVehicle)
+            assertEquals(1, ok(game.store.listOwnedVehicles()).size)
+            assertNull(ok(game.store.delivery.inProgress()))
+            rows
+        }
+        awaitUi("원결과 확인") { button("delivery:acknowledge")?.performClick() == true }
+        await("확인 뒤 동일 원명령 슬롯 해제") {
+            read { ok(it.store.hostCommands.load(pending.profileId)) == null }
+        }
+        assertEquals(after, read { game -> ok(game.store.listUnviewedSettlements()).filter {
+            it.transaction.kind == TransactionKind.DELIVERY
+        } })
+        record("dp_review_and_saved_request", "pid" to Process.myPid(), "request" to request.value)
+    }
+
+    private fun deliveryRestricted(): Boolean {
+        val root = activity.window.decorView
+        return root.findViewWithTag<Spinner>("host:destination") == null &&
+            views(root).none { it.isShown && it is io.drivegrowth.app.ui.delivery.DeliveryView } &&
+            listOf("delivery:abandon", "delivery:change", "delivery:acknowledge").all {
+                root.findViewWithTag<View>(it)?.isShown != true
+            } && "보관한 탁송 요청 확인" !in labels() &&
+            "주차 후 조작이 허용되면 이용할 수 있습니다." in labels()
+    }
+
+    // Main에 전달된 실제 관측을 읽기만 한다. 새 SDK 연결이나 gate 입력을 만들지 않는다.
+    private val vehicleGate: VehicleInteractionGate by lazy {
+        val interaction = MainActivity::class.java.getDeclaredField("interaction").apply { isAccessible = true }
+            .get(activity) as ForegroundInteraction
+        ForegroundInteraction::class.java.getDeclaredField("gate").apply { isAccessible = true }
+            .get(interaction) as VehicleInteractionGate
+    }
+    private val latestVehicleObservation by lazy {
+        VehicleInteractionGate::class.java.getDeclaredField("latest").apply { isAccessible = true }
+    }
+
+    private fun requestVehicleGate(request: String, gear: Gear, ready: () -> Boolean) {
+        val pid = Process.myPid()
+        val restricted = gear == Gear.DRIVE
+        val expectedGate = if (restricted) VehicleInteraction.RESTRICTED else VehicleInteraction.ALLOWED
+        var markerElapsed = -1L
+        instrumentation.runOnMainSync {
+            Log.i("DeliveryGate53", "$request pid=$pid")
+            markerElapsed = SystemClock.elapsedRealtime()
+        }
+        await(request, timeoutMs = 60_000) {
+            var matched = false
+            instrumentation.runOnMainSync {
+                val sample = latestVehicleObservation.get(vehicleGate) as? VehicleObservation ?: return@runOnMainSync
+                val now = SystemClock.elapsedRealtime()
+                val speed = (sample.speedMps as? Observation.Available)?.value ?: return@runOnMainSync
+                if (sample.source != InputSource.VEHICLE || sample.receivedElapsedMs <= markerElapsed ||
+                    now - sample.receivedElapsedMs !in 0L..TRIAL_INTERACTION_POLICY.maxSignalAgeMs ||
+                    abs(speed) != 0.0 || sample.gear != Observation.Available(gear) ||
+                    sample.uxRestricted != Observation.Available(restricted) ||
+                    vehicleGate.state(now) != Observation.Available(expectedGate) || !ready()) return@runOnMainSync
+                assertEquals(pid, Process.myPid())
+                record("dp_sdk_sample", "marker" to request, "pid" to pid, "markerElapsedMs" to markerElapsed,
+                    "sampleElapsedMs" to sample.receivedElapsedMs, "source" to sample.source,
+                    "gear" to gear, "speedMps" to speed, "uxRestricted" to restricted, "gate" to expectedGate)
+                matched = true
+            }
+            matched
+        }
     }
 
     private data class ColdFixture(
@@ -425,8 +546,8 @@ class Issue37NativeMainPurchaseTest :
         return requireNotNull(requireNotNull(value).getOrThrow())
     }
 
-    private fun await(label: String, condition: () -> Boolean) {
-        val deadline = SystemClock.elapsedRealtime() + 30_000
+    private fun await(label: String, timeoutMs: Long = 30_000, condition: () -> Boolean) {
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs
         while (SystemClock.elapsedRealtime() < deadline) {
             if (condition()) return
             SystemClock.sleep(40)
