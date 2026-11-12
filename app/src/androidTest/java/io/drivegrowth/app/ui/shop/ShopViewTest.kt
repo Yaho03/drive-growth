@@ -246,6 +246,35 @@ class ShopViewTest : InstrumentationTestCase() {
     }
 
 
+    fun testHomeMapAndVehicleAreVisibleBeforeSummaryWithoutScrolling() {
+        val state = ShopPreviewStates.normal()
+        val id = state.vehicles.first().id
+        for ((width, height) in listOf(480 to 340, 480 to 360, 936 to 416)) {
+            val view = onUi {
+                ShopView(instrumentation.targetContext) {}.apply {
+                    onOpenVehicle = { _, _ -> }
+                    render(state, true)
+                }
+            }
+            layout(view, width, height)
+            onUi { view.render(state, true) }
+            layout(view, width, height)
+            onUi {
+                val scene = view.findViewWithTag<ShopSceneView>("shop:scene")
+                val vehicle = scene.findViewWithTag<View>("shop:map-vehicle:${id.value}")
+                fun bounds(child: View) = Rect(0, 0, child.width, child.height).apply {
+                    view.offsetDescendantRectToMyCoords(child, this)
+                }
+                val description = "${width}×${height}dp"
+                val mapBounds = bounds(scene)
+                assertEquals(description, view.paddingTop, mapBounds.top)
+                assertTrue(description, mapBounds.bottom <= view.height - view.paddingBottom)
+                assertTrue(description, mapBounds.contains(bounds(vehicle)))
+                assertTrue(description, mapBounds.bottom <= bounds(button(view, "shop:mode:VEHICLES")).top)
+            }
+        }
+    }
+
     fun testSceneUsesAppWidthAndKeepsUnknownFactsInNarrowAndWideWindows() {
         val state = ShopPreviewStates.normal().copy(name = "긴 가게 이름과 확인해야 할 간판 문구", capacity = 6)
         val view = onUi { ShopView(instrumentation.targetContext) {}.apply { render(state,true) } }

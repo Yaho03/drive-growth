@@ -29,7 +29,6 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     internal var facilityPanel: View? = null
     internal var onOpenVehicle: ((OwnedVehicleId, Revision) -> Unit)? = null
     private var wide = false
-    private var short = false
     private var sceneScroll: ScrollView? = null
     private var controlsScroll: ScrollView? = null
     private var sceneY = 0
@@ -54,10 +53,8 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         val nextWide = w >= style.dp(840)
-        val nextShort = h in 1 until style.dp(360)
-        if (nextWide != wide || nextShort != short) {
+        if (nextWide != wide) {
             wide = nextWide
-            short = nextShort
             post { drawScreen() }
         }
     }
@@ -84,7 +81,6 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             is ShopScreenState.Failure -> problem(s(R.string.shop_failure), state.message, true)
             is ShopScreenState.Unsupported -> problem(s(R.string.shop_unsupported), state.message, false)
             is ShopScreenState.Content -> {
-                if (!short) addView(originLabel(state))
                 val area = if (wide) row() else column()
                 addView(area, LayoutParams(-1, 0, 1f))
                 if (wide) {
@@ -125,11 +121,8 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                         open(id, c.revision)
                 }
             }
-            val map = ShopSceneView(context, c, uiState.mode, townBackground, sprites, openVehicle)
-            if (short) {
-                addView(map)
-                addView(originLabel(c))
-            }
+            addView(ShopSceneView(context, c, uiState.mode, townBackground, sprites, openVehicle))
+            addView(originLabel(c))
             addView(text(c.name, 30, bold = true))
             addView(text(s(R.string.shop_level, c.level?.toString() ?: s(R.string.shop_unknown)) + " · " +
                 s(R.string.shop_capacity, c.ownedCount?.toString() ?: s(R.string.shop_unknown), c.capacity?.toString() ?: s(R.string.shop_unknown)), 22))
@@ -144,7 +137,6 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             },
                 LayoutParams(0, -2, 1f).apply { if (mode == ShopMode.VEHICLES) marginStart = dp(8) })
             add(this, modes)
-            if (!short) add(this, map)
             addView(text(c.appearance.sign, 24, bold = true))
             addView(text(s(R.string.shop_scene_layout_note), 16, color = muted))
             val model = shopSceneModel(c)
