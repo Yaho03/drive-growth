@@ -1,8 +1,11 @@
 package io.drivegrowth.app.ui.progress
 
 import android.os.SystemClock
+import android.view.ViewGroup
 import android.test.ActivityInstrumentationTestCase2
 import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.TextView
 import android.widget.ScrollView
 import java.util.concurrent.FutureTask
 
@@ -86,6 +89,52 @@ class ProgressScrollDeviceTest :
         waitForLayout(view)
         assertNull(onUi { view.uiState.selectedKey })
         assertEquals("상세를 닫은 뒤 목록 위치", position, scrollY(view))
+    }
+
+    fun testSameDetailOffsetAcrossRestrictionDetachLoadingAndFreshContent() {
+        val host = activity
+        val view = host.progress
+        val key = content.entries[3].key
+        val frame = onUi {
+            (view.parent as ViewGroup).removeView(view)
+            FrameLayout(host).apply {
+                host.setContentView(this)
+                val height = (208 * resources.displayMetrics.density).toInt()
+                addView(view, FrameLayout.LayoutParams(-1, height))
+            }
+        }
+        waitForLayout(view)
+        assertTrue(onUi { view.findViewWithTag<Button>(key).performClick() })
+        waitForLayout(view)
+        val detailParams = onUi { view.layoutParams }
+        val old = onUi {
+            requireNotNull(scroll(view)).apply { scrollTo(0, 160) }.scrollY
+        }
+        assertTrue("the selected detail has to be scrolled before the gate changes", old > 0)
+
+        onUi {
+            assertTrue(view.render(ProgressScreenState.Loading, false))
+            frame.removeView(view)
+            frame.addView(TextView(host))
+        }
+        instrumentation.waitForIdleSync()
+        assertFalse(onUi { view.isAttachedToWindow })
+        assertEquals(key, onUi { view.uiState.selectedKey })
+
+        onUi {
+            assertTrue(view.render(ProgressScreenState.Loading, true))
+            frame.removeAllViews()
+            frame.addView(view, detailParams)
+        }
+        waitForLayout(view)
+        assertEquals(0, scrollY(view))
+        onUi {
+            view.completeRetry()
+            assertTrue(view.render(content.copy(sequence = content.sequence + 1), true))
+        }
+        waitForLayout(view)
+        assertEquals(key, onUi { view.uiState.selectedKey })
+        assertEquals("reattaching the same detail and replacing Loading must preserve its offset", old, scrollY(view))
     }
 
     fun testUnlaidContentReplacementKeepsLastLaidOutPosition() {
