@@ -2320,7 +2320,7 @@ JDK 17·SDK 35에서 수정 제품의 core 단위 447개·app 단위 814개, lin
 
 첫 APK 쌍에서는 두 selector가 첫 지급 후 가게에서 휴식 시작 버튼 대기 단언에 실패했다. 저장된 첫 지급 1건과 휴식 원장 0건을 확인했고 crash 버퍼는 비어 있었다. 실제 Main에서 탁송 페이지 선택 후 휴식 버튼을 여는 순서와 장소별 독립 설치를 적용해 계측 APK를 재빌드했다. 앱 APK 바이트는 같았다. 앞선 E 반환의 보호 17/19는 부팅 횟수 25→26과 OEM Activity 인스턴스 변경을 포함한다. F는 그 반환 상태에서 부팅 완료·CarService 응답을 확인한 뒤 새 기준을 잡았고, 02:58:27 KST 반환 시 부팅 횟수 26과 보호 19/19가 일치했다.
 
-실제 SDK 장소·시각 권위, 실차와 음성은 미검증이다. 게시 소스에는 실행한 전용 계측 원본을 일반 Android 계측 소스셋 밖에 보존했다. [실행·설치 해시·회수 원장 대조](evidence/issue40-rest-main/metadata.json) · [실행 및 실패 로그](evidence/issue40-rest-main/run-excerpts.txt) · [격리 재현 절차](evidence/issue40-rest-main/selectors/README.md)
+기존 카드에서 저장 잔여와 모의 출처를 확인했다. 장소 확인 불가인 개별 시도에 대한 별도 안내는 이번 계측 범위에 포함되지 않았다. 실제 SDK 장소·시각 권위, 실차와 음성은 미검증이다. 게시 소스에는 실행한 전용 계측 원본을 일반 Android 계측 소스셋 밖에 보존했다. [실행·설치 해시·회수 원장 대조](evidence/issue40-rest-main/metadata.json) · [실행 및 실패 로그](evidence/issue40-rest-main/run-excerpts.txt) · [격리 재현 절차](evidence/issue40-rest-main/selectors/README.md)
 
 
 #### 좁은 Main 진행 화면의 휴식 카드
