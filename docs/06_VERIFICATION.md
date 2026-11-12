@@ -2534,6 +2534,21 @@ Temurin JDK 17과 Kotlin 2.2.21의 캐시된 CLI 컴파일러로 수정 전·후
 게시 준비는 #231 머지 `e1f3961a071a258bc225478b90f4f8272c127db8` 기준이다. 두 #54 파일은 실행 사본과 바이트가 같다. #231이 Main 이탈과 대여 상세·저장을 변경했으므로 이 기준의 APK 빌드·장치 결과는 아직 없다. 첫 지급 정산에서 확인한 공통 열람 회귀와 대여 상세 D/P, 수익 출처별 표시, 저장 중 종료·선택 복원은 각각 확인 범위가 다르다.
 
 
+### #54 확정 정산 원결과와 열람 저장 경계
+
+2026-11-13 KST, 제품 기준 `53db64fa0ac63da108faa323c9ed33cfa99135a0`(#234)과 계측 2파일을 적용한 트리 `02b6f1ae7038e9e9c3f2cc69744486130f2ccd14`를 Pleos API 34 ARM64, emulator-5556, 사용자 10의 격리 Debug 앱에서 실행했다. 패치 SHA-256 `387f9e5facf8d3e9b97571a3a6617b29e9b9039bd00ede29ebb4f6d0bf1c9a5d`. 앱 SHA-256 `a1914db8d1445567d7fdc8d726a76c746a4eb9d7e766770415fbdf6cc052690d`, 계측 APK `89a41e294d5ae4cbe1fc271bc7b9ef3b32821beb0f486428db913f7d852703a5`. 각 설치본을 회수해 동일 SHA-256을 확인했다.
+
+- 원본 준비 1/1 통과. #204 실제 Debug 시연에서 회수한 SIMULATION DB의 과거 원주행·수익 탁송·대여 정산과 당시 잔액을 보존했다. 제품 저장 API를 통해 별도 대여 +173·정산 후 잔액 1,893, 시설 확장 −500·정산 후 잔액 1,393을 확정했다. DB는 schema18 원본을 schema20으로 재개방했다.
+- 실제 Main 1/1 통과. 주행 +360, 탁송 +120, 시설 확장 −500, 대여 +173의 원 ID·금액·출처와 정산 당시 잔액을 확인했다. 대여 상세는 정상 1시간 59분·감액 3시간·상한 제외 1시간·미관측 제외 1분과 모의 사고를 표시했다. 실제 SDK D 정차에서 상세가 숨고, Activity 재생성 뒤 새 D/UX 제한 관측을 확인했다. P에서 새 허용을 받은 뒤 추가 선택 없이 같은 대여 상세와 전체 기록 필터가 돌아왔다. 비교한 SQLite 11개 표는 그대로였다.
+- 격리 계측에서 실제 ResultsHostController.markViewed와 SQLite store.markViewed를 호출해 열람 커밋 전후의 종료 지점을 동일 준비 DB의 독립 사본에 재현했다. 열람 저장 요청은 Main 터치로 시작하지 않았다. COMMIT 전에는 viewed=0·RESULT_VIEWED 0건, COMMIT 후 응답 전에는 viewed=1·해당 RESULT_VIEWED 1건이다. 원정산·금융 행을 보존했다. 각 시험의 runner 종료는 표식과 일치하는 격리 앱 강제 종료였다.
+- 각 종료 뒤 명시 MAIN/LAUNCHER Intent로 시작한 새 PID에서 실제 Main으로 같은 원정산을 조회했다. 커밋 전 30881→31382에서 열람 확인 버튼 활성 및 재조회 뒤 원장 보존을 확인했다. 커밋 후 29947→30315에서 미확인 목록 제외, 전체 목록의 같은 원 ID, 상세의 저장 완료 문구와 열람 확인 버튼 비활성을 화면 계층으로 확인했다. 첫 커밋 후 화면 확인은 스크롤 좌표 문제, 다음 확인은 비활성 버튼도 존재하는 UI를 숨김으로 가정한 스크립트 단언에서 중단했다. 보존한 UI XML에서 enabled=false를 직접 확인했다. 커밋 후 UI 재조회 뒤의 SQLite는 추가 회수하지 못했다. 실제 아이콘과 Android가 이전 task/Bundle을 복원하는 경로는 미수행이다.
+- 첫 Main 실행에서는 재생성 직후 아직 새 D 표본이 없을 때 호스트 스크립트가 즉시 중단했다. 같은 APK에서 새 관측을 기다린 뒤 통과했다. 첫 Lint 중에는 Temurin 17 ARM64 C1 내부 오류가 발생했다. JVM의 OSR만 끄고 앱·계측 조립과 Lint를 다시 확인했다. Lint 0오류·39경고, 저장소 필수21/문서29/로컬링크553 및 staged diff 검사 통과.
+
+실제 SDK는 조작 제한에, SIMULATION 원장은 정산 근거에 사용했다. 과거 원정산은 #204 회수본에서 조회했다. 게시 기준 `b2a0fc3f3be7912528686df3bee67979d46ae9ee`에는 [격리 전용 selector 원본](evidence/issue54-results-ui/stored-results/selectors/README.md)을 바이트 그대로 보존했다. 일반 Android 계측 소스셋에서 제외했으며 게시 기준의 새 장치 실행은 미수행이다.
+[시험 식별·종료 및 SQLite 근거](evidence/issue54-results-ui/stored-results/metadata.json) · [실행·실패 로그 발췌](evidence/issue54-results-ui/stored-results/run-excerpts.txt) · [D 재생성](evidence/issue54-results-ui/stored-results/drive-recreated.png) · [P 복원](evidence/issue54-results-ui/stored-results/park-restored.png) · [커밋 전 재실행](evidence/issue54-results-ui/stored-results/before-commit-reopened.png) · [커밋 후 UI 계층 발췌](evidence/issue54-results-ui/stored-results/after-commit-ui-excerpt.json)
+
+01:33:42 KST에 장치를 반환했다. 보호 항목 19/19, 기존 APK·데이터, 창·권한·차량 설정과 포워드, 계측/격리 프로세스 종료를 확인했다.
+
 ## 탁송 발견 저장과 도감 갱신 — 2026-11-11
 
 후보 표시 확인 뒤 저장 성공 시 같은 세션 도감 조회를 갱신한다. 일시 저장 실패 뒤에는 원 표시를 다시 제출한다. 원 표시가 무효면 실패 화면에서 새 후보 조회로 진행할 수 있다. 확정 결과 확인과 미실행 요청 취소의 저장 결과는 발견 저장과 독립적으로 처리한다. 기존 #116 발견 API와 #181 탁송 호스트를 사용한다.

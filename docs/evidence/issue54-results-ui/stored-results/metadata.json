@@ -1,0 +1,195 @@
+{
+  "executionBase": "53db64fa0ac63da108faa323c9ed33cfa99135a0",
+  "executionTree": "02b6f1ae7038e9e9c3f2cc69744486130f2ccd14",
+  "executionPatchSha256": "387f9e5facf8d3e9b97571a3a6617b29e9b9039bd00ede29ebb4f6d0bf1c9a5d",
+  "publicationBase": "b2a0fc3f3be7912528686df3bee67979d46ae9ee",
+  "publicationBaseDeviceRun": false,
+  "apks": {
+    "app": {
+      "package": "io.drivegrowth.verify.results54originalf",
+      "sha256": "a1914db8d1445567d7fdc8d726a76c746a4eb9d7e766770415fbdf6cc052690d",
+      "installedSHA256": {
+        "main": "a1914db8d1445567d7fdc8d726a76c746a4eb9d7e766770415fbdf6cc052690d",
+        "before-commit": "a1914db8d1445567d7fdc8d726a76c746a4eb9d7e766770415fbdf6cc052690d",
+        "after-commit": "a1914db8d1445567d7fdc8d726a76c746a4eb9d7e766770415fbdf6cc052690d"
+      }
+    },
+    "test": {
+      "package": "io.drivegrowth.verify.results54originalf.test",
+      "sha256": "89a41e294d5ae4cbe1fc271bc7b9ef3b32821beb0f486428db913f7d852703a5",
+      "installedSHA256": {
+        "main": "89a41e294d5ae4cbe1fc271bc7b9ef3b32821beb0f486428db913f7d852703a5",
+        "before-commit": "89a41e294d5ae4cbe1fc271bc7b9ef3b32821beb0f486428db913f7d852703a5",
+        "after-commit": "89a41e294d5ae4cbe1fc271bc7b9ef3b32821beb0f486428db913f7d852703a5"
+      }
+    }
+  },
+  "inputLedgerSha256": "fbc68147edd7924dd6c085c99222a73fe2f5b649a8719faf97c21e2d805c48ed",
+  "preparationRunner": "1/1",
+  "mainRetryRunner": "1/1",
+  "mainRetrySeconds": 13.677,
+  "interruption": {
+    "before": {
+      "sqlite": {
+        "seedSHA256": "fbc68147edd7924dd6c085c99222a73fe2f5b649a8719faf97c21e2d805c48ed",
+        "seedSchema": 18,
+        "originals": {
+          "rental/settle/rental-visit-d2a22077-5f0f-4616-b513-5c12ea1c4b06": [
+            "RENTAL",
+            "CREDIT",
+            120,
+            1120
+          ],
+          "drive/51adc13d-10af-4678-b5ee-20881765ba93": [
+            "DRIVING",
+            "CREDIT",
+            360,
+            1480
+          ],
+          "delivery/delivery-choice-1eb2c3d4-eda4-4af1-b707-f605e7758dcb/settle": [
+            "DELIVERY",
+            "CREDIT",
+            120,
+            1600
+          ]
+        },
+        "prepared": {
+          "rental": [
+            "RENTAL",
+            "CREDIT",
+            173,
+            1893
+          ],
+          "facility": [
+            "FACILITY",
+            "DEBIT",
+            500,
+            1393
+          ],
+          "durationTotalsMs": [
+            7140000,
+            10800000,
+            3600000
+          ],
+          "gapMs": 60000,
+          "schema": 20
+        },
+        "rolledBack": {
+          "targetViewed": 0,
+          "targetEvents": 0
+        },
+        "unchangedTables": [
+          "account",
+          "vehicles",
+          "settlements",
+          "rental_result_basis",
+          "rentals",
+          "shop",
+          "facilities",
+          "quest_events",
+          "observed_driving_receipts",
+          "delivery_outcomes",
+          "host_command_checkpoint"
+        ]
+      },
+      "forcedStop": {
+        "at": "2026-11-13T01:29:11.122980+09:00",
+        "pid": "30881",
+        "runnerExit": 0,
+        "marker": "BEFORE_SQLITE_COMMIT",
+        "settlement": "5136a909-8be2-4757-bf42-041170ea00ca"
+      }
+    },
+    "after": {
+      "sqlite": {
+        "seedSHA256": "fbc68147edd7924dd6c085c99222a73fe2f5b649a8719faf97c21e2d805c48ed",
+        "seedSchema": 18,
+        "originals": {
+          "rental/settle/rental-visit-d2a22077-5f0f-4616-b513-5c12ea1c4b06": [
+            "RENTAL",
+            "CREDIT",
+            120,
+            1120
+          ],
+          "drive/51adc13d-10af-4678-b5ee-20881765ba93": [
+            "DRIVING",
+            "CREDIT",
+            360,
+            1480
+          ],
+          "delivery/delivery-choice-1eb2c3d4-eda4-4af1-b707-f605e7758dcb/settle": [
+            "DELIVERY",
+            "CREDIT",
+            120,
+            1600
+          ]
+        },
+        "prepared": {
+          "rental": [
+            "RENTAL",
+            "CREDIT",
+            173,
+            1893
+          ],
+          "facility": [
+            "FACILITY",
+            "DEBIT",
+            500,
+            1393
+          ],
+          "durationTotalsMs": [
+            7140000,
+            10800000,
+            3600000
+          ],
+          "gapMs": 60000,
+          "schema": 20
+        },
+        "committed": {
+          "targetViewed": 1,
+          "targetEvents": 1
+        },
+        "unchangedTables": [
+          "account",
+          "vehicles",
+          "rental_result_basis",
+          "rentals",
+          "shop",
+          "facilities",
+          "observed_driving_receipts",
+          "delivery_outcomes",
+          "host_command_checkpoint"
+        ]
+      },
+      "forcedStop": {
+        "at": "2026-11-13T01:31:43.163680+09:00",
+        "pid": "29947",
+        "runnerExit": 0,
+        "marker": "AFTER_SQLITE_COMMIT_BEFORE_RESPONSE",
+        "settlement": "5136a909-8be2-4757-bf42-041170ea00ca"
+      }
+    }
+  },
+  "afterCommitReopenedUI": {
+    "stoppedPid": "29947",
+    "newPid": "30315",
+    "settlement": "5136a909-8be2-4757-bf42-041170ea00ca",
+    "sameDetailHierarchy": [
+      "21.xml"
+    ],
+    "disabledReadButtonHierarchy": "25.xml",
+    "commitUI": "열람 표시 저장 완료",
+    "requestButtonEnabled": false
+  },
+  "release": {
+    "at": "2026-11-13T01:33:42.222394+09:00",
+    "released": true,
+    "noFurtherAdb": true,
+    "noFurtherGradle": true,
+    "preservation": "19/19",
+    "activeInstrumentation": false,
+    "activeHostGradle": false,
+    "source": "53db64fa0ac63da108faa323c9ed33cfa99135a0",
+    "tree": "02b6f1ae7038e9e9c3f2cc69744486130f2ccd14"
+  }
+}
