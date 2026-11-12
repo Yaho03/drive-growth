@@ -2115,6 +2115,8 @@ Pleos 2.1.0/API 34/ARM64, Android 사용자 10의 격리 Debug Main에서 실행
 
 시험 안내 종료와 진단 SDK 해제 후 원래 진단 APK의 바이트를 확인했고, 격리 앱·계측 패키지 10개를 제거했다. 제품 APK와 데이터 파일 6개를 포함한 보호 19/19가 일치했으며 02:22:46.786307 KST에 슬롯을 반환했다. 실제 SDK 견적 근거는 P·0km/h에서 확보했다. 실제 D/P 전환, 도착 귀속과 지급, 전원·실차 검증은 남아 있다.
 
+2026-11-13 · [#247](https://github.com/Yaho03/drive-growth/pull/247)을 main `752cd59c50b2a2c799577785ea2f21ced4904054`에 반영했다. [#37](https://github.com/Yaho03/drive-growth/issues/37)은 실제 SDK 구매 원의뢰 복원과 기존 입력·결제 실패 근거를 대조해 종료했다. [#39](https://github.com/Yaho03/drive-growth/issues/39)는 기존 공용 SQLite의 보관 생성, #228의 모의 Main 도착 복원, 이번 네 가지 모의 종료·새 PID를 대조해 1차 범위를 종료했다. [#38](https://github.com/Yaho03/drive-growth/issues/38)의 변경 성공·차액 비교와 [#53](https://github.com/Yaho03/drive-growth/issues/53)의 탁송 화면 실제 D/P·미확정 요청 복원은 [#28](https://github.com/Yaho03/drive-growth/issues/28)의 통합 검증과 연결한다. 도착 귀속 근거가 없는 실제 SDK 입력은 확인 대기·미지급을 유지한다.
+
 #### Schema19 이전과 Quest 원결과 재생의 별도 계측 — 2026-11-12
 
 `c03a333427acf4c1b4a37045ad2e2033365ddba1`에 계측 전용 패치 `108a79a9d3636ba83e777fa05887b1aaa0db6829e2759594478cf7b47b7e1c5d`를 적용한 Pleos API 34 ARM64 격리 실행에서 `Schema19UpgradeTest` 3건(2.800초)과 `QuestStoreIntegrationTest#testActualClaimWholeReplayPrecedesNewDefinitionTimeAndCurrentBalance` 1건(0.217초)이 통과했다. v2·v10·v12의 과거 DDL과 재현용 SIMULATION 행으로 기존 열의 값, 새 `visits.host_command`의 초기 `NULL`, DB 재개방을 확인했다. v12 후기 실패 롤백·원본 보존과 교차 소유 요청 충돌도 검증했다. Quest는 정의·시각·현재 잔액이 달라져도 같은 청구의 당시 전체 결과가 우선 재생되는지 확인했다.
