@@ -2960,3 +2960,16 @@ JDK 17·SDK 35에서 `:app:assembleDebug :app:assembleDebugAndroidTest --offline
 | 주간 성장 | 2026-11-09 | 3/3 | 활성 |
 
 계측 **1/1 통과(7.806초)**. 청구 버튼 입력 없이 비교 대상 원장과 공용 슬롯 0건을 유지했다. 격리 패키지를 제거했고 인계·종료 보호 대조는 각 19/19였다. #57의 미실행 세 목표 현재 기간·진행·청구 가능 표시 조건을 충족한다. 최종 디자인 결합 후보의 기능 간 검증은 #28에 남는다.
+
+
+## 최종 픽셀 화면 결합의 표시·입력 검증 — 2026-11-13
+
+공용 #267과 HOME #268에 표시 PR #262·#263·#264·#266 및 별도 호스트 변경을 결합한 `b3c09a575e16b023e64dcbe93e263bed0788b7ec`(tree `666784894027662b9dceb0d8710cf7bda1ab0a5c`)에서 검사했다. 네 PR의 변경 파일 65개는 이 결합 커밋의 대응 Git blob과 모두 같았다. 공용 자산 23개는 #267의 main 파일과도 같으며 새 경제·저장 계약을 포함하지 않는다.
+
+JDK 17·기존 Gradle Wrapper에서 `:core:test :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug`가 통과했다. 코어 447개·앱 829개, 실패·오류·생략 0, Lint 오류 0·경고 50개다. [단위 결과](evidence/final-pixel-ui/unit-summary.txt)
+
+Pleos 2.1.0 / API34 ARM64의 격리 패키지 `io.drivegrowth.verify.combined28e`에서 HOME 지도 선택·제한, 차고 개체/중복 요청, 도감 스크롤 복귀, 가챠 오래된 입력, 탁송 늦은 응답·Back·금액 누락, 첫 차량·정산 그림, 진행 강조·스크롤, 실제/시연 랭킹 구분을 확인한 표시 계측 **13/13**이 통과했다. 같은 APK의 기존 Main 모의 입력 → 주행·대여·탁송 → 원결과 재조회 시험 **1/1**도 통과했다. 모의 입력을 실제 SDK 이동·도착으로 표시하지 않는다. [표시 시험](evidence/final-pixel-ui/display-tests.log) · [Main 모의 흐름](evidence/final-pixel-ui/simulation-main.log) · [전체 selector·설치 APK 해시](evidence/final-pixel-ui/metadata.json)
+
+제품 코드는 같은 결합 소스이며 설치 격리를 위해 applicationId/testApplicationId만 변경했다. 설치 앱 SHA-256은 `2766ca4af2221b619a26a76e71e393d89854f8fd5a32a5e05f12d1dcf0d0278c`, 시험 APK는 `f57c08900bfec08d06f340d68359b880c2ceb838bf2919c0e0439027ea168283`이다. 게시 PR head의 Actions는 사용 한도로 시작되지 않았으며 원격 성공으로 기록하지 않는다.
+
+**이 시점의 별도 결함:** 결합 호스트의 320dp 탐색 시험은 `ONBOARDING button width 119 exceeds viewport 0`으로 실패했고, 제한 전 탐색 callback의 재활성화가 독립 코드 검토에서 발견됐다. 이 호스트 수정은 네 표시 PR에 포함되지 않으며 수정·재검증 전 전체 결합/주행 제한/최종 #28 완료를 주장하지 않는다. 표시 PR의 수용은 기능 이슈 전체 종료와 다르다. 이 실행 뒤의 실제 전체 플레이·새 프로세스·공식 창 시험은 별도 결과로 이어 기록한다.
