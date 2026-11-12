@@ -2797,7 +2797,7 @@ main `101de32ccfb2b8e3b5855debf6acadee491106cf`에 `GarageScrapRecoveryMainActiv
 
 ## #57 실제 Main 상세 스크롤과 기간 경과 청구 복원 — 2026-11-13
 
-실행 기준은 main `ea1eafefe3621e658b186968731f5eda40077c39`이다. Pleos Emulator API 34 ARM64, Android 사용자 10, 1080×600 물리 픽셀·120dpi에서 격리 Debug 앱을 사용했다. JDK 17과 Gradle Wrapper로 `:app:assembleDebug :app:assembleDebugAndroidTest --offline`을 실행했다. 설치 후 회수한 APK의 SHA-256을 빌드본과 대조했다. 게시 부모 `752cd59c50b2a2c799577785ea2f21ced4904054`에는 #244·#246·#247·#248의 문서와 별도 기능의 계측 변경이 추가됐다. 실행 기준에서 게시 부모까지 제품·debug·core·빌드 설정에는 변경이 없고, 이 PR의 제품 1개·계측 3개 파일은 실행 후보와 Git blob이 같다. 게시 조합의 추가 Gradle·장치 재실행은 미수행이다.
+실행 기준은 main `ea1eafefe3621e658b186968731f5eda40077c39`이다. Pleos Emulator API 34 ARM64, Android 사용자 10, 1080×600 물리 픽셀·120dpi에서 격리 Debug 앱을 사용했다. JDK 17과 Gradle Wrapper로 `:app:assembleDebug :app:assembleDebugAndroidTest --offline`을 실행했다. 설치 후 회수한 APK의 SHA-256을 빌드본과 대조했다. 게시 부모 `752cd59c50b2a2c799577785ea2f21ced4904054`에는 #244·#246·#247·#248의 문서와 별도 기능의 계측 변경이 추가됐다. 실행 기준에서 게시 부모까지 제품·debug·core·빌드 설정에는 변경이 없고, 이 PR의 제품 1개·일반 계측 2개·격리 전용 계측 원본 1개는 실행 후보와 Git blob이 같다. 게시 조합의 추가 Gradle·장치 재실행은 미수행이다.
 
 ### 실제 SDK 정차 D 제한과 같은 상세 위치 복원
 
@@ -2805,14 +2805,14 @@ main `101de32ccfb2b8e3b5855debf6acadee491106cf`에 `GarageScrapRecoveryMainActiv
 
 - **수정 전:** 기존 View가 제한 화면 교체 때 먼저 분리됐다. 제한 상태를 다시 그릴 때 기존 스크롤은 `scrollY=113`이었으나 `isLaidOut=false`여서 값을 기억하지 못했다. 같은 View·같은 기간/목표에서 복귀 위치가 0px이 되어 회귀 1건이 assertion 실패했다(15.249초, 오류 0).
 - **수정 후:** 현재 배치된 콘텐츠 스크롤을 분리 직전에 기억한다. Loading이나 아직 배치되지 않은 교체 View는 저장 위치를 덮어쓰지 않는다. 같은 회귀 1건에서 위치 113→113px(최대 182px, 높이 255px)로 통과했다(17.767초). 공통 gate·MainActivity·저장·보상 규칙의 변경은 없다. 별도 고정 높이 View를 포함한 `ProgressScrollDeviceTest` 5건도 통과했다(4.688초).
-- 수정 전후 계측 APK는 같은 SHA-256 `8fb9fa529be3ddc4e07201ae1b6319a3720b99b746a6f25e280251d94423254e`이다. 수정 전 앱 APK는 `1ab81e0acd77ae5922c7fcf13cfbc29250223fd4e18a4f42bf5bae55a3a703bf`, 수정 후 앱 APK는 `fda058cde4059427768f33a8a6326317022d8dbc88b9cc688e0d842e1f28beb3`이다.
+- 수정 전후 계측 APK는 같은 SHA-256 `8fb9fa529be3ddc4e07201ae1b6319a3720b99b746a6f25e280251d94423254e`이다. 수정 전 앱 APK는 `1ab81e0acd77ae5922c7fcf13cfbc29250223fd4e18a4f42bf5bae55a3a703bf`, 수정 후 앱 APK는 `fda058cde4059427768f33a8a6326317022d8dbc88b9cc688e0d842e1f28beb3`이다. 별도 View 5건은 같은 수정 후 앱 APK와 별도 계측 APK `7f510f4c444894ab41e091f544237e07acc1575c0c3c8ee7d8ea5b494b046f39`를 사용했다.
 
 ### 기간이 지난 SAVED와 STARTED의 새 프로세스 복원
 
-`ProgressionPeriodRecoveryMainTest`는 별도 격리 VEHICLE 설치마다 기존 저장 API와 시험 시계로 과거 기간의 사건·요청을 준비한다. 각 설치에서 준비와 실제 Main 복원을 별개 selector로 실행하고, 그 사이 격리 앱만 종료해 같은 설치·SQLite에서 새 OS PID를 확인했다. 복원은 장치 현재 시간과 실제 SDK P 허용을 사용했다. 준비·복원 4건이 통과했다.
+[격리 전용 계측 원본과 실행 순서](evidence/issue57-period-recovery/selectors/README.md)를 일반 Android 계측 소스셋 밖에 보존한다. `ProgressionPeriodRecoveryMainTest`는 별도 격리 VEHICLE 설치마다 기존 저장 API와 시험 시계로 과거 기간의 사건·요청을 준비한다. 각 설치에서 준비와 실제 Main 복원을 별개 selector로 실행하고, 그 사이 격리 앱만 종료해 같은 설치·SQLite에서 새 OS PID를 확인했다. 복원은 장치 현재 시간과 실제 SDK P 허용을 사용했다. 준비·복원 4건이 통과했다.
 
 - **일간 차량 성장 SAVED:** 준비 PID 2548 → 실제 Main PID 2889. 만료 요청은 실패 안내와 미시작 취소 경로를 제공했다. 취소 후 공용 슬롯은 1→0, 잔액 980·정산 2건이 유지됐고 보상 청구는 0건이었다. 현재 기간의 성장 진행은 0이었다.
 - **주간 대여 완료 STARTED:** 준비 PID 21137 → 실제 Main PID 21496. 기존 300 보상 정산 `45f1c267-9e14-4223-a8be-d8793bd2cebf`를 보존하고 슬롯은 1→0이 됐다. 잔액 2,380·청구 1건·정산 6건이 유지됐고 현재 기간의 대여 진행은 0이었다. 최초 시험에서는 Main의 별도 개업 선물 정산이 추가돼 원장 비교가 실패했다. 재시험은 기존 선물 API로 준비 단계에서 선물을 확정한 뒤 같은 원장 비교를 통과했다.
-- 설치 회수 앱 APK SHA-256은 `55296bc4f7ae8d5e7a185475705d1e15a61eef0a21751e3cf05ed48dfa39e060`, 계측 APK는 `6e155aa284c9249bbfac14ead9973f4f3e31fbd719f2631c31b578233422a2c5`이다. 이 실행은 현재 기간 표시·취소·기존 원정산과 슬롯 상태를 확인한 근거다. 실차·전원 전환과 지원 창 전체 검증은 기존 범위를 따른다.
+- 설치 회수 앱 APK SHA-256은 `55296bc4f7ae8d5e7a185475705d1e15a61eef0a21751e3cf05ed48dfa39e060`, 계측 APK는 `6e155aa284c9249bbfac14ead9973f4f3e31fbd719f2631c31b578233422a2c5`이다. 이 실행에서 현재 기간 표시·취소·기존 원정산과 슬롯 상태를 확인했다. 과거 STARTED 원결과 payload의 UI 전달·표시는 이번 계측 범위 밖이다. 실차·전원 전환과 지원 창 전체 검증은 기존 범위를 따른다.
 
 **장치 보호:** 슬롯 시작 인계 대조는 19/19, 종료 대조는 17/19였다. 제품 APK·데이터 파일 6개·권한·크기/밀도·포워드·주차 상태를 보존했다. 필요한 속도 권한은 격리 패키지에만 부여했고 격리 앱과 계측 앱을 제거했다. 첫 재설치 중 장치 패키지 서비스의 `Broken pipe`를 기록했고 새 설치에서 재시험했다. 종료 시 부팅 카운트 25→26 및 같은 OEM 화면의 Activity 인스턴스 교체를 확인했다. 재부팅 명령은 실행하지 않았으며 두 변화의 원인은 확인되지 않았다. 장치는 부팅 완료·P 상태였고 자체 계측과 Gradle 프로세스가 남지 않은 상태에서 슬롯을 반환했다.
