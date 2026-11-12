@@ -4,7 +4,9 @@ import android.content.Context
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
+import android.text.TextUtils
 import android.view.Gravity
+import android.view.View.MeasureSpec
 import android.widget.Button
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
@@ -22,15 +24,33 @@ internal class MainNavigationBar(
     private var selectedPage: HostPage? = null
     private var revealSelection = false
     private val buttons = destinations.associate { (page, label) ->
-        page to control(context, label) { select(page) }.apply { tag = "host:page:${page.name}" }
+        page to control(context, label) { select(page) }.apply {
+            tag = "host:page:${page.name}"
+            ellipsize = TextUtils.TruncateAt.END
+        }
     }
     private val pages = object : HorizontalScrollView(context) {
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val viewportWidth = (MeasureSpec.getSize(widthMeasureSpec) - paddingLeft - paddingRight).coerceAtLeast(0)
+            if (MeasureSpec.getMode(widthMeasureSpec) != MeasureSpec.UNSPECIFIED) {
+                buttons.values.forEach { button ->
+                    if (button.maxWidth != viewportWidth) button.maxWidth = viewportWidth
+                }
+            }
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        }
+
         override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
             super.onLayout(changed, left, top, right, bottom)
             if (changed || revealSelection) {
                 revealSelection = false
                 buttons[selectedPage]?.let { button ->
-                    button.requestRectangleOnScreen(Rect(0, 0, button.width, button.height), true)
+                    val bounds = Rect()
+                    button.getDrawingRect(bounds)
+                    offsetDescendantRectToMyCoords(button, bounds)
+                    val minScrollX = bounds.right - width + paddingRight
+                    val maxScrollX = bounds.left - paddingLeft
+                    scrollTo(scrollX.coerceIn(minScrollX.coerceAtMost(maxScrollX), maxScrollX), scrollY)
                 }
             }
         }
