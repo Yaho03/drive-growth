@@ -39,8 +39,9 @@ internal object RankingAggregation {
         }
         val included = unique.values.filter { it.origin in definition.included }
         if (included.isEmpty()) return RankingValue.Empty("선택한 정의로 집계할 확정 수익 기록이 없습니다.")
+        val basis = RankingIncomeOrigin.entries.filter { it in definition.included }.joinToString { it.title }
         return RankingValue.Available(included.fold(BigDecimal.ZERO) { sum, row -> sum + row.amount.units.toBigDecimal() },
-            "확정 수익 누적 · ${definition.included.joinToString { it.title }}")
+            "확정 수익 누적 · $basis")
     }
     fun week(rows: List<RankingDayDistance>, definition: RankingWeekDefinition?, source: InputSource, asOf: EpochMillis): RankingValue {
         if (definition == null) return RankingValue.Missing("주 시작 요일·시간대 기준이 아직 공급되지 않았습니다.")

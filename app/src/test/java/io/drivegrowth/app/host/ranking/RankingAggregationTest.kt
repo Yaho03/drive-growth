@@ -34,6 +34,22 @@ class RankingAggregationTest {
         assertTrue(RankingAggregation.income(listOf(row,row.copy(amount=GameMoney(1))),def,source) is RankingValue.Failure)
         assertTrue(RankingAggregation.income(listOf(row),null,source) is RankingValue.Missing)
     }
+    @Test fun incomeBasisUsesDeclaredOrderRegardlessOfSetIteration() {
+        val rows = listOf(
+            RankingIncome(RequestId("drive"), RankingIncomeOrigin.DRIVING, GameMoney(1), source),
+            RankingIncome(RequestId("sale"), RankingIncomeOrigin.DISPOSAL, GameMoney(2), source),
+            RankingIncome(RequestId("quest"), RankingIncomeOrigin.QUEST, GameMoney(3), source),
+            RankingIncome(RequestId("rental"), RankingIncomeOrigin.RENTAL, GameMoney(1_000), source),
+        )
+        val origins = listOf(RankingIncomeOrigin.DRIVING, RankingIncomeOrigin.DISPOSAL, RankingIncomeOrigin.QUEST)
+        val expected = RankingValue.Available(BigDecimal(6), "확정 수익 누적 · 주행, 판매·폐차, 퀘스트")
+
+        for (order in listOf(origins, origins.reversed())) {
+            val definition = RankingIncomeDefinition(RuleVersion("earned"), order.toSet())
+            assertEquals(expected, RankingAggregation.income(rows, definition, source))
+        }
+    }
+
     @Test fun weekUsesExplicitZoneAndStartDayAndExcludesNextWeek(){
         val def=RankingWeekDefinition(RuleVersion("weekly"),DayOfWeek.MONDAY,ZoneId.of("Asia/Seoul"))
         val at=EpochMillis(Instant.parse("2026-11-09T00:00:00Z").toEpochMilli())
