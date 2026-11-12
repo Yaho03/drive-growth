@@ -1,7 +1,6 @@
 package io.drivegrowth.app
 
 import android.app.Activity
-import android.widget.ScrollView
 import io.drivegrowth.app.ui.delivery.*
 import io.drivegrowth.app.host.delivery.DeliveryHostReceipt
 import io.drivegrowth.core.delivery.DeliveryOutcome
@@ -100,7 +99,6 @@ open class MainActivity : Activity() {
     private lateinit var delivery: DeliveryView
     private var deliveryAccessEnabled = false
     private var deliveryReceipt: DeliveryHostReceipt? = null
-    private lateinit var deliveryBody: LinearLayout
     private var deliveryFrame = DeliveryFrame(0, DeliveryScreen.Loading)
     private lateinit var gacha: GachaView
     private var navigationGeneration = 0L
@@ -202,8 +200,7 @@ open class MainActivity : Activity() {
         delivery = DeliveryView(this, { request ->
             session.deliveryUi = delivery.saveUiState()
             session.delivery.onRequest(request)
-        }, session.deliveryUi)
-        deliveryBody = style.column()
+        }, session.deliveryUi, navigationControls = ::deliveryNavigationControls, hostStatus = ::deliveryHostStatus)
         gacha = GachaView(this, ::onGachaEvent, session.gacha.uiState)
         results.restoreUiState(session.results.uiState)
         queries = session.queries
@@ -649,7 +646,7 @@ open class MainActivity : Activity() {
             HostPage.HOME -> showBody(facilityHome)
             HostPage.GACHA -> showBody(gacha)
             HostPage.DELIVERY -> {
-                showBody(deliveryBody)
+                showBody(delivery)
                 val shown = deliveryFrame.version
                 delivery.post {
                     if (active && allowed() && navigation.page == HostPage.DELIVERY && delivery.isShown &&
@@ -676,15 +673,16 @@ open class MainActivity : Activity() {
     private fun renderDelivery(enabled: Boolean) {
         delivery.render(deliveryFrame, enabled)
         session.deliveryUi = delivery.saveUiState()
-        deliveryBody.removeAllViews()
+    }
+
+    private fun deliveryNavigationControls(): View {
         val details = style.column()
-        if (enabled) {
-            if (session.simulation != null) {
-                details.addView(style.text(session.deliveryNavigation.description.orEmpty()))
-                details.addView(style.button("시연 목적지 확인") {
-                    if (allowed() && session.deliveryNavigation.confirm() is ContractResult.Success) session.delivery.refresh()
-                }.apply { tag = "simulation:destination" })
-            } else {
+        if (session.simulation != null) {
+            details.addView(style.text(session.deliveryNavigation.description.orEmpty()))
+            details.addView(style.button("시연 목적지 확인") {
+                if (allowed() && session.deliveryNavigation.confirm() is ContractResult.Success) session.delivery.refresh()
+            }.apply { tag = "simulation:destination" })
+        } else {
             val raw = session.deliveryNavigation.snapshot
             val destination = raw?.destination as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
             val distance = raw?.remainingEstimatedMeters as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
@@ -702,46 +700,51 @@ open class MainActivity : Activity() {
                 })
             }
             details.addView(style.text("실제 이동거리와 도착 상관 근거는 확인 대기예요. 프로필만으로 실차 주행을 확정하지 않아요."))
-            }
-            val state = session.delivery.state
-            val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
-                ?.associate { it.vehicleId to it.displayName }.orEmpty()
-            val date = DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"))
-            for (held in state?.held.orEmpty()) {
-                val name = names[held.vehicle.vehicleId] ?: "차량 정보 확인 중"
-                details.addView(style.text("임시 보관 · $name · ${style.rarity(held.vehicle.rarity)} · 낸 금액 ${held.price.units}"))
-                details.addView(style.text("보관 기한 ${date.format(Instant.ofEpochMilli(held.deadline.value))} (한국시간)"))
-            }
-            if (state?.held?.isNotEmpty() == true)
-                details.addView(style.button("보관 차량 처리 조건 다시 확인") { session.delivery.refresh() })
-            state?.receipt?.let { receipt ->
-                val message = when (receipt) {
-                    is DeliveryHostReceipt.Selected -> "의뢰 선택이 확정됐어요."
-                    is DeliveryHostReceipt.Changed -> "목적지 변경이 확정됐어요."
-                    is DeliveryHostReceipt.Abandoned -> "의뢰 포기가 확정됐어요."
-                    is DeliveryHostReceipt.Arrived -> when (receipt.value.outcome) {
-                        is DeliveryOutcome.AwaitingEvidence -> "도착 근거를 확인하고 있어요."
-                        is DeliveryOutcome.IncomeCompleted -> "수익 탁송 보상이 확정됐어요."
-                        is DeliveryOutcome.VehicleDelivered -> "구매 차량 지급이 확정됐어요."
-                        is DeliveryOutcome.VehicleHeld -> "구매 차량을 임시 보관했어요."
-                        is DeliveryOutcome.IncomeExpired -> "도착 기한이 지나 의뢰가 종료됐어요."
-                        is DeliveryOutcome.PurchaseRefunded -> "미도착 의뢰의 구매 대금 환급이 확정됐어요."
-                    }
-                    is DeliveryHostReceipt.Held -> when (receipt.value.outcome) {
-                        is HoldOutcome.StillHeld -> "차량을 계속 보관하고 있어요."
-                        is HoldOutcome.Claimed -> "보관 차량 수령이 확정됐어요."
-                        is HoldOutcome.Refunded -> "보관 만료 환급이 확정됐어요."
-                    }
-                }
-                details.addView(style.text(message))
-                details.addView(style.button("처리 결과 확인하고 새로 조회") { session.delivery.acknowledge() }.apply { tag = "delivery:acknowledge" })
-            }
-            if (session.delivery.canCancelUnstarted == true)
-                details.addView(style.button("미실행 요청 취소 확인") { session.delivery.cancelUnstarted() })
         }
-        if (details.childCount > 0) deliveryBody.addView(ScrollView(this).apply { addView(details) },
-            LinearLayout.LayoutParams(-1, style.dp(144)))
-        deliveryBody.addView(delivery, LinearLayout.LayoutParams(-1, 0, 1f))
+        return details
+    }
+
+    private fun deliveryHostStatus(): View? {
+        val state = session.delivery.state
+        val heldVehicles = state?.held.orEmpty()
+        val canCancel = session.delivery.canCancelUnstarted
+        if (heldVehicles.isEmpty() && state?.receipt == null && !canCancel) return null
+        val details = style.column()
+        val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
+            ?.associate { it.vehicleId to it.displayName }.orEmpty()
+        val date = DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"))
+        for (held in heldVehicles) {
+            val name = names[held.vehicle.vehicleId] ?: "차량 정보 확인 중"
+            details.addView(style.text("임시 보관 · $name · ${style.rarity(held.vehicle.rarity)} · 낸 금액 ${held.price.units}"))
+            details.addView(style.text("보관 기한 ${date.format(Instant.ofEpochMilli(held.deadline.value))} (한국시간)"))
+        }
+        if (heldVehicles.isNotEmpty())
+            details.addView(style.button("보관 차량 처리 조건 다시 확인") { session.delivery.refresh() })
+        state?.receipt?.let { receipt ->
+            val message = when (receipt) {
+                is DeliveryHostReceipt.Selected -> "의뢰 선택이 확정됐어요."
+                is DeliveryHostReceipt.Changed -> "목적지 변경이 확정됐어요."
+                is DeliveryHostReceipt.Abandoned -> "의뢰 포기가 확정됐어요."
+                is DeliveryHostReceipt.Arrived -> when (receipt.value.outcome) {
+                    is DeliveryOutcome.AwaitingEvidence -> "도착 근거를 확인하고 있어요."
+                    is DeliveryOutcome.IncomeCompleted -> "수익 탁송 보상이 확정됐어요."
+                    is DeliveryOutcome.VehicleDelivered -> "구매 차량 지급이 확정됐어요."
+                    is DeliveryOutcome.VehicleHeld -> "구매 차량을 임시 보관했어요."
+                    is DeliveryOutcome.IncomeExpired -> "도착 기한이 지나 의뢰가 종료됐어요."
+                    is DeliveryOutcome.PurchaseRefunded -> "미도착 의뢰의 구매 대금 환급이 확정됐어요."
+                }
+                is DeliveryHostReceipt.Held -> when (receipt.value.outcome) {
+                    is HoldOutcome.StillHeld -> "차량을 계속 보관하고 있어요."
+                    is HoldOutcome.Claimed -> "보관 차량 수령이 확정됐어요."
+                    is HoldOutcome.Refunded -> "보관 만료 환급이 확정됐어요."
+                }
+            }
+            details.addView(style.text(message))
+            details.addView(style.button("처리 결과 확인하고 새로 조회") { session.delivery.acknowledge() }.apply { tag = "delivery:acknowledge" })
+        }
+        if (canCancel)
+            details.addView(style.button("미실행 요청 취소 확인") { session.delivery.cancelUnstarted() })
+        return details
     }
 
     private fun showBody(view: View) {
