@@ -90,6 +90,8 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
         if (focusedTag != null) findViewWithTag<View>(focusedTag)?.requestFocus()
     }
     private fun overview(body: LinearLayout, state: ProgressScreenState.Content) = with(style) {
+        val showActiveRestFirst = !wide && state.rest?.buffPhase == BuffPhase.ACTIVE
+        if (showActiveRestFirst) rest(body, state.rest, prioritizeStoredState = true)
         add(body, text(state.periodLabel ?: s(R.string.progress_unknown_period), 18, muted))
         val left = column(); val right = column()
         val tabs = row()
@@ -112,7 +114,7 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
         add(body, text(s(R.string.progress_events), 26, bold = true))
         val events = state.entries.filter { it.group == ProgressGroup.EVENT }
         if (events.isEmpty()) add(body, text(state.eventsNote, color = muted)) else items(body, events)
-        rest(body, state.rest)
+        if (!showActiveRestFirst) rest(body, state.rest)
     }
     private fun items(parent: LinearLayout, entries: List<ProgressItem>) = with(style) {
         if (entries.isEmpty()) add(parent, text(s(R.string.progress_group_empty), color = muted))
@@ -174,7 +176,7 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
         RewardStatus.FAILED -> R.string.progress_failed
         RewardStatus.UNSUPPORTED -> R.string.progress_unsupported
     })
-    private fun rest(parent: LinearLayout, value: RestPresentation?) = with(style) {
+    private fun rest(parent: LinearLayout, value: RestPresentation?, prioritizeStoredState: Boolean = false) = with(style) {
         add(parent, text(s(R.string.progress_rest_title), 26, bold = true))
         val card = card()
         if (value == null) add(card, text(s(R.string.progress_rest_missing)), 0)
@@ -200,9 +202,11 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
                 BuffPhase.UNSUPPORTED -> R.string.progress_buff_unsupported
             }
             add(card, text(s(phase), 24, amber, true))
-            add(card, text(value.effectLabel ?: s(R.string.progress_unknown_effect)))
+            val effect = text(value.effectLabel ?: s(R.string.progress_unknown_effect))
+            if (!prioritizeStoredState) add(card, effect)
             add(card, text(value.remainingLabel ?: s(R.string.progress_unknown_remaining)))
             value.note?.let { add(card, text(it, color = muted)) }
+            if (prioritizeStoredState) add(card, effect)
         }
         add(card, text(s(R.string.progress_rest_note), 18, muted)); add(parent, card)
     }

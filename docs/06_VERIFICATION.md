@@ -2161,6 +2161,23 @@ GREEN 앱 SHA-256은 `853db02efb5bf98cbf4f9761842901a4ba5fc342c8aa7bd7e5f26b9cfc
 최상위 Back의 명시적 숨김과 사용자 이탈 힌트가 이어지는 비구성 변경 `onStop`을 이탈로 연결했다. 기존 D→Back→복귀 관측은 B0dd의 별도 시험이다. 이 v4에서 실제 Pleos Home·Back 콜백, OS 프로세스·전원·실차, 장시간 및 시계 변동의 실제 동작은 미검증이다. 앞선 r8 진행 카드·일반 탁송 결과와 이번 표적 결과는 각 실행으로 유지한다. 게시 기준에서의 재빌드·추가 JVM·Lint는 이번 결과에 포함하지 않는다.
 
 
+#### 좁은 Main 진행 화면의 휴식 카드
+
+2026-11-13 KST에 main `26354b4cc3702d025d54bf02175ea34a9f2b7d72`를 기준으로 Pleos API 34 ARM64, Android 사용자 10의 격리 Debug Main에서 시험했다. 물리 화면은 1080×600px·120dpi이며 실제 진행 스크롤 영역은 666×98px(약 888×131dp)였다. 명시 모의주행 뒤 같은 원장의 확정 주행 2건·부스트 100초·잔여 1,100초·정산 15를 확인하고 실제 화면 좌표 터치로 스크롤했다.
+
+| 실행 트리 | 동일 계측 APK 결과 |
+|---|---|
+| RED `dc561a4f0f45d5ef45748dc23a8f7f7cd09b18be` | 활성·미부여·소진 비교 1건 통과. 좁은 View 배치와 실제 Main의 가시 범위 단언 2건 실패. Main은 196px 이내에서 대상 세 문구를 완전히 표시하지 못했다. |
+| 첫 GREEN `5be45386f8e6cf83372590da0b6af6b0f09af252` | 상태 비교·배치 및 기존 스크롤 4건 통과. Main에서 활성·잔여 문구는 보였으나 모의 입력 출처가 204px에서야 완전히 보여 196px 기준에 실패했다. |
+| 최종 GREEN `976f1ba39965397e3c881b44fcbc025ff4b4b159` | 좁은 활성 카드의 잔여·입력 출처를 효과 설명 앞으로 배치했다. 신규 3건과 기존 스크롤 4건 통과, 실패·오류·생략 0. 실제 Main은 73.654초였고 스크롤 전후 원장 결과가 같았다. |
+
+최종 GREEN의 실제 스크롤에서 [102px 위치의 활성·잔여 표시](evidence/issue57-rest-viewport/active-and-remaining.png)와 [153px 위치의 잔여·모의 입력 출처](evidence/issue57-rest-viewport/remaining-and-source.png)를 확인했다. 독립 상태 비교에서 미부여와 소진은 기존 비활성 문구·잔여 0초를 유지했다. 앱·계측 APK를 빌드하고 최종 앱 Lint 오류 0건·경고 39건을 확인했다. [실행 트리·설치 APK SHA-256·반환 요약](evidence/issue57-rest-viewport/verification.json)을 보존했다.
+
+실제 Main 시험은 `io.drivegrowth.app.simulation.UnifiedSimulationRestActivityTest#testConfirmedRestCanBeReadInTheShallowMainWindow` 단독 selector로 실행했다. 이 selector는 높이 80–150dp의 스크롤 뷰포트와 1000dp 미만 진행 본문을 요구한다. 두 공개 시험은 각각 기존 원장이 없는 새 격리 설치가 필요하므로 메서드별 새 격리 설치에서 개별 실행한다. 계측 클래스 전체 실행은 이번 결과에 포함되지 않았다. 기존 제품 설치와 데이터는 보존한다.
+
+게시 기준 `e1f3961a071a258bc225478b90f4f8272c127db8`에는 장치 실행 기준 이후 #228의 Main·탁송 변경, #230의 문서 변경과 #231의 Main·종료 영업 변경이 있다. 이번 표시 코드와 두 계측 파일은 실행한 최종 GREEN과 동일하다. 게시 조합의 새 APK 빌드·장치 시험은 미수행이다. 실제 차량의 휴식 장소·입력, 공식 폼 팩터, 전체 #57·#28 검증은 남는다.
+
+
 ### Rest 6a4 세 수정의 main188 통합 검토 대기 — 2026-11-10
 
 정확6a4d820645cbd58c05959d7dd8a48f73746a5972를main188 c6c345d1866569cb3156229ba363312d1778fede 위에정상통합했다. 소스충돌/추가수정0이며변경41파일전부6a4와바이트동일하다. Main/HostSession/PendingRoute/factory/VehicleInput·Location6·시설12·Results14를보존했다. marker생산API는그대로이며시험fixture만schema16으로갱신했다. RankingReadSource의공통Rest주행reader소비는원본의의도된변경이고기존Provenance hook/typedFailure catch는보존했다. core/Gradle/Manifest불변·B0dd미포함이다. **이main188 로컬후보당시에는새SQLite결과대기였다. 후속c28의실제47통과는아래별도조합으로기록하며, #190이후Main조합·최종독립회수전까지머지보류다.**

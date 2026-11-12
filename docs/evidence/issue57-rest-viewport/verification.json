@@ -1,0 +1,206 @@
+{
+  "executedBase": "26354b4cc3702d025d54bf02175ea34a9f2b7d72",
+  "publicationBase": "e1f3961a071a258bc225478b90f4f8272c127db8",
+  "device": {
+    "api": 34,
+    "abi": "arm64-v8a",
+    "displayPx": [
+      1080,
+      600
+    ],
+    "dpi": 120,
+    "viewportPx": [
+      666,
+      98
+    ]
+  },
+  "buildTasks": [
+    ":app:assembleDebug",
+    ":app:assembleDebugAndroidTest",
+    ":app:lintDebug"
+  ],
+  "lint": {
+    "errors": 0,
+    "warnings": 39
+  },
+  "rounds": {
+    "red-device-initial": {
+      "tree": "dc561a4f0f45d5ef45748dc23a8f7f7cd09b18be",
+      "installedAppSha256": "108be8df23df2904124d3f7fa06989748c193a4b805e0b39e25132d4745651db",
+      "installedTestSha256": "9c02c663522cdd3591d4d936aef4f36ec1ced1f3efbdcade9cf1e084a7997e26",
+      "cases": {
+        "layout": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressViewTest#testConfirmedRestIsReadableNearTheTopOfTheShallowOverview",
+          "verdict": "product-assertion",
+          "counts": [
+            1,
+            1,
+            0
+          ]
+        },
+        "main": {
+          "selector": "io.drivegrowth.app.simulation.UnifiedSimulationRestActivityTest#testConfirmedRestCanBeReadInTheShallowMainWindow",
+          "verdict": "product-assertion",
+          "counts": [
+            1,
+            1,
+            0
+          ]
+        },
+        "states": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressViewTest#testActiveNeverGrantedAndConsumedRestKeepTheirStoredMeaning",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    "green-device-initial": {
+      "tree": "5be45386f8e6cf83372590da0b6af6b0f09af252",
+      "installedAppSha256": "0d85c6a40f2babf834f2097810bfeb95683d329d603374fa6c63c488e0ffae48",
+      "installedTestSha256": "9c02c663522cdd3591d4d936aef4f36ec1ced1f3efbdcade9cf1e084a7997e26",
+      "cases": {
+        "layout": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressViewTest#testConfirmedRestIsReadableNearTheTopOfTheShallowOverview",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        },
+        "main": {
+          "selector": "io.drivegrowth.app.simulation.UnifiedSimulationRestActivityTest#testConfirmedRestCanBeReadInTheShallowMainWindow",
+          "verdict": "product-assertion",
+          "counts": [
+            1,
+            1,
+            0
+          ]
+        },
+        "states": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressViewTest#testActiveNeverGrantedAndConsumedRestKeepTheirStoredMeaning",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        },
+        "testFailureLayoutPreservesContentPosition": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressScrollDeviceTest#testFailureLayoutPreservesContentPosition",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        },
+        "testLoadingLayoutPreservesContentPosition": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressScrollDeviceTest#testLoadingLayoutPreservesContentPosition",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        },
+        "testRestrictionHidesContentAndPreservesDetailSelectionAndListPosition": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressScrollDeviceTest#testRestrictionHidesContentAndPreservesDetailSelectionAndListPosition",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        },
+        "testUnlaidContentReplacementKeepsLastLaidOutPosition": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressScrollDeviceTest#testUnlaidContentReplacementKeepsLastLaidOutPosition",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    "green-device-final": {
+      "tree": "976f1ba39965397e3c881b44fcbc025ff4b4b159",
+      "installedAppSha256": "3a85c038605cdbaa18228a942129e446c0ec07daee2dcdc9d6d1e33bfcbff973",
+      "installedTestSha256": "9c02c663522cdd3591d4d936aef4f36ec1ced1f3efbdcade9cf1e084a7997e26",
+      "cases": {
+        "layout": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressViewTest#testConfirmedRestIsReadableNearTheTopOfTheShallowOverview",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        },
+        "main": {
+          "selector": "io.drivegrowth.app.simulation.UnifiedSimulationRestActivityTest#testConfirmedRestCanBeReadInTheShallowMainWindow",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        },
+        "states": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressViewTest#testActiveNeverGrantedAndConsumedRestKeepTheirStoredMeaning",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        },
+        "testFailureLayoutPreservesContentPosition": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressScrollDeviceTest#testFailureLayoutPreservesContentPosition",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        },
+        "testLoadingLayoutPreservesContentPosition": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressScrollDeviceTest#testLoadingLayoutPreservesContentPosition",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        },
+        "testRestrictionHidesContentAndPreservesDetailSelectionAndListPosition": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressScrollDeviceTest#testRestrictionHidesContentAndPreservesDetailSelectionAndListPosition",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        },
+        "testUnlaidContentReplacementKeepsLastLaidOutPosition": {
+          "selector": "io.drivegrowth.app.ui.progress.ProgressScrollDeviceTest#testUnlaidContentReplacementKeepsLastLaidOutPosition",
+          "verdict": "pass",
+          "counts": [
+            1,
+            0,
+            0
+          ]
+        }
+      }
+    }
+  },
+  "finalMainSeconds": 73.654,
+  "releaseKst": "2026-11-13T00:07:33+09:00",
+  "preservedChecks": "19/19",
+  "publicationBuildAndDeviceRerun": false
+}
