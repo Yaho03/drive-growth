@@ -2815,7 +2815,7 @@ main `101de32ccfb2b8e3b5855debf6acadee491106cf`에 `GarageScrapRecoveryMainActiv
 
 ## #57 실제 Main 상세 스크롤과 기간 경과 청구 복원 — 2026-11-13
 
-실행 기준은 main `ea1eafefe3621e658b186968731f5eda40077c39`이다. Pleos Emulator API 34 ARM64, Android 사용자 10, 1080×600 물리 픽셀·120dpi에서 격리 Debug 앱을 사용했다. JDK 17과 Gradle Wrapper로 `:app:assembleDebug :app:assembleDebugAndroidTest --offline`을 실행했다. 설치 후 회수한 APK의 SHA-256을 빌드본과 대조했다. 게시 부모 `752cd59c50b2a2c799577785ea2f21ced4904054`에는 #244·#246·#247·#248의 문서와 별도 기능의 계측 변경이 추가됐다. 실행 기준에서 게시 부모까지 제품·debug·core·빌드 설정에는 변경이 없고, 일반 계측 2개와 격리 전용 계측 원본 1개는 실행 후보와 Git blob이 같다. 제품 `ProgressView.kt`는 주석의 한국어 번역 한 줄만 다르다. 게시 조합의 추가 Gradle·장치 재실행은 미수행이다.
+실행 기준은 main `ea1eafefe3621e658b186968731f5eda40077c39`이다. Pleos Emulator API 34 ARM64, Android 사용자 10, 1080×600 물리 픽셀·120dpi에서 격리 Debug 앱을 사용했다. JDK 17과 Gradle Wrapper로 `:app:assembleDebug :app:assembleDebugAndroidTest --offline`을 실행했다. 설치 후 회수한 APK의 SHA-256을 빌드본과 대조했다. 게시 부모 `752cd59c50b2a2c799577785ea2f21ced4904054`에는 #244·#246·#247·#248의 문서와 별도 기능의 계측 변경이 추가됐다. 실행 기준에서 게시 부모까지 제품·debug·core·빌드 설정에는 변경이 없고, 일반 계측 2개와 격리 전용 계측 원본 1개는 실행 후보와 Git blob이 같다. 제품 `ProgressView.kt`는 주석의 한국어 번역 한 줄만 다르다. 작성자 인계 시점에는 게시 조합에서 추가 Gradle·장치 실행을 하지 않았다.
 
 ### 실제 SDK 정차 D 제한과 같은 상세 위치 복원
 
@@ -2834,3 +2834,5 @@ main `101de32ccfb2b8e3b5855debf6acadee491106cf`에 `GarageScrapRecoveryMainActiv
 - 설치 회수 앱 APK SHA-256은 `55296bc4f7ae8d5e7a185475705d1e15a61eef0a21751e3cf05ed48dfa39e060`, 계측 APK는 `6e155aa284c9249bbfac14ead9973f4f3e31fbd719f2631c31b578233422a2c5`이다. 이 실행에서 현재 기간 표시·취소·기존 원정산과 슬롯 상태를 확인했다. 과거 STARTED 원결과 payload의 UI 전달·표시는 이번 계측 범위 밖이다. 실차·전원 전환과 지원 창 전체 검증은 기존 범위를 따른다.
 
 **장치 보호:** 슬롯 시작 인계 대조는 19/19, 종료 대조는 17/19였다. 제품 APK·데이터 파일 6개·권한·크기/밀도·포워드·주차 상태를 보존했다. 필요한 속도 권한은 격리 패키지에만 부여했고 격리 앱과 계측 앱을 제거했다. 첫 재설치 중 장치 패키지 서비스의 `Broken pipe`를 기록했고 새 설치에서 재시험했다. 종료 시 부팅 카운트 25→26 및 같은 OEM 화면의 Activity 인스턴스 교체를 확인했다. 재부팅 명령은 실행하지 않았으며 두 변화의 원인은 확인되지 않았다. 장치는 부팅 완료·P 상태였고 자체 계측과 Gradle 프로세스가 남지 않은 상태에서 슬롯을 반환했다.
+
+2026-11-13 · [#249](https://github.com/Yaho03/drive-growth/pull/249)의 정확 게시 head `1efea1dbde949a46ac42b69e61cb6ff778c31dee`에서 로컬 앱 단위 814개(실패·오류·생략 0), 앱·계측 APK 빌드와 Lint(오류 0·경고 39)를 확인했다. 장치 근거는 위 격리 실행 기준이다. 이 PR을 main `b51d0c471b410a53a51e223b2963ed3c01970412`에 반영했고, 채택한 진행·보상·저장 및 기간 경과 복구 근거로 [#45](https://github.com/Yaho03/drive-growth/issues/45)를 종료했다. [#57](https://github.com/Yaho03/drive-growth/issues/57)은 지정 기간 복원과 실제 D/P 스크롤 근거를 재사용하며 세 목표의 남은 실제 Main 표시를 추적한다. 최종 앱 조합은 [#28](https://github.com/Yaho03/drive-growth/issues/28)에 남는다.
