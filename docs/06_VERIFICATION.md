@@ -3078,3 +3078,20 @@ Pleos 에뮬레이터에서 별도 SIMULATION factory 대신 실제 Vehicle SDK 
 v1은 시연 시작 버튼 대기에서, v2는 시설 확인 버튼 대기에서 끝났다. v3는 HOME를 새로 조회하고 같은 UI 이벤트에서 현재 FUEL_STATION 선택·확인 가능 여부를 확인한 뒤 입력했다. 제품 코드는 바꾸지 않았고 실제 원장·단일 차감·슬롯 해제 단언을 유지했다. 실패 원문을 성공으로 덮지 않는다.
 
 [첫 실행](evidence/final-pixel-ui/continuation/device-continuation-local-economy/instrumentation.txt) · [두 번째 실행](evidence/final-pixel-ui/continuation/device-continuation-v2-local-economy/instrumentation.txt) · [최종 통과](evidence/final-pixel-ui/continuation/device-continuation-v3-local-economy/instrumentation.txt) · [소스·설치 해시](evidence/final-pixel-ui/continuation/device-continuation-v3-local-economy/result.json) · [단계 로그](evidence/final-pixel-ui/continuation/device-continuation-v3-local-economy/filtered.txt) · [독립 원장 대조](evidence/final-pixel-ui/continuation/independent-review.json). 계측 재현은 `3bd7d92` 사본에 [시험 소스](evidence/final-pixel-ui/continuation/LocalEconomyContinuationTest.kt.gz)를 압축 해제해 같은 상대 경로에 놓고 [격리 설정](evidence/final-pixel-ui/continuation/continuation-isolation.gradle.gz)을 사용한다. 원본 경로·해시는 독립 대조 기록에 있다. APK·회수 DB는 저장소에 넣지 않았다.
+
+
+### 공식 세로·가로 창과 표준 Debug APK 직접 설치 — 2026-11-13
+
+`3bd7d925c1133fd5a45ecf3cc5ee8d72faabbdfb`의 표준 Debug APK `io.drivegrowth.app.simulation`을 별도 창으로 실행한 Pleos 2.1.0/API34 ARM64 AVD에 직접 설치했다. 설치 후 회수한 APK의 SHA-256은 빌드·로컬 인계 파일과 같은 `6a41e671741781d706025138bf07f964f141210138f162249c39c18f834eb745`다. 앞 절의 표준 APK 미설치는 빌드 당시 상태이며 이 실행으로 갱신한다. Release·실차·VEHICLE 모드 런처 검증은 아니다.
+
+| 공식 FormFactorConsole 프리셋 | 실제 확인 범위 |
+| --- | --- |
+| Connect-S 17″ Portrait, 840×1184px/dp·160dpi | 같은 모의 프로필에서 캐스퍼 첫 지급, HOME, 차고 상세, 도감 보유 이력·스크롤, 탁송 후보·스크롤, 진행 상세의 청구 불가 상태 |
+| 위 세로 창의 앱 task 660×1080px 축소 후 840×1184px 복원 | 시스템 `wm_relaunch_resume_activity`와 같은 캐스퍼 `initial-grant` 상세 유지. 새 프로세스 재시작이나 전체 화면 상태 복원으로 확대하지 않음 |
+| Connect-S 14.6″ Landscape, 1700×1185px·1360×948dp·200dpi | DISPLAY2 AppGrid 실제 SIM 아이콘 → 도감 → Back → HOME → 최상위 Back 뒤 앱 창 숨김. task 종료 또는 런처 복귀까지 확인한 것은 아님 |
+
+[프리셋·소스 결과](evidence/final-pixel-ui/form-factor/formal-verification-summary.json) · [회수 APK 해시](evidence/final-pixel-ui/form-factor/installed-standard-sha256.txt) · [세로 HOME](evidence/final-pixel-ui/form-factor/followup-standard-home-ready.png) · [차고 축소](evidence/final-pixel-ui/form-factor/followup-standard-garage-resized.png) · [차고 복원](evidence/final-pixel-ui/form-factor/followup-standard-garage-restored.png) · [Activity 재실행](evidence/final-pixel-ui/form-factor/activity-relaunch.txt) · [탁송 스크롤](evidence/final-pixel-ui/form-factor/followup-standard-delivery-scrolled.png) · [진행 상세](evidence/final-pixel-ui/form-factor/followup-standard-progress-detail.png) · [실제 앱 목록](evidence/final-pixel-ui/form-factor/official-landscape-standard-launch.png) · [가로 도감](evidence/final-pixel-ui/form-factor/official-landscape-standard-collection.png).
+
+별도 격리 APK `ef338238…b03`의 시스템 전체 90° 회전에서는 표시가 600×1080px로 바뀌어도 앱 bounds가 가로 `[360,57]–[1062,495]`로 유지되어 오른쪽 잘림이 관측됐다. 공식 Portrait에서 같은 잘림은 나타나지 않았다. 전달된 창 bounds의 관측이며 플랫폼 내부 원인을 확정하지 않는다. 시스템의 분할 화면 지원 조회는 `false`여서 Android 분할 검증 성공으로 기록하지 않는다.
+
+이 실행은 공식 모든 프리셋·긴 목표 문구 전체·임시 보관 차량 표시·실제 SDK 목적지 변경 성공을 확인한 결과가 아니다. 세로 캡처의 개체 식별자와 기본 외형 안내도 당시 표시 그대로 보존한다. 별도 DISPLAY2·브리지·AVD를 종료했고 원래 장치의 APK·데이터·권한·화면·전면·포워딩 보존은 [19/19](evidence/final-pixel-ui/form-factor/preservation.json) 일치했다. 원본 전체 로그·task·APK·DB는 공개 자료에 넣지 않았다.

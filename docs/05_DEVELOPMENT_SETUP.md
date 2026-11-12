@@ -267,6 +267,8 @@ adb -s emulator-5556 shell getprop sys.boot_completed
 
 차량 상태 웹 콘솔(8088), SDK 샘플 앱, 화면 크기 시험 도구는 목적이 다르다. 설치·포트·종료 조건은 [공식 자료 목록](contest/04_OFFICIAL_RESOURCES.md) 6절과 [Virtual Console 안내](contest/02_PLEOS_DEVELOPMENT.md) 5절을 기준으로 사용한다. 이미 기록된 headless 부팅 성공을 이 시험들의 성공으로 재분류하지 않는다.
 
+2026-11-13에는 별도 창의 AVD와 공식 Host Display Bridge·FormFactorConsole로 Portrait·Landscape를 실행했다. 현재 설치용 Debug APK의 직접 설치와 관측 범위는 [공식 창 실행 결과](06_VERIFICATION.md#공식-세로가로-창과-표준-debug-apk-직접-설치--2026-11-13)를 따른다. 기본 화면의 강제 회전·task 크기 변경을 공식 프리셋 시험으로 대신하지 않는다.
+
 ## 남은 검증
 
 - 기존 APK 빌드·설치·기본 실행은 2026-11-04 확인했다. 새 게임 화면·기능과 정책 검증은 후속 구현 범위다.
