@@ -21,7 +21,7 @@
 
 평소 이동을 탁송·차량 영입으로 연결하고, 주차 후 차량을 모으고 렌터카 가게를 확장하는 Pleos Connect 차량용 게임을 기획하고 있습니다.
 
-**#229 디자인의 HOME·첫 실행·정산·차고·도감·가챠·탁송·진행·내 기록을 Android에 연결했습니다.** 결합 후보 `ce03352`에서 좁은 View 탐색, HOME 지도·차량 선택, 모의 주행·영업·탁송과 원결과 재조회, 별도 실제 Vehicle SDK의 권한·D/P·Back을 확인했습니다. `ce03352` 격리 모의 앱의 AppGrid 아이콘 반복 실행·Back 복귀도 확인했으며, 별도 `3bd7d92` 표준 Debug를 공식 세로·가로 창에 직접 설치해 차고 상세 재생성과 가로 AppGrid·Back을 확인했습니다. [공식 창 실행](docs/06_VERIFICATION.md#공식-세로가로-창과-표준-debug-apk-직접-설치--2026-11-13). 남은 지원 창·실차와 최종 앱 조합은 #28에서 추적합니다. Debug APK는 로컬 검증용이며 제출용 Release APK·영상과 채택 자산의 외부 사용 조건은 [#29](https://github.com/Yaho03/drive-growth/issues/29)에서 확인합니다. [SDK·Back 실행](docs/06_VERIFICATION.md#같은-ce03352-apk의-실제-sdk-제한과-back)
+**#229 디자인의 HOME·첫 실행·정산·차고·도감·가챠·탁송·진행·내 기록을 Android에 연결했습니다.** 결합 후보 `ce03352`에서 좁은 View 탐색, HOME 지도·차량 선택, 모의 주행·영업·탁송과 원결과 재조회, 별도 실제 Vehicle SDK의 권한·D/P·Back을 확인했습니다. `ce03352` 격리 모의 앱의 AppGrid 아이콘 반복 실행·Back 복귀도 확인했으며, 별도 AVD에 `3bd7d92` 표준 Debug APK를 직접 설치하고 공식 세로·가로 창에서 차고 상세 재생성과 가로 AppGrid·Back을 확인했습니다. [공식 창 실행](docs/06_VERIFICATION.md#공식-세로가로-창과-표준-debug-apk-직접-설치--2026-11-13). 남은 지원 창·실차와 최종 앱 조합은 #28에서 추적합니다. Debug APK는 로컬 검증용이며 제출용 Release APK·영상과 채택 자산의 외부 사용 조건은 [#29](https://github.com/Yaho03/drive-growth/issues/29)에서 확인합니다. [SDK·Back 실행](docs/06_VERIFICATION.md#같은-ce03352-apk의-실제-sdk-제한과-back)
 
 처음 참여한다면 [4인 구현 시작 안내와 책임표](docs/08_PROJECT_PLAN.md)를 확인하세요. 기능 이슈 → 해당 PRD 항목 → 공통 데이터 계약 → 화면 명세 → 검증 명령 순서로 진행합니다. 공통 타입·거래 저장·fixture 구현은 기능 연결의 선행 작업입니다.
 
