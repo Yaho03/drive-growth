@@ -111,6 +111,35 @@ class AchievementLedgerTest : InstrumentationTestCase() {
         assertTrue(earned is io.drivegrowth.app.host.ranking.RankingValue.Empty)
     }
 
+    fun testAchievementAndLegacyGeneralRequestRejectCrossOwnerReuse() {
+        ok(add(1))
+        ok(add(2))
+        val claim = command(AchievementMetric.OWNED, "legacy-general")
+        val legacy = GameChange(RequestId("legacy-general"), TransactionKind.GARAGE, source, version,
+            MoneyChange(MoneyDirection.CREDIT, GameMoney(7)))
+        val receipt = ok(store.commitGameChange(legacy))
+        // 공용 명령·결과를 함께 바꿔 예약 규칙 이전의 정합적인 행을 재현한다.
+        val occupied = legacy.copy(requestId = claim.requestId)
+        raw { db ->
+            db.execSQL("UPDATE settlements SET request_id=?,command=?,result=? WHERE request_id=?",
+                arrayOf(occupied.requestId.value, LedgerJson.command(occupied).toString(),
+                    LedgerJson.settlement(receipt.copy(transaction = receipt.transaction.copy(requestId = occupied.requestId))).toString(),
+                    legacy.requestId.value))
+        }
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), store.achievements.claim(claim))
+        assertEquals(GameMoney(7), ok(store.balance()))
+        assertEquals(AchievementStatus.CLAIMABLE, state(AchievementMetric.OWNED).status)
+        assertEquals(receipt.settlementId, ok(store.commitGameChange(occupied)).settlementId)
+
+        val available = claim.copy(requestId = RequestId(ACHIEVEMENT_CLAIM_PREFIX + "unused"))
+        val original = ok(store.achievements.claim(available))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
+            store.commitGameChange(legacy.copy(requestId = available.requestId)))
+        assertEquals(original, ok(store.achievements.settlement(available.requestId)))
+        assertEquals(GameMoney(107), ok(store.balance()))
+        assertEquals(4, ok(store.listUnviewedSettlements()).size)
+    }
+
     fun testMilestoneAndClaimWritesRollbackTheirOriginalTransactions() {
         ok(add(1))
         raw { it.execSQL("CREATE TRIGGER ignore_achievement BEFORE INSERT ON achievements BEGIN SELECT RAISE(IGNORE); END") }

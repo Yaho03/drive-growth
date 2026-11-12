@@ -820,7 +820,11 @@ internal fun readRecordedSettlement(db: SQLiteDatabase, change: GameChange): Set
             null -> settlement.changedVehicle == null
             // 새로 지급한 차량은 희귀도·취득액·출처까지 원래 거래와 같아야 한다.
             is VehicleWrite.Add -> settlement.changedVehicle == write.vehicle
-            is VehicleWrite.Update -> settlement.changedVehicle?.ownedVehicleId == write.ownedVehicleId
+            is VehicleWrite.Update -> settlement.changedVehicle?.let { vehicle ->
+                vehicle.ownedVehicleId == write.ownedVehicleId && vehicle.level == write.level &&
+                    vehicle.levelProgressPercent == write.levelProgressPercent && vehicle.lifecycle == write.lifecycle &&
+                    vehicle.revision.value.toLong() == write.expectedRevision.value.toLong() + 1L
+            } == true
         }
         if (!sameVehicle) throw JSONException("정산 차량이 원래 거래와 다름")
         settlement

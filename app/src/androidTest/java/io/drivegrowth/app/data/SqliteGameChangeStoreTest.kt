@@ -275,13 +275,78 @@ class SqliteGameChangeStoreTest : InstrumentationTestCase() {
         store = open()
     }
 
+    fun testUpdateReplayRejectsDifferentStoredLevel() =
+        assertUpdateReplayRejects { it.copy(level = 3) }
+
+    fun testUpdateReplayRejectsDifferentStoredProgress() =
+        assertUpdateReplayRejects { it.copy(levelProgressPercent = 46) }
+
+    fun testUpdateReplayRejectsDifferentStoredLifecycle() =
+        assertUpdateReplayRejects { it.copy(lifecycle = VehicleLifecycle.SOLD) }
+
+    fun testUpdateReplayRejectsDifferentStoredRevision() =
+        assertUpdateReplayRejects { it.copy(revision = Revision(2)) }
+
+    private fun assertUpdateReplayRejects(changeSnapshot: (OwnedVehicle) -> OwnedVehicle) {
+        val original = vehicle().copy(rarity = Rarity.RARE, acquisitionCost = GameMoney(350),
+            acquisitionSource = VehicleAcquisitionSource.GACHA)
+        success(store.commitGameChange(credit("add").copy(kind = TransactionKind.GARAGE, vehicle = VehicleWrite.Add(original))))
+        val grow = credit("grow").copy(kind = TransactionKind.GARAGE, vehicle = VehicleWrite.Update(
+            original.ownedVehicleId, Revision(0), 2, VehicleLifecycle.OWNED, 45))
+        val profile = (store.localProfileId() as ContractResult.Success).value
+        val command = HostCheckpointCommand.Garage(ContentVersion("test-content"), grow)
+        assertEquals(ContractResult.Success(HostCommandCheckpoint(profile, command, HostCheckpointPhase.SAVED)),
+            store.hostCommands.save(profile, command))
+        val result = (store.hostCommands.execute(profile, command) as ContractResult.Success).value as HostCheckpointResult.Garage
+        val expectedVehicle = original.copy(level = 2, levelProgressPercent = 45, revision = Revision(1))
+        assertEquals(expectedVehicle, result.value.changedVehicle)
+        val started = ContractResult.Success(HostCommandCheckpoint(profile, command, HostCheckpointPhase.STARTED))
+        assertEquals(started, store.hostCommands.load(profile))
+        store.close()
+
+        val file = context.getDatabasePath(name)
+        val modified = result.value.copy(changedVehicle = changeSnapshot(expectedVehicle))
+        val encoded = LedgerJson.settlement(modified)
+        assertEquals(modified, LedgerJson.settlement(JSONObject(encoded.toString())))
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            val values = ContentValues().apply { put("result", encoded.toString()) }
+            assertEquals(1, db.update("settlements", values, "request_id = ?", arrayOf(grow.requestId.value)))
+        }
+        val before = file.readBytes()
+
+        store = open()
+        val replayed = store.commitGameChange(grow)
+        val replayReason = store.lastStorageFailure
+        store.close()
+        assertTrue("동일 명령 재시도 후 DB 원본 보존", before.contentEquals(file.readBytes()))
+
+        store = open()
+        val finished = store.hostCommands.finish(profile, command)
+        val finishReason = store.lastStorageFailure
+        val slot = store.hostCommands.load(profile)
+        val balance = store.balance()
+        val vehicles = store.listOwnedVehicles()
+        store.close()
+        val unchanged = before.contentEquals(file.readBytes())
+        store = open()
+
+        val expected = failure(ContractError.STORAGE_FAILURE)
+        assertEquals("동일 명령 재생 및 STARTED 완료", listOf(expected, expected), listOf(replayed, finished))
+        assertEquals(LedgerFailureReason.INVALID_RECORD, replayReason)
+        assertEquals(LedgerFailureReason.INVALID_RECORD, finishReason)
+        assertEquals(started, slot)
+        assertEquals(ContractResult.Success(GameMoney(200)), balance)
+        assertEquals(ContractResult.Success(listOf(expectedVehicle)), vehicles)
+        assertTrue("완료 실패 후 정산과 DB 원본 보존", unchanged)
+    }
+
     fun testPastAddAndGrowthReplayTheirSnapshotsAfterDisposalAndReopen() {
         val original = vehicle().copy(rarity = Rarity.RARE, acquisitionCost = GameMoney(350),
             acquisitionSource = VehicleAcquisitionSource.GACHA)
         val add = credit("add").copy(vehicle = VehicleWrite.Add(original))
-        val grow = credit("grow").copy(vehicle = VehicleWrite.Update(
+        val grow = credit("grow").copy(kind = TransactionKind.GARAGE, vehicle = VehicleWrite.Update(
             original.ownedVehicleId, Revision(0), 2, VehicleLifecycle.OWNED, 45))
-        val sell = credit("sell").copy(vehicle = VehicleWrite.Update(
+        val sell = credit("sell").copy(kind = TransactionKind.GARAGE, vehicle = VehicleWrite.Update(
             original.ownedVehicleId, Revision(1), 2, VehicleLifecycle.SOLD, 45))
         val added = success(store.commitGameChange(add))
         val grown = success(store.commitGameChange(grow))
@@ -290,13 +355,21 @@ class SqliteGameChangeStoreTest : InstrumentationTestCase() {
         assertEquals(original.copy(level = 2, revision = Revision(1), levelProgressPercent = 45), grown.changedVehicle)
         assertEquals(original.copy(level = 2, revision = Revision(2), lifecycle = VehicleLifecycle.SOLD,
             levelProgressPercent = 45), sold.changedVehicle)
-        store.close(); store = open()
+        store.close()
+        val file = context.getDatabasePath(name)
+        val before = file.readBytes()
+        store = open()
         assertEquals(ContractResult.Success(added), store.commitGameChange(add))
         assertEquals(ContractResult.Success(grown), store.commitGameChange(grow))
         assertEquals(ContractResult.Success(sold), store.commitGameChange(sell))
+        assertEquals(failure(ContractError.STATE_CONFLICT),
+            store.commitGameChange(grow.copy(vehicle = (grow.vehicle as VehicleWrite.Update).copy(levelProgressPercent = 46))))
         assertEquals(emptyList<OwnedVehicle>(), (store.listOwnedVehicles() as ContractResult.Success).value)
         assertEquals(listOf(added, grown, sold), (store.listUnviewedSettlements() as ContractResult.Success).value)
         assertEquals(ContractResult.Success(GameMoney(300)), store.balance())
+        store.close()
+        assertTrue(before.contentEquals(file.readBytes()))
+        store = open()
     }
 
     fun testMissingVehicleFieldsFailWithoutChangingLegacyRecord() {
