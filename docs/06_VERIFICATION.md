@@ -1991,6 +1991,29 @@ A가 API 34 ARM64 에뮬레이터에서 RED와 GREEN을 차례로 각 1회 실�
 
 앱 APK `40bd4d9cb6d25ff630068b4fe556736065b83cc598ef9c4e2efbf3a18dd4002b`와 계측 APK `73812b16a97120610c8045cc2dff6826a4c96cfbe953151c00ce12d438582c0e`의 설치 회수본 SHA-256이 빌드본과 일치했다. 두 격리 패키지만 정리하고 제품·환경 보존 19/19와 기존 진단 앱 설치 상태를 확인했다. 장치는 12:09:46 KST에 반환했다. 위 rev4의 12건과는 서로 다른 소스·APK의 결과다.
 
+#### #28 구매 탁송 포기와 모의 도착의 새 프로세스 복원 — 2026-11-12
+
+실행 제품 기준은 #226 머지 커밋 `e5051768f576123165f06f516f8b54dab6b65fdf`(트리 `88c3f9ef259f8741384adbe243b325ba3979841f`)에 결과 확인 버튼 수정 패치 `5797eb9178f15e0351e2fc271e497223bb18a4d2a1aa2cadb16eadd5fa8a2871`를 적용한 소스다. 후보 발견 저장 등 탁송 작업 중 결과 확인을 비활성화하고, 완료 뒤 같은 원결과의 확인을 허용한다. 게시 기준 `26354b4`의 #227 시험·문서는 유지했다. 제품 파일과 도착·새 PID에 사용한 시험 파일은 실행본과 동일하다. 포기 통과 당시 시험 파일은 이후 추가한 메뉴 대기·보관 요청 진입·실패 진단을 포함하지 않았으며 포기 원장 단언은 동일하다.
+
+Pleos API 34 ARM64 사용자 10의 별도 Debug **SIMULATION** 설치 두 개에서 [Main 구매 탁송 계측](../app/src/androidTest/java/io/drivegrowth/app/simulation/PurchaseDeliveryMainFlowTest.kt)을 실행했다. 새 프로필의 초기 지급 1,000을 확인한 뒤 구매를 위한 시험 거래로 10,000을 공급했다. 구매 후보 표시·선택·결제·포기·도착 및 결과 확인은 기존 Main 위젯과 실제 SQLite를 사용했다.
+
+| 지정 계측 | 실행 결과 |
+|---|---|
+| `testPurchaseThenAbandonRefundsExactlyOnce` | 6.834초, 통과. 구매 2,040 한 번 차감, 수수료 10% 공제 뒤 1,836 한 번 환급. 잔액 10,796, 신규 차량·도착 결과 없음, 확인 후 슬롯 0건. |
+| `testPurchaseThenSimulatedArrivalPersistsOneVehicle` | 37.289초, 통과. 명시 모의 주행의 62단계 도착·65단계 종료, 같은 경로·프로필 확인. 구매 1,200 한 번 차감, 일반 아반떼 한 대 지급·취득 기준액 1,200, 도착에서 추가 차감 없음. |
+| `testColdProcessReopensSamePurchaseArrivalWithoutGrantingAgain` | 2.632초, 통과. 같은 설치에서 강제 종료 후 프로세스 부재를 확인하고 PID 32232→9357에서 보관 요청을 열었다. 같은 원결과·잔액 10,280·정산·보유·탁송 행을 확인했고 결과 확인 후 슬롯만 1→0이 됐다. |
+
+세 회수본 모두 SQLite `user_version=20` 및 `quick_check=ok`였다. 설치에서 회수한 APK는 빌드본과 일치했다. 격리 패키지·프로세스·활성 계측을 정리하고 제품·환경 보존 19/19와 진단 앱 설치 상태를 확인한 뒤 13:27:27 KST에 반환했다.
+
+| 격리 앱 접미 구분 | 앱 SHA-256 | 계측 SHA-256 |
+|---|---|---|
+| `purchase28cancel` | `de6e2aa1245ac0455b29f0970b0b3192ed1389100ed4bff5ffb0d71d173a706d` | `205195953fd5a7d95d844bf3c430b726ce6f910488c18ff66f7ec2c26718c23f` |
+| `purchase28arrival` | `796a8ffbcd6f9cbf1634995a3692ffddd514bd6c0f62a7f3c4ccdff3e5a5993a` | `cfea77728040b4a5ca97d9742ba6cb7926f39f7bc46baf4c3fa76ed9d0606faf` |
+
+재현에는 JDK 17·SDK 35·기존 캐시를 사용한다. `:app:assembleDebug :app:assembleDebugAndroidTest`를 오프라인으로 실행하되 로컬 Gradle init에서 앱 ID를 각각 `io.drivegrowth.verify.purchase28cancel`, `io.drivegrowth.verify.purchase28arrival`로 지정하고 Debug ID 접미사를 제거한다. 계측 ID는 각각 앱 ID에 `.test`를 붙인다. 이 클래스는 패키지와 새 DB를 단언하므로 기본 Debug 대상이나 전체 장치 계측 묶음에 넣으면 안 된다. `android.test.InstrumentationTestRunner`의 `am instrument --user 10 -w -r -e class io.drivegrowth.app.simulation.PurchaseDeliveryMainFlowTest#<메서드> <계측 ID>/android.test.InstrumentationTestRunner`로 각 메서드를 지정한다. 포기와 도착은 각각 새 설치에서 실행하고, 도착과 새 PID 계측 사이에는 같은 설치·데이터를 유지한 채 격리 앱·계측 패키지만 종료한다.
+
+최초 포기 실행은 환급 뒤 슬롯 해제에서 실패했고 제품 버튼의 활성 조건을 수정했다. 계측에서는 누락 import, 65단계 대기 시간, Main 메뉴 교체 대기 및 보관 요청 진입을 보완했다. 한 회수에는 롤백 저널이 남아 일관된 DB 사본으로 사용하지 않았다. 위 표는 재검증에서 통과한 세 메서드의 결과다. 게시 사본에서는 저장소·diff 및 바이트 일치만 검사했다. 실제 SDK 목적지 선택·변경, 경로 귀속이 확인된 실제 도착, 미도착·만차 경계, 물리 터치·전원·실차 검증은 후속 범위다.
+
 #### Schema19 이전과 Quest 원결과 재생의 별도 계측 — 2026-11-12
 
 `c03a333427acf4c1b4a37045ad2e2033365ddba1`에 계측 전용 패치 `108a79a9d3636ba83e777fa05887b1aaa0db6829e2759594478cf7b47b7e1c5d`를 적용한 Pleos API 34 ARM64 격리 실행에서 `Schema19UpgradeTest` 3건(2.800초)과 `QuestStoreIntegrationTest#testActualClaimWholeReplayPrecedesNewDefinitionTimeAndCurrentBalance` 1건(0.217초)이 통과했다. v2·v10·v12의 과거 DDL과 재현용 SIMULATION 행으로 기존 열의 값, 새 `visits.host_command`의 초기 `NULL`, DB 재개방을 확인했다. v12 후기 실패 롤백·원본 보존과 교차 소유 요청 충돌도 검증했다. Quest는 정의·시각·현재 잔액이 달라져도 같은 청구의 당시 전체 결과가 우선 재생되는지 확인했다.
