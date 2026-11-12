@@ -113,7 +113,7 @@ class RentalResultBasisDeviceTest : InstrumentationTestCase() {
         store.close(); raw { it.execSQL("DROP TABLE rental_result_basis"); it.version = 17 }; reopen()
         assertEquals(Observation.Missing(MissingReason.NO_DATA), ok(RentalResultBasisReader(store).read(id)))
         assertEquals(receipt, ok(store.rental.settle(id)))
-        assertEquals(before, rows().filterNot { it.startsWith("rental_result_basis:") }); raw { assertEquals(19, it.version) }
+        assertEquals(before, rows().filterNot { it.startsWith("rental_result_basis:") }); raw { assertEquals(20, it.version) }
     }
 
     fun testLegacyActiveRentalDoesNotAcquirePartialBasisMidway() {

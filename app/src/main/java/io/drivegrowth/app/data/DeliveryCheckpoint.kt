@@ -3,6 +3,7 @@ package io.drivegrowth.app.data
 import android.content.ContentValues
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
+import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.delivery.*
 import org.json.JSONObject
@@ -12,7 +13,7 @@ import java.util.Collections
 sealed interface DeliveryCheckpointOperation {
     val requestId:RequestId
     data class Select(val proposed:DeliveryProposed,val offerId:DeliveryOfferId,override val requestId:RequestId,val route:RouteId,val at:EpochMillis):DeliveryCheckpointOperation
-    data class Change(val rules:DeliveryChangeRules,val offer:DeliveryChangeOffer,val offerId:DeliveryOfferId,val route:RouteId):DeliveryCheckpointOperation {override val requestId get()=offer.requestId}
+    data class Change(val rules:DeliveryChangeRules,val offer:DeliveryChangeOffer,val offerId:DeliveryOfferId,val route:RouteId,val observedRoute:RouteId?=null):DeliveryCheckpointOperation {override val requestId get()=offer.requestId}
     data class Abandon(val rules:DeliveryChangeRules,override val requestId:RequestId):DeliveryCheckpointOperation
     data class Arrival(val rules:DeliverySettlementRules,override val requestId:RequestId,val evidence:Observation<DeliveryArrivalEvidence>,val now:EpochMillis,val expected:DeliveryList,val replacement:DeliveryList):DeliveryCheckpointOperation
     data class Hold(val rules:DeliverySettlementRules,override val requestId:RequestId,val now:EpochMillis):DeliveryCheckpointOperation
@@ -37,6 +38,7 @@ internal object DeliveryCheckpointJson {
         val value=when(op) {
             is DeliveryCheckpointOperation.Select->DeliveryJson.command(op.requestId,op.offerId,op.proposed).put("route",op.route.value).put("at",op.at.value)
             is DeliveryCheckpointOperation.Change->DeliveryJson.changeCommand(op.rules,op.offer,op.offerId,op.route)
+                .apply { op.observedRoute?.let { put("observedRoute", it.value) } }
             is DeliveryCheckpointOperation.Abandon->DeliveryJson.abandonCommand(op.requestId,op.rules)
             is DeliveryCheckpointOperation.Arrival->DeliveryJson.arrivalCommand(op.requestId,op.rules,op.evidence,op.now).put("expected",DeliveryJson.list(op.expected)).put("replacement",DeliveryJson.list(op.replacement))
             is DeliveryCheckpointOperation.Hold->DeliveryJson.holdCommand(op.requestId,op.rules,op.now)
@@ -51,7 +53,8 @@ internal object DeliveryCheckpointJson {
         val v=j.getJSONObject("value")
         val op=when(j.getString("kind")) {
             "select"->DeliveryCheckpointOperation.Select(proposed(v.getJSONObject("proposed")),DeliveryOfferId(v.getString("offer")),RequestId(v.getString("request")),RouteId(v.getString("route")),EpochMillis(DeliveryJson.long(v,"at",0,Long.MAX_VALUE)))
-            "change"->DeliveryJson.changeInput(v).let{DeliveryCheckpointOperation.Change(it.rules,it.offer.copy(proposed=proposed(v.getJSONObject("proposed"))),it.offerId,it.route)}
+            "change"->DeliveryJson.changeInput(v).let{DeliveryCheckpointOperation.Change(it.rules,it.offer.copy(proposed=proposed(v.getJSONObject("proposed"))),it.offerId,it.route,
+                if (v.has("observedRoute")) RouteId(v.getString("observedRoute")) else null)}
             "abandon"->DeliveryJson.abandonInput(v).let{DeliveryCheckpointOperation.Abandon(it.second,it.first)}
             "arrival"->DeliveryJson.arrivalInput(v).let{DeliveryCheckpointOperation.Arrival(it.rules,it.requestId,it.evidence,it.now,list(v.getJSONObject("expected")),list(v.getJSONObject("replacement")))}
             "hold"->DeliveryJson.holdInput(v).let{DeliveryCheckpointOperation.Hold(it.rules,it.requestId,it.now)}
@@ -85,6 +88,19 @@ internal object DeliveryCheckpointStorage {
         val original=hasOriginal(db,c)
         if(!original&&!canPrepare(db,c))return ContractResult.Failure(ContractError.STATE_CONFLICT)
         val op=c.operation
+        if (!original && op is DeliveryCheckpointOperation.Change &&
+            (store.source == InputSource.VEHICLE || op.observedRoute != null)) {
+            if (store.source != InputSource.VEHICLE || op.observedRoute == null)
+                return ContractResult.Failure(ContractError.STATE_CONFLICT)
+            val current = store.delivery.inProgress(db) ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+            if (current.active.requestId != op.requestId || current.route != op.observedRoute)
+                return ContractResult.Failure(ContractError.STATE_CONFLICT)
+            val identity = GameIdentity(actual(store.localProfileId()), store.source)
+            when (val verified = DeliveryObservedDistance.verifyChange(db, identity, current, op.offer.traveledMeters, store.currentDeliveryDistanceSession())) {
+                is ContractResult.Failure -> return verified
+                is ContractResult.Success -> Unit
+            }
+        }
         var replaced=false
         val result:ContractResult<DeliveryCheckpointReceipt> = when(op) {
             is DeliveryCheckpointOperation.Select->when(val selected=store.delivery.select(op.proposed,op.offerId,op.requestId)) {
@@ -119,6 +135,17 @@ internal object DeliveryCheckpointStorage {
                 is DeliveryCheckpointOperation.Change->if(actual(store.delivery.inProgress())?.route!=op.route)throw SQLiteException("탁송 실제 변경 경로 불일치")
                 is DeliveryCheckpointOperation.Abandon,is DeliveryCheckpointOperation.Arrival->if(actual(store.delivery.active())!=null)throw SQLiteException("탁송 활성 종료 쓰기 불일치")
                 is DeliveryCheckpointOperation.Hold->if(actual(store.delivery.held()).any{it.requestId==op.requestId})throw SQLiteException("탁송 보류 실제 제거 불일치")
+            }
+            if (store.source == InputSource.VEHICLE &&
+                (op is DeliveryCheckpointOperation.Select || op is DeliveryCheckpointOperation.Change)) {
+                val current = store.delivery.inProgress(db) ?: throw SQLiteException("거리 관측에 연결할 탁송 경로 없음")
+                val identity = GameIdentity(actual(store.localProfileId()), store.source)
+                val commitAt = store.now()
+                val at = if (op is DeliveryCheckpointOperation.Select && op.at.value > commitAt.value) op.at else commitAt
+                when (val armed = DeliveryObservedDistance.arm(db, identity, current, at, store.currentDeliveryDistanceSession())) {
+                    is ContractResult.Failure -> return armed
+                    is ContractResult.Success -> Unit
+                }
             }
             val arrived=(result.value as? DeliveryCheckpointReceipt.Arrived)?.value?.outcome
             if(arrived is DeliveryOutcome.VehicleHeld && actual(store.delivery.held()).singleOrNull{it.requestId==op.requestId}!=arrived.held)

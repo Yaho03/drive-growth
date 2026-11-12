@@ -76,14 +76,14 @@ private fun ContractResult<*>.unit(): ContractResult<Unit> = when(this) {
 }
 internal fun DeliveryHostOperation.checkpoint(): DeliveryCheckpointOperation = when(this) {
     is DeliveryHostOperation.Select -> DeliveryCheckpointOperation.Select(proposed, offerId, requestId, route, at)
-    is DeliveryHostOperation.Change -> DeliveryCheckpointOperation.Change(rules, offer, offerId, route)
+    is DeliveryHostOperation.Change -> DeliveryCheckpointOperation.Change(rules, offer, offerId, route, observedRoute)
     is DeliveryHostOperation.Abandon -> DeliveryCheckpointOperation.Abandon(rules, requestId)
     is DeliveryHostOperation.Arrival -> DeliveryCheckpointOperation.Arrival(rules, requestId, evidence, now, expected, replacement)
     is DeliveryHostOperation.Hold -> DeliveryCheckpointOperation.Hold(rules, requestId, now)
 }
 internal fun DeliveryCheckpointOperation.host(): DeliveryHostOperation = when(this) {
     is DeliveryCheckpointOperation.Select -> DeliveryHostOperation.Select(proposed, offerId, requestId, route, at)
-    is DeliveryCheckpointOperation.Change -> DeliveryHostOperation.Change(rules, offer, offerId, route)
+    is DeliveryCheckpointOperation.Change -> DeliveryHostOperation.Change(rules, offer, offerId, route, observedRoute)
     is DeliveryCheckpointOperation.Abandon -> DeliveryHostOperation.Abandon(rules, requestId)
     is DeliveryCheckpointOperation.Arrival -> DeliveryHostOperation.Arrival(rules, requestId, evidence, now, expected, replacement)
     is DeliveryCheckpointOperation.Hold -> DeliveryHostOperation.Hold(rules, requestId, now)

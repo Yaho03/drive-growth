@@ -251,7 +251,7 @@ class ShopOriginalResultReaderDeviceTest : InstrumentationTestCase() {
         }
         store = open()
         assertNull(ok(store.hostCommands.load(profile)))
-        raw { assertEquals(19, it.version) }
+        raw { assertEquals(20, it.version) }
         stopDefinitions()
     }
 
