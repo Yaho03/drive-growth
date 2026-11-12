@@ -5,6 +5,8 @@ import android.os.Process
 import android.os.SystemClock
 import android.test.ActivityInstrumentationTestCase2
 import android.util.Log
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -63,6 +65,152 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
     private fun <T> read(action:(GameSession)->T):T = ok(GameSessionFactory(instrumentation.targetContext).open()).use(action)
     private fun progress(a:MainActivity)=attached<ProgressView>(a)
     private fun claimed(a:MainActivity)=progress(a)?.let{v->tree(v).filterIsInstance<TextView>().any{it.text.toString()==instrumentation.targetContext.getString(R.string.progress_claimed)}}==true
+    fun testQuestDetailRemainsUnclaimedAcrossActualStationaryDriveAndPark() {
+        val context=instrumentation.targetContext
+        assertEquals("이번 계측의 전용 패키지", "io.drivegrowth.verify.questgatee", context.packageName)
+        for(n in listOf("game-ledger-vehicle.db","game-ledger-simulation.db"))
+            assertFalse("새 격리 패키지 cold 첫 플레이가 필요함. 기존 DB 삭제 금지: $n",context.getDatabasePath(n).exists())
+        val definitions=ok(ok(AssetTrialDefinitionProvider(context.assets).load()).questDefinitions(ZoneId.systemDefault()))
+        val definition=definitions.definitions.single{it.id=="daily-result-viewed"}
+        assertEquals("이 시나리오는 중앙 정의의 결과 열람 1회 목표를 검증한다",1,definition.goal)
+        val startedAt = EpochMillis(System.currentTimeMillis())
+        val expectedPeriod = questPeriod(definition.cadence, definition.zone, startedAt)
+        Log.i("QuestMainNewPid", "STARTED pid=${Process.myPid()} observedAt=${Instant.ofEpochMilli(startedAt.value)}")
+        val first=activity
+        gate(first)
+        await(first,"NEW 최초 안내") { attached<OnboardingView>(first)!=null }
+        click(first,R.string.onboarding_start)
+        click(first,VehicleId("hyundai_casper"))
+        click(first,R.string.onboarding_review)
+        click(first,R.string.onboarding_confirm)
+        await(first,"실제 저장 성공 뒤 가게로 버튼") { first.window.decorView.findViewWithTag<Button>(R.string.onboarding_to_shop)?.isEnabled==true }
+        val initial=read { game ->
+            val init=ok(game.store.readInitialization(game.identity.profileId))
+            assertTrue(init.status is ProfileInitializationStatus.Existing)
+            val original=(init.status as ProfileInitializationStatus.Existing).original.also { assertNotNull("실제 최초 지급 원결과",it) }!!
+            assertEquals(FirstGrant.INITIAL_MONEY,ok(game.store.balance()))
+            val vehicle=ok(game.store.listOwnedVehicles()).single()
+            assertEquals(VehicleId("hyundai_casper"),vehicle.vehicleId)
+            assertEquals(VehicleAcquisitionSource.INITIAL_GRANT,vehicle.acquisitionSource)
+            assertEquals(original.grant.changedVehicle,vehicle)
+            original
+        }
+        click(first,R.string.onboarding_to_shop)
+        await(first,"저장 성공 뒤 실제 가게") { attached<ShopView>(first)!=null }
+        chooseGatePage(first, "미확인 정산") { attached<ResultsView>(first)?.isShown == true && first.window.decorView.findViewWithTag<Button>("results:open:${initial.grant.settlementId.value}")?.isEnabled == true }
+        val grantId=initial.grant.settlementId
+        click(first,"results:open:${grantId.value}")
+        click(first,"results:mark:${grantId.value}")
+        await(first,"원래 초기 정산 열람 완료 UI") {
+            attached<ResultsView>(first)?.uiState?.readStates?.get(grantId)==io.drivegrowth.app.ui.results.ResultsReadState.Done
+        }
+        read { game -> assertFalse(ok(game.store.listUnviewedSettlements()).any{it.settlementId==grantId});assertEquals(FirstGrant.INITIAL_MONEY,ok(game.store.balance())) }
+        chooseGatePage(first, "퀘스트·진행") { first.window.decorView.findViewWithTag<Button>(progressKey(definition, expectedPeriod))?.isEnabled == true }
+        if(questPeriod(definition.cadence,definition.zone,EpochMillis(System.currentTimeMillis()))!=expectedPeriod)
+            throw IllegalStateException("ENVIRONMENT_PERIOD_CHANGED: 청구 전 날짜/시간대 경계 변경")
+        val key=progressKey(definition,expectedPeriod)
+        await(first,"실제 daily 결과 확인 목표 상세") { first.window.decorView.findViewWithTag<Button>(key)?.isEnabled==true }
+        assertEquals(GameMoney(100), definition.reward)
+        click(first,key)
+        await(first, "same daily quest and enabled claim in P") {
+            questReady(first, key)
+        }
+        val point = IntArray(2)
+        await(first, "complete claim button inside the actual window") {
+            val button = first.window.decorView.findViewWithTag<Button>("progress-claim") ?: return@await false
+            if (!button.isLaidOut || button.width == 0 || button.height == 0) return@await false
+            val visible = Rect()
+            if (!button.getLocalVisibleRect(visible) || visible != Rect(0, 0, button.width, button.height)) {
+                button.requestRectangleOnScreen(Rect(0, 0, button.width, button.height), true)
+                return@await false
+            }
+            button.getLocationOnScreen(point)
+            point[0] += button.width / 2
+            point[1] += button.height / 2
+            true
+        }
+        val before = gateLedger()
+        assertEquals(listOf(listOf("1", "1000", "VEHICLE")), before.getValue("account"))
+        assertEquals(1, before.getValue("quest_events").size)
+        for (name in listOf("quest_claims", "quest_settlements", "host_command_checkpoint")) {
+            assertTrue(name, before.getValue(name).isEmpty())
+        }
+        Log.i("QuestGateE", "REQUEST_DRIVE_STATIONARY key=$key claimPoint=${point.toList()}")
+        awaitVehicleGate("D0 restriction") {
+            val root = first.window.decorView
+            menu(first) == null && progress(first) == null &&
+                root.findViewWithTag<Button>("progress-claim") == null &&
+                tree(root).filterIsInstance<TextView>().any {
+                    it.isShown && it.text.toString() == "주차 후 조작이 허용되면 이용할 수 있습니다."
+                }
+        }
+        assertEquals(before, gateLedger())
+        var focused = false
+        instrumentation.runOnMainSync { focused = first.window.decorView.hasWindowFocus() }
+        if (focused) {
+            val down = SystemClock.uptimeMillis()
+            for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
+                val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, point[0].toFloat(), point[1].toFloat(), 0)
+                try {
+                    event.source = InputDevice.SOURCE_TOUCHSCREEN
+                    instrumentation.sendPointerSync(event)
+                } finally { event.recycle() }
+            }
+            instrumentation.waitForIdleSync()
+            Log.i("QuestGateE", "RESTRICTED_WINDOW_TOUCH_INJECTED point=${point.toList()}")
+        } else {
+            Log.i("QuestGateE", "RESTRICTED_TOUCH_NOT_RUN no window focus")
+        }
+        assertEquals(before, gateLedger())
+        Log.i("QuestGateE", "REQUEST_PARK")
+        awaitVehicleGate("P recovery shows the same unclaimed detail") { questReady(first, key) }
+        assertEquals(expectedPeriod, questPeriod(definition.cadence, definition.zone, EpochMillis(System.currentTimeMillis())))
+        assertEquals(before, gateLedger())
+        Log.i("QuestGateE", "P_SAME_QUEST_UNCLAIMED")
+        Log.i("QuestGateE", "QUEST_GATE_LEDGER_UNCHANGED firstViewed=1 claim=0 payout=0 balance=1000")
+        SystemClock.sleep(700)
+    }
+
+    private fun questReady(a: MainActivity, key: ProgressKey): Boolean {
+        val view = progress(a) ?: return false
+        val labels = tree(view).filterIsInstance<TextView>().map { it.text.toString() }
+        return menu(a)?.isEnabled == true && view.isShown && view.uiState.selectedKey == key &&
+            a.window.decorView.findViewWithTag<Button>("progress-claim")?.let { it.isShown && it.isEnabled } == true &&
+            labels.containsAll(listOf("결과 확인하기", "1 / 1회", "100 게임머니"))
+    }
+
+    private fun chooseGatePage(a: MainActivity, name: String, ready: () -> Boolean) {
+        await(a, "actual destination $name") {
+            if (ready()) return@await true
+            val current = menu(a)?.takeIf { it.isEnabled && it.isLaidOut && !it.isLayoutRequested } ?: return@await false
+            val index = (0 until current.count).single { current.getItemAtPosition(it).toString() == name }
+            if (current.selectedItemPosition != index) current.setSelection(index)
+            false
+        }
+    }
+
+    private fun awaitVehicleGate(label: String, ready: () -> Boolean) {
+        val deadline = SystemClock.uptimeMillis() + 45_000
+        while (SystemClock.uptimeMillis() < deadline) {
+            var done = false
+            instrumentation.runOnMainSync { done = ready() }
+            if (done) return
+            SystemClock.sleep(50)
+        }
+        fail("SDK_OR_VIEW_TIMEOUT: $label")
+    }
+
+    private fun gateLedger(): Map<String, List<List<String?>>> = read { game ->
+        ok(game.store.read { db ->
+            val queries = listOf("account", "initialization_profile", "quest_events", "quest_claims", "host_command_checkpoint")
+                .associateWith { "SELECT * FROM $it ORDER BY 1" } +
+                ("quest_settlements" to "SELECT * FROM settlements WHERE request_id LIKE 'quest/claim/%' ORDER BY 1")
+            queries.mapValues { (_, sql) -> db.rawQuery(sql, null).use { rows ->
+                buildList { while (rows.moveToNext()) add(List(rows.columnCount) { rows.getString(it) }) }
+            } }
+        })
+    }
+
     fun testActualFirstGrantResultsViewQuestClaimAndRecreationNeverDoubleCredit() {
         val context=instrumentation.targetContext
         assertEquals("이번 계측의 전용 패키지", QUEST_PID_PACKAGE, context.packageName)
