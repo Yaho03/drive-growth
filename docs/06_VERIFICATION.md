@@ -3246,6 +3246,6 @@ Back의 추가 재시험 두 번은 권한 복원 직후 SDK가 `NO_DATA`에 머
 | [표준 Debug 최근 Task 복귀](evidence/issue51-back-return/recent-task-retry.txt) | 기존 `NavigationTest#testTopLevelBackHidesTask` 1/1, 2.217초. 같은 Activity·task의 창 숨김→AppTask.moveToFront→가시성·포커스 복구. [수명주기 로그](evidence/issue51-back-return/recent-task-lifecycle.txt)에서 복귀 사이 두 번째 onResume 없음. 이 시험은 SDK 구독 횟수를 직접 계측하지 않음 |
 | [최초 시도](evidence/issue51-back-return/recent-task-instrumentation.txt) | 시험 시작 포커스 조건 실패. 격리 앱 권한·포커스 준비 후 같은 APK 재시험이며 최초 실패 보존 |
 
-[APK 식별](evidence/issue51-back-return/metadata.json)의 표준 Debug와 로깅 전용 VEHICLE APK는 다르다. SDK 이벤트 추적을 표준 APK에서 직접 계측한 것으로 표시하지 않는다. 시험은 Pleos API 34 ARM64 격리 AVD에서 수행했다. P·속도 0 복원, 격리 패키지·포워드 제거 후 해당 AVD만 종료했고 원래 공유 AVD·제품 데이터는 수정하지 않았다.
+[APK 식별](evidence/issue51-back-return/metadata.json)의 표준 Debug와 로깅 전용 VEHICLE APK는 다르다. SDK 이벤트 추적을 표준 APK에서 직접 계측한 것으로 표시하지 않는다. 시험은 Pleos API 34 ARM64 격리 AVD에서 수행했다. Back은 Android `KEYCODE_BACK` 주입이며 실제 차량 버튼이나 CCP의 직접 입력 시험이 아니다. P·속도 0 복원, 격리 패키지·포워드 제거 후 해당 AVD만 종료했고 원래 공유 AVD·제품 데이터는 수정하지 않았다.
 
 대상 환경에서 실제 onResume 없는 최근 Task 복귀를 확인했다. 다만 Back 전 이미 top=false이고 Back 뒤 새로운 false 없이 정당한 true만 오는 다른 OEM 순서는 검증하지 않았다. 현재 경계는 그 경우 일반 onResume을 기다리므로 Android 전체 환경의 복귀 보장을 주장하지 않는다. 공식 회전·분할 창·실차 등 #28·#51의 잔여 조건은 계속 열어 둔다.
