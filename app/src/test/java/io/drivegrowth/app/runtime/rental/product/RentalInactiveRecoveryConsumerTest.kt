@@ -83,6 +83,58 @@ class RentalInactiveRecoveryConsumerTest {
             assertTrue(f.writes.isEmpty())
         }
     }
+    @Test fun forwardWallJumpOnlyUsesVerifiedExitAndReplaysItsFirstCommand() {
+        val jumped = to.copy(epoch = EpochMillis(to.epoch.value + 9 * 3_600_000))
+        val command = interval.copy(to = jumped, forwardWallJump = true)
+        val f = Fixture()
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
+            f.consumer.resumeWith(actor, jumped) { _, _ -> error("Unverified exit") })
+        f.stored = ContractResult.Success(original.copy(verifiedExit = true))
+        for (invalid in listOf(jumped.copy(bootId = "other"), jumped.copy(elapsedMs = 9), to)) {
+            assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
+                f.consumer.resumeWith(actor, invalid) { _, _ -> error("Invalid clock") })
+        }
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),
+            f.consumer.resumeWith(actor, jumped) { _, actual ->
+                assertEquals(command, actual)
+                ContractResult.Failure(ContractError.STORAGE_FAILURE)
+            })
+        f.stored = ContractResult.Success(original.copy(verifiedExit = true,
+            phase = RentalInactivePhase.PREPARED, interval = command))
+        assertEquals(ContractResult.Success(snapshot), f.consumer.resumeWith(actor,
+            jumped.copy(epoch = EpochMillis(jumped.epoch.value + 1_000), elapsedMs = jumped.elapsedMs + 1_000)) { _, actual ->
+            assertEquals(command, actual)
+            ContractResult.Success(snapshot)
+        })
+        assertEquals(0, f.reads)
+    }
+    @Test fun rawRejectedCandidateCanBeReplacedByCorrectedClockWhileStillRecorded() {
+        val f = Fixture()
+        f.stored = ContractResult.Success(original.copy(verifiedExit = true))
+        val unverified = to.copy(epoch = EpochMillis(to.epoch.value + 9 * 3_600_000L))
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
+            f.consumer.resumeWith(actor, unverified) { _, command ->
+                f.consumer.discardUnverifiedForward(command)
+                ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+            })
+        f.result = ContractResult.Success(snapshot)
+        assertEquals(ContractResult.Success(snapshot), f.consumer.resume(actor))
+        assertEquals(listOf(interval), f.writes)
+    }
+    @Test fun visitScheduleKeepsSequenceAndSkipsPastSlotsInBothClockDomains() {
+        val minute = 60_000L
+        val cursor = RentalVisitCursor(Revision(7), 3, since.copy(
+            epoch = EpochMillis(since.epoch.value + 30 * minute), elapsedMs = 30 * minute))
+        for (offset in listOf(0L, 9 * 3_600_000L)) {
+            val at = cursor.nextAt.copy(epoch = EpochMillis(since.epoch.value + 35 * minute + offset),
+                elapsedMs = 35 * minute)
+            val updated = cursor.rescheduleAfter(at, 30 * minute)
+            assertEquals(Revision(8), updated.revision)
+            assertEquals(cursor.sequence, updated.sequence)
+            assertEquals(at.copy(epoch = EpochMillis(since.epoch.value + 60 * minute + offset),
+                elapsedMs = 60 * minute), updated.nextAt)
+        }
+    }
     @Test fun changedPreparedInputAndLostKnownWindowAreNotNewResumes() {
         val f = Fixture(); f.consumer.resume(actor)
         f.stored = ContractResult.Success(original.copy(phase = RentalInactivePhase.PREPARED,

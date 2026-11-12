@@ -29,6 +29,14 @@ class RentalExitEvidenceTest {
         assertEquals(RentalExitMode.KNOWN_PARKED, mode(parked(), false, since.copy(epoch = EpochMillis(9000), elapsedMs = 4000)))
         assertNull(mode(parked(), false, since.copy(bootId = "other")))
     }
+    @Test fun previouslyConfirmedParkOriginSurvivesARebasedSameBootClock() {
+        val oldEnd = since.copy(epoch = EpochMillis(5_000), elapsedMs = 4_000)
+        assertNull(mode(parked(), false, oldEnd))
+        assertEquals(RentalExitMode.KNOWN_PARKED, rentalExitMode(false, InputSource.SIMULATION,
+            since, parked(), false, oldEnd, policy, rebasedClock = true))
+        assertNull(rentalExitMode(false, InputSource.SIMULATION, since, parked(), false,
+            oldEnd.copy(bootId = "other"), policy, rebasedClock = true))
+    }
     @Test fun staleMissingForeignAndInvalidSpeedCannotSelectDrivingExit() {
         for (input in listOf(null, drive.copy(receivedElapsedMs = 0), drive.copy(source = InputSource.VEHICLE),
             drive.copy(speedMps = Observation.Missing(MissingReason.NO_DATA)),

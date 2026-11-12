@@ -28,7 +28,7 @@ class RentalProductJournalTest:InstrumentationTestCase() {
     private var origin:Observation<RentalClock> = Observation.Missing(MissingReason.NO_DATA)
     private fun at(ms:Long)=RentalClock("test-boot",EpochMillis(1_000_000_000L+ms),ms)
     private fun <T> ok(r:ContractResult<T>):T {assertTrue(r.toString(),r is ContractResult.Success);return(r as ContractResult.Success).value}
-    private fun journal()=SqliteRentalProductJournal(games,{if(definitionsAvailable)ContractResult.Success(definition)else ContractResult.Failure(ContractError.DATA_UNAVAILABLE)},{ContractResult.Success(now)},{ContractResult.Success(origin)})
+    private fun journal()=SqliteRentalProductJournal(games,{if(definitionsAvailable)ContractResult.Success(definition)else ContractResult.Failure(ContractError.DATA_UNAVAILABLE)},{ContractResult.Success(now)},{ContractResult.Success(origin)}, {ContractResult.Success(now)})
     override fun setUp() {
         super.setUp();name="rental-product-${System.nanoTime()}.db";now=at(0);origin=Observation.Available(now)
         definition=ok(ok(AssetTrialDefinitionProvider(context.assets).load()).rentalVisitDefinition())
@@ -44,9 +44,9 @@ class RentalProductJournalTest:InstrumentationTestCase() {
     private fun prepare(id:String="product-visit"):PreparedRentalVisit {
         val cursor=ok(journal().activate(identity));return checkNotNull(ok(RentalVisitPlanner().prepare(identity,catalog,definition,cursor,now,Random(17)){RequestId(id)}))
     }
-    private fun add(id:VehicleId):OwnedVehicle {
-        val car=OwnedVehicle(OwnedVehicleId("product-car"),id,1,Revision(0),VehicleLifecycle.OWNED,Rarity.COMMON,0,GameMoney(0),VehicleAcquisitionSource.INITIAL_GRANT)
-        ok(store.commitGameChange(GameChange(RequestId("add-car"),TransactionKind.GARAGE,source,definition.rules,null,VehicleWrite.Add(car))));return car
+    private fun add(id:VehicleId,key:String="product-car"):OwnedVehicle {
+        val car=OwnedVehicle(OwnedVehicleId(key),id,1,Revision(0),VehicleLifecycle.OWNED,Rarity.COMMON,0,GameMoney(0),VehicleAcquisitionSource.INITIAL_GRANT)
+        ok(store.commitGameChange(GameChange(RequestId(if (key=="product-car") "add-car" else "add-$key"),TransactionKind.GARAGE,source,definition.rules,null,VehicleWrite.Add(car))));return car
     }
     private fun manual(car:OwnedVehicle)=HostCheckpointCommand.Garage(catalog.contentVersion,GameChange(RequestId("manual-command"),TransactionKind.GARAGE,source,definition.rules,null,VehicleWrite.Update(car.ownedVehicleId,car.revision,2,VehicleLifecycle.OWNED,0)))
     private fun directRental():RequestId {
@@ -218,6 +218,127 @@ class RentalProductJournalTest:InstrumentationTestCase() {
         val car=add(catalog.vehicles.first().vehicleId);val id=RequestId("policy-later-rental");ok(store.rental.assign(RentalRequest(id,car.vehicleId,6),catalog,definition.categories,definition.rates,RentalTerms(definition.rules,SimulatedCustomer(30,48),99,now.epoch,60,GameMoney(0),RoundingMode.DOWN,false)))
         val next=RequestId("policy-cap");ok(journal().beginInactiveWhileDriving(identity,next,now));val interval=RentalInactiveInterval(next,now,now,at(9*3600000));now=interval.to;ok(journal().advanceInactive(identity,interval));equalNumber("3240000",weighted(id));assertNull(ok(store.rental.pending()).single().parkedSince)
     }
+    fun testForwardWallJumpKeepsEightHourCapFromOriginalExit() {
+        origin = Observation.Missing(MissingReason.NO_DATA)
+        ok(journal().activate(identity))
+        val first = RequestId("forward-wall-first-exit")
+        ok(journal().beginVerifiedInactive(identity, first, now, drivingExit = true))
+        val initial = RentalInactiveInterval(first, now, now, at(5 * 3_600_000))
+        now = initial.to
+        ok(journal().advanceInactive(identity, initial))
+
+        val car = add(catalog.vehicles.first().vehicleId)
+        val id = RequestId("forward-wall-existing-rental")
+        ok(store.rental.assign(RentalRequest(id, car.vehicleId, 6), catalog, definition.categories, definition.rates,
+            RentalTerms(definition.rules, SimulatedCustomer(30, 48), 99, now.epoch, 60, GameMoney(0), RoundingMode.DOWN, false)))
+        val next = RequestId("forward-wall-next-exit")
+        ok(journal().beginVerifiedInactive(identity, next, now, drivingExit = true))
+        val jumped = at(9 * 3_600_000).copy(elapsedMs = now.elapsedMs + 1_000)
+        val interval = RentalInactiveInterval(next, now, now, jumped, forwardWallJump = true)
+        val recorded = ok(journal().currentInactive(identity))
+        var rejected = false
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
+            journal().advanceInactiveAfterDrain(identity, interval, onUnverifiedForward = { rejected = true }) {
+                error("rejected clock must not drain")
+            })
+        assertTrue(rejected)
+        assertEquals(recorded, ok(journal().currentInactive(identity)))
+        now = jumped
+
+        ok(journal().advanceInactive(identity, interval))
+        equalNumber("3240000", weighted(id))
+        assertNull(ok(store.rental.pending()).single().parkedSince)
+        val marker = checkNotNull(ok(journal().currentInactive(identity)))
+        assertEquals(initial.originalSince, (ok(marker.policyOrigin) as Observation.Available).value)
+        assertEquals(interval, marker.interval)
+        val before = rows()
+        ok(journal().advanceInactive(identity, interval))
+        assertEquals(before, rows())
+    }
+
+    fun testParkedForwardClockAdvancesAllRentalsWithoutCreditingUnknownGap() {
+        val first = directRental()
+        val before = at(30 * 60_000L)
+        val origin = at(0)
+        ok(store.rental.account(first, origin.epoch, before.epoch, origin.epoch))
+        fun assign(key: String, typeIndex: Int, start: RentalClock): RequestId {
+            val car = add(catalog.vehicles[typeIndex].vehicleId, key)
+            val id = RequestId("rental-$key")
+            assertEquals(car.ownedVehicleId, ok(store.rental.assign(RentalRequest(id, car.vehicleId, 6),
+                catalog, definition.categories, definition.rates,
+                RentalTerms(definition.rules, SimulatedCustomer(30, 48), 99, start.epoch,
+                    60, GameMoney(0), RoundingMode.DOWN, false))))
+            return id
+        }
+        val staleOrigin = at(10 * 60_000L)
+        val unknown = assign("unknown", 1, staleOrigin)
+        ok(store.rental.account(unknown, staleOrigin.epoch, at(15 * 60_000L).epoch, staleOrigin.epoch))
+        val lastAccepted = assign("at-cutoff", 2, before)
+        now = at(60 * 60_000L).copy(elapsedMs = before.elapsedMs + 1_000)
+        ok(journal().advanceParkedClock(identity, origin, before, now))
+
+        val byId = ok(store.rental.pending()).associateBy { it.id }
+        for (id in listOf(first, unknown, lastAccepted)) assertEquals(now.epoch, byId.getValue(id).cursor)
+        assertEquals(origin.epoch, byId.getValue(first).parkedSince)
+        assertNull(byId.getValue(lastAccepted).parkedSince)
+        equalNumber("2340000", weighted(first))
+        equalNumber("540000", weighted(lastAccepted))
+        equalNumber("300000", weighted(unknown))
+        assertNull(ok(journal().currentInactive(identity)))
+
+        val rebased = now
+        now = rebased.copy(epoch = EpochMillis(rebased.epoch.value + 1_000), elapsedMs = rebased.elapsedMs + 1_000)
+        val runtime = SqliteRentalRuntimeSource(source, { SqliteGameChangeStore(context, source, name) }, { now })
+        val next = ok(runtime.advance(RentalTick(source, rebased, now, Observation.Available(RentalMotion.Parked(origin.epoch)))))
+        assertTrue(next.deferred.toString(), next.deferred.isEmpty())
+        assertNull(byId.getValue(unknown).parkedSince)
+        val recovered = next.pending.single { it.id == unknown }
+        assertEquals(now.epoch, recovered.cursor)
+        assertEquals(origin.epoch, recovered.parkedSince)
+        equalNumber("300300", weighted(unknown))
+    }
+
+    fun testTwoParkedForwardRebasesRetainOriginalEightHourCap() {
+        val hour = 3_600_000L
+        val origin = at(0)
+        ok(journal().activate(identity))
+        val car = add(catalog.vehicles.first().vehicleId)
+        val id = RequestId("rental-through-two-clock-shifts")
+        val start = at(5 * hour)
+        assertEquals(car.ownedVehicleId, ok(store.rental.assign(RentalRequest(id, car.vehicleId, 6),
+            catalog, definition.categories, definition.rates,
+            RentalTerms(definition.rules, SimulatedCustomer(30, 48), 99, start.epoch,
+                60, GameMoney(0), RoundingMode.DOWN, false))))
+        val before = at(6 * hour)
+        ok(store.rental.account(id, start.epoch, before.epoch, origin.epoch))
+
+        now = at(7 * hour).copy(elapsedMs = before.elapsedMs + 1_000)
+        val first = ok(journal().advanceParkedClock(identity, origin, before, now))
+        equalNumber("2160000", weighted(id))
+        val resumed = now.copy(epoch = EpochMillis(now.epoch.value + 1_000), elapsedMs = now.elapsedMs + 1_000)
+        ok(store.rental.account(id, now.epoch, resumed.epoch, origin.epoch))
+
+        now = at(10 * hour).copy(elapsedMs = resumed.elapsedMs + 1_000)
+        val second = ok(journal().advanceParkedClock(identity, origin, resumed, now, rebasedClock = true))
+        assertEquals(first.sequence, second.sequence)
+        assertEquals(now.epoch, ok(store.rental.pending()).single().cursor)
+        assertEquals(origin.epoch, ok(store.rental.pending()).single().parkedSince)
+        equalNumber("3240000", weighted(id))
+    }
+
+    fun testParkedForwardClockCanRebaseScheduleWithoutAnyActiveRental() {
+        val origin = at(0)
+        val cursor = ok(journal().activate(identity))
+        val before = at(25 * 60_000L)
+        now = at(60 * 60_000L).copy(elapsedMs = before.elapsedMs + 1_000)
+        val next = ok(journal().advanceParkedClock(identity, origin, before, now))
+        assertEquals(cursor.sequence, next.sequence)
+        assertEquals(30 * 60_000L, next.nextAt.elapsedMs)
+        assertEquals(now.epoch.value + 5 * 60_000L - 1_000, next.nextAt.epoch.value)
+        assertTrue(ok(store.rental.pending()).isEmpty())
+        assertNull(ok(journal().currentInactive(identity)))
+    }
+
     fun testPolicyOnlyActualNewDrivingEndAllowsFollowingCycleToStartAgain() {
         val id=directRental();origin=Observation.Missing(MissingReason.NO_DATA);val first=RequestId("policy-cycle-one");ok(journal().beginInactiveWhileDriving(identity,first,now));val a=RentalInactiveInterval(first,now,now,at(1800000));now=a.to;ok(journal().advanceInactive(identity,a))
         ok(store.rental.account(id,at(1800000).epoch,at(7200000).epoch,null));origin=Observation.Available(at(3600000));now=at(7200000)

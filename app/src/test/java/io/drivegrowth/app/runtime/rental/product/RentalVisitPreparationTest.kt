@@ -49,6 +49,22 @@ class RentalVisitPreparationTest {
         assertEquals(original,(h.source.next() as ContractResult.Success).value)
         assertEquals(1,h.inputReads);assertEquals(1,h.ids);assertEquals(original,h.snapshots.last());assertEquals(0,h.executions)
     }
+    @Test fun retainedVisitRecoveryUsesItsOriginalDraftAndNeverPlansAnEmptySlot() {
+        val h = Harness()
+        assertEquals(ContractResult.Success<PreparedRentalVisit?>(null), h.source.recover(h.identity))
+        assertEquals(0, h.inputReads)
+        h.saveFails = true
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), h.source.next())
+        val original = h.snapshots.single()
+        h.saveFails = false
+        h.inputsFail = true
+        assertEquals(ContractResult.Success(original), h.source.recover(h.identity) {
+            assertEquals(original, it)
+            h.save(it)
+        })
+        assertEquals(1, h.inputReads)
+        assertEquals(1, h.ids)
+    }
     @Test fun durablePendingIsRecoveredBeforeUnavailableCurrentInputs() {
         val h=Harness();val original=h.planned();h.inputsFail=true
         assertEquals(original,(h.source.next() as ContractResult.Success).value)

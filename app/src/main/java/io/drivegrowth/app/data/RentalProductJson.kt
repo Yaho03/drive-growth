@@ -39,5 +39,7 @@ internal object RentalProductJson {
         return PreparedRentalVisit(GameIdentity(ProfileId(j.getString("profile")),source),ContentVersion(j.getString("definition")),boolean(j,"trial"),cursor(j.getJSONObject("expected")),cursor(j.getJSONObject("next")),visit)
     }
     fun interval(i:RentalInactiveInterval)=JSONObject().put("marker",i.marker.value).put("since",clock(i.originalSince)).put("from",clock(i.from)).put("to",clock(i.to))
-    fun interval(j:JSONObject)=RentalInactiveInterval(RequestId(j.getString("marker")),clock(j.getJSONObject("since")),clock(j.getJSONObject("from")),clock(j.getJSONObject("to")))
+        .apply { if (i.forwardWallJump) put("forwardWallJump", true) }
+    fun interval(j:JSONObject)=RentalInactiveInterval(RequestId(j.getString("marker")),clock(j.getJSONObject("since")),clock(j.getJSONObject("from")),clock(j.getJSONObject("to")),
+        j.has("forwardWallJump") && boolean(j,"forwardWallJump"))
 }

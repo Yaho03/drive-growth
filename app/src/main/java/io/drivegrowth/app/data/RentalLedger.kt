@@ -141,7 +141,19 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
 
     /** 검증된 이탈 기록의 종료 전 공백은 저널에서 수락 관측 커서를 확인한 뒤 기록한다. */
     internal fun accountInactive(id: RequestId, from: EpochMillis, to: EpochMillis, policyOrigin: EpochMillis,
-        verifiedExit: RentalInactiveBasis? = null) = accountBasis(id, from, to, policyOrigin, false, verifiedExit)
+        verifiedExit: RentalInactiveBasis? = null, unobservedSince: EpochMillis? = null) =
+        accountBasis(id, from, to, policyOrigin, false, verifiedExit, unobservedSince)
+
+    /** 미관측 구간을 연결한 뒤 오래된 현재 주차 연결만 해제한다. 정산 근거는 그대로다. */
+    internal fun detachPreviousParking(id: RequestId, original: EpochMillis): ContractResult<Unit> = store.atomic { db ->
+        if (db.update("rentals", android.content.ContentValues().apply { putNull("parked_since") },
+                "id=? AND phase=? AND parked_since=?",
+                arrayOf(id.value, VehicleActivity.RENTED.name, original.value.toString())) != 1) return@atomic conflict()
+        db.rawQuery("SELECT parked_since FROM rentals WHERE id=?", arrayOf(id.value)).use {
+            if (!it.moveToFirst() || !it.isNull(0)) throw SQLiteException("이전 대여 주차 연결 실제 해제 불일치")
+        }
+        ContractResult.Success(Unit)
+    }
 
     private fun accountBasis(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?,
         physical: Boolean, verifiedExit: RentalInactiveBasis? = null, unobservedSince: EpochMillis? = null) = store.atomic { db ->

@@ -1,6 +1,7 @@
 package io.drivegrowth.app.host.rental
 
 import android.database.sqlite.SQLiteDatabase
+import android.os.Process
 import android.test.InstrumentationTestCase
 import io.drivegrowth.app.data.*
 import io.drivegrowth.app.host.*
@@ -16,7 +17,9 @@ import io.drivegrowth.core.garage.FirstGrant
 import io.drivegrowth.core.progression.VehicleActivity
 import io.drivegrowth.core.rental.RentalRequest
 import io.drivegrowth.core.rental.SimulatedCustomer
+import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Instant
@@ -36,25 +39,38 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
     private lateinit var identity: GameIdentity
     private lateinit var readJournal: SqliteRentalProductJournal
     private var elapsed = 0L
+    private var wallOffset = 0L
+    private var rawClockSample: (() -> RentalClock)? = null
     private var requests = 0
+    private var coldProof: JSONObject? = null
+    private var retainColdDatabase = false
+    private val coldRun get() = File(context.cacheDir, "rental-forward-cold-enabled")
+    private val coldEvidence get() = File(context.cacheDir, "rental-forward-cold-ready.json")
     private val base = Instant.parse("2026-11-10T03:00:00Z").toEpochMilli()
     // 한 시간 대여를 제어 clock으로 진행시키는 시험 정책. 제품의 2500ms 신선도/연속성 정책은 변경하지 않는다.
     private var policy = RecordingPolicy(7_200_000, 7_200_000, 1000, 3000, 0.1, 0.5)
-    private fun clock() = RentalClock("explicit-simulation-boot", EpochMillis(base + elapsed), elapsed)
+    private fun clock() = RentalClock("explicit-simulation-boot", EpochMillis(base + elapsed + wallOffset), elapsed)
     private fun <T> ok(result: ContractResult<T>): T {
         assertTrue(result.toString(), result is ContractResult.Success)
         return (result as ContractResult.Success).value
     }
     override fun setUp() {
         super.setUp()
-        val prefix = "rental-product-binding-${UUID.randomUUID()}"
+        if (name == "testNormalPreparedForwardRepairConnectsAnUnfinishedRentalToLiveDrivingAndPark" &&
+            coldRun.exists()) {
+            assertTrue(context.packageName.startsWith("io.drivegrowth.verify."))
+            if (coldEvidence.exists()) coldProof = JSONObject(coldEvidence.readText())
+        }
+        val prefix = coldProof?.getString("database") ?: "rental-product-binding-${UUID.randomUUID()}"
         names = InputSource.entries.associateWith { "$prefix-${it.name}.db" }
         games = factory()
         definition = ok(AssetTrialDefinitionProvider(context.assets).load())
         val onboarding = StoredOnboardingHostSource(games)
         val initial = ok(onboarding.read()); identity = initial.identity
-        ok(onboarding.choose(identity, FirstGrant.CANDIDATES.first()))
-        ok(games.open()).use { ok(it.store.activateObservedDriving(identity.profileId)) }
+        if (coldProof == null) {
+            ok(onboarding.choose(identity, FirstGrant.CANDIDATES.first()))
+            ok(games.open()).use { ok(it.store.activateObservedDriving(identity.profileId)) }
+        }
         bindRecorder()
         readJournal = SqliteRentalProductJournal(games, { error("조회는 현재 정의를 읽지 않는다") },
             { error("조회는 현재 clock을 읽지 않는다") }, { error("조회는 현재 원점을 읽지 않는다") })
@@ -66,7 +82,14 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
         producer = source()
     }
 
-    override fun tearDown() { names.values.forEach(context::deleteDatabase); super.tearDown() }
+    override fun tearDown() {
+        if (!retainColdDatabase && ::names.isInitialized) names.values.forEach(context::deleteDatabase)
+        if (coldProof != null) {
+            coldEvidence.delete()
+            coldRun.delete()
+        }
+        super.tearDown()
+    }
     private fun factory() = GameSessionFactory(context, names, InputSource.SIMULATION) {
         when (val loaded = AssetTrialDefinitionProvider(context.assets).load()) {
             is ContractResult.Failure -> loaded
@@ -90,7 +113,7 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
     private fun source(): SessionRentalProductSource {
         val seed = visitSeed(ok(definition.rentalVisitDefinition()))
         return SessionRentalProductSource(games, { ContractResult.Success(definition) }, policy,
-            { ContractResult.Success(clock()) }, { Random(seed) }, { RequestId("explicit-simulation-visit-${++requests}") })
+            { ContractResult.Success(rawClockSample?.invoke() ?: clock()) }, { Random(seed) }, { RequestId("explicit-simulation-visit-${++requests}") })
     }
     private fun feed(at: Long, receiver: String = "simulation-receiver-1",
         gear: Gear = Gear.DRIVE): ContractResult<RentalRuntimeSnapshot> {
@@ -581,6 +604,515 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
         }
         assertFalse(context.getDatabasePath(names.getValue(InputSource.VEHICLE)).exists())
     }
+    fun testForwardWallJumpSettlesOnlyExistingExitAndReplaysItsFirstWindow() {
+        ok(feed(0))
+        val assigned = ok(feed(1_000)).pending.single()
+        ok(feed(60_000))
+        ok(stop(60_500, "simulation-receiver-1"))
+        val exit = marker()
+        assertEquals(RentalInactivePhase.RECORDED, exit.phase)
+        producer.reconnect()
+
+        wallOffset = -20_000
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
+            feed(61_000, "simulation-receiver-2"))
+        assertEquals(exit, marker())
+
+        wallOffset = 9 * 3_600_000L
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
+            feed(62_000, "simulation-receiver-2"))
+        assertEquals(exit, marker())
+        rentalSettlementFault(true)
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),
+            feed(63_000, "simulation-receiver-2"))
+        val prepared = marker()
+        assertEquals(RentalInactivePhase.PREPARED, prepared.phase)
+        assertEquals(clock(), checkNotNull(prepared.interval).to)
+        assertEquals(exit.policyOrigin, prepared.policyOrigin)
+
+        rentalSettlementFault(false)
+        val completed = ok(feed(64_000, "simulation-receiver-2")).firstCompleted
+        assertEquals(assigned.id, checkNotNull(completed).rentalId)
+        val recovered = marker()
+        assertEquals(RentalInactivePhase.COMPLETED, recovered.phase)
+        assertEquals(prepared.interval, recovered.interval)
+        assertEquals(1, requests)
+        val originalRows = rentalRows()
+        val cursor = ok(readJournal.cursor(identity))
+        assertTrue(cursor.nextAt.elapsedMs > elapsed)
+        assertEquals(base + wallOffset + cursor.nextAt.elapsedMs, cursor.nextAt.epoch.value)
+        reopenRental()
+        ok(feed(cursor.nextAt.elapsedMs - 1_000, "simulation-receiver-3"))
+        assertEquals(originalRows, rentalRows())
+        assertEquals(recovered, marker())
+        assertEquals(1, requests)
+        ok(feed(cursor.nextAt.elapsedMs, "simulation-receiver-3"))
+        assertEquals(2, requests)
+    }
+
+    fun testForwardWallJumpWhileParkedUsesExistingOriginWithoutCreatingExit() {
+        ok(feed(0))
+        val assigned = ok(feed(1_000)).pending.single()
+        for (at in 2_000L..6_000L step 1_000L) ok(feed(at, gear = Gear.PARK))
+        val original = ok(feed(7_000, gear = Gear.PARK)).pending.single().parkedSince
+        assertNotNull(original)
+        wallOffset = 40 * 60_000L
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE), feed(8_000, gear = Gear.PARK))
+        assertEquals(assigned.id, ok(feed(9_000, gear = Gear.PARK)).pending.single().id)
+        assertEquals(original, ok(feed(10_000, gear = Gear.PARK)).pending.single().parkedSince)
+        val firstSchedule = ok(readJournal.cursor(identity))
+
+        wallOffset = 9 * 3_600_000L
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE), feed(11_000, gear = Gear.PARK))
+        val completed = checkNotNull(ok(feed(12_000, gear = Gear.PARK)).firstCompleted)
+        assertEquals(completed, ok(feed(13_000, gear = Gear.PARK)).firstCompleted)
+        assertEquals(firstSchedule.sequence, ok(readJournal.cursor(identity)).sequence)
+        assertEquals(assigned.id, completed.rentalId)
+        assertNull(ok(readJournal.currentInactive(identity)))
+        ok(games.open()).use { game ->
+            val basis = ok(RentalResultBasisReader(game.store).read(assigned.id)) as Observation.Available
+            val economic = basis.value.periods.filter { it.kind == RentalIncomeKind.INACTIVE }
+            assertTrue(economic.size >= 2)
+            assertEquals(setOf(original), economic.map { it.origin }.toSet())
+        }
+        assertEquals(1, requests)
+
+        ok(stop(13_500, "simulation-receiver-1"))
+        val parkedExit = marker()
+        assertEquals(RentalInactivePhase.RECORDED, parkedExit.phase)
+        assertEquals(RentalInactiveBasis.DRIVING_END, parkedExit.basis)
+        assertEquals(original, (ok(parkedExit.policyOrigin) as Observation.Available).value.epoch)
+        producer.reconnect()
+        ok(feed(14_000, "simulation-receiver-2", gear = Gear.PARK))
+        assertEquals(parkedExit.marker, marker().marker)
+        assertEquals(RentalInactivePhase.COMPLETED, marker().phase)
+    }
+
+    fun testOrdinaryThirtyFiveMinuteGapResumesNextVisitWithoutBackfilling() {
+        ok(feed(0))
+        val assigned = ok(feed(1_000)).pending.single()
+        val original = ok(readJournal.cursor(identity))
+        assertEquals(30 * 60_000L, original.nextAt.elapsedMs)
+        ok(feed(10 * 60_000L))
+        ok(stop(10 * 60_000L + 1, "simulation-receiver-1"))
+        reopenRental()
+        val returned = ok(feed(35 * 60_000L, "simulation-receiver-2"))
+        assertEquals(assigned.id, returned.pending.single().id)
+        val exit = marker()
+        ok(feed(35 * 60_000L + 1_000, "simulation-receiver-2"))
+        val next = ok(readJournal.cursor(identity))
+        assertEquals(60 * 60_000L, next.nextAt.elapsedMs)
+        assertEquals(original.sequence, next.sequence)
+        assertEquals(exit, marker())
+        assertEquals(1, requests)
+
+        // 같은 복귀 세션의 관측을 이어서, 다음 미래 슬롯에서만 새 방문을 확인한다.
+        assertTrue(ok(feed(next.nextAt.elapsedMs - 1_000, "simulation-receiver-2")).deferred.isEmpty())
+        assertEquals(1, requests)
+        assertTrue(ok(feed(next.nextAt.elapsedMs, "simulation-receiver-2")).deferred.isEmpty())
+        assertEquals(2, requests)
+        assertEquals(next.sequence + 1, ok(readJournal.cursor(identity)).sequence)
+        assertEquals(exit, marker())
+    }
+
+    fun testPreparedExitDrainsRetainedSpanBeforeMovingMissedVisitSlot() {
+        val minute = 60_000L
+        policy = policy.copy(maxGapMs = 10 * minute)
+        bindRecorder()
+        ok(feed(0))
+        val assigned = ok(feed(1_000)).pending.single()
+        for (at in listOf(5L, 10L, 15L, 20L, 24L)) ok(feed(at * minute))
+        val overdue = ok(readJournal.cursor(identity))
+        assertEquals(30 * minute, overdue.nextAt.elapsedMs)
+        ok(feed(35 * minute))
+        raw().use {
+            it.execSQL("CREATE TRIGGER reject_visit_schedule BEFORE UPDATE OF revision ON rental_product_state " +
+                "WHEN NEW.revision > OLD.revision BEGIN SELECT RAISE(ABORT, 'injected visit schedule failure'); END")
+        }
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), feed(36 * minute))
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),
+            stop(36 * minute + 1, "simulation-receiver-1"))
+        val exit = marker()
+        assertEquals(RentalInactivePhase.RECORDED, exit.phase)
+        assertEquals(36 * minute, checkNotNull(exit.observedThrough).elapsedMs)
+        assertEquals(overdue, ok(readJournal.cursor(identity)))
+        raw().use { it.execSQL("DROP TRIGGER reject_visit_schedule") }
+
+        producer.reconnect()
+        val receiver = "simulation-receiver-2"
+        val recovered = ok(feed(37 * minute, receiver)).pending.single()
+        assertEquals(assigned.id, recovered.id)
+        assertEquals(base + 37 * minute, recovered.cursor.value)
+        val complete = marker()
+        assertEquals(exit.marker, complete.marker)
+        assertEquals(RentalInactivePhase.COMPLETED, complete.phase)
+        assertEquals(overdue, ok(readJournal.cursor(identity)))
+        assertEquals(1, requests)
+
+        ok(feed(38 * minute, receiver))
+        val next = ok(readJournal.cursor(identity))
+        assertEquals(60 * minute, next.nextAt.elapsedMs)
+        assertEquals(overdue.sequence, next.sequence)
+        assertEquals(complete, marker())
+        assertEquals(1, requests)
+    }
+
+    fun testUnsavedVisitKeepsOriginalRequestAcrossOrdinaryGap() = retainedVisitAcrossGap(0)
+    fun testUnsavedVisitKeepsOriginalRequestAcrossForwardRebase() = retainedVisitAcrossGap(9 * 3_600_000L)
+
+    private fun retainedVisitAcrossGap(offset: Long) {
+        val minute = 60_000L
+        val receiver = "simulation-receiver-2"
+        ok(feed(0))
+        ok(feed(1_000))
+        ok(feed(29 * minute))
+        raw().use {
+            it.execSQL("CREATE TRIGGER reject_visit_draft BEFORE UPDATE ON rental_product_state " +
+                "WHEN instr(NEW.payload,'rental-prepared-v1')>0 AND instr(OLD.payload,'rental-prepared-v1')=0 " +
+                "BEGIN SELECT RAISE(ABORT, 'injected visit draft failure'); END")
+        }
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), feed(30 * minute))
+        assertEquals(2, requests)
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),
+            stop(30 * minute + 1, "simulation-receiver-1"))
+        assertEquals(RentalInactivePhase.RECORDED, marker().phase)
+        raw().use { it.execSQL("DROP TRIGGER reject_visit_draft") }
+
+        producer.reconnect()
+        wallOffset = offset
+        ok(feed(65 * minute, receiver))
+        assertEquals(RentalInactivePhase.COMPLETED, marker().phase)
+        raw().use { db ->
+            db.rawQuery("SELECT host_command FROM visits WHERE id=?", arrayOf("explicit-simulation-visit-2")).use {
+                assertTrue(it.moveToFirst())
+                val original = RentalProductJson.prepared(JSONObject(it.getString(0)))
+                assertEquals(base + 30 * minute, original.visit.terms.start.value)
+                assertEquals(1L, original.expected.sequence)
+            }
+        }
+        assertEquals(2, requests)
+        ok(feed(66 * minute, receiver))
+        val next = ok(readJournal.cursor(identity))
+        assertEquals(90 * minute, next.nextAt.elapsedMs)
+        assertEquals(base + offset + 90 * minute, next.nextAt.epoch.value)
+        assertEquals(2L, next.sequence)
+        assertEquals(2, requests)
+    }
+
+    fun testRawRejectedForwardCandidateDoesNotBlockCorrectedClockAfterReconnect() {
+        ok(feed(0))
+        val assigned = ok(feed(1_000)).pending.single()
+        ok(feed(60_000))
+        ok(stop(60_500, "simulation-receiver-1"))
+        val exit = marker()
+        producer.reconnect()
+
+        wallOffset = 9 * 3_600_000L
+        var reads = 0
+        rawClockSample = {
+            val at = clock()
+            if (++reads == 2) at.copy(epoch = EpochMillis(at.epoch.value - wallOffset)) else at
+        }
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE), feed(62_000, "simulation-receiver-2"))
+        assertEquals(2, reads)
+        assertEquals(exit, marker())
+
+        rawClockSample = null
+        wallOffset = 0
+        producer.reconnect()
+        assertEquals(assigned.id, ok(feed(63_000, "simulation-receiver-3")).pending.single().id)
+        val complete = marker()
+        assertEquals(exit.marker, complete.marker)
+        assertEquals(RentalInactivePhase.COMPLETED, complete.phase)
+        assertEquals(clock(), checkNotNull(complete.interval).to)
+        assertFalse(checkNotNull(complete.interval).forwardWallJump)
+        assertEquals(1, requests)
+    }
+
+    fun testNormalPreparedSettlementAndForwardScheduleRecoverTogetherAfterWriteFailure() {
+        val minute = 60_000L
+        val receiver = "simulation-receiver-2"
+        ok(feed(0))
+        val assigned = ok(feed(1_000)).pending.single()
+        ok(feed(minute))
+        ok(stop(minute + 500, "simulation-receiver-1"))
+        val exit = marker()
+        producer.reconnect()
+
+        rentalSettlementFault(true)
+        val normalResume = 60 * minute + 1
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), feed(normalResume, receiver))
+        val prepared = marker()
+        val original = checkNotNull(prepared.interval)
+        assertEquals(exit.marker, prepared.marker)
+        assertEquals(RentalInactivePhase.PREPARED, prepared.phase)
+        assertFalse(original.forwardWallJump)
+        assertEquals(clock(), original.to)
+        rentalSettlementFault(false)
+
+        fun financeRows() = rentalRows().filter { it.startsWith("settlements:") ||
+            it.startsWith("account:") || it.startsWith("rental_result_basis:") }
+        val beforeFinance = financeRows()
+        val beforeSchedule = ok(readJournal.cursor(identity))
+        wallOffset = 9 * 3_600_000L
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE), feed(normalResume + 1_000, receiver))
+        raw().use {
+            it.execSQL("CREATE TRIGGER reject_forward_schedule BEFORE UPDATE OF revision ON rental_product_state " +
+                "WHEN NEW.revision > OLD.revision BEGIN SELECT RAISE(ABORT, 'injected schedule write failure'); END")
+        }
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), feed(normalResume + 2_000, receiver))
+        assertEquals(prepared, marker())
+        assertEquals(beforeSchedule, ok(readJournal.cursor(identity)))
+        assertEquals(beforeFinance, financeRows())
+        raw().use { it.execSQL("DROP TRIGGER reject_forward_schedule") }
+
+        val completed = checkNotNull(ok(feed(normalResume + 3_000, receiver)).firstCompleted)
+        assertEquals(assigned.id, completed.rentalId)
+        val finished = marker()
+        assertEquals(prepared.copy(phase = RentalInactivePhase.COMPLETED), finished)
+        val schedule = ok(readJournal.cursor(identity))
+        assertEquals(beforeSchedule.sequence, schedule.sequence)
+        assertTrue(schedule.nextAt.elapsedMs > elapsed)
+        assertEquals(base + wallOffset + schedule.nextAt.elapsedMs, schedule.nextAt.epoch.value)
+        ok(games.open()).use { game ->
+            val read = ok(RentalResultBasisReader(game.store).read(assigned.id)) as Observation.Available
+            val inactive = read.value.periods.filter { it.kind == RentalIncomeKind.INACTIVE }
+            assertTrue(inactive.isNotEmpty())
+            assertTrue(inactive.all { it.origin == exit.since.epoch && it.policy?.capMillis == 8 * 60 * minute })
+            assertEquals(1, ok(game.store.listUnviewedSettlements()).count { it.transaction.kind == TransactionKind.RENTAL })
+        }
+        val originalBasis = financeRows()
+        assertEquals(1, requests)
+
+        reopenRental()
+        assertEquals(completed, ok(feed(normalResume + 4_000, "simulation-receiver-3")).firstCompleted)
+        assertEquals(finished, marker())
+        assertEquals(schedule, ok(readJournal.cursor(identity)))
+        assertEquals(originalBasis, financeRows())
+        assertEquals(1, requests)
+    }
+
+    private fun prepareUnfinishedRentalForForwardRepair(resumed: String): RentalLedger.Pending {
+        val first = "simulation-receiver-1"
+        ok(feed(0))
+        val assigned = ok(feed(1_000)).pending.single()
+        ok(feed(60_000))
+        ok(stop(60_500, first))
+        producer.reconnect()
+
+        raw().use {
+            it.execSQL("CREATE TRIGGER reject_completion BEFORE UPDATE OF payload ON rental_product_inactive " +
+                "WHEN instr(NEW.payload, '\"done\":true') > 0 " +
+                "BEGIN SELECT RAISE(ABORT, 'injected completion write failure'); END")
+        }
+        val originalResume = 120_000L
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), feed(originalResume, resumed))
+        val prepared = marker()
+        assertEquals(RentalInactivePhase.PREPARED, prepared.phase)
+        val interval = checkNotNull(prepared.interval)
+        assertFalse(interval.forwardWallJump)
+        assertEquals(clock(), interval.to)
+        assertTrue(interval.to.epoch.value < assigned.end.value)
+        raw().use { it.execSQL("DROP TRIGGER reject_completion") }
+        return assigned
+    }
+
+    fun testNormalPreparedForwardRepairConnectsAnUnfinishedRentalToLiveDrivingAndPark() {
+        coldProof?.let { return verifyForwardRepairFromNewProcess(it) }
+        val resumed = "simulation-receiver-2"
+        val assigned = prepareUnfinishedRentalForForwardRepair(resumed)
+        val prepared = marker()
+        val interval = checkNotNull(prepared.interval)
+        val originalResume = interval.to.elapsedMs
+        wallOffset = 600_000L
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE), feed(originalResume + 1_000, resumed))
+        val oldRows = rentalRows()
+        val originalSchedule = ok(readJournal.cursor(identity))
+        raw().use {
+            it.execSQL("CREATE TRIGGER reject_forward_schedule BEFORE UPDATE OF revision ON rental_product_state " +
+                "WHEN NEW.revision > OLD.revision BEGIN SELECT RAISE(ABORT, 'injected schedule write failure'); END")
+        }
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), feed(originalResume + 2_000, resumed))
+        assertEquals(oldRows, rentalRows())
+        assertEquals(prepared, marker())
+        raw().use { it.execSQL("DROP TRIGGER reject_forward_schedule") }
+
+        val firstLive = originalResume + 3_000
+        val repaired = ok(feed(firstLive, resumed)).pending.single()
+        val rebasedAt = clock().epoch
+        assertEquals(prepared.copy(phase = RentalInactivePhase.COMPLETED), marker())
+        assertEquals(assigned.id, repaired.id)
+        assertEquals(VehicleActivity.RENTED, repaired.phase)
+        assertEquals(rebasedAt, repaired.cursor)
+        assertTrue(repaired.cursor.value < repaired.end.value)
+        assertEquals(0, BigDecimal("119500").compareTo(weighted(assigned.id)))
+        ok(games.open()).use { game ->
+            ok(game.store.read { db ->
+                val basis = checkNotNull(RentalBasisStorage.load(db, game.store, assigned.id))
+                val tail = basis.periods.last()
+                assertEquals(interval.to.epoch, tail.from)
+                assertEquals(rebasedAt, tail.through)
+                assertEquals(RentalIncomeKind.UNOBSERVED, tail.kind)
+                assertEquals(0, tail.weightedMillis.signum())
+                assertNull(tail.origin)
+                assertNull(tail.policy)
+                val credited = basis.periods.last { it.kind == RentalIncomeKind.INACTIVE }
+                assertEquals(interval.from.epoch, credited.from)
+                assertEquals(interval.to.epoch, credited.through)
+                assertEquals(interval.originalSince.epoch, credited.origin)
+                assertNull(basis.settlementId)
+            })
+        }
+
+        val live = ok(feed(firstLive + 1_000, resumed))
+        assertTrue(live.deferred.isEmpty())
+        assertEquals(clock().epoch, live.pending.single().cursor)
+        assertEquals(0, BigDecimal("120500").compareTo(weighted(assigned.id)))
+        for (at in firstLive + 2_000..firstLive + 8_000 step 1_000L) {
+            val parked = ok(feed(at, resumed, Gear.PARK))
+            assertTrue(parked.deferred.isEmpty())
+            assertEquals(clock().epoch, parked.pending.single().cursor)
+        }
+        val schedule = ok(readJournal.cursor(identity))
+        assertEquals(originalSchedule.sequence, schedule.sequence)
+        assertEquals(base + wallOffset + schedule.nextAt.elapsedMs, schedule.nextAt.epoch.value)
+        assertEquals(1, requests)
+        assertEquals(prepared.copy(phase = RentalInactivePhase.COMPLETED), marker())
+        ok(games.open()).use { game ->
+            assertEquals(GameMoney(1000), ok(game.store.balance()))
+            assertTrue(ok(game.store.listUnviewedSettlements()).none { it.transaction.kind == TransactionKind.RENTAL })
+        }
+        if (coldRun.exists()) {
+            ok(stop(elapsed + 500, resumed))
+            val nextExit = marker()
+            assertEquals(RentalInactivePhase.RECORDED, nextExit.phase)
+            assertEquals(RentalInactiveBasis.DRIVING_END, nextExit.basis)
+            coldEvidence.writeText(JSONObject().put("pid", Process.myPid())
+                .put("database", names.getValue(InputSource.SIMULATION).removeSuffix("-SIMULATION.db"))
+                .put("elapsed", elapsed).put("wallOffset", wallOffset)
+                .put("request", assigned.id.value).put("requests", requests)
+                .put("rows", JSONArray(rentalRows())).toString())
+            retainColdDatabase = true
+        }
+    }
+
+    fun testNormalPreparedForwardRepairSettlesAnExpiredRentalWithZeroIncomeForTheTail() {
+        val resumed = "simulation-receiver-2"
+        val assigned = prepareUnfinishedRentalForForwardRepair(resumed)
+        val prepared = marker()
+        val interval = checkNotNull(prepared.interval)
+        val originalResume = interval.to.elapsedMs
+        val before = rentalRows()
+        wallOffset = 9 * 3_600_000L
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE), feed(originalResume + 1_000, resumed))
+        rentalSettlementFault(true)
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), feed(originalResume + 2_000, resumed))
+        assertEquals(before, rentalRows())
+        assertEquals(prepared, marker())
+        rentalSettlementFault(false)
+
+        val completed = ok(feed(originalResume + 3_000, resumed))
+        assertEquals(assigned.id, completed.firstCompleted?.rentalId)
+        assertTrue(completed.pending.isEmpty())
+        assertEquals(prepared.copy(phase = RentalInactivePhase.COMPLETED), marker())
+        assertEquals(0, BigDecimal("119500").compareTo(weighted(assigned.id)))
+        ok(games.open()).use { game ->
+            val read = ok(RentalResultBasisReader(game.store).read(assigned.id)) as Observation.Available
+            val tail = read.value.periods.last()
+            assertEquals(interval.to.epoch, tail.from)
+            assertEquals(assigned.end, tail.through)
+            assertEquals(RentalIncomeKind.UNOBSERVED, tail.kind)
+            assertEquals(0, tail.weightedMillis.signum())
+            assertEquals(1, ok(game.store.listUnviewedSettlements()).count { it.transaction.kind == TransactionKind.RENTAL })
+        }
+        assertEquals(1, requests)
+    }
+
+    private fun verifyForwardRepairFromNewProcess(proof: JSONObject) {
+        assertTrue("새 OS 프로세스에서 같은 DB를 열어야 한다", Process.myPid() != proof.getInt("pid"))
+        assertEquals(proof.getJSONArray("rows").toString(), JSONArray(rentalRows()).toString())
+        elapsed = proof.getLong("elapsed")
+        wallOffset = proof.getLong("wallOffset")
+        requests = proof.getInt("requests")
+        val savedRequests = requests
+        val schedule = ok(readJournal.cursor(identity))
+        val exit = marker()
+        val receiver = "simulation-receiver-3"
+        val firstPark = elapsed + 1_000
+        val resumed = ok(feed(firstPark, receiver, Gear.PARK))
+        val pending = resumed.pending.single()
+        assertEquals(proof.getString("request"), pending.id.value)
+        assertEquals(clock().epoch, pending.cursor)
+        assertEquals(exit.marker, marker().marker)
+        assertEquals(exit.policyOrigin, marker().policyOrigin)
+        assertEquals(RentalInactivePhase.COMPLETED, marker().phase)
+        val continued = ok(feed(firstPark + 1_000, receiver, Gear.PARK))
+        assertTrue(continued.deferred.isEmpty())
+        assertEquals(clock().epoch, continued.pending.single().cursor)
+        assertEquals(schedule, ok(readJournal.cursor(identity)))
+        assertEquals(savedRequests, requests)
+        assertNull(continued.firstCompleted)
+        File(context.cacheDir, "rental-forward-cold-verified.json").writeText(JSONObject()
+            .put("firstPid", proof.getInt("pid")).put("newPid", Process.myPid())
+            .put("request", pending.id.value).put("cursor", continued.pending.single().cursor.value).toString())
+    }
+
+    fun testUnwrittenForwardPreparationCanRetryAfterClockCorrection() {
+        ok(feed(0))
+        val assigned = ok(feed(1_000)).pending.single()
+        ok(feed(60_000))
+        ok(stop(60_500, "simulation-receiver-1"))
+        val exit = marker()
+        producer.reconnect()
+
+        raw().use {
+            it.execSQL("CREATE TRIGGER reject_forward_prepare BEFORE UPDATE OF payload ON rental_product_inactive " +
+                "WHEN instr(NEW.payload,'forwardWallJump')>0 " +
+                "BEGIN SELECT RAISE(ABORT, 'injected prepare failure'); END")
+        }
+        wallOffset = 9 * 3_600_000L
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), feed(62_000, "simulation-receiver-2"))
+        assertEquals(exit, marker())
+        raw().use { it.execSQL("DROP TRIGGER reject_forward_prepare") }
+
+        wallOffset = 0
+        producer.reconnect()
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE), feed(63_000, "simulation-receiver-3"))
+        assertEquals(exit, marker())
+        assertEquals(assigned.id, ok(feed(64_000, "simulation-receiver-3")).pending.single().id)
+        val complete = marker()
+        assertEquals(exit.marker, complete.marker)
+        assertEquals(RentalInactivePhase.COMPLETED, complete.phase)
+        assertEquals(base + 63_000, checkNotNull(complete.interval).to.epoch.value)
+        assertFalse(checkNotNull(complete.interval).forwardWallJump)
+        assertEquals(1, requests)
+    }
+
+    fun testCompletedForwardParkedExitRestoresOriginAfterSourceRecreation() {
+        ok(feed(0))
+        ok(feed(1_000))
+        for (at in 2_000L..7_000L step 1_000L) ok(feed(at, gear = Gear.PARK))
+        ok(stop(7_500, "simulation-receiver-1"))
+        val original = marker()
+        assertEquals(RentalInactiveBasis.DRIVING_END, original.basis)
+        producer.reconnect()
+        wallOffset = 9 * 3_600_000L
+        ok(feed(8_000, "simulation-receiver-2", Gear.PARK))
+        val completed = marker()
+        assertEquals(RentalInactivePhase.COMPLETED, completed.phase)
+        assertTrue(checkNotNull(completed.interval).forwardWallJump)
+        assertFalse(completed.rebasedClock)
+
+        reopenRental()
+        ok(feed(9_000, "simulation-receiver-3", Gear.PARK))
+        ok(stop(9_500, "simulation-receiver-3"))
+        val subsequent = marker()
+        assertEquals(RentalInactivePhase.RECORDED, subsequent.phase)
+        assertEquals(RentalInactiveBasis.DRIVING_END, subsequent.basis)
+        assertEquals(original.policyOrigin, subsequent.policyOrigin)
+        assertTrue(subsequent.rebasedClock)
+    }
+
     fun testConfigurationChangeCreatesNoInactiveMarkerAndDoesNotInventCoverage() {
         ok(feed(0)); val original = ok(feed(1000)).pending.single()
         ok(producer.inactive(true, ContractResult.Success(clock())))
