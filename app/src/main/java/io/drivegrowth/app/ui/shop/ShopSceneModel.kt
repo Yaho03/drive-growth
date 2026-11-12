@@ -2,16 +2,27 @@ package io.drivegrowth.app.ui.shop
 
 import io.drivegrowth.core.rental.Facility
 
-/** 표현에 필요한 확정 입력만 묶는다. 슬롯 배치는 화면용이며 저장 위치/새 소유 사실이 아니다. */
-internal data class ShopSceneModel(
-    val slots: Int?, val vehicles: List<ShopVehicle>, val additionalVehicles: Int,
-    val expandedBuilding: Boolean, val installed: Set<Facility>,
+/** #229 원본 픽셀 좌표. 차량은 화면에만 배치하며 저장 슬롯과 무관하다. */
+internal val townSlots = listOf(
+    253 to 635, 326 to 672, 400 to 709, 474 to 745, 548 to 781,
+    984 to 758, 1063 to 796, 1142 to 835, 1220 to 873, 1299 to 912,
 )
-internal fun shopSceneModel(content: ShopScreenState.Content): ShopSceneModel =
-    ShopSceneModel(
-        content.capacity?.coerceAtMost(12),
-        content.vehicles.take(content.capacity?.coerceAtMost(12) ?: 12),
-        content.vehicles.size - content.vehicles.take(content.capacity?.coerceAtMost(12) ?: 12).size,
-        content.level?.let { it > 1 } == true,
-        content.facilities.filter { it.option.availability == ShopAvailability.INSTALLED }.map { it.facility }.toSet(),
+
+internal data class ShopSceneModel(
+    val slots: Int?,
+    val vehicles: List<ShopVehicle>,
+    val additionalVehicles: Int,
+    val facilityStates: Map<Facility, ShopAvailability>,
+)
+
+internal fun shopSceneModel(content: ShopScreenState.Content): ShopSceneModel {
+    val slots = content.capacity?.coerceAtMost(townSlots.size)
+    val shown = content.vehicles.take(slots ?: 0)
+    val supplied = content.facilities.associate { it.facility to it.option.availability }
+    return ShopSceneModel(
+        slots,
+        shown,
+        content.vehicles.size - shown.size,
+        Facility.entries.associateWith { supplied[it] ?: ShopAvailability.UNKNOWN },
     )
+}
