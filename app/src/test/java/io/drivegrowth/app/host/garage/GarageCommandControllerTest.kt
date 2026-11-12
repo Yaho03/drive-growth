@@ -107,4 +107,25 @@ class GarageCommandControllerTest {
         host.open(event);assertEquals(ContractError.DATA_UNAVAILABLE,(host.state as GarageCommandState.Failure).error)
         assertEquals(0,source.prepares);assertTrue(source.commits.isEmpty())
     }
+
+    @Test fun recoveryReportsLoadingUntilThePreparedRequestCanBeOpened() {
+        val source = Source(); val journal = Journal(); val worker = Queue(); val main = Queue()
+        val states = mutableListOf<GarageCommandState>()
+        val host = GarageCommandController(source, journal, worker, main, onState = states::add)
+        host.setControlsEnabled(true)
+        host.recover()
+        assertEquals(listOf(GarageCommandState.Loading), states)
+        worker.run()
+        assertEquals(GarageCommandState.Loading, host.state)
+        assertEquals(0, source.prepares)
+        main.run()
+        assertEquals(GarageCommandState.Idle, host.state)
+
+        host.open(event)
+        worker.run(); main.run()
+        assertEquals(pending, (host.state as GarageCommandState.Review).pending)
+        assertEquals(1, source.prepares)
+        assertNull(journal.saved)
+        assertTrue(source.commits.isEmpty())
+    }
 }
