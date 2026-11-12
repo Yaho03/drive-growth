@@ -1,0 +1,15 @@
+app/src/androidTest/java/io/drivegrowth/app/host/delivery/DeliveryDiscoverySessionSqliteTest.kt:3:8: warning: 'class InstrumentationTestCase : TestCase' is deprecated. Deprecated in Java.
+import android.test.InstrumentationTestCase
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app/src/androidTest/java/io/drivegrowth/app/host/delivery/DeliveryDiscoverySessionSqliteTest.kt:148:18: warning: this declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+    override fun tearDown() {
+                 ^^^^^^^^
+app/src/main/java/io/drivegrowth/app/MainActivity.kt:1034:18: warning: this declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+    override fun onBackPressed() {
+                 ^^^^^^^^^^^^^
+JUnit version 4.13.2
+....................................
+Time: 0.054
+
+OK (36 tests)
+

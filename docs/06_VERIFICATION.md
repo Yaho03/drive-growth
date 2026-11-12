@@ -3121,7 +3121,7 @@ Pleos API34 ARM64 에뮬레이터의 사용자 10에서 소스별 격리 APK를 
 | 보험 구매와 같은 원장의 사고 효과 · `a801796` | **1/1**(7.479초). 중앙 시험 정의를 읽고 고유 방문 수 99→100에서 해금됐다. 실제 모의 Main의 보험 미리보기·확정·결과 확인으로 1,500을 한 번 차감했다. 같은 프로필의 공개 원장 API에 비교용 사고 대여를 준비해 무보험 수익 60, 보험 설치 뒤 90, 최종 잔액 1,650과 공용 명령 슬롯 해제를 확인했다. 고유 방문 수는 완료 대여 건수와 구분하며 비교 사고는 시험 입력이다. [계측](evidence/final-pixel-ui/final-regressions/insurance/instrumentation.txt) · [단계 로그](evidence/final-pixel-ui/final-regressions/insurance/phase.txt) · [설치](evidence/final-pixel-ui/final-regressions/insurance/result.json) |
 | VEHICLE 앱 목록 아이콘과 Back · `397dd96` | 별도 AVD 기본 화면에서 `io.drivegrowth.verify.vehiclelauncher28`의 실제 MainActivity를 OEM AppGrid 아이콘으로 실행했다. 차고 → Back → HOME → 최상위 Back 숨김 → 같은 아이콘 재진입 뒤 실제 Vehicle SDK의 `speed=OK`, `PARK`, `ux=false`로 화면이 열렸다. PID `4146`, task `1000024`, ActivityRecord `bbffd3b`를 유지했다. Release 빌드를 개발용 Debug 키로 서명했으며 회수 APK는 빌드본과 바이트가 같다. 이 실행은 제출 서명·최신 설치용 APK·공식 DISPLAY2의 VEHICLE 런처·실차로 확대하지 않는다. [실행 결과](evidence/final-pixel-ui/final-regressions/launcher/result.json) · [설치 해시·앱 목록·task 발췌](evidence/final-pixel-ui/final-regressions/launcher/excerpts.txt) |
 
-장치 로그의 시각은 에뮬레이터 표기를 보존했다. 단계 로그는 시험용 프로필·요청·정산 식별자만 가렸다. APK·DB·전체 장치 로그는 저장소에 넣지 않았다. 최신 공식 두 창의 복합 상태 검증은 후속 실행에서 기록한다.
+장치 로그의 시각은 에뮬레이터 표기를 보존했다. 단계 로그는 시험용 프로필·요청·정산 식별자만 가렸다. APK·DB·전체 장치 로그는 저장소에 넣지 않았다. 후속 두 공식 창의 복합 상태는 아래 [차량 관리 복구](#공식-창의-차량-관리-복구와-최신-설치용-apk--2026-11-13)와 [도감 재조회·저장 요청 복원](#공식-창의-도감-재조회와-저장-요청-복원--2026-11-13)에 기록한다.
 
 
 ### 공식 창의 차량 관리 복구와 최신 설치용 APK — 2026-11-13
@@ -3142,3 +3142,34 @@ Pleos API34 ARM64 에뮬레이터의 사용자 10에서 소스별 격리 APK를 
 설치용 표준 Debug APK `io.drivegrowth.app.simulation`은 별도 Pleos AVD에 설치했고 빌드와 회수본 바이트가 일치했다. SHA-256은 `a5551eb76ec6e4539e1e72d37319401a3d06ef5b753a5a350a6b6400398c275a`다. 초기 실제 앱 목록 계층을 수집하지 못했고 패키지만 지정한 MAIN/LAUNCHER Intent는 실행에 실패했다. `UnifiedSimulationActivity` 컴포넌트를 지정한 실행은 새 프로세스에서 첫 차량 안내까지 표시했다. 최신 표준 APK의 실제 앱 목록 아이콘 재진입은 이 실행에서 확인하지 못했다. 이전 `3bd7d92`의 표준 APK 앱 목록 진입 근거는 위 절을 따른다. [회수 해시와 표준 설치·실행](evidence/final-pixel-ui/final-regressions/window-retry/standard-install-and-launch.txt) · [첫 실행 화면](evidence/final-pixel-ui/final-regressions/window-retry/standard-explicit-launch.png)
 
 별도 DISPLAY2와 시험 패키지를 제거하고 전용 AVD·브리지를 종료했다. 원래 장치의 제품 APK·데이터·권한·화면·전면·포워딩 보존을 비롯해 **19/19**를 확인했다. [원래 장치 대조](evidence/final-pixel-ui/final-regressions/window-retry/preservation.json) · [DISPLAY2 반환](evidence/final-pixel-ui/final-regressions/window-retry/isolated-display-removed.json) · [전용 AVD 종료](evidence/final-pixel-ui/final-regressions/window-retry/isolated-avd-stop.txt)
+
+
+### 탁송 발견 저장 중 상세 유지 — 2026-11-13
+
+최종 연속 시연 중 후보를 한 번 선택한 상세가 닫힐 수 있는 경로를 확인했다. 표시 확인 콜백이 자동 발견 저장을 시작하면서 새 Loading 프레임을 내보내고 View가 이전 선택을 무효화했다. `fda0c3c`는 같은 Offers 프레임을 보존하면서 확정 입력을 잠그고, `ed76bb5`는 같은 기간 보관 조건 재조회도 비활성화한다. 거래·주행 제한·프로필 검사는 유지한다.
+
+- 직접 Kotlin·JUnit의 표적 36개는 수정 전 새 회귀 1개 실패, 수정 후 36개 통과했다. 독립 AI가 epoch·busy·이전 버튼·실패·프로필 경계를 검토했다. [수정 전](evidence/final-pixel-ui/final-regressions/delivery-selection/unit-before.log) · [수정 후](evidence/final-pixel-ui/final-regressions/delivery-selection/unit-after.log)
+- `ed76bb5c54bc525c8f5b6ebbd5efceec47495bed`의 격리 SIMULATION Android View·controller·실제 SQLite 계측 3개가 0.948초에 통과했다. 열린 상세와 같은 프레임 보존, 저장 중 확정 및 이전 버튼 차단, 저장 후 동일 후보 확정 활성화, 발견 기록과 실패 롤백·재시도를 확인했다. 이 계측은 제품 Main의 전체 연속 플레이 시험과 구분한다. [계측 로그](evidence/final-pixel-ui/final-regressions/delivery-selection/device-after.txt) · [실행 식별·해시](evidence/final-pixel-ui/final-regressions/delivery-selection/device-result.json)
+- 이전 `e824452` 호스트와 새 시험 APK의 장치 비교는 생성자 차이로 시험 본문에 진입하지 못했다. 이를 수정 전 assertion 실패로 계산하지 않는다. 수정 전 인과 근거는 위 JVM 회귀를 사용한다.
+- core·저장 계약·주행 gate는 변경하지 않았다. Main은 View의 발견 저장 상태 전달과 보관 조회 버튼 잠금만 변경했다. 이전 SDK·공식 창 시험은 실행 당시 소스 범위로 인용하며 최신 설치·연속 결과는 별도 기록한다.
+
+
+### 처분 뒤 대여 후보와 탁송 공간 재개방 — 2026-11-13
+
+`6defee3dda83e99399bea5de34e40a09eab9576a`의 격리 SIMULATION SQLite에서 `DeliveryHostQueriesSqliteTest` 3개가 0.460초에 통과했다. 새 시험은 같은 차종 두 개체 중 하나를 제품 `StoredGarageCommandSource` 판매 명령으로 처분한 뒤 새 `GameSessionFactory`로 같은 프로필·DB를 다시 열었다. 처분 개체의 SOLD 이력, 공통 현재 보유·Garage 대여 후보의 남은 ID 하나, 제품 `FactoryDeliveryHostQueries`의 빈자리 1→2를 함께 단언했다. 전체 처분 이력을 대여 후보 입력으로 사용하므로 사전 필터 결과만 비교한 시험이 아니다.
+
+[실행 로그](evidence/final-pixel-ui/final-regressions/disposal-reopen/instrumentation.txt) · [소스·APK 해시와 종료 기록](evidence/final-pixel-ui/final-regressions/disposal-reopen/result.json). 이 검증은 SQLite 재개방이며 새 OS PID나 판매 금액·중복 지급의 추가 시험으로 확대하지 않는다. 기존 제품 판매 재시도와 새 프로세스 근거는 해당 기록을 유지한다. 제품 소스는 `ed76bb5`와 같고 이 커밋은 계측만 추가했다.
+
+
+### 공식 창의 도감 재조회와 저장 요청 복원 — 2026-11-13
+
+`45e2f6f9e9f6292ad116261ef50ebd7c8ce4cc28`에서 도감 재조회 중 Activity 재생성 시험을 추가했다. `e824452` 대비 제품 app·core·Gradle 소스는 같고 AndroidTest 한 파일만 달랐다. 시험 APK 조립은 성공했으며 이 변경에서 기존 단위 시험과 Lint를 다시 실행하지 않았다.
+
+Pleos API34 ARM64의 격리 `io.drivegrowth.verify.collectionwindow28`를 공식 두 창에 각각 새로 설치했다. 실제 UnifiedSimulationActivity의 도감 새로고침이 Loading을 표시한 UI 처리 중 재생성을 요청하고, 다른 Activity 인스턴스에서 같은 도감 탭과 보유·발견·미발견 표시를 확인했다. 공개 원장 API로 준비한 원 SAVED 레벨업 요청을 도감에서 열어도 원 command/request·프로필·잔액·차량 이력·미확인 정산·발견·checkpoint는 유지됐다. 확정 명령 입력은 하지 않았다.
+
+| 공식 창 | 실제 계측 결과 |
+|---|---|
+| Portrait 840×1184px/dp·160dpi | [1/1 통과, 19.222초](evidence/final-pixel-ui/final-regressions/collection-window/portrait/instrumentation.txt) |
+| Landscape 1700×1185px·1360×948dp·200dpi | [1/1 통과, 29.476초](evidence/final-pixel-ui/final-regressions/collection-window/landscape/instrumentation.txt) |
+
+빌드·설치 회수 해시는 두 실행에서 일치했다. 앱은 `ab0403b370fd2ccd5b0829190472fd4d575382a8e32b86f3a96e6a6a534d4049`, 시험 APK는 `1fb6d537939e0aa385017f54c5fc6f1686089ddcddf58daf0da3959fab1458b4`다. 각 폴더의 result와 phase-log가 버전·단계 근거다. 격리 패키지·전용 디스플레이 제거와 전용 AVD 종료 뒤 [공유 환경 19/19 보존](evidence/final-pixel-ui/final-regressions/collection-window/preservation.json)을 확인했다. 디스크 I/O 완료 순서·강제 지연 응답·Activity 간 동일 scrollY·새 OS PID는 이 시험 범위가 아니다.

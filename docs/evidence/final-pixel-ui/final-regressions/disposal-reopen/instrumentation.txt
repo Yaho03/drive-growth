@@ -1,0 +1,51 @@
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.host.delivery.DeliveryHostQueriesSqliteTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=3
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.host.delivery.DeliveryHostQueriesSqliteTest:
+INSTRUMENTATION_STATUS: test=testReadsActualSameProfileMoneyAndShopAndRejectsForeignIdentity
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.host.delivery.DeliveryHostQueriesSqliteTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=3
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=testReadsActualSameProfileMoneyAndShopAndRejectsForeignIdentity
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.host.delivery.DeliveryHostQueriesSqliteTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=3
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=testSaleOfOneSameModelVehicleUpdatesOwnershipRentalAndDeliverySlotsAfterReopen
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.host.delivery.DeliveryHostQueriesSqliteTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=3
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=testSaleOfOneSameModelVehicleUpdatesOwnershipRentalAndDeliverySlotsAfterReopen
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.host.delivery.DeliveryHostQueriesSqliteTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=3
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=testSavedUnshownCandidatesDoNotDiscoverAndExplicitShownPurchaseKeysPersist
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.host.delivery.DeliveryHostQueriesSqliteTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=3
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=testSavedUnshownCandidatesDoNotDiscoverAndExplicitShownPurchaseKeysPersist
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+Test results for InstrumentationTestRunner=...
+Time: 0.46
+
+OK (3 tests)
+
+
+INSTRUMENTATION_CODE: -1
