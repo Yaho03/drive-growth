@@ -3122,3 +3122,23 @@ Pleos API34 ARM64 에뮬레이터의 사용자 10에서 소스별 격리 APK를 
 | VEHICLE 앱 목록 아이콘과 Back · `397dd96` | 별도 AVD 기본 화면에서 `io.drivegrowth.verify.vehiclelauncher28`의 실제 MainActivity를 OEM AppGrid 아이콘으로 실행했다. 차고 → Back → HOME → 최상위 Back 숨김 → 같은 아이콘 재진입 뒤 실제 Vehicle SDK의 `speed=OK`, `PARK`, `ux=false`로 화면이 열렸다. PID `4146`, task `1000024`, ActivityRecord `bbffd3b`를 유지했다. Release 빌드를 개발용 Debug 키로 서명했으며 회수 APK는 빌드본과 바이트가 같다. 이 실행은 제출 서명·최신 설치용 APK·공식 DISPLAY2의 VEHICLE 런처·실차로 확대하지 않는다. [실행 결과](evidence/final-pixel-ui/final-regressions/launcher/result.json) · [설치 해시·앱 목록·task 발췌](evidence/final-pixel-ui/final-regressions/launcher/excerpts.txt) |
 
 장치 로그의 시각은 에뮬레이터 표기를 보존했다. 단계 로그는 시험용 프로필·요청·정산 식별자만 가렸다. APK·DB·전체 장치 로그는 저장소에 넣지 않았다. 최신 공식 두 창의 복합 상태 검증은 후속 실행에서 기록한다.
+
+
+### 공식 창의 차량 관리 복구와 최신 설치용 APK — 2026-11-13
+
+`a801796`의 공식 Portrait 재생성 시험은 **실패·통과·실패**(19.676·5.673·19.561초), Landscape는 **1/1**(5.772초)이었다. 두 세로 실패 모두 HOME의 전체·차량 보기와 같은 차고 선택의 복원 뒤 **같은 대상의 최신 비용 재조회**를 기다리다 실패했다. 마지막 실패의 화면 계층에는 재조회·준비 요청 닫기만 남았고 비용 리뷰가 표시되지 않았다. 실패 순간의 controller 작업 상태는 직접 관측하지 못했다. [수정 전 계측](evidence/final-pixel-ui/final-regressions/window-retry/before-instrumentation.txt) · [마지막 실패의 화면 계층 발췌](evidence/final-pixel-ui/final-regressions/window-retry/before-portrait-failure-viewport.txt)
+
+`e824452`는 복구가 시작되면 `Loading`을 알리고, 복구 중 조건 재조회 버튼을 비활성화한다. 버튼을 실행할 때 현재 조작 허용 여부·페이지·준비 요청·표시 상태도 다시 확인한다. 단위 시험은 작업자를 단계별로 실행해 `Loading`이 유지되는 동안 조건 계산이 0회이고, 복구 뒤 같은 준비 요청의 조건 조회가 1회이며 거래 저장·확정이 없음을 확인했다. 전후 장치 시험은 같은 selector와 설치 후 회수한 동일 시험 APK `9e50d79c7a2f147b6d21dd9ceb7cf4029160feea1631182306dc7a4a2b83cacc`를 사용했다. [소스·APK·공식 프리셋](evidence/final-pixel-ui/final-regressions/window-retry/window-runs.json)
+
+| 수정 후 공식 창 | 같은 격리 앱의 실제 실행 |
+| --- | --- |
+| Portrait 840×1184px·160dpi | **3/3**(6.000·5.535·6.219초), 매회 새 격리 설치 |
+| Landscape 1700×1185px·200dpi | **1/1**(6.566초), 새 격리 설치 |
+
+두 HOME 보기에서 지정한 가게 요약·시설 3개·꾸미기 미리보기와 취소를 확인했다. 차고의 준비된 레벨업 화면에서 Activity를 재생성해 같은 차량 선택, 이전 확정 버튼 부재, 최신 비용 재조회와 취소를 확인했다. 지정 원장 비교값과 공용 명령 슬롯은 유지됐다. 초기 차량은 공개 원장 API로 준비했고 입력은 View의 `performClick()`을 사용했다. 이 결과는 임의의 화면 요소 전체, 차량 관리의 확정 도중 프로세스 종료, 시스템 분할·회전이나 실차 시험과 범위가 다르다. [수정 후 계측](evidence/final-pixel-ui/final-regressions/window-retry/after-instrumentation.txt) · [단계 로그](evidence/final-pixel-ui/final-regressions/window-retry/window-after-phases.txt)
+
+같은 `e824452`의 다른 격리 앱에서 만차 유료 가챠 차단, 레벨업·재료 강화·수리의 실제 원결과를 **4/4**(7.245·5.081·5.511·3.869초)로 재검증했다. PID `29514 → 30996 → 32169 → 1065`에서 같은 원요청·원정산과 비교 원장을 다시 읽었다. JDK 17·Android SDK 35에서 코어 단위 **447개**, 앱 단위 **837개**가 실패·오류·생략 0으로 통과했고 Debug 앱·시험 APK 빌드 및 Lint 오류 0·경고 50을 확인했다. [차량 재실행](evidence/final-pixel-ui/final-regressions/window-retry/vehicle/process-summary.txt) · [단계 로그](evidence/final-pixel-ui/final-regressions/window-retry/vehicle/phases.txt) · [설치 해시](evidence/final-pixel-ui/final-regressions/window-retry/vehicle/result.json) · [단위·Lint](evidence/final-pixel-ui/final-regressions/window-retry/unit-lint.json)
+
+설치용 표준 Debug APK `io.drivegrowth.app.simulation`은 별도 Pleos AVD에 설치했고 빌드와 회수본 바이트가 일치했다. SHA-256은 `a5551eb76ec6e4539e1e72d37319401a3d06ef5b753a5a350a6b6400398c275a`다. 초기 실제 앱 목록 계층을 수집하지 못했고 패키지만 지정한 MAIN/LAUNCHER Intent는 실행에 실패했다. `UnifiedSimulationActivity` 컴포넌트를 지정한 실행은 새 프로세스에서 첫 차량 안내까지 표시했다. 최신 표준 APK의 실제 앱 목록 아이콘 재진입은 이 실행에서 확인하지 못했다. 이전 `3bd7d92`의 표준 APK 앱 목록 진입 근거는 위 절을 따른다. [회수 해시와 표준 설치·실행](evidence/final-pixel-ui/final-regressions/window-retry/standard-install-and-launch.txt) · [첫 실행 화면](evidence/final-pixel-ui/final-regressions/window-retry/standard-explicit-launch.png)
+
+별도 DISPLAY2와 시험 패키지를 제거하고 전용 AVD·브리지를 종료했다. 원래 장치의 제품 APK·데이터·권한·화면·전면·포워딩 보존을 비롯해 **19/19**를 확인했다. [원래 장치 대조](evidence/final-pixel-ui/final-regressions/window-retry/preservation.json) · [DISPLAY2 반환](evidence/final-pixel-ui/final-regressions/window-retry/isolated-display-removed.json) · [전용 AVD 종료](evidence/final-pixel-ui/final-regressions/window-retry/isolated-avd-stop.txt)

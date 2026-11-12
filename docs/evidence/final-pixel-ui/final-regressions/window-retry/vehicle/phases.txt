@@ -1,0 +1,8 @@
+이번 실행의 행만 발췌하고 시험 식별자를 가렸다.
+11-12 13:44:32.268 29514 29587 I FinalVehicleRestore: CAPACITY_BLOCKED pid=29514 owned=3 capacity=3 balance=2000
+11-12 13:44:34.119 29514 29587 I FinalVehicleRestore: STARTED pid=29514 profile=[profile-1] action=LEVEL_UP request=[request-1] settlement=[settlement-1] balance=1980 digest=ec07181f9595b7133276da61a0708de27ec0d21d1f427c5d13886d488dfec73b
+11-12 13:44:38.390 30996 31057 I FinalVehicleRestore: RESTORED_FROM_29514 pid=30996 profile=[profile-1] action=LEVEL_UP request=[request-1] settlement=[settlement-1] balance=1980 digest=c8dbbcd34f2d366d113802f46eb1d3b82cdf35efa931469723d18cf1567c8b6e
+11-12 13:44:39.881 30996 31057 I FinalVehicleRestore: STARTED pid=30996 profile=[profile-1] action=USE_MATERIAL request=[request-2] settlement=[settlement-2] balance=1980 digest=7015f6d3760510676b74f7f68ded6b83f63db2044a6e30f2dbd42b6ed17c9df5
+11-12 13:44:44.023 32169 32244 I FinalVehicleRestore: RESTORED_FROM_30996 pid=32169 profile=[profile-1] action=USE_MATERIAL request=[request-2] settlement=[settlement-2] balance=1980 digest=6b133f9be0ebc1d50ff2b612413c743e71bc2fe8f9f8054b8c965da8213c87e9
+11-12 13:44:45.916 32169 32244 I FinalVehicleRestore: STARTED pid=32169 profile=[profile-1] action=REPAIR request=[request-3] settlement=[settlement-3] balance=1992 digest=eac0f670f07ccb048fdaa4fdf3509d5c2f6e48d3750c59475ae052716f679f3b
+11-12 13:44:50.335  1065  1139 I FinalVehicleRestore: RESTORED_FROM_32169 pid=1065 profile=[profile-1] action=REPAIR request=[request-3] settlement=[settlement-3] balance=1992 digest=fea818e19c2eacc93b3919d0ea0361af9a0ec619805350d02e3945a09023c268
