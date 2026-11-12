@@ -231,7 +231,6 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             addView(text(s(R.string.shop_condition, option.condition)))
             addView(text(s(R.string.shop_effect, option.effect)))
             addView(text(s(R.string.shop_price, money(option.price))))
-            addView(text(s(R.string.shop_rule, option.ruleVersion?.value ?: s(R.string.shop_unknown)), color = muted))
             if (option.trial) addView(text(s(R.string.shop_trial), color = muted))
             val selection = ShopSelection(c.revision, option)
             if (option.command != null) add(this, button(s(R.string.shop_preview), interaction.canSelect(selection)) {

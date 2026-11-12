@@ -49,6 +49,9 @@ class ShopViewTest : InstrumentationTestCase() {
                 val shown = text(view)
                 assertTrue(shown.contains("세차장")); assertTrue(shown.contains("가게 레벨 3 필요 · 현재 레벨 2"))
                 assertTrue(shown.contains("캐스퍼")); assertTrue(shown.contains("보유 / 공간 · 2 / 5"))
+                assertTrue(shown.contains("조정 가능한 시험값"))
+                assertFalse(shown.contains("규칙 ·"))
+                assertFalse(shown.contains(checkNotNull(state.expansion?.ruleVersion).value))
                 val label = views(view).filterIsInstance<TextView>().single { it.text.contains("가게 레벨 3 필요") }
                 assertTrue(label.width > 0); assertTrue(label.height > 0)
                 assertEquals(0, label.layout.getEllipsisCount(0))

@@ -20,6 +20,15 @@ class ShopExpansionMapperTest {
         assertEquals(GameMoney(500),exact.screen.expansion!!.price)
         assertTrue(exact.screen.expansion!!.condition.contains("3/3"))
     }
+    @Test fun expansionEffectUsesGameCopyAndKeepsDefinitionAndRuleVersions() {
+        val snapshot = mapped()
+        val option = checkNotNull(snapshot.screen.expansion)
+        assertEquals("확정 후 공간 5칸", option.effect)
+        assertEquals(definition.version, snapshot.definitionVersion)
+        assertEquals(definition.rules, option.ruleVersion)
+        assertEquals(ShopCommand.Expand(definition.offers.first()), option.command)
+        assertTrue(option.trial)
+    }
     @Test fun unknownCapacityAndUnsupportedFacilitiesAndDecorationsCannotSubmit() {
         val value=mapped(capacity=6)
         assertEquals(6,value.screen.capacity);assertEquals(ShopAvailability.UNKNOWN,value.screen.expansion!!.availability)
