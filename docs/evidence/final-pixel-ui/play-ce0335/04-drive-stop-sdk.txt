@@ -1,0 +1,16 @@
+--------- beginning of main
+11-12 12:12:59.809 32023 32023 I DriveGrowthVehicle: observation_start firstInProcess=true displayId=0
+11-12 12:12:59.825 32023 32023 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-12 12:12:59.902 32023 32023 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE
+11-12 12:13:00.840 32023 32023 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false
+11-12 12:13:00.850 32023 32023 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE
+11-12 12:13:01.837 32023 32023 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE
+11-12 12:13:02.837 32023 32023 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE
+11-12 12:13:03.838 32023 32023 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE
+11-12 12:13:04.914 32023 32023 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE
+11-12 12:13:06.245 32023 32023 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE
+11-12 12:13:07.247 32023 32023 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE
+11-12 12:13:08.242 32023 32023 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE
+11-12 12:13:09.250 32023 32023 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE
+11-12 12:13:10.240 32023 32023 I DriveGrowthVehicle: signal_state speed=OK gear=DRIVE ux=true
+11-12 12:13:10.268 32023 32023 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE

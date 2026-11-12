@@ -3021,3 +3021,14 @@ Pleos 2.1.0 / API34 ARM64의 격리 패키지 `io.drivegrowth.verify.combined28e
 꾸미기 시험의 첫 시도는 시험 클릭 코드가 대기 뒤 다시 찾은 버튼에 `!!`를 사용해 NPE로 중단됐다. 버튼 확인과 클릭을 같은 UI 콜백에서 처리한 두 번째 시도는 내부 오류 코드 `STORAGE_FAILURE`를 일반 화면에서 찾는 잘못된 기대 문구로 실패했다. 실제 사용자용 복구 안내를 확인하도록 고친 v3는 원명령·금액·원장 단언을 유지했다. 제품 오류 처리나 경제 코드를 변경한 것은 아니다. [첫 중단 원문](evidence/final-pixel-ui/device-fixture-55-retry/filtered.txt) · [두 번째 실패](evidence/final-pixel-ui/device-fixture-v2-55-retry/instrumentation.txt)
 
 #44의 추가 patch 복원 SHA-256은 `126aaa2059e46d1dbafe802c93e04a2418c381d25c110d7dbe3955d481696255`, #55는 `3751a6ea5a783917b1d251f28529e29e81fea2823cd4773794a5b54ccdbac9c3`다. #44는 앞의 공통 계측 patch 중 ObservedDrivingJournalTest 부분을 적용한 사본에 덧붙이며, #55는 `ce03352` 사본의 같은 시험 파일에 적용한다. 지원 창·최종 디자인·실차의 전체 검증과 구분한다.
+
+
+### 같은 ce03352 APK의 실제 SDK 제한과 Back
+
+Pleos 에뮬레이터에서 별도 SIMULATION factory 대신 실제 Vehicle SDK 수신을 사용했다. 속도 권한 거부 시 게임 본문을 제한했고, `PARK·ux=false`에서 허용, `DRIVE·ux=true` 정차와 이동에서 제한, 다시 P에서 허용을 확인했다. 이동 시 에뮬레이터 속도 표본은 5.555556m/s였다. 이것은 실제 차량 운행이나 내비 도착 귀속·보상 지급의 검증이 아니다. 초기화되지 않은 시험 프로필의 `recording_failure DATA_UNAVAILABLE` 로그도 원문에 보존한다.
+
+[권한 로그](evidence/final-pixel-ui/play-ce0335/01-denied-sdk.txt) · [P 로그](evidence/final-pixel-ui/play-ce0335/02-park-sdk.txt) · [D 정차](evidence/final-pixel-ui/play-ce0335/04-drive-stop-sdk.txt) · [D 이동](evidence/final-pixel-ui/play-ce0335/05-drive-moving-sdk.txt) · [P 복귀](evidence/final-pixel-ui/play-ce0335/06-park-return-sdk.txt) · [설치 APK 대조](evidence/final-pixel-ui/play-ce0335/install-sha256.txt)
+
+같은 후보에서 실제 Back 입력으로 온보딩→HOME→앱 본문 숨김을 확인했다. 명시적 Main 재진입은 같은 PID 23414로 복귀했다. 이 실행은 실제 런처 아이콘 반복 시작의 대체 근거가 아니다. [숨김 화면](evidence/final-pixel-ui/play-ce0335-back/05-top-hidden.png) · [복귀 화면](evidence/final-pixel-ui/play-ce0335-back/06-top-return.png) · [전 PID](evidence/final-pixel-ui/play-ce0335-back/pid-top-before.txt) · [후 PID](evidence/final-pixel-ui/play-ce0335-back/pid-top-after.txt)
+
+이 시험 묶음 종료 시 제품 APK·데이터 6개·권한·전역 화면 설정·차량 상태 등 보존 대조 19/19가 일치했다. 격리 패키지·계측·포워딩을 정리했다. 뒤이어 시행하는 최종 표시 패치·지원 창 시험은 별도 소스·장치 반환 기록을 남긴다. [보존 결과](evidence/final-pixel-ui/preservation-ce0335.json)

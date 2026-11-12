@@ -1,0 +1,8 @@
+--------- beginning of main
+11-12 12:12:55.175 30973 30973 I DriveGrowthVehicle: observation_start firstInProcess=true displayId=0
+11-12 12:12:55.343 30973 30973 I DriveGrowthVehicle: observation_start firstInProcess=false displayId=0
+11-12 12:12:55.360 30973 30973 I DriveGrowthVehicle: observation_gap kind=APP_HIDDEN durationMs=165
+11-12 12:12:55.362 30973 30973 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-12 12:12:55.473 30973 30973 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE
+11-12 12:12:56.371 30973 30973 I DriveGrowthVehicle: signal_state speed=PERMISSION_DENIED gear=PARK ux=false
+11-12 12:12:56.383 30973 30973 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE
