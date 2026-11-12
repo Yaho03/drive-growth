@@ -2158,7 +2158,9 @@ GREEN 앱 SHA-256은 `853db02efb5bf98cbf4f9761842901a4ba5fc342c8aa7bd7e5f26b9cfc
 
 최종 GREEN의 실제 스크롤에서 [102px 위치의 활성·잔여 표시](evidence/issue57-rest-viewport/active-and-remaining.png)와 [153px 위치의 잔여·모의 입력 출처](evidence/issue57-rest-viewport/remaining-and-source.png)를 확인했다. 독립 상태 비교에서 미부여와 소진은 기존 비활성 문구·잔여 0초를 유지했다. 앱·계측 APK를 빌드하고 최종 앱 Lint 오류 0건·경고 39건을 확인했다. [실행 트리·설치 APK SHA-256·반환 요약](evidence/issue57-rest-viewport/verification.json)을 보존했다.
 
-게시 기준 `2c54ad1901ac8d1009b504802c08ce0904a376af`에는 장치 실행 기준 이후 #228의 Main·탁송 변경과 #230의 문서 변경이 있다. 이번 표시 코드와 두 계측 파일은 실행한 최종 GREEN과 동일하다. 게시 조합의 새 APK 빌드·장치 시험은 미수행이다. 실제 차량의 휴식 장소·입력, 공식 폼 팩터, 전체 #57·#28 검증은 남는다.
+실제 Main 시험은 `io.drivegrowth.app.simulation.UnifiedSimulationRestActivityTest#testConfirmedRestCanBeReadInTheShallowMainWindow` 단독 selector로 실행했다. 이 selector는 높이 80–150dp의 스크롤 뷰포트와 1000dp 미만 진행 본문을 요구한다. 두 공개 시험은 각각 기존 원장이 없는 새 격리 설치가 필요하므로 메서드별 새 격리 설치에서 개별 실행한다. 계측 클래스 전체 실행은 이번 결과에 포함되지 않았다. 기존 제품 설치와 데이터는 보존한다.
+
+게시 기준 `e1f3961a071a258bc225478b90f4f8272c127db8`에는 장치 실행 기준 이후 #228의 Main·탁송 변경, #230의 문서 변경과 #231의 Main·종료 영업 변경이 있다. 이번 표시 코드와 두 계측 파일은 실행한 최종 GREEN과 동일하다. 게시 조합의 새 APK 빌드·장치 시험은 미수행이다. 실제 차량의 휴식 장소·입력, 공식 폼 팩터, 전체 #57·#28 검증은 남는다.
 
 
 ### Rest 6a4 세 수정의 main188 통합 검토 대기 — 2026-11-10
