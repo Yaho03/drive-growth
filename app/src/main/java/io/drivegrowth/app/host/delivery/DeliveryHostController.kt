@@ -10,6 +10,7 @@ class DeliveryHostController(private val source: DeliveryHostSource, private val
     private var render: ((DeliveryFrame, Boolean) -> Unit)? = null
     private var complete: ((DeliveryRequest, DeliveryFrame) -> Unit)? = null
     private var onDiscoverySaved: (() -> Unit)? = null
+    private var onOriginalResolved: (() -> Unit)? = null
     private var pendingDiscovery: DeliveryHostRead? = null
     @Volatile private var allowed = false
     @Volatile private var released = false
@@ -26,12 +27,13 @@ class DeliveryHostController(private val source: DeliveryHostSource, private val
         private set
 
     fun attach(render: (DeliveryFrame, Boolean) -> Unit, complete: (DeliveryRequest, DeliveryFrame) -> Unit,
-        onDiscoverySaved: () -> Unit = {}) {
+        onDiscoverySaved: () -> Unit = {}, onOriginalResolved: () -> Unit = {}) {
         detach(); this.render = render; this.complete = complete; this.onDiscoverySaved = onDiscoverySaved
+        this.onOriginalResolved = onOriginalResolved
         render(frame, false)
     }
-    fun detach() { setControlsEnabled(false); render = null; complete = null; onDiscoverySaved = null }
-    fun release() { released = true; allowed = false; epoch++; render = null; complete = null; onDiscoverySaved = null }
+    fun detach() { setControlsEnabled(false); render = null; complete = null; onDiscoverySaved = null; onOriginalResolved = null }
+    fun release() { released = true; allowed = false; epoch++; render = null; complete = null; onDiscoverySaved = null; onOriginalResolved = null }
     fun setControlsEnabled(value: Boolean) {
         if (released || value == allowed) return
         allowed = value
@@ -82,14 +84,19 @@ class DeliveryHostController(private val source: DeliveryHostSource, private val
             when (val result = resolve()) {
                 is ContractResult.Failure -> result
                 is ContractResult.Success -> {
-                    original = null
-                    confirmed = false
+                    originalResolved()
                     // 새 후보를 읽으면 일시 실패한 원 표시의 저장 근거가 교체된다.
                     if (discovery == null) recover()
                     else ContractResult.Success(discovery.copy(pending = null, receipt = null))
                 }
             }
         }
+    }
+    private fun originalResolved() {
+        original = null
+        confirmed = false
+        // 슬롯 해제는 후속 탁송 조회 결과와 별개다. 공통 요청 표시는 Main에서 원장을 다시 읽는다.
+        main.execute { if (!released) onOriginalResolved?.invoke() }
     }
     fun onRequest(value: DeliveryRequest) {
         if (released || busy || identity == null) return
@@ -111,7 +118,7 @@ class DeliveryHostController(private val source: DeliveryHostSource, private val
                 if (!confirmed) return@launch ContractResult.Failure(ContractError.STATE_CONFLICT)
                 when (val finished = source.finish(profile, previous)) {
                     is ContractResult.Failure -> return@launch finished
-                    is ContractResult.Success -> { original = null; confirmed = false }
+                    is ContractResult.Success -> originalResolved()
                 }
             }
             if (!inCurrentWork()) return@launch ContractResult.Failure(ContractError.UX_RESTRICTED)

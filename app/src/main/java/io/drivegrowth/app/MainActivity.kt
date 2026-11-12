@@ -286,7 +286,7 @@ open class MainActivity : Activity() {
         }, { request, frame ->
             delivery.complete(request, frame)
             session.deliveryUi = delivery.saveUiState()
-        }, queries::refresh)
+        }, onDiscoverySaved = queries::refresh, onOriginalResolved = ::refreshPendingRoute)
         session.deliveryNavigation.changed = { if (active && allowed() && navigation.page == HostPage.DELIVERY) render() }
         queries.attach {
             screen = it
