@@ -1,18 +1,20 @@
 package io.drivegrowth.app.ui.garage
 
 import android.content.Context
+import android.view.Gravity
 import android.view.View
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
+import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.progression.VehicleAction
 import io.drivegrowth.core.progression.VehicleActivity
 
 /** 호스트가 허용한 영역에 삽입하는 표시 전용 View. 탐색·저장·차량 SDK를 호출하지 않는다. */
 class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayout(context) {
-    private val style = GarageStyle(context)
+    private val style = GarageStyle(context, pixelPanel = true)
+    private val artwork = VehicleArtwork(context, style)
     private val interaction = GarageInteraction(onEvent)
     private var widthClass = 0
     private var listScroll: ScrollView? = null
@@ -112,12 +114,20 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
     private fun vehicleCard(value: VehiclePresentation): LinearLayout = with(style) {
         val selected = interaction.selectedId == value.vehicle.ownedVehicleId
         card(selected).apply {
-            addView(text(rarity(value.vehicle.rarity), color = rarityColor(value.vehicle.rarity), bold = true))
-            addView(placeholder(76))
-            addView(text("${value.name} ${value.instanceLabel}", 24, bold = true))
-            addView(text(context.getString(R.string.garage_level, value.vehicle.level), 24))
-            addView(text(progress(value), color = muted))
-            addView(text(activity(value), color = ink))
+            addView(row().apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(artwork.view(value.vehicle.vehicleId, value.vehicle.rarity, 76), LayoutParams(dp(88), dp(76)))
+                addView(column().apply {
+                    addView(text("${value.name} ${value.instanceLabel}", 20, bold = true))
+                    addView(text(rarity(value.vehicle.rarity), 16, rarityColor(value.vehicle.rarity), bold = true))
+                    addView(activityBadge(value))
+                }, LayoutParams(0, -2, 1f).apply { marginStart = dp(PixelStyle.gapDp) })
+            })
+            if (!artwork.hasSprite(value.vehicle.vehicleId))
+                addView(text(s(R.string.garage_art_placeholder), 16, muted))
+            addView(text(context.getString(R.string.garage_level, value.vehicle.level), 20, bold = true))
+            addView(progressTrack(value.vehicle.levelProgressPercent), LayoutParams(-1, dp(8)))
+            addView(text(progress(value), 16, muted))
             if (value.activityDetail != null) addView(text(value.activityDetail, color = muted))
             if (value.informationNote != null) addView(text(value.informationNote, color = muted))
             if (selected) addView(text(s(R.string.garage_selected), bold = true))
@@ -142,13 +152,16 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
             }
             add(this, card(true).apply {
                 addView(text(rarity(value.vehicle.rarity), color = rarityColor(value.vehicle.rarity), bold = true))
-                addView(text(activity(value), 24, bold = true))
+                addView(activityBadge(value), LayoutParams(-2, -2))
                 if (value.activityDetail != null) addView(text(value.activityDetail, color = muted))
                 if (value.informationNote != null) addView(text(value.informationNote, color = muted))
-                addView(placeholder(128))
-                addView(text("${value.name} ${value.instanceLabel}", 32, bold = true))
-                addView(text(context.getString(R.string.garage_level, value.vehicle.level), 30, bold = true))
-                addView(text(progress(value), color = muted))
+                addView(artwork.view(value.vehicle.vehicleId, value.vehicle.rarity, 144), LayoutParams(-1, dp(144)))
+                if (!artwork.hasSprite(value.vehicle.vehicleId))
+                    addView(text(s(R.string.garage_art_placeholder), 16, muted))
+                addView(text("${value.name} ${value.instanceLabel}", 28, bold = true))
+                addView(text(context.getString(R.string.garage_level, value.vehicle.level), 22, bold = true))
+                addView(progressTrack(value.vehicle.levelProgressPercent), LayoutParams(-1, dp(8)))
+                addView(text(progress(value), 16, muted))
                 addView(text(value.accidentLabel?.let { context.getString(R.string.garage_accidents, it) }
                     ?: s(R.string.garage_accidents_missing)))
                 addView(text(value.modelPriceLabel?.let { context.getString(R.string.garage_model_price, it) }
@@ -175,16 +188,18 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
         }
     }
 
-    private fun placeholder(height: Int) = style.column().apply {
-        background = style.shape(style.inset)
-        addView(ImageView(context).apply {
-            setImageResource(R.drawable.garage_vehicle_placeholder)
-            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-            scaleType = ImageView.ScaleType.FIT_CENTER
-        }, LayoutParams(-1, style.dp(height)))
-        addView(style.text(s(R.string.garage_art_placeholder), color = style.muted).apply {
-            gravity = android.view.Gravity.CENTER
-        })
+    private fun activityBadge(value: VehiclePresentation) = with(style) {
+        val (fill, foreground) = when (value.activity) {
+            VehicleActivity.IDLE -> 0xff1f3a2c.toInt() to 0xff7ee2a6.toInt()
+            VehicleActivity.RENTED -> 0xff1e2f57.toInt() to PixelStyle.focus
+            VehicleActivity.RETURNING -> 0xff173c3c.toInt() to 0xff7fd8cf.toInt()
+            VehicleActivity.NEEDS_REPAIR -> 0xff4a2026.toInt() to 0xffff9a8a.toInt()
+            null -> inset to muted
+        }
+        text(activity(value), 16, foreground, bold = true).apply {
+            background = shape(fill)
+            setPadding(dp(10), dp(4), dp(10), dp(4))
+        }
     }
 
     private fun progress(value: VehiclePresentation) =
