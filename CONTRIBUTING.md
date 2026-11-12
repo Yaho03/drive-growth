@@ -133,6 +133,8 @@ M0 준비·기술 확인, M1 기획·설계, M2 핵심 구현, M3 통합·제출
 
 실제 명령과 환경은 README의 실행 안내를 따른다. 자동 검사 이름은 CI의 `repository-checks`, `android-checks`와 일치시킨다.
 
+원격 CI는 PR과 `main` 푸시에서 실행한다. 작업 브랜치 푸시만으로 중복 실행하지 않으므로 PR을 만들기 전에는 변경 범위에 맞는 로컬 검사를 수행한다. 같은 PR에 새 변경이 올라오면 이전 실행을 취소하고 최신 변경을 검사한다. 서로 다른 PR과 `main` 실행은 취소 그룹을 공유하지 않는다. 검사 항목·필수 검사명은 유지하며 취소된 이전 실행을 최신 커밋의 성공으로 기록하지 않는다.
+
 - 문서·설정: `python3 scripts/check_repository.py`.
 - 핵심 로직: `./gradlew :core:test`.
 - Android 코드·설정: `./gradlew :app:assembleDebug :app:lintDebug`와 관련 단위 테스트.
