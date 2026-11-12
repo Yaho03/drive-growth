@@ -1,5 +1,8 @@
 package io.drivegrowth.app.host.progression
 
+import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.host.HostPage
 import android.app.UiAutomation
 import android.graphics.Rect
 import android.os.ParcelFileDescriptor
@@ -13,7 +16,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.Window
 import android.widget.Button
-import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.data.AssetTrialDefinitionProvider
@@ -188,11 +190,9 @@ class RemainingAchievementsMainTest :
             if (shown != null && targets.all { shown.findViewWithTag<Button>(achievementKey(it.metric))?.isShown == true }) {
                 return@awaitUi true
             }
-            val menu = root.findViewWithTag<Spinner>("host:destination") ?: return@awaitUi false
+            val menu = root.mainPage(HostPage.PROGRESSION) ?: return@awaitUi false
             if (!menu.isShown || !menu.isEnabled || !menu.isLaidOut || menu.isLayoutRequested) return@awaitUi false
-            val desired = (0 until menu.count).single { menu.getItemAtPosition(it).toString() == "퀘스트·진행" }
-            // A cold query can replace the Spinner before its selection callback runs.
-            if (menu.selectedItemPosition != desired) menu.setSelection(desired)
+            root.openMainPage(HostPage.PROGRESSION)
             false
         }
         return root

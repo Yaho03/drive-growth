@@ -17,7 +17,7 @@ internal fun mapShopExpansion(profile: ProfileId, source: InputSource, definitio
         ShopOption("expand","레벨 ${offer.fromLevel} → ${offer.fromLevel+1} · 공간 ${offer.currentCapacity} → ${offer.nextCapacity}",
             "완료 대여 ${completed}/${offer.requiredCustomers}건 · 현재 공간 ${shop.capacity}칸"+
                 (if(!capacityMatches) " · 공간 정의 불일치" else if(balance.units<offer.price.units) " · 잔액 부족" else ""),
-            "확정 후 공간 ${offer.nextCapacity}칸 · ${definition.version.value}",
+            "확정 후 공간 ${offer.nextCapacity}칸",
             if(!capacityMatches)ShopAvailability.UNKNOWN else if(available)ShopAvailability.AVAILABLE else ShopAvailability.LOCKED,
             ShopCommand.Expand(offer),offer.price,offer.ruleVersion,offer.trial)
     }

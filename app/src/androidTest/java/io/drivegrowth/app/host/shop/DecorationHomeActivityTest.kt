@@ -1,5 +1,9 @@
 package io.drivegrowth.app.host.shop
 
+import io.drivegrowth.app.mainNavigation
+import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.host.HostPage
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Rect
@@ -11,7 +15,6 @@ import android.test.ActivityInstrumentationTestCase2
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.R
@@ -36,7 +39,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
     private fun <T> read(action: (GameSession) -> T) = ok(GameSessionFactory(context).open()).use(action)
     private fun tree(v: View): List<View> = listOf(v) + if(v is ViewGroup)(0 until v.childCount).flatMap{tree(v.getChildAt(it))} else emptyList()
     private fun shop(a: MainActivity) = tree(a.window.decorView).filterIsInstance<ShopView>().single()
-    private fun menu(a: MainActivity) = a.window.decorView.findViewWithTag<Spinner>("host:destination")
+    private fun menu(a: MainActivity) = a.window.decorView.mainNavigation()
     private fun await(a: MainActivity, label: String, check: () -> Boolean) {
         val end=SystemClock.uptimeMillis()+30_000;var passed=false;var gate=false
         while(!passed && SystemClock.uptimeMillis()<end) {
@@ -96,11 +99,11 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
             await(current,"같은 HOME/원결과 복원") { current.window.decorView.findViewWithTag<View>("decoration:receipt")?.isShown==true && shop(current).uiState.pending==null && currentShopShown(current,expected.second.selectedId!!) }
             assertEquals(expected,read{it.identity to ok(it.store.decorations.state(it.identity.profileId))})
             instrumentation.runOnMainSync {
-                val m=menu(current)!!;m.setSelection((0 until m.count).first{m.getItemAtPosition(it).toString().contains("보유 차량")})
+                current.window.decorView.openMainPage(HostPage.GARAGE)
             }
-            await(current,"차고 탐색") { menu(current)?.selectedItem.toString().contains("보유 차량") }
+            await(current,"차고 탐색") { current.window.decorView.mainPage(HostPage.GARAGE)?.isSelected == true }
             instrumentation.runOnMainSync { current.onBackPressed() }
-            await(current,"Back HOME") { menu(current)?.selectedItem.toString().contains("가게") && shop(current).isShown }
+            await(current,"Back HOME") { current.window.decorView.mainPage(HostPage.HOME)?.isSelected == true && shop(current).isShown }
             assertEquals(expected,read{it.identity to ok(it.store.decorations.state(it.identity.profileId))})
         } finally {instrumentation.removeMonitor(monitor);next?.let{n->instrumentation.runOnMainSync{n.finish()}}}
     }
@@ -276,10 +279,9 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
             assertRestricted(fresh, "새 HostSession 제한")
             checkSaved(fresh)
             onMain {
-                val spinner = checkNotNull(menu(fresh))
-                spinner.setSelection((0 until spinner.count).first { spinner.getItemAtPosition(it).toString() == "보유 차량" })
+                fresh.window.decorView.openMainPage(HostPage.GARAGE)
             }
-            await(fresh, "다른 화면 탐색과 gate") { menu(fresh)?.selectedItem.toString() == "보유 차량" }
+            await(fresh, "다른 화면 탐색과 gate") { fresh.window.decorView.mainPage(HostPage.GARAGE)?.isSelected == true }
             assertEquals(HostPage.GARAGE.name, save(fresh).getString("page"))
             finish(fresh)
 
@@ -288,7 +290,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
                 putString("page", HostPage.GARAGE.name)
                 putBundle("shopUi", ShopUiStateBundle.encode(shopState, validFacility))
             })
-            await(healthy, "정상 Bundle의 차고 진입") { menu(healthy)?.selectedItem.toString() == "보유 차량" }
+            await(healthy, "정상 Bundle의 차고 진입") { healthy.window.decorView.mainPage(HostPage.GARAGE)?.isSelected == true }
             val healthyShop = save(healthy).getBundle("shopUi")
             assertEquals(ContractResult.Success(shopState), ShopUiStateBundle.decodePresent(healthyShop))
             assertEquals(ContractResult.Success(validFacility), ShopUiStateBundle.decodeFacility(healthyShop))

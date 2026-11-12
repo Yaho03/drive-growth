@@ -1,0 +1,23 @@
+Starting: Intent { cmp=io.drivegrowth.verify.combined28e/io.drivegrowth.app.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.android.permissioncontroller/.permission.ui.GrantPermissionsActivity
+TotalTime: 458
+WaitTime: 460
+Complete
+Starting: Intent { cmp=io.drivegrowth.verify.combined28e/io.drivegrowth.app.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: io.drivegrowth.verify.combined28e/io.drivegrowth.app.MainActivity
+TotalTime: 410
+WaitTime: 415
+Complete
+Starting: Intent { cmp=io.drivegrowth.verify.combined28e/io.drivegrowth.app.MainActivity }
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+Status: ok
+LaunchState: UNKNOWN (0)
+Activity: io.drivegrowth.verify.combined28e/io.drivegrowth.app.MainActivity
+TotalTime: 0
+WaitTime: 2
+Complete
+SDK permission/P/D/P and game gate verified

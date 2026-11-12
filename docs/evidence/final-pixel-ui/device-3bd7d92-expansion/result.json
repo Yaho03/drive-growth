@@ -1,0 +1,16 @@
+{
+  "head": "3bd7d925c1133fd5a45ecf3cc5ee8d72faabbdfb",
+  "tree": "cc9a75d325b1112b236fd4d5351725719d4e8121",
+  "package": "io.drivegrowth.verify.combined28e",
+  "selector": [
+    "io.drivegrowth.app.data.ShopExpansionLiveSourceTest#testChangedDefinitionBeforeSaveRejectsStaleSelectionWithoutCharge",
+    "io.drivegrowth.app.data.ShopExpansionLiveSourceTest#testAboveThresholdAtEachPackagedExpansionStageReplaysWithoutAdditionalCharge"
+  ],
+  "sha256": {
+    "io.drivegrowth.verify.combined28e": "ef338238e45ece44a54a07decd3331092f9f88dab5f38bfeacc1d664f6bd4b03",
+    "io.drivegrowth.verify.combined28e.test": "422d611eaefa51874cfa14817ea9897c0504ba49107717a2fa2911b0a19cf246"
+  },
+  "cleanupErrors": [],
+  "signerSHA256": "4241ac4162c67a0e0101009cec5a8810ae78bdf1346d4decdf55b191fc64d60b",
+  "passed": true
+}

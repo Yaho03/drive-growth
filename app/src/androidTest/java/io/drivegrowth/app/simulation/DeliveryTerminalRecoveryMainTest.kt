@@ -1,5 +1,8 @@
 package io.drivegrowth.app.simulation
 
+import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.host.HostPage
 import android.content.pm.ApplicationInfo
 import android.os.Process
 import android.os.SystemClock
@@ -7,7 +10,6 @@ import android.test.ActivityInstrumentationTestCase2
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.data.ArrivalCommit
 import io.drivegrowth.app.data.AssetTrialDefinitionProvider
@@ -323,11 +325,10 @@ class DeliveryTerminalRecoveryMainTest :
                     return@awaitUi false
                 }
             }
-            val menu = root.findViewWithTag<Spinner>("host:destination")
+            val menu = root.mainPage(HostPage.DELIVERY)
                 ?.takeIf { it.isShown && it.isEnabled && it.isLaidOut && !it.isLayoutRequested }
                 ?: return@awaitUi false
-            val target = (0 until menu.count).singleOrNull { menu.getItemAtPosition(it).toString() == "탁송" }
-            if (target != null && menu.selectedItemPosition != target) menu.setSelection(target)
+            root.openMainPage(HostPage.DELIVERY)
             false
         }
     }

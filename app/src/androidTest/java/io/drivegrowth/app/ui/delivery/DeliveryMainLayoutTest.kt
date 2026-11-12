@@ -1,5 +1,8 @@
 package io.drivegrowth.app.ui.delivery
 
+import io.drivegrowth.app.mainNavigation
+import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.host.HostPage
 import android.app.UiAutomation
 import android.graphics.Rect
 import android.os.ParcelFileDescriptor
@@ -11,7 +14,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.host.GameSessionFactory
@@ -52,10 +54,9 @@ class DeliveryMainLayoutTest :
             onUi { assertTrue(checkNotNull(root.findViewWithTag<Button>(tag)).performClick()) }
         }
 
-        await("Main 화면 탐색") { root.findViewWithTag<Spinner>("host:destination")?.isEnabled == true }
+        await("Main 화면 탐색") { root.mainNavigation()?.isEnabled == true }
         onUi {
-            val menu = checkNotNull(root.findViewWithTag<Spinner>("host:destination"))
-            menu.setSelection((0 until menu.count).first { menu.getItemAtPosition(it).toString() == "탁송" })
+            root.openMainPage(HostPage.DELIVERY)
         }
         // Main의 최초 조회가 Destination을 그린 뒤에만 확인한다. 조회 중에는 refresh가 합쳐질 수 있다.
         await("시연 목적지 확인 전 Main의 최초 탁송 조회 완료") {

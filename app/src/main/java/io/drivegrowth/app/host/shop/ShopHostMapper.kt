@@ -33,12 +33,14 @@ class ShopHostMapper {
             level = null, ownedCount = owned.size,
             capacity = ((stored?.capacity as? ContractResult.Success)?.value)?.takeIf { it > 0 },
             balance = snapshot.balance, appearance = ShopAppearance("드라이브 키우기", 0xff58a6ff.toInt()),
-            vehicles = owned.map { car -> ShopVehicle(car.ownedVehicleId, names.getValue(car.vehicleId),
-                when ((details[car.ownedVehicleId]?.activity as? ContractResult.Success)?.value) {
+            vehicles = owned.map { car ->
+                val activity = (details[car.ownedVehicleId]?.activity as? ContractResult.Success)?.value
+                ShopVehicle(car.ownedVehicleId, names.getValue(car.vehicleId), when (activity) {
                     VehicleActivity.IDLE -> "대기 중"; VehicleActivity.RENTED -> "대여 중"
                     VehicleActivity.RETURNING -> "반납 이동 중"; VehicleActivity.NEEDS_REPAIR -> "수리 필요"
                     null -> "활동 미확인"
-                }) },
+                }, car.vehicleId, car.rarity, activity)
+            },
             facilities = Facility.entries.map { ShopFacility(it, unknown("facility-$it", when (it) {
                 Facility.FUEL_STATION -> "주유소"; Facility.INSURANCE -> "보험 시설"; Facility.CAR_WASH -> "세차장"
             })) },

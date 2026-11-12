@@ -1,5 +1,9 @@
 package io.drivegrowth.app.host.progression
 
+import io.drivegrowth.app.mainNavigation
+import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.host.HostPage
 import android.graphics.Rect
 import android.os.Process
 import android.os.SystemClock
@@ -11,7 +15,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.R
@@ -31,7 +34,7 @@ import java.time.ZoneId
 @Suppress("DEPRECATION")
 class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainActivity>(MainActivity::class.java) {
     private fun tree(view:View):List<View> = listOf(view)+if(view is ViewGroup)(0 until view.childCount).flatMap{tree(view.getChildAt(it))}else emptyList()
-    private fun menu(a:MainActivity)=a.window.decorView.findViewWithTag<Spinner>("host:destination")
+    private fun menu(a:MainActivity)=a.window.decorView.mainNavigation()
     private inline fun <reified T:View> attached(a:MainActivity):T? = tree(a.window.decorView).filterIsInstance<T>().singleOrNull()
     private fun await(a:MainActivity,label:String,check:()->Boolean) {
         val until=SystemClock.uptimeMillis()+15000;var success=false;var gate=false
@@ -53,12 +56,12 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
             assertTrue("공개 UI 버튼 클릭",b.performClick())
         }
     }
-    private fun page(a:MainActivity,label:String) {
-        gate(a);instrumentation.runOnMainSync { val m=menu(a)!!;m.setSelection((0 until m.count).single{m.getItemAtPosition(it).toString()==label}) }
+    private fun page(a:MainActivity,target:HostPage) {
+        gate(a);instrumentation.runOnMainSync { a.window.decorView.openMainPage(target) }
     }
     private fun refresh(a:MainActivity) {
         gate(a);instrumentation.runOnMainSync {
-            val b=tree(a.window.decorView).filterIsInstance<Button>().single{it.text.toString()=="새로고침"}
+            val b=checkNotNull(a.window.decorView.findViewWithTag<Button>("host:refresh"))
             assertTrue(b.isEnabled);b.performClick()
         }
     }
@@ -98,7 +101,7 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
         }
         click(first,R.string.onboarding_to_shop)
         await(first,"저장 성공 뒤 실제 가게") { attached<ShopView>(first)!=null }
-        chooseGatePage(first, "미확인 정산") { attached<ResultsView>(first)?.isShown == true && first.window.decorView.findViewWithTag<Button>("results:open:${initial.grant.settlementId.value}")?.isEnabled == true }
+        chooseGatePage(first, HostPage.RESULTS) { attached<ResultsView>(first)?.isShown == true && first.window.decorView.findViewWithTag<Button>("results:open:${initial.grant.settlementId.value}")?.isEnabled == true }
         val grantId=initial.grant.settlementId
         click(first,"results:open:${grantId.value}")
         click(first,"results:mark:${grantId.value}")
@@ -106,7 +109,7 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
             attached<ResultsView>(first)?.uiState?.readStates?.get(grantId)==io.drivegrowth.app.ui.results.ResultsReadState.Done
         }
         read { game -> assertFalse(ok(game.store.listUnviewedSettlements()).any{it.settlementId==grantId});assertEquals(FirstGrant.INITIAL_MONEY,ok(game.store.balance())) }
-        chooseGatePage(first, "퀘스트·진행") { first.window.decorView.findViewWithTag<Button>(progressKey(definition, expectedPeriod))?.isEnabled == true }
+        chooseGatePage(first, HostPage.PROGRESSION) { first.window.decorView.findViewWithTag<Button>(progressKey(definition, expectedPeriod))?.isEnabled == true }
         if(questPeriod(definition.cadence,definition.zone,EpochMillis(System.currentTimeMillis()))!=expectedPeriod)
             throw IllegalStateException("ENVIRONMENT_PERIOD_CHANGED: 청구 전 날짜/시간대 경계 변경")
         val key=progressKey(definition,expectedPeriod)
@@ -217,12 +220,11 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
             labels.containsAll(listOf("결과 확인하기", "1 / 1회", "100 게임머니"))
     }
 
-    private fun chooseGatePage(a: MainActivity, name: String, ready: () -> Boolean) {
+    private fun chooseGatePage(a: MainActivity, name: HostPage, ready: () -> Boolean) {
         await(a, "actual destination $name") {
             if (ready()) return@await true
-            val current = menu(a)?.takeIf { it.isEnabled && it.isLaidOut && !it.isLayoutRequested } ?: return@await false
-            val index = (0 until current.count).single { current.getItemAtPosition(it).toString() == name }
-            if (current.selectedItemPosition != index) current.setSelection(index)
+            if (a.window.decorView.mainPage(name)?.let { it.isEnabled && it.isLaidOut && !it.isLayoutRequested } != true) return@await false
+            a.window.decorView.openMainPage(name)
             false
         }
     }
@@ -281,7 +283,7 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
         }
         click(first,R.string.onboarding_to_shop)
         await(first,"저장 성공 뒤 실제 가게") { attached<ShopView>(first)!=null }
-        page(first,"미확인 정산")
+        page(first,HostPage.RESULTS)
         val grantId=initial.grant.settlementId
         click(first,"results:open:${grantId.value}")
         click(first,"results:mark:${grantId.value}")
@@ -289,7 +291,7 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
             attached<ResultsView>(first)?.uiState?.readStates?.get(grantId)==io.drivegrowth.app.ui.results.ResultsReadState.Done
         }
         read { game -> assertFalse(ok(game.store.listUnviewedSettlements()).any{it.settlementId==grantId});assertEquals(FirstGrant.INITIAL_MONEY,ok(game.store.balance())) }
-        page(first,"퀘스트·진행")
+        page(first,HostPage.PROGRESSION)
         if(questPeriod(definition.cadence,definition.zone,EpochMillis(System.currentTimeMillis()))!=expectedPeriod)
             throw IllegalStateException("ENVIRONMENT_PERIOD_CHANGED: 청구 전 날짜/시간대 경계 변경")
         val key=progressKey(definition,expectedPeriod)
@@ -347,7 +349,7 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
         reportQuest("REOPEN_START", before, requireCurrentPeriod(receipt))
 
         val next = activity
-        page(next, "퀘스트·진행")
+        page(next, HostPage.PROGRESSION)
         val key = progressKey(receipt.command.definition, receipt.command.period)
         click(next, key)
         awaitClaimDisabled(next, key)

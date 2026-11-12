@@ -1,5 +1,7 @@
 package io.drivegrowth.app.host.garage
 
+import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.host.HostPage
 import android.app.UiAutomation
 import android.content.Context
 import android.content.pm.ApplicationInfo
@@ -16,7 +18,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.data.HostCheckpointCommand
@@ -111,7 +112,7 @@ class GarageGrowthMainActivityTest :
         for (tag in listOf(R.string.onboarding_start, casper, R.string.onboarding_review,
             R.string.onboarding_confirm, R.string.onboarding_to_shop)) tapTag(tag)
         awaitUi("가게로 버튼을 누른 뒤 실제 HOME 선택") {
-            activityRoot().findViewWithTag<Spinner>("host:destination")?.selectedItem?.toString() == "가게"
+            activityRoot().mainPage(HostPage.HOME)?.isSelected == true
         }
         read { game ->
             assertEquals(GameMoney(1_000), ok(game.store.balance()))
@@ -129,7 +130,7 @@ class GarageGrowthMainActivityTest :
         // 직접 준비한 대여의 선물도 시험 입력으로 확정해 이후 저장 변화가 확장 명령에서만 나오게 한다.
         val gift = ok(StoredOnboardingHostSource(games).claimGift(read { it.identity }))
         assertEquals(FirstGrant.GIFT_REQUEST_ID, gift.command.requestId)
-        tapText("새로고침")
+        tapTag("host:refresh")
         val before = snapshot()
         assertEquals(1, before.settlements.count { it.transaction.requestId == FirstGrant.GIFT_REQUEST_ID })
         assertEquals(1 to 3, before.shopLevel to before.capacity)
@@ -243,7 +244,6 @@ class GarageGrowthMainActivityTest :
     private fun awaitLabel(text: String) = awaitUi(text) { text in labels() }
 
     private fun tapTag(tag: Any) = tapButton(target = "tag=$tag") { it.tag == tag }
-    private fun tapText(text: String) = tapButton(target = "text=$text") { it.text.toString() == text }
 
     private data class TapTarget(val button: Button, val x: Float, val y: Float)
 

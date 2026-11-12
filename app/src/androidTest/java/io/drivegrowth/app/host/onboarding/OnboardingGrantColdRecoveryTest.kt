@@ -1,5 +1,8 @@
 package io.drivegrowth.app.host.onboarding
 
+import io.drivegrowth.app.mainNavigation
+import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.host.HostPage
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Process
@@ -9,7 +12,6 @@ import android.util.AtomicFile
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.R
@@ -109,8 +111,7 @@ class OnboardingGrantColdRecoveryTest :
             menu(main)?.let { it.isShown && it.isEnabled } == true
         }
         instrumentation.runOnMainSync {
-            val menu = checkNotNull(menu(main))
-            menu.setSelection((0 until menu.count).single { menu.getItemAtPosition(it).toString() == "첫 차량 안내" })
+            main.window.decorView.openMainPage(HostPage.ONBOARDING)
         }
         awaitUi("저장된 최초 지급 완료 화면") { button(main, R.string.onboarding_to_shop) != null }
         instrumentation.runOnMainSync {
@@ -207,7 +208,7 @@ class OnboardingGrantColdRecoveryTest :
         }
     }
 
-    private fun menu(main: MainActivity): Spinner? = main.window.decorView.findViewWithTag("host:destination")
+    private fun menu(main: MainActivity): View? = main.window.decorView.mainNavigation()
     private fun button(main: MainActivity, tag: Any): Button? =
         main.window.decorView.findViewWithTag<Button>(tag)?.takeIf { it.isShown && it.isEnabled }
 

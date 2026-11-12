@@ -50,6 +50,13 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
     override val policy = RecordingPolicy(60_000, 60_000, 1000, 3000, 0.1, 0.5)
     override val controlsAllowed get() = failure == null && !inFlight && progress?.controlsAllowed == true
     override val canRetry get() = progress != null && failure != null && !inFlight && !lostRestInput
+    override val inputState: SimulationInputState
+        get() = when {
+            canRetry -> SimulationInputState.RETRYABLE_FAILURE
+            failure != null -> SimulationInputState.UNAVAILABLE
+            accept != null && (inFlight || progress?.controlsAllowed == false) -> SimulationInputState.PROCESSING
+            else -> SimulationInputState.READY
+        }
     override val status get() = "SIMULATION · 실제 SDK/차량 입력 아님\n" + (failure ?: notice ?: progress?.let {
         val step = "논리 UTC ${java.time.Instant.ofEpochMilli(it.clock.epoch.value)} · 단계 ${it.stage}"
         if (it.restRun) "$step/72\n모의 휴식 시험 장소 · 논리 주행·주차·출발"

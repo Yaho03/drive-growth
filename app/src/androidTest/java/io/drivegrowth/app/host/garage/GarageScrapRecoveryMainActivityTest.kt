@@ -12,8 +12,10 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.TextView
+import io.drivegrowth.app.mainNavigation
+import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.data.HostCheckpointCommand
 import io.drivegrowth.app.data.HostCheckpointPhase
@@ -234,7 +236,7 @@ class GarageScrapRecoveryMainActivityTest :
 
     private fun assertRestriction(id: OwnedVehicleId, activity: VehicleActivity, label: String, enabled: Set<VehicleAction>) {
         assertEquals(activity, read { ok(it.store.rental.activity(id)) })
-        tapText("새로고침")
+        tapTag("host:refresh")
         awaitUi("차고에서 현재 활동과 허용 행동 표시: $activity") {
             label in labels() && VehicleAction.entries.filter {
                 activityRoot().findViewWithTag<Button>(it)?.isEnabled == true
@@ -356,11 +358,9 @@ class GarageScrapRecoveryMainActivityTest :
         val navigation = mainNavigation()
         awaitUi("Main의 $label 라우트 수락") {
             if (navigation.page == page) return@awaitUi true
-            val menu = root.findViewWithTag<Spinner>("host:destination") ?: return@awaitUi false
+            val menu = root.mainPage(page) ?: return@awaitUi false
             if (!menu.isShown || !menu.isEnabled || !menu.isLaidOut || menu.isLayoutRequested) return@awaitUi false
-            val position = (0 until menu.count).single { menu.getItemAtPosition(it).toString() == label }
-            // Cold-start queries can replace the Spinner before its selection callback runs.
-            if (menu.selectedItemPosition != position) menu.setSelection(position)
+            root.openMainPage(page)
             false
         }
     }
@@ -391,8 +391,8 @@ class GarageScrapRecoveryMainActivityTest :
                     .any { !it.isLaidOut || it.isLayoutRequested }) {
                 previous = null
                 return@awaitUi blocked {
-                    val menu = root.findViewWithTag<Spinner>("host:destination")
-                    "route=${navigation.page} menu=${menu?.selectedItem} rootFocus=${root.hasWindowFocus()} " +
+                    val menu = root.mainNavigation()
+                    "route=${navigation.page} menu=${menu?.isShown} rootFocus=${root.hasWindowFocus()} " +
                         "garage=${garage != null} button=${button?.let(::geometry)} " +
                         "layoutPending=${button?.let { v -> generateSequence(v as View) { it.parent as? View }
                             .filter { !it.isLaidOut || it.isLayoutRequested }.joinToString { it.javaClass.simpleName } }}"

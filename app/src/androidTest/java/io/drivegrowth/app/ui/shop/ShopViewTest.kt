@@ -49,6 +49,9 @@ class ShopViewTest : InstrumentationTestCase() {
                 val shown = text(view)
                 assertTrue(shown.contains("세차장")); assertTrue(shown.contains("가게 레벨 3 필요 · 현재 레벨 2"))
                 assertTrue(shown.contains("캐스퍼")); assertTrue(shown.contains("보유 / 공간 · 2 / 5"))
+                assertTrue(shown.contains("조정 가능한 시험값"))
+                assertFalse(shown.contains("규칙 ·"))
+                assertFalse(shown.contains(checkNotNull(state.expansion?.ruleVersion).value))
                 val label = views(view).filterIsInstance<TextView>().single { it.text.contains("가게 레벨 3 필요") }
                 assertTrue(label.width > 0); assertTrue(label.height > 0)
                 assertEquals(0, label.layout.getEllipsisCount(0))
@@ -245,6 +248,35 @@ class ShopViewTest : InstrumentationTestCase() {
         assertEquals(Revision(5),(events.single() as ShopEvent.Submit).request.selection.revision)
     }
 
+
+    fun testHomeMapAndVehicleAreVisibleBeforeSummaryWithoutScrolling() {
+        val state = ShopPreviewStates.normal()
+        val id = state.vehicles.first().id
+        for ((width, height) in listOf(480 to 340, 480 to 360, 936 to 416)) {
+            val view = onUi {
+                ShopView(instrumentation.targetContext) {}.apply {
+                    onOpenVehicle = { _, _ -> }
+                    render(state, true)
+                }
+            }
+            layout(view, width, height)
+            onUi { view.render(state, true) }
+            layout(view, width, height)
+            onUi {
+                val scene = view.findViewWithTag<ShopSceneView>("shop:scene")
+                val vehicle = scene.findViewWithTag<View>("shop:map-vehicle:${id.value}")
+                fun bounds(child: View) = Rect(0, 0, child.width, child.height).apply {
+                    view.offsetDescendantRectToMyCoords(child, this)
+                }
+                val description = "${width}×${height}dp"
+                val mapBounds = bounds(scene)
+                assertEquals(description, view.paddingTop, mapBounds.top)
+                assertTrue(description, mapBounds.bottom <= view.height - view.paddingBottom)
+                assertTrue(description, mapBounds.contains(bounds(vehicle)))
+                assertTrue(description, mapBounds.bottom <= bounds(button(view, "shop:mode:VEHICLES")).top)
+            }
+        }
+    }
 
     fun testSceneUsesAppWidthAndKeepsUnknownFactsInNarrowAndWideWindows() {
         val state = ShopPreviewStates.normal().copy(name = "긴 가게 이름과 확인해야 할 간판 문구", capacity = 6)

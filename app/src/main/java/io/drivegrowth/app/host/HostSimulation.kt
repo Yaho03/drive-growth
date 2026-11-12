@@ -17,6 +17,7 @@ internal interface HostSimulation {
     val policy: RecordingPolicy
     val controlsAllowed: Boolean
     val canRetry: Boolean
+    val inputState: SimulationInputState
     val status: String
     var changed: (() -> Unit)?
     fun clock(): ContractResult<RentalClock>
@@ -34,6 +35,8 @@ internal interface HostSimulation {
     fun rejected(error: ContractError)
     fun stop()
 }
+internal enum class SimulationInputState { READY, PROCESSING, RETRYABLE_FAILURE, UNAVAILABLE }
+
 internal data class SimulationRestSample(val clock: RestClockDomain, val area: Observation<RestAreaProof>,
     val restRun: Boolean, val ordinaryTerminal: Boolean)
 

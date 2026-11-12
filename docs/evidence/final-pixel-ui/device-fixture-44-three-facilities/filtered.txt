@@ -1,0 +1,9 @@
+--------- beginning of main
+11-12 12:09:59.223 28825 28825 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+11-12 12:09:59.227 28825 28825 I AndroidRuntime: Using default boot image
+11-12 12:09:59.227 28825 28825 I AndroidRuntime: Leaving lock profiling enabled
+11-12 12:09:59.334 28825 28825 D AndroidRuntime: Calling main entry com.android.commands.am.Am
+11-12 12:09:59.599 28878 28943 I TestRunner: started: testIdenticalDrivingFramesKeepRecordedTripAndBaseIncomeAcrossFacilityFixtures(io.drivegrowth.app.data.ObservedDrivingJournalTest)
+11-12 12:10:00.971 28878 28943 I TestRunner: finished: testIdenticalDrivingFramesKeepRecordedTripAndBaseIncomeAcrossFacilityFixtures(io.drivegrowth.app.data.ObservedDrivingJournalTest)
+11-12 12:10:00.971 28878 28943 I TestRunner: passed: testIdenticalDrivingFramesKeepRecordedTripAndBaseIncomeAcrossFacilityFixtures(io.drivegrowth.app.data.ObservedDrivingJournalTest)
+11-12 12:10:00.975 28825 28825 I AndroidRuntime: VM exiting with result code 0.

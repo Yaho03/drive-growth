@@ -8,7 +8,8 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.Spinner
+import io.drivegrowth.app.mainNavigation
+import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.R
 import io.drivegrowth.app.data.SettlementHistoryReader
@@ -27,7 +28,7 @@ class ActualMainResultsHistoryIndependentTest : ActivityInstrumentationTestCase2
     private fun tree(view: View): List<View> = listOf(view) + if (view is ViewGroup)
         (0 until view.childCount).flatMap { tree(view.getChildAt(it)) } else emptyList()
 
-    private fun menu(a: MainActivity) = a.window.decorView.findViewWithTag<Spinner>("host:destination")
+    private fun menu(a: MainActivity) = a.window.decorView.mainNavigation()
     private fun results(a: MainActivity) = tree(a.window.decorView).filterIsInstance<ResultsView>().singleOrNull()
     private fun stage(value: String) { Log.i("ActualMainResultsF", value) }
 
@@ -60,9 +61,7 @@ class ActualMainResultsHistoryIndependentTest : ActivityInstrumentationTestCase2
     private fun openResults(a: MainActivity) {
         await(a, "실제 화면 선택 메뉴") { menu(a) != null }
         instrumentation.runOnMainSync {
-            val spinner = menu(a)!!
-            val index = (0 until spinner.count).single { spinner.getItemAtPosition(it).toString() == "미확인 정산" }
-            spinner.setSelection(index)
+            a.window.decorView.openMainPage(HostPage.RESULTS)
         }
         await(a, "실제 Results 전체 이력 조회 완료") {
             results(a)?.isShown == true && a.window.decorView.findViewWithTag<View>("results:list")?.isShown == true &&

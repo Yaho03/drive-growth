@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
+import io.drivegrowth.app.showSimulationControls
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.host.HostSession
@@ -25,6 +26,10 @@ class RestSimulationActivityTest :
         assertFalse(context.getSharedPreferences("unified-simulation-v1", 0).contains("stage"))
 
         val main = activity
+        instrumentation.runOnMainSync {
+            assertFalse(button(main.window.decorView, "rest-simulation:entry").isShown)
+            main.window.decorView.showSimulationControls()
+        }
         assertEntryHidesWhileRestricted(main)
         assertEntryHidesWhenMainStopsObservingWithoutPausing(main)
         val first = openRest(main)
