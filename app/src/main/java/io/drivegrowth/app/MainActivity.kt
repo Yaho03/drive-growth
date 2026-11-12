@@ -83,7 +83,6 @@ open class MainActivity : Activity() {
     private var recoveredManagement = false
     private var managementVisible = false
     private lateinit var facilityControls: io.drivegrowth.app.ui.shop.FacilityControlsView
-    private lateinit var facilityHome: LinearLayout
     private var pendingPage: HostPage? = null
     private var pendingRouteGeneration = 0L
     private var pendingRouteFailed = false
@@ -138,26 +137,9 @@ open class MainActivity : Activity() {
         garage = GarageView(this, ::onGarageEvent).also { it.restoreSelection(navigation.selectedVehicleId) }
         collection = CollectionView(this, ::refresh)
         results = ResultsView(this, ::onResultsEvent)
-        shop = ShopView(this, ::onShopEvent)
+        shop = ShopView(this, ::onShopEvent).also { it.onOpenVehicle = ::openVehicleFromShop }
         facilityControls = io.drivegrowth.app.ui.shop.FacilityControlsView(this, ::onFacilityEvent)
-        val facilityPanel = android.widget.ScrollView(this).apply { addView(facilityControls) }
-        facilityHome = object : LinearLayout(this) {
-            init {
-                orientation = VERTICAL
-                addView(shop, LayoutParams(-1, 0, 1f))
-                addView(facilityPanel, LayoutParams(-1, style.dp(220)))
-            }
-
-            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-                val available = MeasureSpec.getSize(heightMeasureSpec)
-                if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY) {
-                    // Leave room for the shop header and controls in a short app window.
-                    facilityPanel.layoutParams.height = minOf(style.dp(220),
-                        maxOf(available / 3, available - style.dp(150)))
-                }
-                super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-            }
-        }
+        shop.facilityPanel = facilityControls
         val shopMode = ShopMode.entries.firstOrNull { it.name == savedInstanceState?.getString("shopMode") } ?: ShopMode.OVERALL
         var restoredFacility: io.drivegrowth.app.host.facility.FacilityCommand.Buy? = null
         val restoredShop = if (savedInstanceState?.containsKey("shopUi") == true) {
@@ -694,7 +676,7 @@ open class MainActivity : Activity() {
             HostPage.COLLECTION -> showBody(collection)
             HostPage.RESULTS -> showBody(results)
             HostPage.ONBOARDING -> showBody(onboarding)
-            HostPage.HOME -> showBody(facilityHome)
+            HostPage.HOME -> showBody(shop)
             HostPage.GACHA -> showBody(gacha)
             HostPage.DELIVERY -> {
                 showBody(delivery)
@@ -827,6 +809,17 @@ open class MainActivity : Activity() {
                 if (::body.isInitialized) render()
             }
         }
+    }
+
+    private fun openVehicleFromShop(id: OwnedVehicleId, revision: Revision) {
+        if (!allowed() || navigation.page != HostPage.HOME || shopRestoreFailed) return
+        val current = session.home.state.screen as? ShopScreenState.Content ?: return
+        if (current.revision != revision || current.vehicles.none { it.id == id } ||
+            shop.uiState.pending != null || navigation.pendingGarageRequest != null) return
+        navigation.selectedVehicleId = id
+        garage.restoreSelection(id)
+        select(HostPage.GARAGE)
+        queries.refresh()
     }
 
     private fun onShopEvent(event: ShopEvent) {

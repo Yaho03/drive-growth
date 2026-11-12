@@ -40,7 +40,7 @@ class StoredShopExpansionSource(
             val activity=when(val r=store.rental.activity(car.ownedVehicleId)){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
             ShopVehicle(car.ownedVehicleId,names[car.vehicleId] ?: "${car.vehicleId.value} · 차종명 미제공",when(activity){
                 VehicleActivity.IDLE->"대기";VehicleActivity.RENTED->"대여 중";VehicleActivity.RETURNING->"반납 이동 중";VehicleActivity.NEEDS_REPAIR->"수리 필요"
-            })
+            }, car.vehicleId, car.rarity, activity)
         }
         ContractResult.Success(mapShopExpansion(profile,source,definition,shop,count,money,vehicles))
     }
