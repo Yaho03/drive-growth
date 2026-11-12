@@ -1,10 +1,13 @@
 package io.drivegrowth.app.ui.onboarding
 
+import android.graphics.drawable.BitmapDrawable
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.TextView
+import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.core.contract.VehicleId
 
 /** 공유 장치 사용 조율 뒤 실행한다. UI 스레드의 실패는 시험 스레드에 전달한다. */
@@ -49,6 +52,24 @@ class OnboardingViewTest : InstrumentationTestCase() {
         assertTrue(texts(view).contains("아반떼"))
         button(view, "가게로").performClick()
         assertEquals(OnboardingEvent.GoToShop, events.last())
+    }
+
+    fun testTownAndCandidateArtFollowTheCurrentStageAndVehicleId() = onUi {
+        val context = instrumentation.targetContext
+        val sprites = VehicleSprites(context)
+        val view = OnboardingView(context) { fail("그림 표시만으로 요청이 발생했다") }
+        view.render(OnboardingPreviewStates.intro, true)
+        assertNotNull(view.findViewWithTag<ImageView>("onboarding:town-art")?.drawable)
+        view.render(OnboardingPreviewStates.choosing, true)
+        assertNull(view.findViewWithTag<ImageView>("onboarding:town-art"))
+        for (candidate in listOf(OnboardingPreviewStates.casper, OnboardingPreviewStates.avante)) {
+            val id = candidate.vehicle.vehicleId
+            val image = checkNotNull(view.findViewWithTag<ImageView>("onboarding:vehicle-art:${id.value}"))
+            val expected = checkNotNull(sprites.bitmap(id))
+            assertTrue(expected.sameAs((image.drawable as BitmapDrawable).bitmap))
+        }
+        view.render(OnboardingPreviewStates.choosing, false)
+        assertTrue(all(view).none { it is ImageView })
     }
 
     fun testRestrictedStateHidesAllGameContentAndActions() = onUi {

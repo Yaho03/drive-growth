@@ -1,20 +1,39 @@
 package io.drivegrowth.app.ui.onboarding
 
 import android.content.Context
-import android.graphics.Color
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
+import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.garage.GarageStyle
+import io.drivegrowth.app.ui.pixel.PixelStyle
+import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.core.contract.VehicleId
+import java.io.IOException
 
 /** 실제 지급·저장·탐색을 호출하지 않고 호스트가 전달한 단계와 확정 결과만 표시한다. */
 class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : LinearLayout(context) {
     private val style = GarageStyle(context)
     private val interaction = OnboardingInteraction(onEvent)
-    private val accent = Color.rgb(141, 106, 238)
+    private val sprites = VehicleSprites(context)
+    private val townBitmap by lazy(LazyThreadSafetyMode.NONE) {
+        try {
+            context.assets.open("pixel/town.png").use {
+                BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = 2 })
+                    ?.apply { density = Bitmap.DENSITY_NONE }
+            }
+        } catch (_: IOException) {
+            null
+        }
+    }
     private var wide = false
     private var scroll: ScrollView? = null
     private var savedY = 0
@@ -22,7 +41,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
     val selectedVehicleId: VehicleId? get() = interaction.selectedId
     val pendingVehicleId: VehicleId? get() = interaction.pendingSelection
 
-    init { orientation = VERTICAL; setBackgroundColor(style.base) }
+    init { orientation = VERTICAL; setBackgroundColor(PixelStyle.background) }
 
     /** false인 늦은/역행 응답은 표시하지 않는다. 호스트는 프로필·requestId·응답 순서도 대조한다. */
     fun render(state: OnboardingScreenState, controlsEnabled: Boolean): Boolean {
@@ -51,28 +70,25 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         previousScene = scene
         val focused = findFocus()?.tag
         removeAllViews(); scroll = null
-        setPadding(dp(24), dp(16), dp(24), dp(16))
+        setPadding(dp(PixelStyle.panelPaddingDp), dp(PixelStyle.gapDp), dp(PixelStyle.panelPaddingDp), dp(PixelStyle.gapDp))
         if (!interaction.controlsEnabled) {
-            addView(text(s(R.string.onboarding_restricted), 28, bold = true))
-            addView(text(s(R.string.onboarding_restricted_body), color = muted))
+            addView(label(s(R.string.onboarding_restricted), 28, bold = true))
+            addView(label(s(R.string.onboarding_restricted_body), color = PixelStyle.muted))
             return@with
         }
-        addView(text(s(R.string.onboarding_title), 32, bold = true))
+        addView(label(s(R.string.onboarding_title), 32, bold = true))
         val body = column()
         scroll = style.scroll(body, savedY)
         addView(scroll, LayoutParams(-1, 0, 1f))
         when (val state = interaction.state) {
-            OnboardingScreenState.Loading -> body.addView(text(s(R.string.onboarding_loading), 28))
+            OnboardingScreenState.Loading -> body.addView(label(s(R.string.onboarding_loading), 28))
             is OnboardingScreenState.Unavailable -> {
                 heading(body, R.string.onboarding_unavailable_title)
-                body.addView(text(state.message, 24))
+                body.addView(label(state.message, 24))
             }
             is OnboardingScreenState.Intro -> {
                 source(body, state.sourceLabel)
-                heading(body, R.string.onboarding_intro_title, R.string.onboarding_intro_body)
-                body.addView(art())
-                benefits(body, state.plannedBenefits)
-                action(body, R.string.onboarding_start, primary = true) { interaction.start() }
+                intro(body, state)
             }
             is OnboardingScreenState.Choosing -> {
                 source(body, state.sourceLabel)
@@ -84,12 +100,12 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
                     state.candidates.chunked(if (wide) 2 else 1).forEach { candidates ->
                         val row = row()
                         candidates.forEachIndexed { index, value ->
-                            row.addView(candidate(value, true), LayoutParams(0, -2, 1f).apply { if (index > 0) marginStart = dp(16) })
+                            row.addView(candidate(value, true), LayoutParams(0, -2, 1f).apply { if (index > 0) marginStart = dp(PixelStyle.gapDp) })
                         }
-                        add(body, row, 16)
+                        add(body, row, PixelStyle.gapDp)
                     }
-                    if (interaction.selectedCandidate == null) body.addView(text(s(if (interaction.selectedId == null)
-                        R.string.onboarding_select_required else R.string.onboarding_selection_missing), color = muted))
+                    if (interaction.selectedCandidate == null) body.addView(label(s(if (interaction.selectedId == null)
+                        R.string.onboarding_select_required else R.string.onboarding_selection_missing), color = PixelStyle.muted))
                     action(body, R.string.onboarding_review, interaction.selectedCandidate?.selectable == true, true) { interaction.review() }
                 }
                 benefits(body, state.plannedBenefits)
@@ -104,90 +120,143 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
                     interaction.confirm(state.candidate.vehicle.vehicleId)
                 }
                 action(body, R.string.onboarding_previous, state.backAllowed) { interaction.handleBack() }
-                if (interaction.pendingSelection != null) body.addView(text(s(R.string.onboarding_submitting), 24))
+                if (interaction.pendingSelection != null) body.addView(label(s(R.string.onboarding_submitting), 24))
             }
             is OnboardingScreenState.Submitting -> {
                 source(body, state.sourceLabel)
                 heading(body, R.string.onboarding_submitting, R.string.onboarding_pending_note)
-                body.addView(text(state.vehicleName ?: s(R.string.onboarding_vehicle_missing), 28, bold = true))
+                body.addView(label(state.vehicleName ?: s(R.string.onboarding_vehicle_missing), 28, bold = true))
             }
             is OnboardingScreenState.LoadError -> {
                 heading(body, R.string.onboarding_load_error)
-                body.addView(text(state.message, 24))
+                body.addView(label(state.message, 24))
                 action(body, R.string.onboarding_retry, state.retryAllowed) { interaction.retry() }
             }
             is OnboardingScreenState.GrantError -> {
                 source(body, state.sourceLabel)
                 heading(body, R.string.onboarding_grant_error, R.string.onboarding_recovery_note)
-                body.addView(text(state.vehicleName ?: s(R.string.onboarding_vehicle_missing), 28, bold = true))
-                body.addView(text(state.message, 24))
+                body.addView(label(state.vehicleName ?: s(R.string.onboarding_vehicle_missing), 28, bold = true))
+                body.addView(label(state.message, 24))
                 action(body, R.string.onboarding_retry, state.retryAllowed, true) { interaction.retry() }
                 action(body, R.string.onboarding_change, state.changeAllowed) { interaction.handleBack() }
-                if (interaction.pendingSelection != null) body.addView(text(s(R.string.onboarding_submitting), 24))
+                if (interaction.pendingSelection != null) body.addView(label(s(R.string.onboarding_submitting), 24))
             }
             is OnboardingScreenState.Completed -> {
                 source(body, state.sourceLabel)
                 heading(body, if (state.alreadyGranted) R.string.onboarding_already_granted else R.string.onboarding_complete,
                     R.string.onboarding_completed_note)
-                add(body, card(true).apply {
-                    addView(art())
-                    addView(text(state.displayName, 30, bold = true))
-                    addView(text(rarity(state.vehicle.rarity), 24, rarityColor(state.vehicle.rarity), true))
-                    addView(text(context.getString(R.string.onboarding_level, state.vehicle.level), 24))
-                    addView(text(context.getString(R.string.onboarding_acquisition, state.vehicle.acquisitionCost.units), 24))
+                add(body, pixelCard(selected = true).apply {
+                    addVehicleArt(this, state.vehicle.vehicleId)
+                    addView(label(state.displayName, 30, bold = true))
+                    addView(label(rarity(state.vehicle.rarity), 24, PixelStyle.rarityColor(state.vehicle.rarity), true))
+                    addView(label(context.getString(R.string.onboarding_level, state.vehicle.level), 24))
+                    addView(label(context.getString(R.string.onboarding_acquisition, state.vehicle.acquisitionCost.units), 24))
                 })
-                if (state.summary.isEmpty()) body.addView(text(s(R.string.onboarding_result_missing), color = muted))
-                else state.summary.forEach { add(body, text(it, 24)) }
-                add(body, text(s(R.string.onboarding_next), color = muted))
+                if (state.summary.isEmpty()) body.addView(label(s(R.string.onboarding_result_missing), color = PixelStyle.muted))
+                else state.summary.forEach { add(body, label(it, 24)) }
+                add(body, label(s(R.string.onboarding_next), color = PixelStyle.muted))
                 action(body, R.string.onboarding_to_shop, primary = true) { interaction.goToShop() }
             }
         }
         if (focused != null) findViewWithTag<View>(focused)?.takeIf { it.isEnabled }?.requestFocus()
     }
 
-    private fun heading(body: LinearLayout, title: Int, description: Int? = null) = with(style) {
-        add(body, text(s(title), 30, bold = true))
-        if (description != null) add(body, text(s(description), 24, muted))
+    private fun intro(body: LinearLayout, state: OnboardingScreenState.Intro) = with(style) {
+        val welcome = column().apply {
+            add(this, pixelCard().apply {
+                heading(this, R.string.onboarding_intro_title, R.string.onboarding_intro_body)
+            })
+            benefits(this, state.plannedBenefits)
+            action(this, R.string.onboarding_start, primary = true) { interaction.start() }
+        }
+        val town = townBitmap?.let { bitmap ->
+            artwork(BitmapDrawable(resources, bitmap).apply { setFilterBitmap(false) }).apply {
+                tag = "onboarding:town-art"
+            }
+        }
+        if (wide && town != null) {
+            add(body, row().apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(town, LayoutParams(0, dp(320), 1.2f))
+                addView(welcome, LayoutParams(0, -2, 1f).apply { marginStart = dp(PixelStyle.gapDp) })
+            })
+        } else {
+            if (town != null) body.addView(town, LayoutParams(-1, dp(216)))
+            add(body, welcome)
+        }
     }
-    private fun source(body: LinearLayout, label: String) { body.addView(style.text(label, color = style.muted)) }
+
+    private fun heading(body: LinearLayout, title: Int, description: Int? = null) = with(style) {
+        add(body, label(s(title), 30, bold = true))
+        if (description != null) add(body, label(s(description), 24, PixelStyle.muted))
+    }
+    private fun source(body: LinearLayout, value: String) { body.addView(label(value, color = PixelStyle.muted)) }
     private fun benefits(body: LinearLayout, lines: List<String>) = with(style) {
-        add(body, card().apply {
-            addView(text(s(R.string.onboarding_planned_title), 24, bold = true))
-            if (lines.isEmpty()) addView(text(s(R.string.onboarding_benefits_missing), color = muted))
-            else lines.forEach { addView(text(it, 24)) }
-            addView(text(s(R.string.onboarding_planned_note), color = muted))
+        add(body, pixelCard().apply {
+            addView(label(s(R.string.onboarding_planned_title), 24, bold = true))
+            if (lines.isEmpty()) addView(label(s(R.string.onboarding_benefits_missing), color = PixelStyle.muted))
+            else lines.forEach { addView(label(it, 24)) }
+            addView(label(s(R.string.onboarding_planned_note), color = PixelStyle.muted))
         })
     }
     private fun candidate(value: OnboardingCandidate, selectable: Boolean) = with(style) {
         val selected = interaction.selectedId == value.vehicle.vehicleId
-        card(selected).apply {
-            addView(art())
-            addView(text(value.vehicle.displayName, 28, bold = true))
-            addView(text(value.description ?: s(R.string.onboarding_description_missing), 24, muted))
-            addView(text(s(R.string.onboarding_first_vehicle), color = muted))
-            addView(text(s(R.string.onboarding_game_note), color = muted))
-            if (!value.selectable) addView(text(value.unavailableReason ?: s(R.string.onboarding_unavailable), color = muted))
-            if (selected) addView(text(s(R.string.onboarding_selected), 24, bold = true))
+        pixelCard(selected).apply {
+            addVehicleArt(this, value.vehicle.vehicleId)
+            addView(label(value.vehicle.displayName, 28, bold = true))
+            addView(label(value.description ?: s(R.string.onboarding_description_missing), 24, PixelStyle.muted))
+            addView(label(s(R.string.onboarding_first_vehicle), color = PixelStyle.muted))
+            addView(label(s(R.string.onboarding_game_note), color = PixelStyle.muted))
+            if (!value.selectable) addView(label(value.unavailableReason ?: s(R.string.onboarding_unavailable), color = PixelStyle.muted))
+            if (selected) addView(label(s(R.string.onboarding_selected), 24, bold = true))
             if (selectable) action(this, R.string.onboarding_select, value.selectable, selected, value.vehicle.vehicleId, "${value.vehicle.displayName}, ${s(R.string.onboarding_select)}") {
                 interaction.select(value.vehicle.vehicleId)
             }
         }
     }
-    private fun art() = style.column().apply {
-        addView(ImageView(context).apply {
-            setImageResource(R.drawable.garage_vehicle_placeholder)
-            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-            scaleType = ImageView.ScaleType.FIT_CENTER
-        }, LayoutParams(-1, style.dp(88)))
-        addView(style.text(s(R.string.onboarding_art), color = style.muted))
+    private fun label(value: CharSequence, size: Int = 20, color: Int = PixelStyle.text, bold: Boolean = false) =
+        style.text(value, size, color, bold)
+
+    private fun pixelCard(selected: Boolean = false) = style.column().apply {
+        background = pixelShape(PixelStyle.panel, selected)
+        val padding = style.dp(PixelStyle.panelPaddingDp)
+        setPadding(padding, padding, padding, padding)
     }
+
+    private fun pixelShape(fill: Int, highlighted: Boolean = false) = GradientDrawable().apply {
+        setColor(fill)
+        cornerRadius = style.dp(PixelStyle.panelRadiusDp).toFloat()
+        setStroke(style.dp(if (highlighted) 2 else 1), if (highlighted) PixelStyle.focus else PixelStyle.outline)
+    }
+
+    private fun artwork(drawable: Drawable) = ImageView(context).apply {
+        setImageDrawable(drawable)
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+        background = pixelShape(PixelStyle.inset)
+        clipToOutline = true
+        scaleType = ImageView.ScaleType.FIT_CENTER
+    }
+
+    private fun addVehicleArt(card: LinearLayout, id: VehicleId) {
+        val drawable = sprites.drawable(id) ?: return
+        card.addView(artwork(drawable).apply {
+            tag = "onboarding:vehicle-art:${id.value}"
+            setPadding(0, style.dp(8), 0, style.dp(8))
+        }, LayoutParams(-1, style.dp(104)))
+    }
+
     private fun action(body: LinearLayout, label: Int, enabled: Boolean = true, primary: Boolean = false,
                        tag: Any = label, description: String? = null, callback: () -> Boolean) = with(style) {
         val available = enabled && !interaction.inputPending && interaction.pendingSelection == null
         add(body, button(s(label), available) { callback(); drawScreen() }.apply {
             this.tag = tag
             if (description != null) contentDescription = description
-            if (primary && available) background = shape(accent)
-        }, 16)
+            val fill = if (primary && available) PixelStyle.primary else PixelStyle.inset
+            setTextColor(if (available) PixelStyle.text else PixelStyle.muted)
+            background = StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_focused), pixelShape(fill, highlighted = true))
+                addState(intArrayOf(), pixelShape(fill))
+            }
+        }, PixelStyle.gapDp)
     }
 }
