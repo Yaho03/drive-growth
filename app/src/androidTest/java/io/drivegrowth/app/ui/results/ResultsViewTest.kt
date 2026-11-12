@@ -1,11 +1,14 @@
 package io.drivegrowth.app.ui.results
 
+import android.graphics.drawable.BitmapDrawable
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.ScrollView
 import android.widget.TextView
+import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.core.contract.SettlementId
 
 /** 실제 Android 위젯의 상태·layout 시험. assertion 실패는 시험 스레드로 돌려준다. */
@@ -47,6 +50,22 @@ class ResultsViewTest : InstrumentationTestCase() {
         assertTrue(shown.contains("고정 시험 입력"))
         assertTrue(shown.contains("제공되지 않았어요"))
         assertFalse(shown.contains("+9,001"))
+    }
+
+    fun testVehicleArtUsesTheSettledVehicleIdAndHidesWhenRestricted() = onUi {
+        val context = instrumentation.targetContext
+        val source = ResultsPreviewStates.normal
+        val original = source.results.first { it.settlement.changedVehicle != null }
+        val id = checkNotNull(original.settlement.changedVehicle).vehicleId
+        val state = source.copy(results = listOf(original))
+        val view = ResultsView(context) {}
+        view.render(state, true)
+        open(view, original.settlement.settlementId.value)
+        val image = checkNotNull(view.findViewWithTag<ImageView>("results:vehicle-art:${id.value}"))
+        val expected = checkNotNull(VehicleSprites(context).bitmap(id))
+        assertTrue(expected.sameAs((image.drawable as BitmapDrawable).bitmap))
+        view.render(state, false)
+        assertNull(view.findViewWithTag<ImageView>("results:vehicle-art:${id.value}"))
     }
 
     fun testMarkViewedWaitsForResponseAndRetriesAfterFailure() {
