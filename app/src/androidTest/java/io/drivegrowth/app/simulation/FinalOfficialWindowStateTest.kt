@@ -12,17 +12,31 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
+import io.drivegrowth.app.R
+import io.drivegrowth.app.data.HostCheckpointPhase
+import io.drivegrowth.app.data.HostCommandCheckpoint
+import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.host.HostPage
+import io.drivegrowth.app.host.garage.CheckpointGarageCommandAdapter
+import io.drivegrowth.app.host.garage.GaragePreparation
 import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
 import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.ui.garage.CollectionView
+import io.drivegrowth.app.ui.garage.GarageEvent
 import io.drivegrowth.app.ui.garage.GarageView
 import io.drivegrowth.app.ui.shop.ShopMode
 import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.core.contract.ContractResult
+import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.InputSource
+import io.drivegrowth.core.contract.OwnedVehicle
 import io.drivegrowth.core.contract.OwnedVehicleId
+import io.drivegrowth.core.contract.Rarity
+import io.drivegrowth.core.contract.RequestId
+import io.drivegrowth.core.contract.Settlement
 import io.drivegrowth.core.contract.VehicleId
+import io.drivegrowth.core.garage.CollectionKey
 import io.drivegrowth.core.progression.VehicleAction
 import java.util.concurrent.FutureTask
 
@@ -37,7 +51,19 @@ class FinalOfficialWindowStateTest : InstrumentationTestCase() {
     }
 
     fun testHomeModesAndPreparedGarageCommandInOfficialWindow() {
-        assertEquals("io.drivegrowth.verify.finalwindow28", context.packageName)
+        openOfficialWindow("io.drivegrowth.verify.finalwindow28") { current ->
+            checkHomeModes(current)
+            checkGarageRecreation(current)
+        }
+    }
+
+    fun testCollectionReloadAndSavedRequestSurviveActivityRecreation() {
+        openOfficialWindow("io.drivegrowth.verify.collectionwindow28", ::checkCollectionRecreation)
+    }
+
+    private fun openOfficialWindow(packageName: String,
+        exercise: (UnifiedSimulationActivity) -> UnifiedSimulationActivity) {
+        assertEquals(packageName, context.packageName)
         assertFalse("시험 전용 새 설치가 필요합니다", context.getDatabasePath(database).exists())
         val timeline = SimulationTimeline()
         val preferences = context.getSharedPreferences("unified-simulation-v1", 0)
@@ -58,8 +84,7 @@ class FinalOfficialWindowStateTest : InstrumentationTestCase() {
         ) as UnifiedSimulationActivity
         try {
             assertEquals(display.displayId, ui { current.display?.displayId })
-            checkHomeModes(current)
-            current = checkGarageRecreation(current)
+            current = exercise(current)
             assertEquals(display.displayId, ui { current.display?.displayId })
             assertFalse(context.getDatabasePath("game-ledger-vehicle.db").exists())
             Log.i(TAG, "PASS display=${display.displayId} width=${metrics.widthPixels} height=${metrics.heightPixels} dpi=${metrics.densityDpi} source=SIMULATION")
@@ -67,6 +92,101 @@ class FinalOfficialWindowStateTest : InstrumentationTestCase() {
             ui { current.finish() }
         }
     }
+
+    private fun checkCollectionRecreation(first: UnifiedSimulationActivity): UnifiedSimulationActivity {
+        val adapter = CheckpointGarageCommandAdapter(context, sessions = games)
+        val vehicle = ok(games.open()).use { ok(it.store.listOwnedVehicles()).single() }
+        val saved = ok(adapter.prepare(
+            GarageEvent.RequestAction(vehicle.ownedVehicleId, vehicle.revision, VehicleAction.LEVEL_UP),
+            RequestId("official-window-saved-level"),
+        )) as GaragePreparation.Ready
+        ok(adapter.save(saved.pending))
+        select(first, HostPage.COLLECTION)
+        click(first) { button("host:refresh") }
+        await("도감에 보유와 미발견 표시, 저장 요청 진입") {
+            collectionCount(R.string.garage_ever_owned) == 1 &&
+                collectionCount(R.string.garage_undiscovered) > 0 &&
+                labeledButton("보관한 차량 관리 요청 확인")?.isEnabled == true
+        }
+        assertEquals(0, ui { collectionCount(R.string.garage_discovered) })
+
+        // 보유 여부와 분리되는 발견 기록만 기존 원장 API로 추가한다.
+        val discovery = CollectionKey(VehicleId("hyundai_avante"), Rarity.COMMON)
+        ok(games.open()).use { game ->
+            ok(game.store.recordDiscoveries(ok(game.content).catalog, setOf(discovery)))
+        }
+        val before = collectionSnapshot()
+        assertEquals(HostCheckpointPhase.SAVED, before.checkpoint?.phase)
+        assertEquals(setOf(discovery), before.discoveries)
+        val monitor = instrumentation.addMonitor(UnifiedSimulationActivity::class.java.name, null, false)
+        val next = try {
+            await("도감 새로고침이 실제 Loading으로 전환된 시점에 재생성") {
+                val refresh = button("host:refresh")?.takeIf { it.isEnabled } ?: return@await false
+                if (!reveal(refresh)) return@await false
+                assertTrue(refresh.performClick())
+                assertEquals(1, collectionCount(R.string.garage_collection_loading))
+                first.recreate()
+                true
+            }
+            checkNotNull(instrumentation.waitForMonitorWithTimeout(monitor, 15_000) as? UnifiedSimulationActivity)
+        } finally {
+            instrumentation.removeMonitor(monitor)
+        }
+        try {
+            screen = next
+            assertNotSame(first, next)
+            await("도감 페이지·최신 발견/보유·공용 대기 요청 복원") {
+                next.root.mainPage(HostPage.COLLECTION)?.isSelected == true &&
+                    collectionCount(R.string.garage_ever_owned) == 1 &&
+                    collectionCount(R.string.garage_discovered) == 1 &&
+                    collectionCount(R.string.garage_undiscovered) > 0 &&
+                    labeledButton("보관한 차량 관리 요청 확인")?.isEnabled == true
+            }
+            expose(next, "복원 도감에서 발견 상태까지 스크롤") {
+                collection()?.let { tree ->
+                    views(tree).filterIsInstance<TextView>().firstOrNull {
+                        it.text.toString() == context.getString(R.string.garage_discovered)
+                    }
+                }
+            }
+            expose(next, "복원 도감의 새로고침") { button("host:refresh")?.takeIf { it.isEnabled } }
+            assertEquals("도감 재조회·재생성 뒤 원장과 저장 요청 동일", before, collectionSnapshot())
+            click(next) { labeledButton("보관한 차량 관리 요청 확인") }
+            expose(next, "원 관리 요청의 결과 확인 진입") { labeledButton("보관 요청 처리 · 결과 확인") }
+            assertEquals("저장 요청을 열기만 하면 원장 불변", before, collectionSnapshot())
+            val restored = checkNotNull(ok(adapter.load()))
+            assertEquals(saved.pending.command, restored.command)
+            assertEquals(saved.pending.request, restored.request)
+            Log.i(TAG, "COLLECTION activity=recreated page=restored loading=requested discoveries=1 owned=1 saved_request=preserved ledger=unchanged")
+            return next
+        } catch (error: Throwable) {
+            ui { next.finish() }
+            throw error
+        }
+    }
+
+    private data class CollectionSnapshot(
+        val identity: GameIdentity,
+        val balance: GameMoney,
+        val vehicles: List<OwnedVehicle>,
+        val unviewed: List<Settlement>,
+        val discoveries: Set<CollectionKey>,
+        val checkpoint: HostCommandCheckpoint?,
+    )
+
+    private fun collectionSnapshot() = ok(games.open()).use { game ->
+        val store = game.store
+        assertEquals(InputSource.SIMULATION, game.identity.source)
+        CollectionSnapshot(game.identity, ok(store.balance()), ok(store.listVehicleHistory()),
+            ok(store.listUnviewedSettlements()), ok(store.discoveredVehicles()),
+            ok(store.hostCommands.load(game.identity.profileId)))
+    }
+
+    private fun collection() = views(checkNotNull(screen).root).filterIsInstance<CollectionView>().singleOrNull()
+
+    private fun collectionCount(label: Int) = collection()?.let { view ->
+        views(view).filterIsInstance<TextView>().count { it.isShown && it.text.toString() == context.getString(label) }
+    } ?: 0
 
     private fun checkHomeModes(activity: UnifiedSimulationActivity) {
         select(activity, HostPage.HOME)

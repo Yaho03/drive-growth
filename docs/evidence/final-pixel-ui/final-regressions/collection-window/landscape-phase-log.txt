@@ -1,0 +1,3 @@
+--------- beginning of main
+11-12 13:57:41.932  9082  9178 I DriveGrowthFinalWindow: COLLECTION activity=recreated page=restored loading=requested discoveries=1 owned=1 saved_request=preserved ledger=unchanged
+11-12 13:57:41.935  9082  9178 I DriveGrowthFinalWindow: PASS display=3 width=1700 height=1185 dpi=200 source=SIMULATION
