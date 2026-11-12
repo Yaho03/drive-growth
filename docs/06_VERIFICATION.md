@@ -2035,6 +2035,21 @@ Pleos API 34 ARM64 사용자 10의 별도 Debug **SIMULATION** 설치 두 개에
 
 앞선 main217의 정상 이전 시험은 기존 행 비교에 새 nullable 열까지 포함해 실패했다. 후속 시험은 기존 열과 신규 열의 초기값을 각각 비교했다. 재현 fixture의 결과이며, 설치된 구버전 APK의 데이터 업데이트나 새 OS 프로세스 복원은 확인하지 않았다. 격리 패키지 정리 뒤 제품·환경 보존 19/19를 확인했다. #221의 schema20 결과와 별도다.
 
+#### #122 구매 결제 재생과 schema20 이전 — 2026-11-13
+
+Pleos Connect Emulator의 API 34 ARM64 사용자 10에서 별도 Debug 앱 `io.drivegrowth.verify.schema20replayd`와 계측 앱 `io.drivegrowth.verify.schema20replayd.test`를 실행했다. 기준 소스는 `e1f3961a071a258bc225478b90f4f8272c127db8`이다. RED와 GREEN의 앱 소스 차이는 `SqliteGameChangeStore.record`의 재생 경계 수정뿐이다. 최초 비교는 같은 계측 APK를 사용했고 빌드 APK와 설치 회수본의 SHA-256 일치를 확인했다.
+
+| 지정 계측 | 실제 결과 |
+|---|---|
+| 활성 및 완료 구매의 선택 이력 누락 | RED 2건은 원본 무변경을 확인한 뒤 공용 결제가 `Success`로 재생돼 기대값을 위반했다(0.467초). 같은 시험 APK로 GREEN 2건은 `STORAGE_FAILURE`·`INVALID_RECORD`와 원본 보존을 확인했다(0.475초). 완료 구매 사례는 DB 재개방 뒤 실행했다. |
+| 정상 및 충돌 대조군 | 6건 통과(1.816초). typed 정상 재생, 공용 경로의 구매 ID 충돌과 무변경, 독립 GENERAL 및 예약 전 v4 GENERAL 재생, 공용 차감 누락, 경로 쓰기 실패 롤백을 확인했다. |
+| 지원 이전과 실패 보존 | `Schema20UpgradeTest` 4건 통과(3.345초). 당시 DDL과 직렬화 형식을 재현한 격리 fixture로 v2·v10·v12→20 이전 및 DB 재개방, 기존 열과 저장값, 새 열과 마커의 상태를 확인했다. v12 최종 DDL 실패 시 이전 단계까지 롤백하고 원래 버전·스키마·행·파일 바이트를 보존했다. 필수 필드가 빠진 처분 개체는 보정 없이 조회 오류를 반환했으며, 이전 뒤 확장과 업적 간 교차 소유 요청의 충돌 및 최초 결과 재생을 확인했다. |
+| 나머지 재생·경쟁·손상 회귀 | 첫 실행은 7건 중 6건 통과(1.258초). Quest의 정의·시각·잔액 변경 뒤 전체 결과 재생, 정산 스냅샷 누락 필드, 미래 버전·손상 원본, 두 연결의 업적·확장 경쟁을 확인했다. 구형 차량 명령 시험 1건은 성장 fixture가 `RENTAL` 종류를 써 준비 단계에서 오류가 났다. fixture를 `GARAGE`로 고치고 같은 GREEN 앱과 새 계측 APK로 해당 시험만 실행해 1건을 통과했다(0.312초). 구형 차량 명령은 충돌하고 기존 금액 명령은 원본 변경 없이 재생됐다. |
+
+RED 앱 `6c30db81157d7d509b2f625abd7687ee4c5a652e420274e86ec276c7c2f50468`, GREEN 앱 `eddeaad577323517896b2cfee02889196a0dd141be31c916eda87d6aea344bcb`, 공통 계측 `ca5d2a0081ccc0673f26fdbb7d824c0fad3f532bca568d9c1cdc3643dae73ab1`, fixture 수정 계측 `8fd95179ba299ed2cda1a89dd0f8bea174904237164e252f9bba122e6dfc39e8`. Gradle은 RED에 `:app:assembleDebug :app:assembleDebugAndroidTest`, GREEN 앱에 `:app:assembleDebug`, fixture 수정에 `:app:assembleDebugAndroidTest`를 각각 오프라인으로 실행했다. 원본 로그와 설치 APK 해시는 로컬 `/private/tmp/drive-122-slot-e1f3961.GOBAXB`에 보존했다. 격리 패키지를 정리한 뒤 제품·장치 보호 항목 19/19를 확인하고 00:25:19.620482 KST에 슬롯을 반환했다.
+
+앞 절의 schema19 결과는 해당 소스와 당시 이전 경로의 근거로 보존한다. 이번 결과는 격리 DB 재개방까지다. 실제 옛 APK가 작성한 제품 DB 업그레이드와 새 OS 프로세스 복원, 최신 조합의 나머지 원자성 조건은 미검증이다. 게시 기준 `53db64fa0ac63da108faa323c9ed33cfa99135a0`에서는 실행본과 해당 저장 변경·계측 소스의 diff를 대조했다. 게시 후보의 새 APK·장치 실행은 수행하지 않았다.
+
 #### 결합 APK의 지정 계측 시험
 
 A는 코드 커밋 `dce75aea611904d2f94d754e4cbeb080c38e9848`의 Debug 앱 `io.drivegrowth.app.simulation`을 API 34 ARM64에서 설치하고 아래 네 시험을 각각 한 번 실행했다. 네 설치 앱의 SHA-256은 `33479608b9d1baf46ad202481c57c8a196be11556a80a44e954adba9bf6711a9`로 동일했다.

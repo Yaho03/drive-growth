@@ -199,9 +199,19 @@ class SqliteGameChangeStore(
         }
         if (existing != null) {
             // v4에서 허용한 GENERAL 동일 명령은 새 prefix 예약보다 먼저 검증·재생한다.
-            return if (domain == RequestDomain.GENERAL && existing.first == command)
-                ContractResult.Success(readRecordedSettlement(db, change) ?: throw SQLiteException("기존 정산 누락"))
-            else failure(ContractError.STATE_CONFLICT)
+            if (domain != RequestDomain.GENERAL || existing.first != command) return failure(ContractError.STATE_CONFLICT)
+            if (change.kind == TransactionKind.DELIVERY && change.money?.direction == MoneyDirection.DEBIT) {
+                // 선택 이력이 온전하면 위의 소유권 검사에서 충돌한다. 남은 탁송 행은 이 결제가 고아임을 증명한다.
+                val linkedDelivery = db.rawQuery("""
+                    SELECT 1 FROM delivery_active WHERE request_id=?
+                    UNION ALL SELECT 1 FROM delivery_routes WHERE request_id=?
+                    UNION ALL SELECT 1 FROM delivery_route_history WHERE request_id=?
+                    UNION ALL SELECT 1 FROM delivery_outcomes WHERE request_id=?
+                    LIMIT 1
+                """.trimIndent(), arrayOf(id, id, id, id)).use { it.moveToFirst() }
+                if (linkedDelivery) throw JSONException("구매 결제의 선택 이력 누락")
+            }
+            return ContractResult.Success(readRecordedSettlement(db, change) ?: throw SQLiteException("기존 정산 누락"))
         }
         // 기존 GENERAL 원명령 replay 뒤에만 신규 요청의 namespace를 검사한다.
         if (id.startsWith("quest/")) return failure(ContractError.STATE_CONFLICT)
