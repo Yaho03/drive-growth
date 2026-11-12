@@ -4,6 +4,10 @@ import android.content.Context
 import android.os.Bundle
 import io.drivegrowth.app.host.driving.*
 import io.drivegrowth.app.host.progression.readStoredRestProgression
+import io.drivegrowth.app.data.RestAtomicStorage
+import io.drivegrowth.app.data.RestClockDomain
+import io.drivegrowth.app.host.rest.ForegroundRestObservationProducer
+import io.drivegrowth.app.host.rest.RestEvidencePolicy
 import io.drivegrowth.app.data.questDefinitions
 import io.drivegrowth.app.host.delivery.*
 import io.drivegrowth.app.ui.delivery.DeliveryInteractionState
@@ -52,7 +56,15 @@ internal class HostSession(
     private val rentalSource = io.drivegrowth.app.host.rental.SessionRentalProductSource(games, {
         io.drivegrowth.app.data.AssetTrialDefinitionProvider(context.assets).load()
     }, recordingPolicy, rentalClock::read, random = { simulation?.rentalRandom(games) ?: kotlin.random.Random.Default })
-    val rental = io.drivegrowth.app.host.rental.RentalProductHost(worker, main, rentalSource::observe,
+    private var ordinaryRentalReplayClock: RestClockDomain? = null // 직렬 worker의 새 시연 세션 복원 경계.
+    val rental = io.drivegrowth.app.host.rental.RentalProductHost(worker, main, { frame, recorded ->
+        val replayClock = ordinaryRentalReplayClock
+        if (replayClock == null) rentalSource.observe(frame, recorded)
+        else rentalSource.observeOrdinarySimulationReplay(frame, recorded, replayClock,
+            ordinaryTerminal = simulation?.restSample(frame)?.ordinaryTerminal == true).also { result ->
+            if (result is ContractResult.Success && result.value.deferred.isEmpty()) ordinaryRentalReplayClock = null
+        }
+    },
         rentalSource::reconnect, rentalSource::pauseObservations, rentalSource::inactive)
     private val drivingSource = SessionObservedDrivingSource(games, io.drivegrowth.app.data.SqliteObservedDrivingJournal(),
         ObservedDrivingReducer(recordingPolicy) { java.util.UUID.randomUUID().toString() }, {
@@ -61,15 +73,23 @@ internal class HostSession(
                 is ContractResult.Success -> loaded.value.drivingIncomeRules()
             }
         })
+    private var restProducer: ForegroundRestObservationProducer? = null
     private var drivingActivated = false // worker 전용. 매 관측의 실제 초기화/출처는 별도로 재확인한다.
     val driving = ObservedDrivingHost(worker, main,
         { if (simulation == null) RecordingClock(android.os.SystemClock.elapsedRealtime(), epochNow()) else
-            when (val result = simulation.clock()) { is ContractResult.Failure -> error("모의 논리 시각 미제공");
+            when (val result = simulation.clock()) { is ContractResult.Failure -> null
                 is ContractResult.Success -> RecordingClock(result.value.elapsedMs, result.value.epoch) } },
         { receiver, frame, at ->
             val recorded = when (val activated = activateDriving(frame.observation.source)) {
                 is ContractResult.Failure -> activated
-                is ContractResult.Success -> drivingSource.observe(receiver, frame, at)
+                is ContractResult.Success -> if (simulation?.restRecording == true) {
+                    val sample = simulation.restSample(frame)
+                    if (sample == null) ContractResult.Failure(ContractError.STATE_CONFLICT)
+                    else when (val staged = stageSimulationRest(frame, sample)) {
+                        is ContractResult.Failure -> staged
+                        is ContractResult.Success -> drivingSource.observe(SIMULATION_REST_RECEIVER, frame, at)
+                    }
+                } else drivingSource.observe(receiver, frame, at)
             }
             val simulated = simulation?.observed(frame, recorded)
             if (simulated !is ContractResult.Failure) {
@@ -81,8 +101,84 @@ internal class HostSession(
             }
             recorded
         }, { receiver, at ->
-            if (drivingActivated) drivingSource.pause(receiver, at) else ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+            // 명시 시연은 화면이 멈춘 동안 표본과 논리 시간이 모두 멈춘다.
+            if (drivingActivated && simulation?.restRecording != true) drivingSource.pause(receiver, at)
+            else ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         })
+
+    private fun stageSimulationRest(frame: DrivingFrame, sample: SimulationRestSample): ContractResult<Unit> {
+        if (frame.observation.source != InputSource.SIMULATION) return ContractResult.Failure(ContractError.INVALID_INPUT)
+        val producer = restProducer ?: when (val prepared = openSimulationRestProducer(sample)) {
+            is ContractResult.Failure -> return prepared
+            is ContractResult.Success -> {
+                val (restored, replayClock) = prepared.value
+                ordinaryRentalReplayClock = replayClock
+                restProducer = restored
+                drivingSource.restObservationProvider = restored
+                restored
+            }
+        }
+        return producer.observe(SIMULATION_REST_RECEIVER, sample.clock, frame.observation, sample.area)
+    }
+
+    private fun openSimulationRestProducer(
+        sample: SimulationRestSample,
+    ): ContractResult<Pair<ForegroundRestObservationProducer, RestClockDomain?>> {
+        val game = when (val opened = games.open()) {
+            is ContractResult.Failure -> return opened
+            is ContractResult.Success -> opened.value
+        }
+        return game.use {
+            if (game.identity.source != InputSource.SIMULATION)
+                return@use ContractResult.Failure(ContractError.INVALID_INPUT)
+            val definition = when (val loaded = game.store.trialDefinitions.load()) {
+                is ContractResult.Failure -> return@use loaded
+                is ContractResult.Success -> loaded.value
+            }
+            val producer = ForegroundRestObservationProducer(game.identity, definition::restRules,
+                RestEvidencePolicy(recordingPolicy.maxGapMs, recordingPolicy.maxAgeMs, recordingPolicy.maxUtcSkewMs,
+                    recordingPolicy.movingMps, recordingPolicy.stationaryMps),
+                definition.restPricing)
+            game.store.atomic { db ->
+                when (val activated = game.store.restDriving.activate(game.identity.profileId)) {
+                    is ContractResult.Failure -> activated
+                    is ContractResult.Success -> {
+                        val contexts = RestAtomicStorage.contexts(db, game.identity).map { it.value }
+                        when (val restored = producer.restore(contexts)) {
+                            is ContractResult.Failure -> return@atomic restored
+                            is ContractResult.Success -> Unit
+                        }
+                        var replayClock = sample.clock.takeIf { sample.ordinaryTerminal }
+                        if (!sample.restRun) {
+                            val observed = when (val saved = game.store.observedDriving.read(db, game.identity)) {
+                                is ContractResult.Failure -> return@atomic saved
+                                is ContractResult.Success -> saved.value
+                            }
+                            val trip = observed.trip
+                            val anchor = observed.anchor
+                            if (trip != null && anchor != null) {
+                                val context = contexts.singleOrNull { it.trip == trip }
+                                    ?: return@atomic ContractResult.Failure(ContractError.STORAGE_FAILURE)
+                                val last = context.segments.lastOrNull()
+                                val clock = last?.let { RestClockDomain(it.clockDomain, it.span.bootId) }
+                                    ?: context.departureClock
+                                if ((last?.span?.to ?: trip.departure) != anchor || clock != sample.clock ||
+                                    observed.receiver != SIMULATION_REST_RECEIVER)
+                                    return@atomic ContractResult.Failure(ContractError.STATE_CONFLICT)
+                                val area = last?.span?.toPlace ?: Observation.Missing(MissingReason.NO_DATA)
+                                when (val staged = producer.observe(SIMULATION_REST_RECEIVER, clock, anchor, area)) {
+                                    is ContractResult.Failure -> return@atomic staged
+                                    is ContractResult.Success -> replayClock = clock
+                                }
+                            }
+                        }
+                        ContractResult.Success(producer to replayClock)
+                    }
+                }
+            }
+        }
+    }
+
     private fun activateDriving(source: InputSource): ContractResult<Unit> = when (val opened = games.open()) {
         is ContractResult.Failure -> opened
         is ContractResult.Success -> opened.value.use { game ->
@@ -152,7 +248,7 @@ internal class HostSession(
         simulation?.attach(worker, accept)
     }
 
-    fun prepareSimulation(done: (ContractResult<Unit>) -> Unit) {
+    fun prepareSimulation(rest: Boolean = false, done: (ContractResult<Unit>) -> Unit) {
         worker.execute {
             val result = when (val opened = games.open()) {
                 is ContractResult.Failure -> opened
@@ -163,13 +259,29 @@ internal class HostSession(
                             ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
                         else when (val saved = game.store.hostCommands.load(game.identity.profileId)) {
                             is ContractResult.Failure -> saved
-                            is ContractResult.Success -> if (saved.value == null) ContractResult.Success(Unit)
-                                else ContractResult.Failure(ContractError.STATE_CONFLICT)
+                            is ContractResult.Success -> if (saved.value != null)
+                                ContractResult.Failure(ContractError.STATE_CONFLICT)
+                                else if (rest) checkRestSimulation(game) else ContractResult.Success(Unit)
                         }
                     }
                 }
             }
             main.execute { done(result) }
+        }
+    }
+
+    private fun checkRestSimulation(game: GameSession): ContractResult<Unit> {
+        if (simulation == null || game.identity.source != InputSource.SIMULATION)
+            return ContractResult.Failure(ContractError.INVALID_INPUT)
+        when (val delivery = game.store.delivery.inProgress()) {
+            is ContractResult.Failure -> return delivery
+            is ContractResult.Success -> if (delivery.value != null) return ContractResult.Failure(ContractError.STATE_CONFLICT)
+        }
+        return when (val loaded = game.store.trialDefinitions.load()) {
+            is ContractResult.Failure -> loaded
+            is ContractResult.Success -> if (loaded.value.rest.minDrivingMs == 3_600_000L &&
+                loaded.value.rest.minParkedMs == 300_000L) ContractResult.Success(Unit)
+            else ContractResult.Failure(ContractError.POLICY_UNRESOLVED)
         }
     }
 
@@ -206,4 +318,7 @@ internal class HostSession(
         onboarding.release()
         worker.shutdown() // 이미 받은 관측/pause의 영속 쓰기는 폐기하지 않는다.
     }
+
+    private companion object { const val SIMULATION_REST_RECEIVER = "unified-simulation-rest" }
+
 }

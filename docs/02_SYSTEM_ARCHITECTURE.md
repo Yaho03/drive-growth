@@ -877,7 +877,7 @@ main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결
 
 생산자는 같은 previous/next 전체 제안의 재시도에서 계산한 recognition과 batch를 재생한다. `SessionObservedDrivingSource`의 Rest 경로도 최초 reduce 결과·drive ID·전체 입력/실제 previous 원문과 준비된 batch를 단일 메모리 슬롯에 보존한다. capture 실패 뒤 같은 입력은 새 ID/provider batch를 만들지 않는다. 다른 frame·receiver·clock·pause·provider·actual previous/revision은 원 제안을 덮지 않고 STATE_CONFLICT다. capture가 실제 거래로 확정된 뒤 슬롯을 해제하므로 별도 금융 drain 실패가 다음 관측을 옛 제안에 묶지 않는다. 내부 자동 반복·재귀·누적 큐는 없다. provider=null의 기존 저장·지급 본문은 유지한다.
 
-이 경계는 같은 source 인스턴스의 미확정 제안 재시도이며 디스크 큐/프로세스 사망 전 미저장 입력 복원을 새로 보장하지 않는다. 호출자는 실패한 원 frame/clock의 재시도와 수명 종료 순서를 보존해야 한다. 새 producer는 같은 session worker에서 같은 store.atomic 안의 `restDriving.projectionIn(db, identity)`를 먼저 검증하고 `RestAtomicStorage.contexts(db, identity).map { it.value }`의 원 ordinal 순서를 읽어 성공한 전체 목록만 restore한다. contexts 단독·별도 거래 조회·elapsed 재정렬·실패를 빈 목록으로 보정하지 않는다. 실제 Main/HostSession 등록·opt-in·boot/domain/장소 권위 공급·정책·전체 SDK/프로세스 검증은 별도다.
+이 경계는 같은 source 인스턴스의 미확정 제안 재시도이며 디스크 큐/프로세스 사망 전 미저장 입력 복원을 새로 보장하지 않는다. 호출자는 실패한 원 frame/clock의 재시도와 수명 종료 순서를 보존해야 한다. 새 producer는 같은 session worker에서 같은 store.atomic 안의 `restDriving.projectionIn(db, identity)`를 먼저 검증하고 `RestAtomicStorage.contexts(db, identity).map { it.value }`의 원 ordinal 순서를 읽어 성공한 전체 목록만 restore한다. contexts 단독·별도 거래 조회·elapsed 재정렬·실패를 빈 목록으로 보정하지 않는다. 실제 차량 입력의 Main/HostSession 등록·동의·boot/domain/장소 권위 공급과 SDK·프로세스 검증은 별도다.
 
 ### 대여 결과 시간 근거 schema18
 
@@ -892,7 +892,7 @@ main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결
 
 `FactoryProgressionSource`의 선택적 읽기 포트는 퀘스트와 같은 `GameSession`에서 `restDriving.state(profileId)`를 조회할 수 있다. 저장소가 검증한 `RestDrivingProjection`과 `ContractResult` 오류를 진행 상태에 전달한다. 포트가 없으면 `UNSUPPORTED`를 유지한다. 기록 없음, 읽기 실패, 빈 원장, 미확정 주행은 잔여 시간 미확인으로 표시하며, 미확정 투영으로 활성 버프를 표시하지 않는다.
 
-진행 화면은 확정 주행이 있고 미확정 주행이 없는 스냅샷의 저장 잔여 시간과 입력 출처만 표시한다. 이 조회는 현재 장소, 이번 휴식 인정 여부나 다음 출발 효과를 제공하지 않는다. 제품 `MainActivity`·`HostSession` 등록은 별도이며, 조립 시 같은 프로필의 읽기 허용·동의·근거를 확인해야 한다. 저장 활성화, 주행 명령·지급, SDK 등록은 조회 범위 밖이다.
+진행 화면은 확정 주행이 있고 미확정 주행이 없는 스냅샷의 저장 잔여 시간과 입력 출처만 표시한다. 이 조회는 현재 장소, 이번 휴식 인정 여부나 다음 출발 효과를 제공하지 않는다. Debug `HostSession`은 이 포트에 같은 SIMULATION 프로필의 저장 상태를 공급한다. 실제 차량 입력 호스트에 등록하려면 같은 프로필의 읽기 허용·동의·근거를 확인해야 한다. 저장 활성화, 주행 명령·지급, SDK 등록은 조회 범위 밖이다.
 
 
 ### #40·#57 Debug 휴식 시연 화면
@@ -903,6 +903,14 @@ main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결
 
 결과 화면은 같은 프로필의 휴식 원장 투영과 원정산에서 확정 건수·부스트 사용·다음 주행 수익·저장 잔여 시간을 읽는다. Quest 진행 조회나 화면용 값을 금융 근거로 사용하지 않는다. 시연 화면은 Debug 전용이며, 실제 장소 판정·제품 휴식 입력·OS 종료 뒤 미확정 표본 재개는 후속 범위다. [장치 및 빌드 기록](06_VERIFICATION.md#debug-휴식-시연-진입과-원결과-검증)
 
+
+#### 현재 시연 원장을 사용하는 휴식
+
+Debug Main의 휴식 포함 모의주행은 같은 `GameSessionFactory`의 `unified-simulation.db`와 SIMULATION 프로필을 사용한다. 시작 요청을 받으면 다른 조작을 제한하고, session worker에서 최초 지급 완료·공용 checkpoint·진행 중 탁송·휴식 시험 정의를 확인한 뒤 명시 논리 시연을 시작한다. 시연 표본은 `ForegroundRestObservationProducer`와 기존 관측 주행 저장에 공급한다. 진행 화면의 읽기는 위 휴식 원장 조회 계약을 따른다.
+
+화면이 숨겨진 동안 다음 시연 표본과 논리 시간의 진행을 멈춘다. 완료 후 다시 열면 확인된 원결과를 읽는다. 프로세스 종료로 진행 중 휴식의 미저장 연속성 근거를 잃으면 시연을 보류하고 기존 확정 원장을 보존한다. 실제 차량 입력의 장소 권위와 휴식 판정은 별도 범위다. [실행 근거와 잔여 검증](06_VERIFICATION.md#일반-모의주행-휴식의-main-통합-검증--2026-11-12)
+
+휴식 시연 뒤 일반 모의주행을 새 프로세스에서 열면, 먼저 저장된 고객 배정 명령을 복구한다. 같은 SIMULATION 프로필·주행·boot·clock domain의 저장 관측이 원 대여 커서부터 첫 재생 표본까지 연속일 때만 기존 대여 소비자에 넘긴다. 이미 시간을 누적한 대여는 원 커서의 정산과 기한이 지난 반납을 기존 소비자로 재시도한다. 일반 시연의 종료 표본에서 주행이 먼저 확정된 경우에는 같은 표본·시간대·시계와 연결되는 유일한 저장 주행 영수증을 검증한 뒤 남은 정산·반납만 처리한다. 누락·공백·불일치는 보류한다. 과거 고객과 관측 시간을 합성하지 않으며, 닫힌 주행의 추가 시간 누적과 D→P 경계의 새 프로세스 복원은 미검증이다. 격리 모의 실행의 [활성 대여 60초 복구와 단일 도착 정산](06_VERIFICATION.md#219-포함-revision-8의-결합-장치-시험)과 [재생성 후 진행 모델·View 확인](06_VERIFICATION.md#466f80c-기준-진행-카드-판별-계측)은 서로 다른 APK의 실행 근거다.
 
 ### #55 가게 꾸미기·확장 완료 원결과 조회
 

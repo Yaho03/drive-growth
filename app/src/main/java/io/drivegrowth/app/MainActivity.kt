@@ -98,6 +98,7 @@ open class MainActivity : Activity() {
     private var rankingState: RankingState = RankingState.Restricted
     private lateinit var delivery: DeliveryView
     private var deliveryAccessEnabled = false
+    private var restStartTicket: Any? = null
     private var deliveryReceipt: DeliveryHostReceipt? = null
     private var deliveryFrame = DeliveryFrame(0, DeliveryScreen.Loading)
     private lateinit var gacha: GachaView
@@ -211,8 +212,10 @@ open class MainActivity : Activity() {
         progression.restoreUiState(session.progressionUi)
         deliveryFrame = session.deliveryUi.frame ?: DeliveryFrame(0, DeliveryScreen.Loading)
         delivery = DeliveryView(this, { request ->
-            session.deliveryUi = delivery.saveUiState()
-            session.delivery.onRequest(request)
+            if (restStartTicket == null) {
+                session.deliveryUi = delivery.saveUiState()
+                session.delivery.onRequest(request)
+            }
         }, session.deliveryUi, navigationControls = ::deliveryNavigationControls, hostStatus = ::deliveryHostStatus)
         gacha = GachaView(this, ::onGachaEvent, session.gacha.uiState)
         results.restoreUiState(session.results.uiState)
@@ -412,6 +415,7 @@ open class MainActivity : Activity() {
     }
 
     private fun stopObserving() {
+        restStartTicket = null
         session.simulation?.stop()
         session.simulation?.changed = null
         active = false // 새 UI/관측 입구를 먼저 닫고 SDK queue를 중단한다.
@@ -493,8 +497,32 @@ open class MainActivity : Activity() {
         super.onSaveInstanceState(outState)
     }
 
-    protected fun allowed() = active &&
+    protected fun allowed() = active && restStartTicket == null &&
         (session.simulation?.controlsAllowed ?: (interaction.state(SystemClock.elapsedRealtime()) == Observation.Available(VehicleInteraction.ALLOWED)))
+
+    protected fun canStartRestSimulation(): Boolean =
+        session.simulation != null && navigation.page != HostPage.ONBOARDING && allowed()
+
+    protected fun startRestSimulation() {
+        if (!canStartRestSimulation()) return
+        val simulation = session.simulation ?: return
+        val ticket = Any()
+        restStartTicket = ticket
+        // 같은 UI 이벤트에서 새 탁송 요청을 닫고, 앞선 거래 뒤 worker에서 원장을 확인한다.
+        updateAccess()
+        session.prepareSimulation(rest = true) { result ->
+            if (restStartTicket !== ticket) return@prepareSimulation
+            try {
+                if (active && simulation.controlsAllowed && navigation.page != HostPage.ONBOARDING) when (result) {
+                    is ContractResult.Failure -> simulation.rejected(result.error)
+                    is ContractResult.Success -> simulation.beginRest()
+                }
+            } finally {
+                restStartTicket = null
+                if (active) updateAccess()
+            }
+        }
+    }
 
     protected open fun onControlsAvailabilityChanged(allowed: Boolean) = Unit
 

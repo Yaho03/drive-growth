@@ -1,6 +1,8 @@
 package io.drivegrowth.app.host
 
+import io.drivegrowth.app.data.RestClockDomain
 import io.drivegrowth.app.host.delivery.DeliveryNavigationPort
+import io.drivegrowth.app.host.rest.RestAreaProof
 import io.drivegrowth.app.host.driving.*
 import io.drivegrowth.app.runtime.rental.RentalClock
 import io.drivegrowth.app.runtime.rental.RentalRuntimeSnapshot
@@ -24,10 +26,16 @@ internal interface HostSimulation {
     fun rentalRandom(games: GameSessionFactory): Random
     fun attach(worker: Executor? = null, accept: (DrivingFrame, () -> Unit) -> Unit)
     fun begin()
+    fun beginRest()
+    fun restSample(frame: DrivingFrame): SimulationRestSample?
+    val restRecording: Boolean
     fun retry()
     fun rejected(error: ContractError)
     fun stop()
 }
+internal data class SimulationRestSample(val clock: RestClockDomain, val area: Observation<RestAreaProof>,
+    val restRun: Boolean, val ordinaryTerminal: Boolean)
+
 internal fun interface RentalClockReader { fun read(): ContractResult<RentalClock> }
 
 /** 화면의 확인·재조회만 공유한다. SDK snapshot이 없는 모의 공급자가 SDK 값을 만들지 않는다. */

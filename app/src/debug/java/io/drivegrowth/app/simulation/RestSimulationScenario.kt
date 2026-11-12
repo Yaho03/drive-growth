@@ -164,9 +164,12 @@ internal object RestSimulationScenario {
         val raw = VehicleObservation(InputSource.SIMULATION, elapsed, utc,
             Observation.Available(if (parked) 0.0 else 10.0),
             Observation.Available(if (parked) Gear.PARK else Gear.DRIVE), Observation.Available(!parked))
-        val place = RestAreaProof("rest-simulation-area", RestPlace.SERVICE_AREA, ContentVersion("rest-simulation-v1"),
-            "https://example.test/rest-simulation", "fixture-only", "2026-11-11",
-            InputSource.SIMULATION, inside, elapsed, utc)
-        return Sample(DrivingFrame(raw, Observation.Available(ZoneId.of("UTC"))), Observation.Available(place), last)
+        return Sample(DrivingFrame(raw, Observation.Available(ZoneId.of("UTC"))),
+            Observation.Available(testArea(raw, inside)), last)
     }
+
+    internal fun testArea(raw: VehicleObservation, inside: Boolean): RestAreaProof =
+        RestAreaProof("rest-simulation-area", RestPlace.SERVICE_AREA, ContentVersion("rest-simulation-v1"),
+            "https://example.test/rest-simulation", "fixture-only", "2026-11-11",
+            InputSource.SIMULATION, inside, raw.receivedElapsedMs, raw.receivedAt)
 }

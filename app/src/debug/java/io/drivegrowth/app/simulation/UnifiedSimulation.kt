@@ -18,28 +18,42 @@ import kotlin.random.Random
 internal class UnifiedSimulation(private val context: Context, preferenceName: String = "unified-simulation-v1") : HostSimulation {
     private val prefs = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
     private val handler = Handler(Looper.getMainLooper())
-    @Volatile private var progress: SimulationTimeline? = try {
-        if (!prefs.contains("stage")) {
-            if (preferenceName == "unified-simulation-v1" && context.getDatabasePath("unified-simulation.db").exists()) null
+    private val restored = try {
+        val recording = prefs.getBoolean("restRecording", false)
+        val timeline = if (!prefs.contains("stage")) {
+            if (recording || preferenceName == "unified-simulation-v1" &&
+                context.getDatabasePath("unified-simulation.db").exists()) null
             else SimulationTimeline()
-        }
-        else SimulationTimeline(prefs.getLong("elapsed", -1), prefs.getInt("stage", -1))
+        } else SimulationTimeline(prefs.getLong("elapsed", -1), prefs.getInt("stage", -1),
+            prefs.getBoolean("restRun", false))
+        require(timeline?.restRun != true || recording)
+        timeline to recording
     } catch (_: RuntimeException) { null }
+    @Volatile override var restRecording = restored?.second == true
+        private set
+    @Volatile private var progress = restored?.first
+    private val lostRestInput = progress?.let { it.restRun && !it.controlsAllowed } == true
     private var accept: ((DrivingFrame, () -> Unit) -> Unit)? = null
     private var generation = 0L
     private var inFlight = false
     private var completedTerminal: SimulationTimeline? = null
-    @Volatile private var failure: String? = if (progress == null) "진행 기록을 읽지 못했습니다. 기존 원장은 보존합니다." else null
+    @Volatile private var failure: String? = when {
+        progress == null -> "진행 기록을 읽지 못했습니다. 기존 원장은 보존합니다."
+        lostRestInput ->
+            "이전 프로세스의 미완료 휴식 시연 근거를 확인할 수 없습니다. 확정 원장은 보존합니다."
+        else -> null
+    }
     private var notice: String? = null
     private var nav: SimulationNavigation? = null
     private var terminalProof: SimulationTerminalProof? = null
     override var changed: (() -> Unit)? = null
     override val policy = RecordingPolicy(60_000, 60_000, 1000, 3000, 0.1, 0.5)
     override val controlsAllowed get() = failure == null && !inFlight && progress?.controlsAllowed == true
-    override val canRetry get() = progress != null && failure != null && !inFlight
+    override val canRetry get() = progress != null && failure != null && !inFlight && !lostRestInput
     override val status get() = "SIMULATION · 실제 SDK/차량 입력 아님\n" + (failure ?: notice ?: progress?.let {
-        "논리 UTC ${java.time.Instant.ofEpochMilli(it.clock.epoch.value)} · 단계 ${it.stage}/65\n" +
-            "모의 1시간 이동·명시 도착·연속 주차 / 시연 고객: 보유차량·1시간·무사고"
+        val step = "논리 UTC ${java.time.Instant.ofEpochMilli(it.clock.epoch.value)} · 단계 ${it.stage}"
+        if (it.restRun) "$step/72\n모의 휴식 시험 장소 · 논리 주행·주차·출발"
+        else "$step/65\n모의 1시간 이동·명시 도착·연속 주차 / 시연 고객: 보유차량·1시간·무사고"
     }.orEmpty())
     override fun clock(): ContractResult<RentalClock> = progress?.let { ContractResult.Success(it.clock) }
         ?: ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
@@ -51,10 +65,13 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
     override fun observed(frame: DrivingFrame, result: ContractResult<DrivingRecordingResult>): ContractResult<Unit> {
         val handled: ContractResult<Unit> = try {
             val current = progress ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+            val waiting = (result as? ContractResult.Success)?.value?.waiting
             when {
                 frame != current.frame() -> ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
                 result is ContractResult.Failure -> if (current.stage == 0 && result.error == ContractError.DATA_UNAVAILABLE)
                     ContractResult.Success(Unit) else result
+                restRecording && waiting != null -> ContractResult.Failure(waiting)
+                current.restRun -> ContractResult.Success(Unit)
                 else -> nav?.observed(current, result) ?: ContractResult.Success(Unit)
             }
         } catch (_: SecurityException) { ContractResult.Failure(ContractError.PERMISSION_DENIED) }
@@ -70,7 +87,7 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
         val proof = terminalProof
         when {
             current == completedTerminal -> changed?.invoke()
-            current.stage != 65 || worker == null || proof == null -> emit()
+            !current.terminal || worker == null || proof == null -> emit()
             else -> {
                 val token = generation
                 inFlight = true
@@ -93,7 +110,7 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
 
     override fun inputConsumed(frame: DrivingFrame, recorded: DrivingRecordingResult, rental: RentalRuntimeSnapshot) {
         val current = progress ?: return
-        if (current.stage == 65 && failure == null && frame == current.frame()) {
+        if (current.terminal && failure == null && frame == current.frame()) {
             terminalProof?.remember(current, recorded, rental)
         }
     }
@@ -116,12 +133,32 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
         progress = current.begin() ?: return
         emit()
     }
+    override fun beginRest() {
+        val current = progress ?: return
+        if (!controlsAllowed || accept == null) return
+        val next = current.beginRest() ?: return
+        restRecording = true
+        notice = null
+        progress = next
+        emit()
+    }
+
+    override fun restSample(frame: DrivingFrame): SimulationRestSample? {
+        val current = progress ?: return null
+        if (!restRecording || frame != current.frame()) return null
+        val clock = RestClockDomain("unified-simulation-elapsed", current.clock.bootId)
+        val area = if (current.restRun) Observation.Available(RestSimulationScenario.testArea(frame.observation, current.inRestArea))
+            else Observation.Missing(MissingReason.NO_DATA)
+        return SimulationRestSample(clock, area, current.restRun, current.terminal && !current.restRun)
+    }
+
     private fun emit() {
         val current = progress ?: return
         val consumer = accept ?: return
         if (inFlight || failure != null) return
         val token = generation
-        if (!prefs.edit().putLong("elapsed", current.elapsedMs).putInt("stage", current.stage).commit()) {
+        if (!prefs.edit().putLong("elapsed", current.elapsedMs).putInt("stage", current.stage)
+                .putBoolean("restRun", current.restRun).putBoolean("restRecording", restRecording).commit()) {
             failure = "시연 진행을 저장하지 못했습니다. 원장/진행을 초기화하지 않습니다."; changed?.invoke(); return
         }
         android.util.Log.i("DriveGrowthSimulation", "simulation_input source=SIMULATION stage=${current.stage} elapsedMs=${current.elapsedMs} utcMs=${current.clock.epoch.value}")
@@ -129,7 +166,7 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
         consumer(current.frame()) {
             if (token != generation || accept == null) return@consumer
             inFlight = false
-            if (failure == null && current.stage == 65) completedTerminal = current
+            if (failure == null && current.terminal) completedTerminal = current
             changed?.invoke()
             if (failure == null && current.next() != null) handler.postDelayed({
                 if (token == generation && accept != null) { progress = current.next(); emit() }
@@ -141,11 +178,7 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
     /** 입력용 seed를 기존 planner로 고른다. 가격/분포/사고 계산이나 지급을 복제하지 않는다. */
     override fun rentalRandom(games: GameSessionFactory): Random {
         val current = checkNotNull(progress)
-        val run = current.elapsedMs - when {
-            current.stage == 0 -> 0
-            current.stage <= 61 -> 1000 + (current.stage - 1) * 60_000L
-            else -> 3_601_000L + (current.stage - 61) * 1000L
-        }
+        val run = current.runStartMs
         if (prefs.getLong("seedRun", -1) == run && prefs.contains("seed")) return Random(prefs.getInt("seed", 0))
         val seed = when (val opened = games.open()) {
             is ContractResult.Failure -> throw IllegalStateException(opened.toString())
