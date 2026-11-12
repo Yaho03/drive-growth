@@ -2104,6 +2104,25 @@ Revision 4 대비 계측 시험 한 파일이 바뀌었다. Revision 5 소스 �
 101de32 기준 게시 준비 사본은 위 시험 트리의 앱 생산 코드와 진행 카드 계측 파일을 그대로 유지했다. #224의 시험 두 파일과 근거 문서를 함께 보존했다. 이 게시 조합의 새 APK 빌드·장치 실행은 아직 수행하지 않았다. 실제 SDK·실차 및 #43 v4의 검증은 이 범위에 포함되지 않는다.
 
 
+### #43 앱 이탈과 종료 영업 복구 표적 검증 — 2026-11-12
+
+#226 머지 `e5051768f576123165f06f516f8b54dab6b65fdf`의 제품에서 실행했다. 게시 후보 기준 `26354b4cc3702d025d54bf02175ea34a9f2b7d72`의 #227은 차고 계측·문서만 변경했다. 제품·Debug·core 소스와 빌드 설정은 동일하며 후보의 변경 코드·시험 17개 파일을 GREEN 실행 소스와 바이트 단위로 대조했다.
+
+JDK 17·SDK 35에서 각 사본의 `:app:assembleDebug :app:assembleDebugAndroidTest`를 실행했다. Pleos API 34 ARM64의 별도 Debug 앱 세 개에서 [대여 source 바인딩 계측](../app/src/androidTest/java/io/drivegrowth/app/host/rental/RentalProductSourceBindingTest.kt)의 지정 메서드를 실행했다. 차량 표본과 시각은 제어된 SIM 입력이며 실제 제품 source·원장·SQLite를 사용했다. RED와 GREEN의 계측 소스는 동일했다.
+
+| 사본·실행 트리 | 실제 결과 | runner 시간 |
+| --- | --- | ---: |
+| main 대조 `f46e55618aad1b8a9f7bdc6c9e605fe88105dab4` | 정상 복귀와 구성 변경 2개 통과. 마지막 수락 표본과 이탈 사이 공백 1개에서 복귀 `STATE_CONFLICT` 재현. | 3.979초 |
+| RED `bf5a83e0f4a7cf1cda24de9aa5bb58e1adf06d4d` | 원래 PREPARED 대조 1개 통과. RECORDED 최초 복귀와 재생 쓰기 실패·재시도 두 건에서 준비 전에 현재 표본까지 재생하려 해 `DATA_UNAVAILABLE` 재현. | 4.058초 |
+| GREEN `dd568b4d0c99b55d7d8c3dd52018f1a8948eec54` | 10/10 통과. 위 세 복구 경로, 이탈 전 공백, 수락 표본의 쓰기 재시도, maxGap 뒤 D/P 적립, 확인된 주차 뒤 새 주행의 30분 원점, 구성 변경, r8 원영수증 재생과 근거 없는 공백 거부를 확인했다. | 15.553초 |
+
+RECORDED에서 첫 복귀 표본 120,000ms를 PREPARED로 저장하고 원방문과 이탈 전까지의 수락 관측을 복구했다. SQLite 쓰기 실패 후 121,000ms 표본으로 재시도해도 최초 120,000ms와 같은 원구간을 사용했다. 같은 요청의 원방문·수익은 중복되지 않았다. 이탈 전 수락 표본의 처리가 보류되면 정산도 보류되고, 확인된 미관측 구간만 수익 0으로 남긴다. 결과 상세는 미관측 제외 시간을 기존 상한 제외 시간과 구분한다. 이번 표적 실행에는 별도 결과 화면 계측을 포함하지 않았다.
+
+GREEN 앱 SHA-256은 `853db02efb5bf98cbf4f9761842901a4ba5fc342c8aa7bd7e5f26b9cfc27f97d`, 계측 APK는 `3fe5b07655dd5085d7cd41949254ed36f2a5ac92caa6664a0229e29aa49b9d73`다. 세 사본의 앱·계측 APK를 설치 후 회수해 각각 빌드본과 일치함을 확인했다. 이번에 설치한 격리 패키지 세 쌍만 제거했고 제품·환경 19/19 일치, 부팅 완료, 계측·시험 프로세스 부재를 확인해 13:35:23 KST에 반환했다.
+
+최상위 Back의 명시적 숨김과 사용자 이탈 힌트가 이어지는 비구성 변경 `onStop`을 이탈로 연결했다. 기존 D→Back→복귀 관측은 B0dd의 별도 시험이다. 이 v4에서 실제 Pleos Home·Back 콜백, OS 프로세스·전원·실차, 장시간 및 시계 변동의 실제 동작은 미검증이다. 앞선 r8 진행 카드·일반 탁송 결과와 이번 표적 결과는 각 실행으로 유지한다. 게시 기준에서의 재빌드·추가 JVM·Lint는 이번 결과에 포함하지 않는다.
+
+
 ### Rest 6a4 세 수정의 main188 통합 검토 대기 — 2026-11-10
 
 정확6a4d820645cbd58c05959d7dd8a48f73746a5972를main188 c6c345d1866569cb3156229ba363312d1778fede 위에정상통합했다. 소스충돌/추가수정0이며변경41파일전부6a4와바이트동일하다. Main/HostSession/PendingRoute/factory/VehicleInput·Location6·시설12·Results14를보존했다. marker생산API는그대로이며시험fixture만schema16으로갱신했다. RankingReadSource의공통Rest주행reader소비는원본의의도된변경이고기존Provenance hook/typedFailure catch는보존했다. core/Gradle/Manifest불변·B0dd미포함이다. **이main188 로컬후보당시에는새SQLite결과대기였다. 후속c28의실제47통과는아래별도조합으로기록하며, #190이후Main조합·최종독립회수전까지머지보류다.**
