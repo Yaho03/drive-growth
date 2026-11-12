@@ -1,0 +1,3 @@
+시험용 프로필·요청·정산 식별자만 같은 값끼리 같은 번호로 가림.
+--------- beginning of main
+11-12 13:33:53.703  6986  7074 I FinalInsuranceMain: pid=6986 source=SIMULATION profile=[profile-1] definition=trial-demo-2026-11-10-v5 rules=trial-demo-2026-11-10-v4 facility=INSURANCE request=[request-1] settlement=[settlement-1] visitors=99->100 purchase=1500 uninsured=60 insured=90 balance=1650 slot=empty

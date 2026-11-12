@@ -1,0 +1,13 @@
+{
+  "head": "a8017961028f892e602b67b9e4a0124fc2588513",
+  "tree": "fdbbb3207fcd4fc343e22d6d01f2c6af86e8a7b8",
+  "package": "io.drivegrowth.verify.finalinsurance44",
+  "mode": "external",
+  "sha256": {
+    "io.drivegrowth.verify.finalinsurance44": "90b134cf85fc13c79019332ca220244fe0203e09d776ca92416011e5fb543b0d",
+    "io.drivegrowth.verify.finalinsurance44.test": "4417fa409fbad87d0b5cc289066278c785eeb0b60bb65377ea41ef16b568fad2"
+  },
+  "cleanupErrors": [],
+  "signerSHA256": "3398b6f1e8a85d4950d221b75ec046770046d8bc2c614ef7af3ebc1bbef856da",
+  "passed": true
+}
