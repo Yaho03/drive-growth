@@ -251,11 +251,11 @@ function renderShop(){
     <div class="map" id="townViewport" aria-label="가게 지도. 주차 ${S.cars.length}/${cap()}칸">
      <div class="town-world" id="townWorld">
       <img class="full town-background" src="${IMG.isoTown}" alt="사선 시점의 파란 렌트카 본관, 빨간 HR주유소, 민트 보험회사와 주황 세차장">
-      ${SLOTS.map((sl,i)=>i>=cap()?`<span class="lot-lock" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-35,1024)}%">확장 예정</span>`:'').join('')}
-      ${cars.map(({c,sl,m})=>`<span class="ring parked-ring ${c.rar}" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y+13,1024)}%"></span>
-       <img class="town-car" src="${IMG[m.id]||IMG[m.type]}" alt="${esc(m.name)}" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-7,1024)}%;width:${pct(m.type==='light'?88:100,1536)}%">
-       <span class="car-label" style="left:${pct(sl.x-36,1536)}%;top:${pct(sl.y+25,1024)}%">${esc(m.name)}${c.st==='repair'?' · 수리':c.rest?' · 쉼':''}</span>
-       <button class="slotbtn parked-hit" data-act="openCar" data-arg="${c.id}" aria-label="${esc(m.name)} 자세히" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-7,1024)}%"></button>`).join("")}
+      ${SLOTS.map((sl,i)=>i>=cap()?`<span class="lot-lock" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-35,1024)}%;z-index:2500">확장 예정</span>`:'').join('')}
+      ${cars.map(({c,sl,m})=>`<span class="ring parked-ring ${c.rar}" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y+13,1024)}%;z-index:2"></span>
+       <img class="town-car" src="${IMG[m.id]||IMG[m.type]}" alt="${esc(m.name)}" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-7,1024)}%;width:${pct(m.type==='light'?88:100,1536)}%;z-index:${100+Math.round(sl.y+13)}">
+       <span class="car-label" style="left:${pct(sl.x-36,1536)}%;top:${pct(sl.y+25,1024)}%;z-index:2500">${esc(m.name)}${c.st==='repair'?' · 수리':c.rest?' · 쉼':''}</span>
+       <button class="slotbtn parked-hit" data-act="openCar" data-arg="${c.id}" aria-label="${esc(m.name)} 자세히" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-7,1024)}%;z-index:3000"></button>`).join("")}
       ${TOWN_ACTORS.map((p,i)=>`<img class="px town-actor" id="townActor${i}" alt="${p.name}" style="width:${pct(p.ruru?64:40,1536)}%;left:${pct(p.a[0],1536)}%;top:${pct(p.a[1],1024)}%" src="${p.ruru?RURU_FRAMES.idle[0]:npcFrames(p.kind)[0]}">`).join('')}
      </div>
      <div class="hud" style="left:2%;top:3%">● 정상 영업 중</div>
