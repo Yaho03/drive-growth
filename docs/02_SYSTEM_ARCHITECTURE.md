@@ -383,7 +383,7 @@ PR #104 당시 SQLite 변경은 새 필드를 손실시키지 않는 `LedgerJson
 
 #48의 추가 거래는 아래 `MaterialChangeStore`·재료 강화 SQLite 절의 기존 공급을 소비한다. 대상ID/revision·재료ID/revision·활동·버전에서 계산한 새 레벨/진행량을 한 정산의 대상 성장 snapshot과 재료 CONSUMED snapshot에 연결하고 각각의 취득 정보를 보존한다. 같은 개체 중복·활동 제한·revision 충돌·금액 부족이면 전부 미반영이어야 하며, 단일 `GameChange` 두 번으로 나누지 않는다. PR #104 당시 후속이었던 다중 개체 거래를 다시 설계하지 않고 기존 명령·결과·저장·fixture를 재사용한다. 가챠·초기 지급·사고/활동·도감의 현재 공급과 남은 제품 연결은 각 기능 절과 #46/#122/#28을 따른다.
 
-**단일 개체 Update 정산의 후속 확인:** `DeliveryLedger.kt`의 공용 `readRecordedSettlement(db, change)`는 원래 명령·정산 연결을 읽고, Add에서는 차량 snapshot 전체를 비교한다. Update에서는 개체 ID까지 대조한다. 저장 담당은 Update의 결과 레벨·진행량·lifecycle과 원래 명령의 값, 결과 revision과 `expectedRevision + 1`을 대조하는 경계를 검증한다. 정상 과거 결과는 그 뒤에 차량을 성장시키거나 처분해도 당시 snapshot과 정산 ID·잔액을 돌려줘야 한다. 동일한 개체 ID와 원래 명령을 둔 채 결과 필드 하나만 다르게 바꾼 SQLite fixture에서 `STORAGE_FAILURE`와 원장 무변경을 확인한다. 희귀도·취득 정보의 근거가 없는 legacy는 현재 개체로 보정하지 않으며 기존 #46/#122의 복구 정책 조건을 따른다. [JVM 재현과 한계](06_VERIFICATION.md#46-공통-차량-계약과-update-정산-재생-재확인--2026-11-13)
+**단일 개체 Update 정산 재생.** 공용 `readRecordedSettlement(db, change)`는 원래 명령과 정산을 대조하고, Add의 당시 차량 스냅샷 전체를 검사한다. Update의 당시 스냅샷에는 같은 개체 ID·레벨·진행량·lifecycle과 `expectedRevision + 1`이 필요하다. revision은 Long으로 넓혀 비교한다. 불일치는 `STORAGE_FAILURE / INVALID_RECORD`로 반환하며, Garage 명령의 `finish`는 STARTED 슬롯을 유지한다. 같은 명령의 정상 결과는 이후 성장·처분과 관계없이 당시 정산을 반환한다. 희귀도·취득 정보는 Update 명령의 입력에 없으므로 현재 개체로 복구하지 않는다. [SQLite 계측](06_VERIFICATION.md#122-quest-원자성update-정산-재생과-구버전-apk-이전--2026-11-13)
 
 #### #48 레벨업과 재료 강화
 
@@ -744,6 +744,8 @@ E b8972b56의 기능 커밋만 main177 위에 통합한 후보는 schema12다. Q
 
 E 변경31파일 중30개는 b897과 동일하며 RentalLedger는 최신 main의 Pending.parkedSince·엄격 정수 조회만 추가 보존했다. 중앙 trial·helper/data에 새로운 제품 논리를 추가하지 않았다. 현 앱 소비 호환은 Garage adapter의 Quest/Delivery 명령·결과를 STATE_CONFLICT로 거절하고, 보관 경로 조회도 두 명령을 명시 실패로 반환해 UI의 재확인 상태로 전달한다. null은 실제 빈 checkpoint에만 사용하며 명령을 지우거나 다른 페이지 명령으로 실행/취소하지 않는다. Driving schema13·제품 Progress/Delivery Main·랭킹 진입은 포함하지 않는다. 제품 연결과 공식 SDK/기기 범위는 별도다.
 
+
+Quest 청구는 공통 정산과 수령 마커를 확정한 뒤 같은 거래에서 STARTED 원명령을 다시 읽는다. 완료·취소는 슬롯의 실제 삭제를 확인한 뒤 성공을 반환한다. 마지막 쓰기가 슬롯을 되돌리거나 재삽입하면 거래를 롤백하고 저장 오류를 반환한다. [Quest·꾸미기 공용 원장 계측](06_VERIFICATION.md#122-quest-원자성update-정산-재생과-구버전-apk-이전--2026-11-13)
 
 ### 관측 주행 schema13 저장 공급 — 2026-11-10
 

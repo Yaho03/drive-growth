@@ -2104,6 +2104,28 @@ RED 앱 `6c30db81157d7d509b2f625abd7687ee4c5a652e420274e86ec276c7c2f50468`, GREE
 
 앞 절의 schema19 결과는 해당 소스와 당시 이전 경로의 근거로 보존한다. 이번 결과는 격리 DB 재개방까지다. 실제 옛 APK가 작성한 제품 DB 업그레이드와 새 OS 프로세스 복원, 최신 조합의 나머지 원자성 조건은 미검증이다. 게시 기준 `53db64fa0ac63da108faa323c9ed33cfa99135a0`에서는 실행본과 해당 저장 변경·계측 소스의 diff를 대조했다. 게시 후보의 새 APK·장치 실행은 수행하지 않았다.
 
+#### #122 Quest 원자성·Update 정산 재생과 구버전 APK 이전 — 2026-11-13
+
+Pleos API 34 ARM64 사용자 10의 격리 Debug 앱에서 `d2759b60f97eeae3011e8f07bbb6d27e42a3f310`을 기준으로 같은 계측 APK를 사용했다. GREEN 앱에는 Quest checkpoint와 공용 Update 정산 재생 수정을 적용했다. [Quest 계측](../app/src/androidTest/java/io/drivegrowth/app/data/QuestCheckpointTest.kt), [업적 계측](../app/src/androidTest/java/io/drivegrowth/app/data/AchievementLedgerTest.kt), [꾸미기 계측](../app/src/androidTest/java/io/drivegrowth/app/data/DecorationLedgerTest.kt), [공용 Update 계측](../app/src/androidTest/java/io/drivegrowth/app/data/SqliteGameChangeStoreTest.kt)을 지정했다.
+
+| 구간 | 수정 전 RED | 같은 시험 APK의 최종 GREEN |
+|---|---|---|
+| #122 Quest와 공용 원장 | 첫 청구가 기대 저장 오류 대신 성공했다. 예상 단언 실패 1건, 오류 0, 0.248초. 후행 취소·완료 단언은 미도달. | 5건 통과, 1.427초. 청구 롤백, 취소·완료의 슬롯 보존, Quest·업적과 GENERAL의 양방향 요청 충돌, 마지막 잔액 경쟁, 재개방 뒤 유료 꾸미기 최초 결과를 확인했다. |
+| 공용 Update 정산 | 형식상 유효한 레벨·진행량·lifecycle·revision 불일치 각각에서 같은 명령과 `finish`가 성공했다. 예상 단언 실패 4건, 오류 0, 1.014초. | 5건 통과, 1.107초. 네 불일치는 `STORAGE_FAILURE / INVALID_RECORD`이며 STARTED·잔액·차량·정산 및 DB 원본을 보존했다. 정상 대조군은 처분 뒤 당시 Add·성장·처분 결과와 같은 ID의 다른 명령 충돌을 확인했다. |
+
+RED 앱 `b1e94435ba83ea51e29a461c0b6b5e839d153522f4dbb0e2e1713ccfad33e136`, GREEN 앱 `3f1193e9ed9d43600cd5a7edcc1e5cdb2da1fe463027aaaa51e2229117ac3172`, 공통 계측 `1ba75ab594dd20abe6965f0f86f2d7bbe1ad69ada0e2dc30440c881479540e82`의 SHA-256이 빌드본과 설치 회수본에서 일치했다. JDK 17·SDK 35에서 RED 앱·계측은 `:app:assembleDebug :app:assembleDebugAndroidTest`, GREEN 앱은 `:app:assembleDebug`로 오프라인 빌드했다. 최초 로컬 빌드는 샌드박스 루프백 제한으로 중단됐고, 같은 소스를 루프백 허용 환경에서 빌드했다. RED 결과는 JUnit이 예외를 두 곳에 출력해 요약기가 중복 집계했다. 원본의 상태 코드·메서드별 실패·최종 집계를 대조해 바로잡았다. 계측 재실행은 없었다.
+
+**구버전 APK가 직접 작성한 DB.** 각 보존 APK의 저장 API로 시험 전용 SIMULATION DB를 새로 만들고, 같은 패키지와 서명의 schema20 APK로 데이터를 유지한 채 업데이트했다. 두 업데이트 앱의 제품 소스는 `2988fb1fbf4025503e11ef2d370e581a2ba651cc`다. 최초 DB 개방 전에는 원본과 journal의 SHA-256이 동일했다. 이전과 DB 재개방 뒤 프로필·출처·잔액·차량·정산의 기존 행을 대조했다.
+
+| 이전 | 보존 APK의 소스와 SHA-256 | 작성 / 이전 계측 |
+|---|---|---|
+| schema10 → 20 | `81bbaf30a2f5fd3d968abc66fa6404d1585af33d` · `e0e93e202e3e5168e8c1a848da982223a1ad65e2dfc2e34f18efa54c014a30bf` | 각 1건 통과(0.148초 / 0.145초) |
+| schema12 → 20 | `b8972b563ffb0c0d6a7e969097f4cd172fff1941` · `6791049c6b8cf7b77865cd3ad678627ebbaf081c4b9f564616ad1f33b596aaf6` | 각 1건 통과(0.156초 / 0.100초) |
+
+schema2는 앞 절의 당시 DDL fixture 근거를 유지한다. 실제 과거 사용자의 DB, 제품 UI의 새 프로세스 복원과 실차는 미수행이다. 원본 로그와 격리 DB 사본·APK 해시는 로컬 `/private/tmp/drive-239-update-replay.Ur4QpN`에 보존했다. 격리 패키지 정리와 제품·장치 보호 항목 19/19를 확인하고 01:42:45.935233 KST에 슬롯을 반환했다.
+
+게시 기준 `b2a0fc3f3be7912528686df3bee67979d46ae9ee`에는 #240의 계측·문서가 포함된다. 실행 기준과 app/core 제품 소스가 같고 수정·계측 diff도 바이트 단위로 일치한다. 게시 조합의 새 Gradle·장치 실행은 미수행이다.
+
 #### 결합 APK의 지정 계측 시험
 
 A는 코드 커밋 `dce75aea611904d2f94d754e4cbeb080c38e9848`의 Debug 앱 `io.drivegrowth.app.simulation`을 API 34 ARM64에서 설치하고 아래 네 시험을 각각 한 번 실행했다. 네 설치 앱의 SHA-256은 `33479608b9d1baf46ad202481c57c8a196be11556a80a44e954adba9bf6711a9`로 동일했다.
