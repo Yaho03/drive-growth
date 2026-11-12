@@ -44,6 +44,19 @@ class FNavigationDeliveryPortTest {
         assertTrue(value.estimated is Observation.Missing);assertTrue(value.arrival is Observation.Missing)
     }
 
+    @Test fun `SDK 실패 중 다시 받은 필드로 확인한 목적지와 예상 거리를 제공하지 않는다`() {
+        for (error in listOf(NavigationError.PERMISSION_DENIED, NavigationError.ASYNC_SDK_ERROR)) {
+            val failure = NavigationFailure(error, NavigationOperation.SDK_EVENT, NavigationErrorOrigin.ASYNCHRONOUS)
+            val value = read(port(raw.copy(failure = failure)))
+            val reason = if (error == NavigationError.PERMISSION_DENIED) MissingReason.PERMISSION_DENIED else MissingReason.NO_DATA
+            assertEquals(Observation.Missing(reason), value.estimated)
+            assertEquals(Observation.Missing(MissingReason.NO_DATA), value.arrival)
+            assertNull(value.destination)
+            assertNull(value.selectionRevision)
+            assertEquals(11L, value.metadata!!.fields.getValue("destination").sequence)
+        }
+    }
+
     @Test fun `다른 프로필의 사용자 선택 문맥을 재사용하지 않는다`() {
         val value=read(port(bindingIdentity=GameIdentity(ProfileId("other"),identity.source)))
         assertNull(value.destination);assertNull(value.selectionRevision);assertTrue(value.estimated is Observation.Missing)

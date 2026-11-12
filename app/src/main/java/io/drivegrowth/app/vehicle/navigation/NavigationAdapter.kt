@@ -13,6 +13,8 @@ class NavigationAdapter(private val worker: Executor, private val main: Executor
     init { require(timeoutMillis > 0) }
     private val generation = AtomicLong()
     private val released = AtomicBoolean()
+    // 작업 중 연결이 교체돼도 현재 worker의 표본을 새 연결 세대로 발행하지 않는다.
+    private var workerGeneration = 0L
     private var sequence = 0L
     private var listener: ((NavigationEvent) -> Unit)? = null
     private var port: NavigationSdkPort? = null
@@ -20,6 +22,9 @@ class NavigationAdapter(private val worker: Executor, private val main: Executor
     private var destination: NavigationField<NavigationDestination> = missing()
     private var distance: NavigationField<Long> = missing()
     private var route: NavigationField<String> = missing()
+    private var lastRouteId: String? = null
+    // 조회·재연결 후에도 경로 ID 하나로 폐기한 견적을 다시 유효하게 만들 수 없다.
+    private var routeInvalidated = false
     private var guidance: NavigationField<NavigationGuidance> = missing()
     private var startDistance: NavigationField<Long> = missing()
     private var navigationStatus: NavigationField<String> = missing()
@@ -36,7 +41,11 @@ class NavigationAdapter(private val worker: Executor, private val main: Executor
         val token = generation.incrementAndGet()
         worker.execute {
             if (!valid(token)) return@execute
-            closePort(); this.listener = listener; clear(NavigationMissing.NOT_OBSERVED); failure = null
+            closePort()
+            workerGeneration = token
+            this.listener = listener
+            clear(if (routeInvalidated) NavigationMissing.REQUEST_CHANGED else NavigationMissing.NOT_OBSERVED)
+            failure = null
             connection = NavigationConnection.CONNECTING
             val denied = checkedPermission(readPermission, NavigationOperation.CONNECT)
             if (denied != null) { failConnection(denied); return@execute }
@@ -61,8 +70,12 @@ class NavigationAdapter(private val worker: Executor, private val main: Executor
     fun disconnect() {
         if (released.get()) return
         val token = generation.incrementAndGet()
-        worker.execute { if (valid(token)) { closePort(); connection = NavigationConnection.DISCONNECTED
-            clear(NavigationMissing.DISCONNECTED); failure = null; publish() } }
+        worker.execute { if (valid(token)) {
+            workerGeneration = token
+            closePort()
+            connection = NavigationConnection.DISCONNECTED
+            clear(NavigationMissing.DISCONNECTED); failure = null; publish()
+        } }
     }
     override fun close() {
         if (released.getAndSet(true)) return
@@ -72,8 +85,9 @@ class NavigationAdapter(private val worker: Executor, private val main: Executor
     fun refresh() = dispatch {
         if (!ready(NavigationOperation.QUERY)) return@dispatch
         queryDeadline?.cancel(); pendingQuery.clear(); pendingQuery.addAll(listOf("destination", "route", "guidance"))
-        clear(NavigationMissing.NOT_OBSERVED); failure = null; publish()
-        val token = generation.get(); val sdk = port!!
+        clear(if (routeInvalidated) NavigationMissing.REQUEST_CHANGED else NavigationMissing.NOT_OBSERVED)
+        failure = null; publish()
+        val token = workerGeneration; val sdk = port!!
         queryDeadline = timer.after(timeoutMillis) { worker.execute { if (active(token, sdk) && pendingQuery.isNotEmpty()) timeout(NavigationOperation.QUERY) } }
         try { sdk.query() }
         catch (error: RuntimeException) { failConnection(error(error, NavigationOperation.QUERY)) }
@@ -93,16 +107,30 @@ class NavigationAdapter(private val worker: Executor, private val main: Executor
             }
         } else if (previous != null) { emit(NavigationEvent.Command(previous)); return@dispatch }
         val op = operation(command)
-        val preflight = when {
+        val invalid = when {
             !validCommand(command) -> NavigationFailure(NavigationError.INVALID_REQUEST, op, NavigationErrorOrigin.PREFLIGHT)
             connection != NavigationConnection.CONNECTED_OBSERVED || port == null -> NavigationFailure(NavigationError.NOT_CONNECTED, op, NavigationErrorOrigin.PREFLIGHT)
-            else -> checkedPermission(readPermission, op) ?: checkedPermission(searchPermission, op)
+            else -> null
+        }
+        val readFailure = if (invalid == null) checkedPermission(readPermission, op) else null
+        val preflight = invalid ?: readFailure ?: checkedPermission(searchPermission, op)
+        latestId = command.id
+        if (preflight != null) {
+            if (readFailure != null) {
+                queryDeadline?.cancel(); queryDeadline = null; pendingQuery.clear()
+                clear(NavigationMissing.SDK_ERROR)
+                failure = readFailure
+            }
+            record(command, NavigationCommandStatus.NOT_SENT, preflight)
+            publish()
+            return@dispatch
         }
         commandDeadline?.cancel(); queryDeadline?.cancel(); pendingQuery.clear()
-        latestId = command.id; clear(NavigationMissing.REQUEST_CHANGED)
-        if (preflight != null) { record(command, NavigationCommandStatus.NOT_SENT, preflight); publish(); return@dispatch }
+        if (lastRouteId != null || commands.values.any { it.status != NavigationCommandStatus.NOT_SENT } ||
+            command is NavigationCommand.Cancel) routeInvalidated = true
+        clear(NavigationMissing.REQUEST_CHANGED)
         record(command, NavigationCommandStatus.SENT_UNCONFIRMED); failure = null; publish()
-        val sdk = port!!; val token = generation.get()
+        val sdk = port!!; val token = workerGeneration
         commandDeadline = timer.after(timeoutMillis) { worker.execute {
             if (active(token, sdk) && latestId == command.id && commands[command.id]?.status == NavigationCommandStatus.SENT_UNCONFIRMED) {
                 record(command, NavigationCommandStatus.OUTCOME_UNKNOWN, NavigationFailure(NavigationError.TIMEOUT, op, NavigationErrorOrigin.DEADLINE)); publish()
@@ -116,21 +144,32 @@ class NavigationAdapter(private val worker: Executor, private val main: Executor
     private fun observe(event: NavigationSdkEvent, stamp: NavigationStamp) {
         when (event) {
             is NavigationSdkEvent.Destination -> {
-                val d = event.destination
-                destination = if (coordinates(d.latitude, d.longitude)) NavigationField.Value(d, stamp) else NavigationField.Missing(NavigationMissing.INVALID_SDK_VALUE, stamp)
-                distance = if (event.remainingMeters >= 0) NavigationField.Value(event.remainingMeters, stamp) else NavigationField.Missing(NavigationMissing.INVALID_SDK_VALUE, stamp)
+                if (!routeInvalidated) {
+                    val d = event.destination
+                    destination = if (coordinates(d.latitude, d.longitude)) NavigationField.Value(d, stamp)
+                        else NavigationField.Missing(NavigationMissing.INVALID_SDK_VALUE, stamp)
+                    distance = if (event.remainingMeters >= 0) NavigationField.Value(event.remainingMeters, stamp)
+                        else NavigationField.Missing(NavigationMissing.INVALID_SDK_VALUE, stamp)
+                }
                 queried("destination")
             }
-            is NavigationSdkEvent.RouteId -> { route = event.value?.takeIf { it.isNotBlank() }?.let { NavigationField.Value(it, stamp) }
-                ?: NavigationField.Missing(NavigationMissing.NO_ROUTE_ID, stamp); queried("route") }
+            is NavigationSdkEvent.RouteId -> {
+                observeRouteId(event.value, stamp)
+                queried("route")
+            }
             is NavigationSdkEvent.Guidance -> {
-                // 두 다른 콜백의 status/mode를 합쳐 현재 하나의 상태라고 꾸미지 않는다.
-                if (event.status != null) navigationStatus = NavigationField.Value(event.status, stamp)
-                if (event.mode != null || event.isRouting != null) guidance = NavigationField.Value(NavigationGuidance(null, event.mode, event.isRouting), stamp)
+                if (!routeInvalidated) {
+                    // 두 다른 콜백의 status/mode를 합쳐 현재 하나의 상태라고 꾸미지 않는다.
+                    if (event.status != null) navigationStatus = NavigationField.Value(event.status, stamp)
+                    if (event.mode != null || event.isRouting != null)
+                        guidance = NavigationField.Value(NavigationGuidance(null, event.mode, event.isRouting), stamp)
+                }
                 queried("guidance")
             }
-            is NavigationSdkEvent.RouteStarted -> startDistance = if (event.estimatedMeters >= 0) NavigationField.Value(event.estimatedMeters, stamp)
-                else NavigationField.Missing(NavigationMissing.INVALID_SDK_VALUE, stamp)
+            is NavigationSdkEvent.RouteStarted -> if (!routeInvalidated) {
+                startDistance = if (event.estimatedMeters >= 0) NavigationField.Value(event.estimatedMeters, stamp)
+                    else NavigationField.Missing(NavigationMissing.INVALID_SDK_VALUE, stamp)
+            }
             is NavigationSdkEvent.Arrived -> emit(NavigationEvent.ArrivalObserved(NavigationArrivalObservation(stamp, event.name, event.address, event.distanceMeters, event.durationSeconds)))
             is NavigationSdkEvent.Error -> {
                 failure = NavigationFailure(NavigationError.ASYNC_SDK_ERROR, NavigationOperation.SDK_EVENT, NavigationErrorOrigin.ASYNCHRONOUS, event.code)
@@ -139,10 +178,29 @@ class NavigationAdapter(private val worker: Executor, private val main: Executor
                     record(it.command, NavigationCommandStatus.OUTCOME_UNKNOWN, failure)
                 }
             }
-            NavigationSdkEvent.RouteCancelled, NavigationSdkEvent.RouteEnded, NavigationSdkEvent.DestinationChanged -> clear(NavigationMissing.REQUEST_CHANGED)
+            NavigationSdkEvent.RouteCancelled, NavigationSdkEvent.RouteEnded, NavigationSdkEvent.DestinationChanged -> invalidateRoute()
         }
         publish()
     }
+    private fun observeRouteId(value: String?, stamp: NavigationStamp) {
+        val current = value?.takeIf { it.isNotBlank() }
+        val previous = lastRouteId
+        if (current == null) {
+            invalidateRoute()
+            route = NavigationField.Missing(NavigationMissing.NO_ROUTE_ID, stamp)
+            return
+        }
+        if (previous != null && previous != current) invalidateRoute()
+        lastRouteId = current
+        // 위치 응답의 ID는 원래 목적지·안내 콜백과 연결되지 않는다.
+        route = NavigationField.Value(current, stamp)
+    }
+
+    private fun invalidateRoute() {
+        routeInvalidated = true
+        clear(NavigationMissing.REQUEST_CHANGED)
+    }
+
     private fun queried(field: String) { pendingQuery.remove(field); if (pendingQuery.isEmpty()) { queryDeadline?.cancel(); queryDeadline = null } }
     private fun commandException(command: NavigationCommand, thrown: Throwable) {
         val f = error(thrown, operation(command)); commandDeadline?.cancel()
@@ -172,10 +230,16 @@ class NavigationAdapter(private val worker: Executor, private val main: Executor
         catch (error: LinkageError) { emit(NavigationEvent.Failure(error(error, NavigationOperation.CLEANUP))) }
     }
     private fun clear(reason: NavigationMissing) { destination = missing(reason); distance = missing(reason); route = missing(reason); guidance = missing(reason); startDistance = missing(reason); navigationStatus = missing(reason) }
-    private fun publish() = emit(NavigationEvent.State(NavigationSnapshot(stamp(source = NavigationSource.APP_STATE), connection, destination, distance, route, guidance, startDistance, latestId?.let { commands[it] }, failure, navigationStatus)))
-    private fun emit(event: NavigationEvent) { val token = generation.get(); val consumer = listener ?: return
+    private fun publish() {
+        val canQuote = route is NavigationField.Value && !routeInvalidated
+        val quotedDestination = if (canQuote || destination is NavigationField.Missing) destination else missing()
+        val quotedDistance = if (canQuote || distance is NavigationField.Missing) distance else missing()
+        emit(NavigationEvent.State(NavigationSnapshot(stamp(source = NavigationSource.APP_STATE), connection,
+            quotedDestination, quotedDistance, route, guidance, startDistance, latestId?.let { commands[it] }, failure, navigationStatus)))
+    }
+    private fun emit(event: NavigationEvent) { val token = workerGeneration; val consumer = listener ?: return
         main.execute { if (valid(token)) consumer(event) } }
-    private fun stamp(at: Long = clock.utcMillis(), elapsed: Long = clock.elapsedMillis(), source: NavigationSource = NavigationSource.PLEOS_NAVI_SDK) = NavigationStamp(at, elapsed, generation.get(), ++sequence, source)
+    private fun stamp(at: Long = clock.utcMillis(), elapsed: Long = clock.elapsedMillis(), source: NavigationSource = NavigationSource.PLEOS_NAVI_SDK) = NavigationStamp(at, elapsed, workerGeneration, ++sequence, source)
     private fun receive(token: Long, sdk: NavigationSdkPort, action: (NavigationStamp) -> Unit) {
         if (!valid(token)) return
         val at = clock.utcMillis(); val elapsed = clock.elapsedMillis()
