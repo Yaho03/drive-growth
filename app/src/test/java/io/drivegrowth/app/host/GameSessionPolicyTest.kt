@@ -27,4 +27,17 @@ class GameSessionPolicyTest {
         assertEquals(GameMoney(500),authority.purchasePrice)
         assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),gameGachaAuthority(c.copy(vehicles=emptyList()),InputSource.VEHICLE,2,7))
     }
+
+    @Test fun onlyKnownLockedCandidatesGiveSpecificGachaFailure() {
+        val content = (GameContentLoader.load(File("src/main/assets/content/vehicle-facts.csv").readText(),
+            File("src/main/assets/content/game-content.csv").readText()) as ContentLoad.Loaded).snapshot
+        val locked = content.copy(vehicles = content.vehicles.map { it.copy(unlockShopLevel = 2) })
+        val unavailable = ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+        assertEquals(unavailable.copy(detail = ContractFailureDetail.GACHA_NO_UNLOCKED_CANDIDATES),
+            gameGachaAuthority(locked, InputSource.VEHICLE, 1, 3))
+        assertEquals(unavailable, gameGachaAuthority(locked, InputSource.VEHICLE, 0, 3))
+        assertEquals(unavailable, gameGachaAuthority(locked, InputSource.VEHICLE, 1, 0))
+        val missingCatalog = locked.copy(catalog = locked.catalog.copy(vehicles = emptyList()))
+        assertEquals(unavailable, gameGachaAuthority(missingCatalog, InputSource.VEHICLE, 1, 3))
+    }
 }

@@ -36,7 +36,13 @@ internal fun chooseGameSource(existing: Map<InputSource, ContractResult<InputSou
 internal fun gameGachaAuthority(content: GameContentSnapshot, source: InputSource, level: Int, capacity: Int): ContractResult<GachaAuthority> {
     if (level < 1 || capacity < 1) return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
     val ids = content.unlockedAt(level).map { it.vehicleId }.toSet()
-    if (ids.isEmpty() || ids.any { id -> content.catalog.vehicles.none { it.vehicleId == id } })
+    if (ids.isEmpty()) {
+        val validLockedCandidates = content.vehicles.isNotEmpty() &&
+            content.vehicles.all { candidate -> content.catalog.vehicles.any { it.vehicleId == candidate.vehicleId } }
+        val detail = if (validLockedCandidates) ContractFailureDetail.GACHA_NO_UNLOCKED_CANDIDATES else null
+        return ContractResult.Failure(ContractError.DATA_UNAVAILABLE, detail)
+    }
+    if (ids.any { id -> content.catalog.vehicles.none { it.vehicleId == id } })
         return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
     return ContractResult.Success(GachaAuthority(source, content.catalog.contentVersion, content.ruleVersion, level, capacity,
         GameMoney(500), content.gacha.pity, content.gacha.guaranteedFrom, ids,

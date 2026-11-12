@@ -83,9 +83,11 @@ enum class ContractError {
     STORAGE_FAILURE,
 }
 
+enum class ContractFailureDetail { GACHA_NO_UNLOCKED_CANDIDATES }
+
 sealed interface ContractResult<out T> {
     data class Success<T>(val value: T) : ContractResult<T>
-    data class Failure(val error: ContractError) : ContractResult<Nothing>
+    data class Failure(val error: ContractError, val detail: ContractFailureDetail? = null) : ContractResult<Nothing>
 }
 
 data class VehicleDefinition(val vehicleId: VehicleId, val displayName: String) {
