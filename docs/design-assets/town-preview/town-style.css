@@ -1,0 +1,21 @@
+.map-shell{min-width:0;align-self:start}
+.map-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:10px 12px;background:#202b3d;border:1px solid #354661;border-radius:15px;font-size:13px}
+.map-tools>span{font-weight:900;margin-right:auto;color:#dbeaff}
+.map-tools button{min-width:40px;min-height:40px;border-radius:9px;background:#354864;font-size:13px;padding:6px 10px}
+.map-tools button:hover{background:#44638d}.map-tools button:disabled{opacity:.35;cursor:default}
+.map-tools output{min-width:43px;text-align:center;font-variant-numeric:tabular-nums}
+#townViewport{background:#72a449;isolation:isolate;touch-action:pan-y;cursor:grab;border:1px solid #617f40;border-radius:16px}
+#townViewport.is-dragging{cursor:grabbing;touch-action:none}
+.town-world{position:absolute;inset:0;transform-origin:50% 50%}
+.map .town-background{image-rendering:auto;user-select:none;pointer-events:none}
+.town-actor{transform:translate(-50%,-100%);pointer-events:none;z-index:4;user-select:none}
+.town-car{pointer-events:none;user-select:none}
+.car-label,.lot-lock{position:absolute;transform:translateX(-50%);white-space:nowrap;pointer-events:none;font-size:clamp(6px,1.1cqw,13px);line-height:1.2;border-radius:3px;padding:2px 4px}
+.car-label{background:#fff8e8;color:#16263e;font-weight:800}
+.lot-lock{background:#29374e99;color:#f7faff}
+.map-help{font-size:12px;color:#aabdd2;margin:10px 4px;line-height:1.6}
+#townViewport>.hud{z-index:6;pointer-events:none;font-size:clamp(9px,1.45cqw,15px)}
+@media(max-width:640px){.map-tools{gap:5px;padding:8px}.map-tools>span{width:100%}.map-tools button{font-size:12px;padding:5px 8px}.map-help{font-size:11px}}
+.map .town-car{transform:translate(-50%,-50%) scaleX(-1);image-rendering:auto;filter:saturate(1.14) contrast(1.06)}
+.parked-hit{width:4.6%;height:7%;transform:translate(-50%,-50%)}
+.parked-ring{width:5.4%;height:2.4%;transform:translate(-50%,-50%) rotate(-29deg)}
