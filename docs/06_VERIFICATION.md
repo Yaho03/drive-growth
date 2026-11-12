@@ -1669,6 +1669,34 @@ Pleos Connect Emulator 2.1.0 / API 34 / ARM64의 새 격리 앱에서 `io.driveg
 [PRD의 시작 경험](01_PRD.md#시작-경험과-주요-기능)은 첫 차량·초기 재화 1,000·공간 3칸과 첫 영업 완료 뒤의 개업 선물 뽑기권 1장을 구분한다. 공간 확장과 간판은 이후 사용자가 선택하는 첫 성장 기능이다. #204의 시연 흐름과 [#55의 별도 가게 확장·꾸미기 검증](#55-가게-꾸미기확장-완료-원결과-조회-검증)에 각 근거를 연결한다.
 
 
+### #56 최초 지급 확정 직후 종료와 새 프로세스 복원 — 2026-11-12
+
+Pleos Connect Emulator 2.1.0/API 34 ARM64·사용자 10의 별도 Debug SIMULATION 앱에서 실제 Main·온보딩 호스트와 schema20 SQLite를 사용했다. 실행 기준은 `cf33333ae6ffbb95509bc0204f500ebeb213fa69`와 [최초 통과 계측 소스](../app/src/androidTest/java/io/drivegrowth/app/host/onboarding/OnboardingGrantColdRecoveryTest.kt)다. 격리 앱 `io.drivegrowth.verify.onboardingcold56`, 시험 앱 `io.drivegrowth.verify.onboardingcold56.test`, runner `android.test.InstrumentationTestRunner`를 빌드 및 설치 회수본에서 확인했다. 앱·시험 SHA-256은 각각 `48b8c39aadc92522c5d12c1309bfef7bfb3febf5d5977fb264e130ce010e295c`, `39379f220acdab4fa6bdb88a14a0edef2e9a6b564f90ee914151d1399a3f9b26`이다.
+
+| 시험 단계 | 실제 관측 |
+| --- | --- |
+| 최초 지급 확정 → UI 응답 전 종료 | 실제 확인 버튼의 동작을 호출하고 같은 serial worker 뒤에서 별도 DB 연결로 캐스퍼 지급 확정을 읽었다. Main의 지급 대기와 완료 버튼 부재를 단언했다. 호스트는 표식의 살아 있는 격리 PID 17810을 확인해 12:30:26 KST에 종료했다. 첫 selector의 프로세스 중단은 의도한 종료이며 JUnit 통과 건수에 포함하지 않는다. |
+| 같은 설치의 새 PID에서 화면 확인 → 가게 이동 | PID 18798에서 기존 지급 안내·캐스퍼·최초 잔액 1,000·공간 3칸을 계측 단언했다. 가게로 동작을 호출해 `ShopView` 진입을 확인했다. 두 번째 selector 1건 통과, 3.258초. 화면·이동은 View 단언으로 확인했다. |
+| 실제 원장 대조 | `initial-grant` 요청·프로필 마커, 같은 거래·원정산·개체, 계정·가게와 공용 슬롯 등 지정 7개 표의 행이 전후 동일했다. 초기 지급 요청·정산·차량은 각 1건, 공용 슬롯은 0건이었다. 전체 DB의 두 관측 주행 초기화 표에는 각각 1행이 추가됐다. |
+
+JDK 17·SDK 35에서 `./gradlew --offline --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process --init-script <격리설정> :app:assembleDebug :app:assembleDebugAndroidTest`를 실행했다. 이 계측은 전용 패키지의 새 설치에 `am instrument --user 10 -w -r -e class`로 `OnboardingGrantColdRecoveryTest#testHoldCommittedGrantBeforeUiReplyForHostStop`와 `#testNewProcessReadsOriginalGrantWithoutAnotherWrite`를 따로 호출한다. 첫 호출 중 커밋 표식의 살아 있는 PID를 확인한 뒤 시험 앱만 종료하고, 같은 DB를 유지해 두 번째 호출을 실행한다.
+
+최초 소프트웨어 PNG에는 전환 직전 내용이 담겨 시각 증거에서 제외했다. 창 캡처를 바꾼 두 후속 실행은 31.736초와 32.375초에 각각 추가 화면 단언 1건에서 실패했다. 702×438px 창에서 처음부터 하단 가게 버튼이 보여야 한다는 단언과, 스크롤 뒤 금액과 버튼이 동시에 보여야 한다는 단언이었다. 해당 PNG는 채택하지 않았다. 원래 완료 조건의 지급 후 복원은 최초 실행의 View 단언과 원장 대조에 근거한다. 좁은 창에서 항목별 스크롤·좌표 입력은 #51·#28에서 별도로 대조한다.
+
+초기 지급 전 제한은 [#205의 별도 계측](#56-첫-차량-확인-전과-지급-직후의-조작-제한--2026-11-11), 실제 SDK D 정차·P 복귀는 [#209의 실제 수신](#56-실제-sdk-d-정차와-첫-차량-단일-지급--2026-11-11), 첫 성장 확장은 [#222의 실제 Main·재실행](#기본-앱-창의-첫-공간-확장과-새-프로세스--2026-11-12), 간판 변경은 [#204의 별도 시연](#실제-ui와-새-os-프로세스-재실행)을 따른다. 이번 실행은 지급 확정 이후 응답 전 종료를 확인했다. 확정 전 프로세스 종료, 실제 SDK와 결합한 종료, 전원 복구·공식 폼팩터·실차는 이 시험에서 실행하지 않았다.
+
+
+### #44 보험 해금과 사고 정산의 SQLite 검증 — 2026-11-12
+
+같은 `cf33333ae6ffbb95509bc0204f500ebeb213fa69`의 [보험 계측](../app/src/androidTest/java/io/drivegrowth/app/host/facility/InsuranceContentLedgerTest.kt)을 별도 격리 SIMULATION SQLite에서 실행했다. `io.drivegrowth.app.insurance44` 및 `io.drivegrowth.app.insurance44.test`와 runner `android.test.InstrumentationTestRunner`를 확인했다. 빌드 APK와 설치 회수본의 SHA-256은 앱 `b17536aeaf2470136d95d0025d9ebd5d6abd74e5dc53fa972de89dcaf90f74a2`, 시험 `540f1196fd15c07c6b76f2230ccdeb7a999c4f6c0f781c0f12f889b56175bff5`로 일치했다. 위 Gradle 명령으로 별도 사본에서 조립한 뒤 `am instrument --user 10 -w -r -e class`로 `InsuranceContentLedgerTest#testCentralInsuranceUsesVisitThresholdAndChangesAccidentPayout` 한 건을 실행했다. **1건 통과, 2.141초**다.
+
+- 실제 APK의 중앙 시설 정의에서 보험 제안의 버전·시험값·가격 1,500을 읽었다. 고유 방문 99에서 구매 요청을 거절해 잔액·정산·공용 슬롯을 보존했다. 미배정 고유 방문 100에서 해금했고, 같은 100번째 방문 재시도에도 방문 수는 100·완료 대여 수는 1이었다. 구매를 한 번 확정해 1,500을 차감했다.
+- 같은 차종·희귀도·레벨, 고객·난수·시간의 두 사고 대여에서 실제 입금은 보험 전 60, 보험 후 90이었다. 사고·리뷰·단골·별도 시설 보너스 플래그는 같은 기대값을 확인했다. 같은 DB를 새 factory로 열어 두 대여 원영수증과 보험 구매의 같은 요청 재생, 추가 차감 0을 확인했다.
+- 이 결과는 보험의 직전·정확 해금, 단일 구매와 사고 효과의 부분 근거다. 초과 조건의 명시 검증, 주유소 효과, 운전자 평가 불변, 잘못된 시설 참조, 실제 Main 보험 조작과 새 OS 프로세스, 전체 #44·#28은 별도로 추적한다.
+
+#56과 #44의 설치·DB·앱 데이터는 서로 분리했다. 12:37:40 KST에 최종 제품·환경 보존 19/19와 격리 패키지·프로세스·계측 정리를 확인해 장치를 반환했다. 두 계측 파일의 원본과 빌드에 사용한 제품 입력을 게시 기준 `466f80c624da2e33c080ae9ccf28fe9751cb4d6d`에 대조했다. 게시 준비에서 Gradle·장치 실행을 다시 하지 않았다.
+
+
 ### 랭킹 모듈·Android JSON 오류 분리 수정 검증 — 2026-11-10
 
 b35c0bf의독립코드APPROVE와실제원본13중12PASS/1FAIL을별도보존한다. rewarded=1.5의Cursor.integer가던진Android checkedJSONException이RuntimeException catch를벗어나outerFailure가된P2다. 원58407d173ae4d5135404243db4b5c8d0d4a66d3e는명시import/catch만추가하고DB/숫자/정책/기존기대값을바꾸지않았다.

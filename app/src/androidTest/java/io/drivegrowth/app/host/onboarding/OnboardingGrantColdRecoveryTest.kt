@@ -1,0 +1,244 @@
+package io.drivegrowth.app.host.onboarding
+
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.os.Process
+import android.os.SystemClock
+import android.test.ActivityInstrumentationTestCase2
+import android.util.AtomicFile
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.Spinner
+import android.widget.TextView
+import io.drivegrowth.app.MainActivity
+import io.drivegrowth.app.R
+import io.drivegrowth.app.host.GameSessionFactory
+import io.drivegrowth.app.host.HostSession
+import io.drivegrowth.app.simulation.UnifiedSimulationActivity
+import io.drivegrowth.app.ui.shop.ShopView
+import io.drivegrowth.core.contract.ContractResult
+import io.drivegrowth.core.contract.GameMoney
+import io.drivegrowth.core.contract.InputSource
+import io.drivegrowth.core.contract.ProfileInitializationStatus
+import io.drivegrowth.core.contract.VehicleId
+import io.drivegrowth.core.garage.FirstGrant
+import org.json.JSONObject
+import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.TimeUnit
+
+/** 두 계측 사이에서 호스트가 자기 격리 앱의 PID를 종료한다. */
+@Suppress("DEPRECATION")
+class OnboardingGrantColdRecoveryTest :
+    ActivityInstrumentationTestCase2<UnifiedSimulationActivity>(UnifiedSimulationActivity::class.java) {
+    private val context get() = instrumentation.targetContext
+    private val choice = VehicleId("hyundai_casper")
+    private val readyFile get() = File(context.cacheDir, "first-grant-before-ui.json")
+    private val recoveredFile get() = File(context.cacheDir, "first-grant-recovered.json")
+
+    fun testHoldCommittedGrantBeforeUiReplyForHostStop() {
+        assertIsolated()
+        for (name in listOf("unified-simulation.db", "game-ledger-vehicle.db", "game-ledger-simulation.db")) {
+            assertFalse("새 격리 설치가 필요합니다: $name", context.getDatabasePath(name).exists())
+        }
+        assertFalse(context.getSharedPreferences("unified-simulation-v1", 0).contains("stage"))
+        assertFalse(readyFile.exists())
+        assertFalse(recoveredFile.exists())
+
+        val main = activity
+        click(main, R.string.onboarding_start)
+        click(main, choice)
+        click(main, R.string.onboarding_review)
+        awaitUi("최초 지급 확인") { button(main, R.string.onboarding_confirm) != null }
+        val session = MainActivity::class.java.getDeclaredField("session")
+            .apply { isAccessible = true }.get(main) as HostSession
+        val worker = HostSession::class.java.getDeclaredField("worker")
+            .apply { isAccessible = true }.get(session) as Executor
+
+        instrumentation.runOnMainSync {
+            val before = session.onboarding.uiState
+            assertEquals(OnboardingStep.CONFIRMING, before.step)
+            assertEquals(choice, before.selected)
+            assertEquals(InputSource.SIMULATION, before.identity?.source)
+            assertNull(before.pending)
+            assertTrue(checkNotNull(button(main, R.string.onboarding_confirm)).performClick())
+            assertEquals(choice, session.onboarding.uiState.pending)
+
+            // #205와 같은 serial worker 표식이다. Main의 큐는 이 블록 안에서 진행되지 않는다.
+            var proof: Result<JSONObject>? = null
+            val workerFinished = CountDownLatch(1)
+            worker.execute {
+                try {
+                    proof = runCatching { readOriginalGrant() }
+                } finally {
+                    workerFinished.countDown()
+                }
+            }
+            assertTrue("최초 지급 worker와 별도 연결의 원결과 조회", workerFinished.await(15, TimeUnit.SECONDS))
+            val grant = checkNotNull(proof).getOrThrow()
+            assertEquals(choice, session.onboarding.uiState.pending)
+            assertNull("완료 응답은 아직 UI에 전달되지 않아야 합니다", button(main, R.string.onboarding_to_shop))
+            assertTrue(context.getString(R.string.onboarding_submitting) in labels(main))
+            writeMarker(readyFile, JSONObject()
+                .put("phase", "committed_before_ui")
+                .put("pid", Process.myPid())
+                .put("pendingModel", choice.value)
+                .put("completionButtonVisible", false)
+                .put("grant", grant))
+
+            // 호스트가 표식을 읽고 살아 있는 이 PID를 종료할 때까지 큐를 막는다.
+            CountDownLatch(1).await(25, TimeUnit.SECONDS)
+            fail("호스트가 커밋 후 UI 응답 대기 구간의 프로세스를 종료하지 않았습니다")
+        }
+    }
+
+    fun testNewProcessReadsOriginalGrantWithoutAnotherWrite() {
+        assertIsolated()
+        assertFalse(recoveredFile.exists())
+        val before = JSONObject(AtomicFile(readyFile).readFully().decodeToString())
+        assertEquals("committed_before_ui", before.getString("phase"))
+        val previousPid = before.getInt("pid")
+        assertTrue("새 OS 프로세스가 필요합니다", previousPid != Process.myPid())
+        val original = before.getJSONObject("grant").toString()
+        assertEquals(original, readOriginalGrant().toString())
+
+        val main = activity
+        awaitUi("허용된 Main 탐색") {
+            menu(main)?.let { it.isShown && it.isEnabled } == true
+        }
+        instrumentation.runOnMainSync {
+            val menu = checkNotNull(menu(main))
+            menu.setSelection((0 until menu.count).single { menu.getItemAtPosition(it).toString() == "첫 차량 안내" })
+        }
+        awaitUi("저장된 최초 지급 완료 화면") { button(main, R.string.onboarding_to_shop) != null }
+        instrumentation.runOnMainSync {
+            val visible = labels(main)
+            assertTrue(context.getString(R.string.onboarding_already_granted) in visible)
+            assertTrue("캐스퍼" in visible)
+            assertTrue("최초 확정 게임머니 1000" in visible)
+            assertTrue("최초 차량 공간 3칸" in visible)
+            assertNull(button(main, R.string.onboarding_confirm))
+            captureContent(main, "first-grant-original-screen.png")
+        }
+        click(main, R.string.onboarding_to_shop)
+        awaitUi("원결과 확인 뒤 가게 화면") {
+            descendants(main.window.decorView).any { it is ShopView && it.isShown && it.width > 0 && it.height > 0 }
+        }
+        instrumentation.runOnMainSync { captureContent(main, "first-grant-shop-screen.png") }
+        val after = readOriginalGrant()
+        assertEquals(original, after.toString())
+        writeMarker(recoveredFile, JSONObject()
+            .put("phase", "original_shown_in_new_process")
+            .put("pid", Process.myPid())
+            .put("previousPid", previousPid)
+            .put("originalSummaryVisible", true)
+            .put("shopVisibleAfterAction", true)
+            .put("grant", after))
+    }
+
+    private fun captureContent(main: MainActivity, name: String) {
+        val content = main.findViewById<View>(android.R.id.content)
+        val bitmap = Bitmap.createBitmap(content.width, content.height, Bitmap.Config.ARGB_8888)
+        try {
+            content.draw(Canvas(bitmap))
+            File(context.cacheDir, name).outputStream().use { stream ->
+                assertTrue("현재 앱 화면의 PNG 저장", bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream))
+            }
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    private fun assertIsolated() {
+        assertEquals("io.drivegrowth.verify.onboardingcold56", context.packageName)
+    }
+
+    private fun readOriginalGrant(): JSONObject {
+        assertTrue(context.getDatabasePath("unified-simulation.db").isFile)
+        val factory = GameSessionFactory(context,
+            mapOf(InputSource.SIMULATION to "unified-simulation.db"), InputSource.SIMULATION)
+        return ok(factory.open()).use { game ->
+            val store = game.store
+            val identity = game.identity
+            val state = ok(store.readInitialization(identity.profileId))
+            val original = checkNotNull((state.status as? ProfileInitializationStatus.Existing)?.original)
+            val car = checkNotNull(original.grant.changedVehicle)
+            val shop = ok(store.rental.shop())
+            assertEquals(InputSource.SIMULATION, identity.source)
+            assertEquals(identity.profileId, original.marker.profileId)
+            assertEquals(FirstGrant.REQUEST_ID, original.marker.requestId)
+            assertEquals(FirstGrant.REQUEST_ID, original.command.grant.requestId)
+            assertEquals(FirstGrant.REQUEST_ID, original.grant.transaction.requestId)
+            assertEquals(choice, car.vehicleId)
+            assertEquals(listOf(car), ok(store.listOwnedVehicles()))
+            assertEquals(listOf(original.grant), ok(store.listUnviewedSettlements()))
+            assertEquals(FirstGrant.INITIAL_MONEY, original.grant.balance)
+            assertEquals(FirstGrant.INITIAL_MONEY, state.balance)
+            assertEquals(1, state.ownedVehicleCount)
+            assertEquals(FirstGrant.INITIAL_GARAGE_CAPACITY, original.garageCapacity)
+            assertEquals(original.garageCapacity, shop.capacity)
+            assertEquals(1, shop.progress.shopLevel)
+            assertNull("초기 지급은 공용 checkpoint 슬롯을 사용하지 않습니다", ok(store.hostCommands.load(identity.profileId)))
+            JSONObject()
+                .put("profileId", identity.profileId.value)
+                .put("source", identity.source.name)
+                .put("requestId", original.command.grant.requestId.value)
+                .put("settlementId", original.grant.settlementId.value)
+                .put("transactionId", original.grant.transaction.transactionId.value)
+                .put("confirmedAt", original.grant.confirmedAt.value)
+                .put("ownedVehicleId", car.ownedVehicleId.value)
+                .put("vehicleId", car.vehicleId.value)
+                .put("balance", state.balance.units)
+                .put("capacity", shop.capacity)
+        }
+    }
+
+    private fun writeMarker(file: File, value: JSONObject) {
+        val target = AtomicFile(file)
+        val stream = target.startWrite()
+        try {
+            stream.write(value.toString().encodeToByteArray())
+            target.finishWrite(stream)
+        } catch (error: Exception) {
+            target.failWrite(stream)
+            throw error
+        }
+    }
+
+    private fun menu(main: MainActivity): Spinner? = main.window.decorView.findViewWithTag("host:destination")
+    private fun button(main: MainActivity, tag: Any): Button? =
+        main.window.decorView.findViewWithTag<Button>(tag)?.takeIf { it.isShown && it.isEnabled }
+
+    private fun labels(main: MainActivity): Set<String> =
+        descendants(main.window.decorView).filterIsInstance<TextView>().filter { it.isShown }
+            .map { it.text.toString() }.toSet()
+
+    private fun descendants(view: View): Sequence<View> = sequence {
+        yield(view)
+        if (view is ViewGroup) {
+            for (index in 0 until view.childCount) yieldAll(descendants(view.getChildAt(index)))
+        }
+    }
+
+    private fun awaitUi(label: String, predicate: () -> Boolean) {
+        val deadline = SystemClock.uptimeMillis() + 30_000
+        var shown = false
+        while (!shown && SystemClock.uptimeMillis() < deadline) {
+            instrumentation.runOnMainSync { shown = predicate() }
+            if (!shown) SystemClock.sleep(40)
+        }
+        assertTrue("화면 대기: $label", shown)
+    }
+
+    private fun click(main: MainActivity, tag: Any) {
+        awaitUi("활성 버튼 $tag") { button(main, tag) != null }
+        instrumentation.runOnMainSync { assertTrue(checkNotNull(button(main, tag)).performClick()) }
+    }
+
+    private fun <T> ok(result: ContractResult<T>): T {
+        assertTrue(result.toString(), result is ContractResult.Success)
+        return (result as ContractResult.Success).value
+    }
+}
