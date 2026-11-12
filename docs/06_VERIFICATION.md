@@ -2785,6 +2785,22 @@ JDK 17·SDK 35로 해당 후보의 core 447개와 앱 단위 815개를 확인했
 
 게시 기준은 #254·#255가 들어간 `60d54fe8759bb9d8379fd81dcc0c44de1477d682`다. 게시 코드 커밋 `6b5aff00fd0254c6c050952bf676eb1fa1bd5ab2`의 변경 소스·시험 7개 파일이 실행 트리와 일치한다. 이 문서 후속은 앱·core를 바꾸지 않는다. 최신 main과 결합한 전체 APK의 재실행, 공식 폼팩터 전체, 전원·실차, 최종 디자인 적용 뒤 검증은 별도 범위다.
 
+## #229 Native HOME 마을 · 첫 확장과 차고 진입 — 2026-11-13
+
+실행 기준은 main `6945c000540105f5db74d3e98aced1d9b235dc5c`, HOME 표시 소스 `ba789444391b3bee31b6426fd6daab678e75c429`, 공용 탐색·HOME 표시 공급과 계측 준비를 합친 실행 트리 `7258c41436354a7e738f8a43979e8c525170d537`다. 공용 호스트 검증 패치 SHA-256은 `ac9c2f16486f6b154a7275fd3838da78a00916e246b62f78dfc74a2ace2dc50e`다. #229 원본에서 복사한 앱 PNG 21개는 바이트가 같다.
+
+JDK 17·SDK 35에서 오프라인 `:app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:testDebugUnitTest`가 통과했다. 앱 단위 828개가 실패·오류·생략 0건으로 통과했고 lint는 오류 0건·경고 45건이다. Pleos API 34 ARM64·사용자 10의 격리 앱 `io.drivegrowth.verify.nativehome229`에서 앱 창 702×438px, 표시 1080×600px·120dpi를 사용했다. 설치 회수 SHA-256은 앱 `065db878d416a6dcc47c4173e20f9d034fa6f299a03146be00917533eef2bb30`, 계측 `5eaddf016bae5ace68a261236b45010c7bc9103bab13fa83da3a12d870261955`이며 각각 빌드와 일치했다.
+
+| 장치 확인 | 관측 |
+|---|---|
+| `ShopViewTest` 13개 | 좁은/넓은 창, 오래된 지도 탭 무효화, 접근 제한, 미확인 구획, 조회 중·오류에서 시설 결과 확인 컨트롤 도달을 확인했다. 상태는 위젯 fixture다. |
+| `GarageGrowthMainActivityTest` 첫 확장과 냉시작 | SIMULATION 준비 입력 뒤 실제 지도 영역에 시스템 DOWN·UP을 보내 캐스퍼 `initial-grant` 상세를 열고 Back으로 복귀했다. 미리보기 전후 원장이 같았고, 확정 뒤 Lv1·1/3 → Lv2·1/5, 잔액 1,360→860, 원정산 1건을 확인했다. 새 PID에서 동일 확장 상태를 읽었으며 추가 차감은 없었다. |
+| `FacilityHomeActivityTest#testActualHomeRestingRequestSurvivesRecreationAndChangesNoMoneyOrVehicle` | 별도 실행의 실제 SDK 주차 허용에서 영업 쉬기 원결과와 요청이 Activity 재생성 뒤 유지됐고, 확인 뒤 다시 조회했다. 켜기·끄기 두 결과가 남고 잔액·차량은 동일했다. |
+
+첫 캡처에서는 짧은 창의 지도와 확정 상세가 잘리거나 조회 중이었다. 지도 우선 배치, 시설 컨트롤의 HOME 스크롤 통합과 캡처 조건을 보완한 뒤 앱 화면과 Native 지도 전체를 다시 캡처했다. 시설 가림을 반투명 음영과 잠김 표지로 변경해 #229의 시설 위치와 사선 구도를 보존했다. 지도 자체에 확정 Lv1·1/3 및 Lv2·1/5가 표시됐다. 기본 창의 지도 탭은 약 19×20px이므로 같은 개체를 여는 큰 Native 목록 버튼도 제공한다. 별도 시설 회귀의 첫 시도는 변경할 수 없는 CAR_POWERTRAIN 권한을 부여하려다 selector 시작 전에 멈췄다. 같은 APK로 CAR_SPEED만 격리 앱에 부여한 재시도에서 1개가 통과했다.
+
+04:22:03 KST에 격리 앱을 제거하고 보호 항목 19/19와 남은 계측·Gradle 프로세스 부재를 확인해 장치를 반환했다. 게시한 HOME 범위와 실제 실행을 대조했으며 공용 MainActivity와 표시 공급 패치는 별도 소유 범위다. 최종 앱 외곽과 다른 페이지를 결합한 #28, 모든 폼 팩터·실차, 신규 레이어와 배포 권리 확인은 별도다.
+
 ## 실제 Main 가챠·판매 후 도감 이력 복원 — 2026-11-11
 
 #52·#46의 실제 표시/저장 연결을 Pleos API34 ARM64·user10에서 확인했다. 시험 대상 앱 소스는 `dce75aea611904d2f94d754e4cbeb080c38e9848`이며 #204 최종 head `00e4142b6aefcc61dc464e5e1aa66de1507c699c`와 앱·코어는 같다(차이는 문서 3개). 격리 패키지 `io.drivegrowth.app.onboarding56gate`의 실제 MainActivity와 새 DB를 사용했고 설치 후 회수 APK SHA-256은 `f0d804bc755c1781bfc22eb04741c4513a3133eb0f19255c83b19a43df6b6603`으로 준비본과 일치했다. 실제 에뮬레이터 SDK의 `gear=PARK ux=false`를 세 OS 프로세스에서 수신했고 프로필 출처는 VEHICLE이다. 모의 시연 입력이나 가짜 잔액/추첨 결과를 넣지 않았다.
