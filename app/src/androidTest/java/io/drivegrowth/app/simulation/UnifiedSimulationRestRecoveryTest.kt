@@ -5,6 +5,9 @@ import android.os.SystemClock
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.widget.Button
+import android.widget.TextView
+import io.drivegrowth.app.MainActivity
+import io.drivegrowth.app.host.HostSession
 import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
 import io.drivegrowth.app.host.driving.DrivingFrame
@@ -92,6 +95,42 @@ class UnifiedSimulationRestRecoveryTest : InstrumentationTestCase() {
         assertEquals(ledgerBefore, ledger.takeIf { it.exists() }?.readBytes()?.toList())
     }
 
+    fun testCollapsedMainShowsRecoverableInputFailureAndRetriesTheSameFrame() {
+        assertTrue(context.packageName.startsWith("io.drivegrowth.verify."))
+        assertFalse(context.getDatabasePath("unified-simulation.db").exists())
+        assertTrue(context.getSharedPreferences("unified-simulation-v1", 0).all.isEmpty())
+        val activity = instrumentation.startActivitySync(Intent(context, UnifiedSimulationActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as UnifiedSimulationActivity
+        try {
+            instrumentation.waitForIdleSync()
+            onUi {
+                val field = MainActivity::class.java.getDeclaredField("session").apply { isAccessible = true }
+                val simulation = (field.get(activity) as HostSession).simulation as UnifiedSimulation
+                val frames = mutableListOf<DrivingFrame>()
+                // Save failure is supplied at the existing input callback. Main still renders real simulator state.
+                simulation.attach { frame, done ->
+                    frames += frame
+                    simulation.observed(frame, ContractResult.Failure(ContractError.STORAGE_FAILURE))
+                    done()
+                }
+                val root = activity.window.decorView
+                assertFalse(root.findViewWithTag<Button>("simulation:controls").isSelected)
+                assertFalse(root.findViewWithTag<TextView>("simulation:status").isShown)
+                assertEquals("모의 입력이 중단됐어요. 같은 입력을 다시 시도해 주세요.",
+                    root.findViewWithTag<TextView>("simulation:blocked").text.toString())
+                assertNull(root.findViewWithTag<View>("host:destination"))
+                val retry = root.findViewWithTag<Button>("simulation:retry")
+                assertTrue(retry.isShown && retry.isEnabled)
+                assertTrue(retry.performClick())
+                assertEquals(2, frames.size)
+                assertEquals(frames.first(), frames.last())
+                assertFalse(root.findViewWithTag<Button>("simulation:controls").isSelected)
+            }
+        } finally {
+            onUi { activity.finish() }
+        }
+    }
+
     fun testCorruptRestClockAllowsActualMainBackgroundAndFinishWithoutWrites() {
         assertTrue(context.packageName.startsWith("io.drivegrowth.verify."))
         val ledger = context.getDatabasePath("unified-simulation.db")
@@ -114,7 +153,11 @@ class UnifiedSimulationRestRecoveryTest : InstrumentationTestCase() {
             instrumentation.waitForIdleSync()
             onUi {
                 assertFalse(activity.isFinishing)
-                val start = activity.window.decorView.findViewWithTag<Button>("simulation:rest-start")
+                val root = activity.window.decorView
+                assertEquals("모의 입력을 확인할 수 없어요. 기존 저장 기록은 그대로예요.",
+                    root.findViewWithTag<TextView>("simulation:blocked").text.toString())
+                assertFalse(root.findViewWithTag<Button>("simulation:retry").isShown)
+                val start = root.findViewWithTag<Button>("simulation:rest-start")
                 assertTrue(start == null || start.visibility != View.VISIBLE || !start.isEnabled)
                 activity.moveTaskToBack(true)
             }

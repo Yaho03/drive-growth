@@ -43,6 +43,7 @@ import io.drivegrowth.app.ui.ranking.RankingView
 import io.drivegrowth.app.ui.ranking.RankingMode
 import io.drivegrowth.app.ui.ranking.RankingUiState
 import io.drivegrowth.app.host.HostSession
+import io.drivegrowth.app.host.SimulationInputState
 import io.drivegrowth.app.host.ResultsHostMapper
 import io.drivegrowth.app.host.ResultsStateBundle
 import io.drivegrowth.app.ui.results.ResultsEvent
@@ -547,9 +548,13 @@ open class MainActivity : Activity() {
             }
         }.apply { tag = "simulation:start"; content.addView(this) }
         addSimulationActions(content)
-        simulationRetry = style.button("같은 모의 입력 다시 시도") {
+        val retry = style.button("같은 모의 입력 다시 시도") {
             if (simulation.canRetry) simulation.retry()
-        }.apply { tag = "simulation:retry"; content.addView(this) }
+        }.apply {
+            tag = "simulation:retry"
+            visibility = View.GONE
+        }
+        simulationRetry = retry
         val details = ScrollView(this).apply {
             addView(content)
             visibility = View.GONE
@@ -568,6 +573,7 @@ open class MainActivity : Activity() {
         simulationToggle = toggle
         return style.column().apply {
             addView(toggle, LinearLayout.LayoutParams(-1, -2))
+            addView(retry, LinearLayout.LayoutParams(-1, -2))
             addView(details, LinearLayout.LayoutParams(-1, style.dp(144)))
         }
     }
@@ -656,7 +662,15 @@ open class MainActivity : Activity() {
         renderSimulationControls(enabled)
         if (!enabled) {
             panel.removeView(navigationBar)
-            showBody(style.text(if (session.simulation == null) "주차 후 조작이 허용되면 이용할 수 있습니다." else "명시 모의주행 중입니다. 완료 후 모의 주차 화면에서 결과를 확인하세요."))
+            val simulation = session.simulation
+            val message = when (simulation?.inputState) {
+                null -> "주차 후 조작이 허용되면 이용할 수 있습니다."
+                SimulationInputState.PROCESSING -> "모의 입력을 처리하고 있어요. 잠시 기다려 주세요."
+                SimulationInputState.RETRYABLE_FAILURE -> "모의 입력이 중단됐어요. 같은 입력을 다시 시도해 주세요."
+                SimulationInputState.UNAVAILABLE -> "모의 입력을 확인할 수 없어요. 기존 저장 기록은 그대로예요."
+                SimulationInputState.READY -> "지금은 시연을 조작할 수 없어요. 시연 상태를 확인해 주세요."
+            }
+            showBody(style.text(message).apply { if (simulation != null) tag = "simulation:blocked" })
             return
         }
         if (navigationBar.parent == null) panel.addView(navigationBar, LinearLayout.LayoutParams(-1, -2))
