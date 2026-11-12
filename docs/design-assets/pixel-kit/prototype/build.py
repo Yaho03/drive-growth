@@ -1,8 +1,16 @@
 """template.html에 지도·본관·차 그림(data URI)과 좌표를 넣어 prototype.html을 만든다."""
-import base64, csv, json
+import base64, csv, io, json
 from pathlib import Path
 HERE = Path(__file__).parent; KIT = HERE.parent
-def uri(p): return "data:image/png;base64," + base64.b64encode((KIT / p).read_bytes()).decode()
+SHADOW = {(52, 110, 72, 255), (78, 146, 72, 255), (40, 78, 64, 255)}  # 그림자 + 잔디 가장자리
+def uri(p):
+    data = (KIT / p).read_bytes()
+    if "/car_" in p:  # 2차 시안에서 잘라낸 차 밑 바닥 그림자(진초록)를 지운다
+        from PIL import Image
+        im = Image.open(io.BytesIO(data)).convert("RGBA")
+        im.putdata([(0, 0, 0, 0) if px in SHADOW else px for px in im.getdata()])
+        buf = io.BytesIO(); im.save(buf, "PNG"); data = buf.getvalue()
+    return "data:image/png;base64," + base64.b64encode(data).decode()
 imgs = {"ground": "map/ground.png", "cover_lv1": "map/cover_lv1.png", "cover_lv2": "map/cover_lv2.png", "cover_lv3": "map/cover_lv3.png",
         "main_lv1": "building/main_lv1.png", "main_lv2": "building/main_lv2.png", "person_staff": "ref-sprites/person_staff_se_ref.png",
         **{f"car_{n}": f"ref-sprites/car_{n}_se_ref.png" for n in ("light", "sedan", "suv", "van", "luxury")}}
