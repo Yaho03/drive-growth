@@ -73,8 +73,12 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         if (!interaction.controlsEnabled) { addView(text(s(R.string.shop_restricted), 28)); return@with }
         when (val state = interaction.state) {
             ShopScreenState.Loading -> {
-                addView(text(s(R.string.shop_title), 32, bold = true))
-                addView(text(s(R.string.shop_loading)))
+                val content = column().apply {
+                    addView(text(s(R.string.shop_title), 32, bold = true))
+                    addView(text(s(R.string.shop_loading)))
+                    addFacilityPanel(this)
+                }
+                addView(scroll(content, controlsY), LayoutParams(-1, 0, 1f))
             }
             is ShopScreenState.Empty -> problem(s(R.string.shop_empty), state.message, true)
             is ShopScreenState.Failure -> problem(s(R.string.shop_failure), state.message, true)
@@ -101,6 +105,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         val content = column().apply {
             addView(text(s(R.string.shop_title), 32, bold = true))
             addView(text(title, 28, bold = true)); addView(text(body))
+            addFacilityPanel(this)
             if (retry) add(this, button(s(if (uiState.retryPending) R.string.shop_retry_pending else R.string.shop_retry), !uiState.retryPending) {
                 interaction.retry(); drawScreen()
             }.apply { tag = "shop:retry" })
@@ -209,15 +214,19 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                 if (supplied == null) add(this, card().apply { addView(text(title, 24, bold = true)); addView(text(s(R.string.shop_unknown))) })
                 else add(this, option(c, supplied.option, title))
             }
-            facilityPanel?.let { panel ->
-                (panel.parent as? ViewGroup)?.removeView(panel)
-                add(this, panel)
-            }
+            addFacilityPanel(this)
             add(this, text(s(R.string.shop_decorations), 28, bold = true))
             if (c.decorations.isEmpty()) add(this, text(s(R.string.shop_no_decorations)))
             c.decorations.forEach { add(this, option(c, it)) }
         }
     }
+    private fun addFacilityPanel(parent: LinearLayout) = with(style) {
+        facilityPanel?.let { panel ->
+            (panel.parent as? ViewGroup)?.removeView(panel)
+            add(parent, panel)
+        }
+    }
+
     private fun option(c: ShopScreenState.Content, option: ShopOption, title: String = option.title) = with(style) {
         card().apply {
             addView(text(title, 26, bold = true))
