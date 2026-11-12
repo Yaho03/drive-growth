@@ -6,6 +6,7 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.text.TextUtils
 import android.view.Gravity
+import android.view.View
 import android.view.View.MeasureSpec
 import android.widget.Button
 import android.widget.HorizontalScrollView
@@ -24,16 +25,19 @@ internal class MainNavigationBar(
     var selectedPage: HostPage? = null
         private set
     private var revealSelection = false
+    private var pageWidthSpec: Int? = null
     private val buttons = destinations.associate { (page, label) ->
         page to control(context, label) { select(page) }.apply { tag = "host:page:${page.name}" }
     }
     private val pages = object : HorizontalScrollView(context) {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-            val viewportWidth = (MeasureSpec.getSize(widthMeasureSpec) - paddingLeft - paddingRight).coerceAtLeast(0)
-            if (MeasureSpec.getMode(widthMeasureSpec) != MeasureSpec.UNSPECIFIED) {
-                buttons.values.forEach { button ->
-                    if (button.maxWidth != viewportWidth) button.maxWidth = viewportWidth
-                }
+            val buttonSpec = if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED) null else {
+                val viewportWidth = (MeasureSpec.getSize(widthMeasureSpec) - paddingLeft - paddingRight).coerceAtLeast(0)
+                MeasureSpec.makeMeasureSpec(viewportWidth, MeasureSpec.AT_MOST)
+            }
+            if (pageWidthSpec != buttonSpec) {
+                pageWidthSpec = buttonSpec
+                getChildAt(0).forceLayout()
             }
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         }
@@ -56,7 +60,15 @@ internal class MainNavigationBar(
         tag = "host:pages"
         isFillViewport = true
         isHorizontalScrollBarEnabled = false
-        addView(LinearLayout(context).apply {
+        addView(object : LinearLayout(context) {
+            override fun measureChildWithMargins(child: View, parentWidthMeasureSpec: Int, widthUsed: Int,
+                parentHeightMeasureSpec: Int, heightUsed: Int) {
+                // 목록은 가로로 스크롤하되 버튼 하나는 현재 보이는 폭 안에 들어가게 한다.
+                val buttonSpec = pageWidthSpec?.takeIf { MeasureSpec.getMode(parentWidthMeasureSpec) == MeasureSpec.UNSPECIFIED }
+                super.measureChildWithMargins(child, buttonSpec ?: parentWidthMeasureSpec,
+                    if (buttonSpec == null) widthUsed else 0, parentHeightMeasureSpec, heightUsed)
+            }
+        }.apply {
             gravity = Gravity.CENTER_VERTICAL
             buttons.values.forEach { button ->
                 addView(button, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {

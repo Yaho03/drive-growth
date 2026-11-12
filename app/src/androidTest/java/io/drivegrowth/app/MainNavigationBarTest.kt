@@ -16,10 +16,10 @@ class MainNavigationBarTest : InstrumentationTestCase() {
     fun testLongLastLabelFitsWithinNarrowViewport() {
         val destinations = HostPage.entries.filterNot { it == HostPage.ONBOARDING }.map { it to it.name } +
             (HostPage.ONBOARDING to "첫 차량 안내 및 렌터카 영업 시작 준비와 운영 방법")
-        verifyNarrowBar(destinations)
+        verifyNarrowBar(destinations, oversizedMinimum = true)
     }
 
-    private fun verifyNarrowBar(destinations: List<Pair<HostPage, String>>) {
+    private fun verifyNarrowBar(destinations: List<Pair<HostPage, String>>, oversizedMinimum: Boolean = false) {
         val task = FutureTask {
             val context = instrumentation.targetContext
             val density = context.resources.displayMetrics.density
@@ -27,10 +27,13 @@ class MainNavigationBarTest : InstrumentationTestCase() {
             val height = (72 * density).toInt()
             val actions = mutableListOf<HostPage>()
             val bar = MainNavigationBar(context, destinations, actions::add, {}, {})
-            fun layout() {
-                bar.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            if (oversizedMinimum) {
+                checkNotNull(bar.mainPage(HostPage.ONBOARDING)).minimumWidth = width
+            }
+            fun layout(widthPx: Int = width) {
+                bar.measure(View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY),
                     View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
-                bar.layout(0, 0, width, height)
+                bar.layout(0, 0, widthPx, height)
             }
             bar.showSelected(HostPage.ONBOARDING)
             layout()
@@ -69,6 +72,15 @@ class MainNavigationBarTest : InstrumentationTestCase() {
             assertFullyVisible(HostPage.HOME)
             assertTrue(checkNotNull(bar.mainPage(HostPage.HOME)).performClick())
             assertEquals(listOf(HostPage.HOME), actions)
+            if (oversizedMinimum) {
+                val narrowViewport = scroll.width
+                bar.showSelected(HostPage.ONBOARDING)
+                layout((600 * density).toInt())
+                assertTrue(checkNotNull(bar.mainPage(HostPage.ONBOARDING)).width > narrowViewport)
+                assertFullyVisible(HostPage.ONBOARDING)
+                layout()
+                assertFullyVisible(HostPage.ONBOARDING)
+            }
         }
         instrumentation.runOnMainSync(task)
         task.get()

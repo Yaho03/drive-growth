@@ -791,6 +791,7 @@ open class MainActivity : Activity() {
             val destination = raw?.destination as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
             val distance = raw?.remainingEstimatedMeters as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
             details.addView(style.text("내비에서 목적지를 먼저 설정한 뒤 여기서 조회하고 확인해 주세요."))
+            details.addView(style.text("현재 경로의 도착이 확인될 때까지 보상은 대기해요."))
             details.addView(style.button("내비 목적지 다시 조회") { session.deliveryNavigation.refresh() })
             if (destination != null && distance != null && destination.stamp == distance.stamp) {
                 details.addView(style.text("내비 목적지: ${destination.value.name ?: "이름 없음"} · ${destination.value.address ?: "주소 없음"}"))
