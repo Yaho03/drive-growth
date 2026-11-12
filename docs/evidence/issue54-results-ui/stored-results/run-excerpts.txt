@@ -1,0 +1,26 @@
+11-12 08:27:52.645 16022 16022 I DriveGrowthVehicle: observation_start firstInProcess=true displayId=0
+11-12 08:27:52.659 16022 16022 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-12 08:27:53.671 16022 16022 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false
+11-12 08:27:58.804 16022 16090 I Results54OriginalF: pid=16022 STORED_DETAIL kind=DRIVING id=1ce6b7d7-8e22-4328-a4e0-16889e51c9ef money=+360 게임머니
+11-12 08:27:58.902 16022 16090 I Results54OriginalF: pid=16022 STORED_DETAIL kind=DELIVERY id=588ff9cb-2f33-4da5-9d82-e8025f2a3cc8 money=+120 게임머니
+11-12 08:27:58.994 16022 16090 I Results54OriginalF: pid=16022 STORED_DETAIL kind=FACILITY id=19cbbfa7-cf49-4733-8b54-6d8bd4ce8ec5 money=−500 게임머니
+11-12 08:27:59.132 16022 16090 I Results54OriginalF: pid=16022 STORED_DETAIL kind=RENTAL id=5136a909-8be2-4757-bf42-041170ea00ca money=+173 게임머니
+11-12 08:27:59.132 16022 16090 I Results54OriginalF: pid=16022 REQUEST_DRIVE_STATIONARY rental=5136a909-8be2-4757-bf42-041170ea00ca
+11-12 08:28:00.069 16022 16022 I DriveGrowthVehicle: signal_state speed=OK gear=DRIVE ux=true
+11-12 08:28:00.099 16022 16090 I Results54OriginalF: pid=16022 RESTRICTED_BEFORE_RECREATE
+11-12 08:28:00.162 16022 16022 I DriveGrowthVehicle: observation_start firstInProcess=false displayId=0
+11-12 08:28:00.175 16022 16090 I Results54OriginalF: pid=16022 REQUEST_PARK_AFTER_RECREATE
+11-12 08:28:00.182 16022 16022 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-12 08:28:01.176 16022 16022 I DriveGrowthVehicle: signal_state speed=OK gear=DRIVE ux=true
+11-12 08:28:02.183 16022 16022 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false
+11-12 08:28:05.827 16022 16090 I Results54OriginalF: pid=16022 STORED_DETAIL kind=RENTAL id=5136a909-8be2-4757-bf42-041170ea00ca money=+173 게임머니
+11-12 08:28:05.846 16022 16090 I Results54OriginalF: pid=16022 RESTORED_SAME_RENTAL_NO_FINANCIAL_WRITE
+
+First Main attempt: host orchestration RuntimeError before new same-PID D was delivered after recreation.
+The operator force-stop produced runner shortMsg=Process crashed; Android crash buffer was empty.
+Same APK retry waited for the new Activity observation before requesting P and passed 1/1.
+Before/after-commit runner shortMsg=Process crashed followed the recorded intentional force-stop in both tests.
+First after-commit reopen UI automation: failed to scroll back to the filter controls.
+Second after-commit reopen UI automation: asserted the read button would be absent; the UI keeps it disabled.
+Saved UI hierarchy directly shows the original ID, saved-read label, and enabled=false; automated assertion stays failed.
+Initial Gradle lint analysis: Temurin 17 ARM64 C1 OSR assembler guarantee failure. Lint retry: 0 errors, 39 warnings.
