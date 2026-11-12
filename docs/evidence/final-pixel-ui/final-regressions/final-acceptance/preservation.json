@@ -1,0 +1,27 @@
+{
+  "checks": {
+    "boot": true,
+    "abi": true,
+    "sdk": true,
+    "user": true,
+    "boot_count": true,
+    "size": true,
+    "density": true,
+    "night": true,
+    "font": true,
+    "overlay": true,
+    "forward": true,
+    "permissions": true,
+    "foreground": true,
+    "car_state": true,
+    "product_data6": true,
+    "product_apk_sha256": true,
+    "no_active_instrumentation": true,
+    "own_packages_absent": true,
+    "no_own_processes": true
+  },
+  "passed": 19,
+  "total": 19,
+  "bootCompleted": true,
+  "diagnosticInstallStatePreserved": true
+}
