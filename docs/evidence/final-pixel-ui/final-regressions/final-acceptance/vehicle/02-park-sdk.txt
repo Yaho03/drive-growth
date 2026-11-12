@@ -1,0 +1,6 @@
+--------- beginning of main
+11-12 15:10:45.093  7400  7400 I DriveGrowthVehicle: observation_start firstInProcess=true displayId=0
+11-12 15:10:45.116  7400  7400 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-12 15:10:45.322  7400  7400 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE
+11-12 15:10:46.135  7400  7400 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false
+11-12 15:10:46.148  7400  7400 W DriveGrowthDriving: recording_failure code=DATA_UNAVAILABLE

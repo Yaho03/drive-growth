@@ -1,0 +1,11 @@
+--------- beginning of main
+11-12 15:13:30.555 31203 31301 I FinalSingleLedger: BEFORE_STOP profile=local-0bdffdc8-1bf9-4bc9-b38b-33013dd03058 pid=31203 driving=71a115ee-5fc1-4175-9769-f09ef4462533 delivery=17d0a139-4c85-4a6a-9237-867fe2e56e1a balance=1610
+11-12 15:13:35.960 11228 11310 I FinalSingleLedger: AFTER_STOP profile=local-0bdffdc8-1bf9-4bc9-b38b-33013dd03058 pid=11228 original=17d0a139-4c85-4a6a-9237-867fe2e56e1a request=delivery-choice-0f466306-8f27-4a86-afc4-9fae74448f58 balance=1610
+11-12 15:13:38.127 11228 11310 I FinalSingleLedger: FREE profile=local-0bdffdc8-1bf9-4bc9-b38b-33013dd03058 request=0e120e8a-2615-4b90-9f96-09761b27b2c0 balance=1610 owned=2
+11-12 15:14:20.339 11228 11310 I FinalSingleLedger: DELIVERED profile=local-0bdffdc8-1bf9-4bc9-b38b-33013dd03058 request=delivery-choice-e8c3955f-dea0-4189-8e4d-d59217c15b1f price=1200 owned=3
+11-12 15:14:24.902 11228 11310 I FinalSingleLedger: EXPAND profile=local-0bdffdc8-1bf9-4bc9-b38b-33013dd03058 HOME debit=500 capacity=5
+11-12 15:14:28.686 11228 11310 I FinalSingleLedger: FACILITY profile=local-0bdffdc8-1bf9-4bc9-b38b-33013dd03058 request=72c91943-5638-4a55-8d1d-e29af163702d debit=500
+11-12 15:15:36.579 11228 11310 I FinalSingleLedger: RENTAL profile=local-0bdffdc8-1bf9-4bc9-b38b-33013dd03058 request=rental/settle/rental-visit-22a57c1b-57f9-4930-82d1-1c0650049bf6 settlement=60aa454e-4683-4098-be4b-2405e4ea38d8 bonus=10
+11-12 15:16:56.981 11228 11310 I FinalSingleLedger: REST profile=local-0bdffdc8-1bf9-4bc9-b38b-33013dd03058 confirmed drives=2 active
+11-12 15:16:58.034 11228 11310 I FinalSingleLedger: QUEST profile=local-0bdffdc8-1bf9-4bc9-b38b-33013dd03058 request=quest/claim/e9877dd5-7575-4524-8f74-aac0693df31f credit=100 balance=12042
+11-12 15:17:13.048 24103 24160 I FinalSingleLedger: REOPEN_AFTER_QUEST profile=local-0bdffdc8-1bf9-4bc9-b38b-33013dd03058 priorPid=11228 pid=24103 balance=12042 remainingMs=1100000 originalSettlements=27 duplicateCredit=0

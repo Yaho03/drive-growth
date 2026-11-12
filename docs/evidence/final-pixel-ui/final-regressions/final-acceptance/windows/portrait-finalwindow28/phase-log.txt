@@ -1,0 +1,5 @@
+--------- beginning of main
+11-12 15:11:36.344 15981 16053 I DriveGrowthFinalWindow: HOME mode=OVERALL summary=visible facilities=3 decoration=preview_cancel ledger=unchanged
+11-12 15:11:36.656 15981 16053 I DriveGrowthFinalWindow: HOME mode=VEHICLES summary=visible facilities=3 decoration=preview_cancel ledger=unchanged
+11-12 15:11:40.988 15981 16053 I DriveGrowthFinalWindow: GARAGE activity=recreated selection=preserved prepared_request=revalidated ledger=unchanged
+11-12 15:11:40.988 15981 16053 I DriveGrowthFinalWindow: PASS display=2 width=840 height=1184 dpi=160 source=SIMULATION

@@ -1,0 +1,33 @@
+{
+  "main": "77dfebdce98031db80e96f69cdf8711a32c8430d",
+  "product_source": "35f93a6ecb2f7418aa5806525159366dd1856068",
+  "source_note": "main app/src/main, app/src/debug, core 및 Gradle 소스가 동일. 격리 시험 패키지는 각 APK로 구분.",
+  "installed_apks": {
+    "standard": {
+      "installed.apk": "47b3420535fb9fa9c7e95d1d7314af3ce27904772eeaa91fcebc68895d255c5d"
+    },
+    "reward_reopen": {
+      "app-debug-androidTest.apk": "a026662c0216e5384eb87312c4fc25297a5e9ff2103ce8a0dc79d316772f3d86",
+      "app-debug.apk": "88f664e5074b8b776b6b0e821cd3eca54a2c715df7563ccb6a85c98b06268dfc"
+    },
+    "portrait_finalwindow28": {
+      "app-debug-androidTest.apk": "dcee68d84c1ff3e9e745813d07076eae391902e8eaa4f691d81a0e0e7c0995a4",
+      "app-debug.apk": "e842e30a81873f8cd7b5613621e3ce8666e81d47a47af08c3df1ae57db8674e0"
+    },
+    "portrait_collectionwindow28": {
+      "app-debug-androidTest.apk": "6895d1b46ce7aadb15b53dc9221331f3036995850902bf26510aac54171a9621",
+      "app-debug.apk": "601865971ef5c883c88add05dcc2845ec06b9f03d5b1b74edbcdc82cd93dfb0f"
+    },
+    "landscape_finalwindow28": {
+      "app-debug-androidTest.apk": "dcee68d84c1ff3e9e745813d07076eae391902e8eaa4f691d81a0e0e7c0995a4",
+      "app-debug.apk": "e842e30a81873f8cd7b5613621e3ce8666e81d47a47af08c3df1ae57db8674e0"
+    },
+    "landscape_collectionwindow28": {
+      "app-debug-androidTest.apk": "6895d1b46ce7aadb15b53dc9221331f3036995850902bf26510aac54171a9621",
+      "app-debug.apk": "601865971ef5c883c88add05dcc2845ec06b9f03d5b1b74edbcdc82cd93dfb0f"
+    },
+    "vehicle_release_development_signed": {
+      "installed.apk": "c64d37cada35a6eaff936793804a9a4b6a85f2cba5a8bfa854d7c99e18afe3e7"
+    }
+  }
+}

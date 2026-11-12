@@ -3206,3 +3206,26 @@ Pleos API34 ARM64 에뮬레이터의 사용자 10에서 소스별 격리 APK를 
 별도 `ed76bb5` VEHICLE 실행에서는 실제 SDK의 P→D 정차·20km/h와 Back 재진입 제한→P 복귀를 로그·화면으로 확인했다. 마지막 자동 assertion은 다른 창의 접근성 계층을 읽어 실패했으므로 이를 자동 시험 통과로 집계하지 않는다. 이 기록은 이후 SIMULATION 대여 전환만 바뀐 `35f93a6`의 실제 SDK 재시험을 뜻하지 않는다.
 
 최종 표적 `2b6b579`는 제품 변경 없이 계측 입력 순서를 수정한 소스다. 전용 AVD와 시험 프로세스를 종료했고 원래 제품 APK·DB·권한·화면·포워딩 등 [19/19 보존](evidence/final-pixel-ui/final-regressions/latest-install/preservation.json)을 확인했다. 원래 ADB 서버는 유지했다. APK는 로컬 `.local-tools/submission-candidate/20261113-35f93a6/drive-growth-35f93a6-debug.apk`에 보관하며 저장소에 바이너리를 추가하지 않는다.
+
+
+### 최종 후보 AppGrid·차량 제한·공식 창 재확인 — 2026-11-13
+
+검토한 main은 `77dfebdce98031db80e96f69cdf8711a32c8430d`이며, 설치용 APK를 빌드한 `35f93a6`과 제품 소스 차이가 없다. Pleos API34 ARM64 전용 AVD(user 10)에서 시험했다.
+
+- 표준 Debug `io.drivegrowth.app.simulation` 설치 회수 SHA-256 `47b3420535fb9fa9c7e95d1d7314af3ce27904772eeaa91fcebc68895d255c5d`. OEM 앱 목록 아이콘 → 캐스퍼 최초 지급 → 차고 1/3 → 가게 → 화면의 최상위 ‘뒤로’로 본문 숨김 → OEM 앱 목록 아이콘 재선택으로 가게를 다시 열었다. PID 11165, task 1000346, ActivityRecord 44e56c4 유지. ADB로 OEM 목록을 열었으며 게임 실행은 두 번 모두 아이콘 터치였다. 물리 키 Back은 별도다.
+- 격리 VEHICLE Release `io.drivegrowth.verify.vehiclelauncher28`, 개발용 서명, 설치 회수 SHA-256 `c64d37cada35a6eaff936793804a9a4b6a85f2cba5a8bfa854d7c99e18afe3e7`. 속도 권한 거부와 SDK NO_DATA에서 화면 제한, 권한 복원 후 P에서 표시 허용, D 정차 및 Virtual Console과 계기판 20km/h에서 제한, P 복귀 후 차량 프로필 표시를 확인했다. PID 7400에서 야간 모드 설정과 원복 두 번의 Android destroy→create→resume 이벤트를 대조했다. 재생성 이후 각각 SDK NO_DATA→DRIVE·ux=true와 제한 화면을 확인했다. 물리 Back 후에도 제한 화면은 유지됐으나 태스크가 실제 숨겨지고 명시 MainActivity 호출로 새 관찰이 시작됐다는 단언은 성립하지 않았다. 미초기화 프로필의 `recording_failure DATA_UNAVAILABLE`이 남았다. SDK 수신·게이트를 확인했고 내비 실제 도착 지급·주행 원장·실차는 별개다.
+- 공식 DISPLAY2 세로 840×1184px / 160dpi(840×1184dp), 가로 1700×1185px / 200dpi(1360×948dp) 각각에서 정식 `FinalOfficialWindowStateTest`의 차고와 도감 계측이 통과했다(4/4). 차고 개체 선택과 준비 요청 재검증, 실제 Loading에서 도감 Activity 재생성, 최신 발견·보유 및 저장 요청 복원, 비교 원장 불변을 확인했다. 각각 새 격리 설치를 사용했다. 두 프리셋을 별도로 만들었으므로 같은 창의 시스템 방향 전환·분할과 구분한다.
+
+[설치 해시](evidence/final-pixel-ui/final-regressions/final-acceptance/source-and-apks.json) · [AppGrid](evidence/final-pixel-ui/final-regressions/final-acceptance/launcher/second-grid-open.png) · [재진입 화면](evidence/final-pixel-ui/final-regressions/final-acceptance/launcher/reentry-settled.png). 공식 창 로그는 [세로 차고](evidence/final-pixel-ui/final-regressions/final-acceptance/windows/portrait-finalwindow28/instrumentation.txt) · [세로 도감](evidence/final-pixel-ui/final-regressions/final-acceptance/windows/portrait-collectionwindow28/instrumentation.txt) · [가로 차고](evidence/final-pixel-ui/final-regressions/final-acceptance/windows/landscape-finalwindow28/instrumentation.txt) · [가로 도감](evidence/final-pixel-ui/final-regressions/final-acceptance/windows/landscape-collectionwindow28/instrumentation.txt)를 따른다. 실측 보조 display·Activity 소속·지정 View 가시성의 근거이며 제품 task 전체 좌표를 측정했다는 뜻은 아니다.
+
+### 휴식·일일 보상 확정 이후 동일 원장 복원 — 2026-11-13
+
+새 격리 설치 `io.drivegrowth.verify.singleledger28`의 같은 모의 프로필·SQLite에서 01(45.278초)→강제 종료→03(208.897초)→강제 종료→04(11.921초)가 3/3 통과했다. 종료 직후 두 번 모두 PID 조회는 비었고, 실제 PID는 31203→11228→24103이었다. 01과 03 사이 원수익 탁송·잔액 1610을 복원했다. 03에서 휴식 활성과 일일 결과 확인 목표 보상 100을 확정했으며, 04에서 같은 프로필·청구 ID·잔액 12042·정산 27건과 열람 상태·차량 이력 5건·휴식 잔여 1100초를 보존했다. 수령 완료 화면의 청구 버튼은 비활성이며 재실행과 조회로 추가 지급은 0이다. 회수 DB 집계는 휴식 주행 영수증 2건, 휴식 출발 1건, 퀘스트 청구 1건이다. 원청구 명령을 직접 재제출하지 않았으며 실제 도착과 실차는 범위 밖이다.
+
+제품 APK SHA-256 `88f664e5074b8b776b6b0e821cd3eca54a2c715df7563ccb6a85c98b06268dfc`, 계측 APK `a026662c0216e5384eb87312c4fc25297a5e9ff2103ce8a0dc79d316772f3d86`. 제품 코드는 유지하고 검증 worktree에만 04용 계측을 추가했다. 위 12042는 이 설치의 실제 값이며 과거 설치의 11937과 별개다. 이전과 동일하게 일부 해금 준비는 공개 원장 API로 수행했다.
+
+[계측 소스](evidence/final-pixel-ui/final-regressions/final-acceptance/reward-reopen/FinalSingleLedgerTest.kt) · [01](evidence/final-pixel-ui/final-regressions/final-acceptance/reward-reopen/01-before-stop.txt) · [03](evidence/final-pixel-ui/final-regressions/final-acceptance/reward-reopen/03-after-stop.txt) · [04](evidence/final-pixel-ui/final-regressions/final-acceptance/reward-reopen/04-after-claim-reopen.txt) · [PID·단계](evidence/final-pixel-ui/final-regressions/final-acceptance/reward-reopen/phase-log.txt). 독립 읽기 검토에서 회수 DB의 `quick_check=ok`, 초기 원정산 5건과 최종 27건, 유일 요청 27건, 금액 합·잔액 12042, 공용 슬롯 0을 대조했다. 준비 거래는 입금 1건·과거 대여 3건·차량 2건이며 자연 플레이 밸런스의 근거는 아니다.
+
+Back의 추가 재시험 두 번은 권한 복원 직후 SDK가 `NO_DATA`에 머물러 D 입력 전에 중단했다. 포트 충돌 한 건은 다른 포트로 해소했지만 SDK 수신은 복구되지 않았다. Back handler 진입의 직접 근거가 없어 OEM 입력 전달과 앱 처리 중 어느 쪽의 문제인지 판정하지 않는다. [D 재생성 화면](evidence/final-pixel-ui/final-regressions/final-acceptance/vehicle/05-drive-recreate.png) · [생명주기](evidence/final-pixel-ui/final-regressions/final-acceptance/vehicle/lifecycle-events.txt) · [재시도 NO_DATA](evidence/final-pixel-ui/final-regressions/final-acceptance/vehicle/retry-no-data.txt).
+
+시험 패키지·포워드·보조 디스플레이를 정리하고 야간 모드를 `no`로 원복한 뒤 전용 AVD만 종료했다. 원래 AVD의 APK·데이터·권한·설정 등 [19/19 보존](evidence/final-pixel-ui/final-regressions/final-acceptance/preservation.json)을 확인했다.
