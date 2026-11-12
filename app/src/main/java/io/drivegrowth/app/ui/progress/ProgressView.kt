@@ -84,7 +84,7 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
             private var restore = true
             init { isFillViewport = true; addView(body) }
             override fun onDetachedFromWindow() {
-                // The host can remove this View before sending a restricted render.
+                // 호스트가 제한 화면을 그리기 전에 이 View를 먼저 분리할 수 있다.
                 rememberScrollPosition(this)
                 super.onDetachedFromWindow()
             }

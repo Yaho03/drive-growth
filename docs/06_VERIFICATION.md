@@ -2797,7 +2797,7 @@ main `101de32ccfb2b8e3b5855debf6acadee491106cf`에 `GarageScrapRecoveryMainActiv
 
 ## #57 실제 Main 상세 스크롤과 기간 경과 청구 복원 — 2026-11-13
 
-실행 기준은 main `ea1eafefe3621e658b186968731f5eda40077c39`이다. Pleos Emulator API 34 ARM64, Android 사용자 10, 1080×600 물리 픽셀·120dpi에서 격리 Debug 앱을 사용했다. JDK 17과 Gradle Wrapper로 `:app:assembleDebug :app:assembleDebugAndroidTest --offline`을 실행했다. 설치 후 회수한 APK의 SHA-256을 빌드본과 대조했다. 게시 부모 `752cd59c50b2a2c799577785ea2f21ced4904054`에는 #244·#246·#247·#248의 문서와 별도 기능의 계측 변경이 추가됐다. 실행 기준에서 게시 부모까지 제품·debug·core·빌드 설정에는 변경이 없고, 이 PR의 제품 1개·일반 계측 2개·격리 전용 계측 원본 1개는 실행 후보와 Git blob이 같다. 게시 조합의 추가 Gradle·장치 재실행은 미수행이다.
+실행 기준은 main `ea1eafefe3621e658b186968731f5eda40077c39`이다. Pleos Emulator API 34 ARM64, Android 사용자 10, 1080×600 물리 픽셀·120dpi에서 격리 Debug 앱을 사용했다. JDK 17과 Gradle Wrapper로 `:app:assembleDebug :app:assembleDebugAndroidTest --offline`을 실행했다. 설치 후 회수한 APK의 SHA-256을 빌드본과 대조했다. 게시 부모 `752cd59c50b2a2c799577785ea2f21ced4904054`에는 #244·#246·#247·#248의 문서와 별도 기능의 계측 변경이 추가됐다. 실행 기준에서 게시 부모까지 제품·debug·core·빌드 설정에는 변경이 없고, 일반 계측 2개와 격리 전용 계측 원본 1개는 실행 후보와 Git blob이 같다. 제품 `ProgressView.kt`는 주석의 한국어 번역 한 줄만 다르다. 게시 조합의 추가 Gradle·장치 재실행은 미수행이다.
 
 ### 실제 SDK 정차 D 제한과 같은 상세 위치 복원
 
