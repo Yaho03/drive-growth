@@ -2029,6 +2029,60 @@ Pleos API 34 ARM64 사용자 10의 별도 Debug **SIMULATION** 설치 두 개에
 
 최초 포기 실행은 환급 뒤 슬롯 해제에서 실패했고 제품 버튼의 활성 조건을 수정했다. 계측에서는 누락 import, 65단계 대기 시간, Main 메뉴 교체 대기 및 보관 요청 진입을 보완했다. 한 회수에는 롤백 저널이 남아 일관된 DB 사본으로 사용하지 않았다. 위 표는 재검증에서 통과한 세 메서드의 결과다. 게시 사본에서는 저장소·diff 및 바이트 일치만 검사했다. 실제 SDK 목적지 선택·변경, 경로 귀속이 확인된 실제 도착, 미도착·만차 경계, 물리 터치·전원·실차 검증은 후속 범위다.
 
+#### #37 실제 SDK 최초 견적과 Main 구매·잔액 부족 — 2026-11-13
+
+실행 제품은 main `6d3fbeabc0f8fea45ce1ce12bb8b9e7d7a8fa081`에 [#236](https://github.com/Yaho03/drive-growth/pull/236)의 구매 결제 재생 수정 패치(SHA-256 `d7450afb7542e1fa0bd2a035143ae8331a15f0000c0a64bffea89e49161c7eae`)를 적용한 소스다. 저장소 파일은 #236의 GREEN 실행본과 바이트가 일치했다. [#37 계측](../app/src/androidTest/java/io/drivegrowth/app/host/delivery/Issue37NativeMainPurchaseTest.kt)만 추가했다. 게시 기준은 #236과 #237이 반영된 main `03ee44b4916955d2b9f5dd246a303ee532f7e93e`다. 두 계측 파일과 `SqliteGameChangeStore.kt`는 각 실행본과 바이트가 일치한다. 실행 이후 정산 열람과 진행 화면 변경도 main에 반영됐다. 게시 조합의 빌드와 장치 실행은 미수행이다.
+
+Pleos 2.1.0/API 34/ARM64 사용자 10의 별도 Debug 설치 두 개에서 기존 Main의 버튼·목록 콜백과 실제 SQLite를 사용했다. 진단 앱에서 42dot(37.41289678, 127.09383464)의 안내를 시작하고 SDK 리스너를 해제한 뒤 같은 안내를 유지했다. Main이 받은 SDK 경로 ID는 두 시험 모두 `365c4f1a-deae-11f1-8a90-72e3ec72fa29`, 연결 세대 1, `ROUTE_GUIDING`, 남은 예상 거리 **50m**였다. 최초 견적의 **5초** 기준을 그대로 적용했고 확인 시 거리 표본은 각각 170ms·136ms였다. 각 실행에서 후보 목록과 발견 키는 해당 VEHICLE 프로필·출처와 콘텐츠 `trial-content-2026-11-09`·규칙 `trial-demo-2026-11-10-v4`에서 대조했다.
+
+| 지정 계측 | 장치 결과 |
+| --- | --- |
+| `testNativeQuoteDisplaysAndConfirmsOnePurchase` | 10.987초, 통과. 최초 지급 1,000 뒤 시험 자금 10,000을 공급했다. 화면 구매 후보 3개와 발견 키 3개, 저장 목록 1건을 확인했다. 1,200을 한 번 차감해 잔액 9,800, 선택·활성 의뢰·앱 경로 각 1건, 차량 1대와 도착 결과 0건을 확인했다. 결과 확인 뒤 대기 슬롯은 0건이었다. |
+| `testNativeQuoteShowsInsufficientFundsWithoutChanges` | 10.675초, 통과. 최초 지급 1,000을 시험 거래로 차감해 잔액 0을 만들었다. 구매 후보 3개와 발견 키 3개를 대조했다. 1,200 구매 상세에서 잔액 부족과 비활성 확정 버튼을 확인했고 구매·차감·활성 의뢰·경로·대기 슬롯의 신규 행은 없었다. 비교한 계정·차량·정산·탁송 거래 행은 유지됐다. |
+
+잔액 부족은 실제 Main의 확정 차단 범위다. 저장소에 직접 제출한 부족 명령은 기존 [DeliveryLedgerTest](../app/src/androidTest/java/io/drivegrowth/app/data/DeliveryLedgerTest.kt)의 별도 검증을 따른다. 이번 실행은 버튼 콜백을 사용했으며 실제 도착·모의 도착 입력, 실차, 전원 및 같은 VEHICLE 프로필의 새 프로세스 복원은 실행하지 않았다. [#225의 경로 교체·재연결 뒤 미지급](#80-실제-sdk-최초-견적과-경로-교체-뒤-미지급--2026-11-12)과 [#28의 포기·명시 모의 도착 복원](#28-구매-탁송-포기와-모의-도착의-새-프로세스-복원--2026-11-12)은 각각의 원 실행 근거를 유지한다.
+
+| 격리 앱 접미사 | 앱 APK SHA-256 | 계측 APK SHA-256 |
+| --- | --- | --- |
+| `issue37buy` | `e778e0a5fc8c5a4b39429e7d3c01d97f1b80ecd5eb46914870f0c558f28bc6ff` | `746ec2e34872af1803c6791d960cf8c34b93e019bc3c520044061ab0d0da7d40` |
+| `issue37poor` | `494d6cfbd3f3bb03e8bcb25e566f7abf989e833cbd196147e10adbd4417ba09e` | `4e39a4afbd1d73a8ff9e147aee21aa45714b600891b88f162d4566a7fd121722` |
+
+설치 회수 APK와 빌드본은 일치했고 두 회수 DB는 schema 20, `quick_check=ok`였다. #37 뒤 시험 42dot 안내를 종료하고 SDK의 빈 목적지·경로 ID와 `SAFE_GUIDING`을 확인했다. 진단 리스너를 해제하고 원래 진단 APK를 복원했다. 같은 슬롯에서 #52 반복 확인까지 실행한 뒤 격리 패키지 6개를 제거했다. P·0km/h와 제품·환경 19/19를 확인하고 00:39:12.467507 KST에 반환했다.
+
+##### 탁송과 차고의 격리 계측 재현
+
+JDK 17·SDK 35와 기존 Gradle 캐시를 사용한다. 장치 사용 시간을 배정받은 뒤 표의 각 앱 ID로 새 Debug 앱과 계측 APK를 조립한다. 아래 내용을 로컬 `isolation.gradle`로 저장하면 앱 ID와 계측 ID를 지정할 수 있다.
+
+```groovy
+def isolated = gradle.startParameter.projectProperties['isolatedAppId']
+gradle.beforeProject { p ->
+    if (p.path == ':app') {
+        p.pluginManager.withPlugin('com.android.application') {
+            p.extensions.getByName('androidComponents').finalizeDsl { android ->
+                android.defaultConfig.applicationId = isolated
+                android.defaultConfig.testApplicationId = isolated + '.test'
+                android.buildTypes.getByName('debug').applicationIdSuffix = null
+            }
+        }
+    }
+}
+```
+
+```sh
+./gradlew --offline --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process \
+  -I /path/to/isolation.gradle -PisolatedAppId="$app_id" :app:assembleDebug :app:assembleDebugAndroidTest
+adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w -r \
+  -e class "$selector" "$app_id.test/android.test.InstrumentationTestRunner"
+```
+
+| 앱 ID | 지정 셀렉터 |
+| --- | --- |
+| `io.drivegrowth.verify.issue37buy` | `io.drivegrowth.app.host.delivery.Issue37NativeMainPurchaseTest#testNativeQuoteDisplaysAndConfirmsOnePurchase` |
+| `io.drivegrowth.verify.issue37poor` | `io.drivegrowth.app.host.delivery.Issue37NativeMainPurchaseTest#testNativeQuoteShowsInsufficientFundsWithoutChanges` |
+| `io.drivegrowth.verify.garage52repeat` | `io.drivegrowth.app.host.garage.GarageRepeatConfirmMainActivityTest#testRepeatedLevelUpConfirmProducesOneSettlement` |
+
+Manifest의 앱 ID·계측 대상·runner·서명과 APK 해시를 확인해 두 APK를 해당 사용자에 설치한다. #37은 기존 #80 진단 절차로 42dot 안내를 준비하고 진단 SDK를 해제한다. 격리 앱의 `NAVI_ROUTE`와 `CAR_SPEED` 허용을 확인한다. 시험 자금은 각 시험이 격리 `databases/game-ledger-vehicle.db`에 생성하며 SDK 입력은 주입하지 않는다. 실행별 SDK·선택 기록은 앱의 `files/issue37-native-main.jsonl`에서 회수한다. #52는 공개 초기화 어댑터로 첫 아반떼와 주차 시연 설정을 준비하고 격리 `databases/unified-simulation.db`를 사용한다. 각 시험은 새 DB와 전용 앱 ID를 요구하므로 기본 Debug 전체 계측 대신 표의 셀렉터를 개별 실행한다.
+
 #### Schema19 이전과 Quest 원결과 재생의 별도 계측 — 2026-11-12
 
 `c03a333427acf4c1b4a37045ad2e2033365ddba1`에 계측 전용 패치 `108a79a9d3636ba83e777fa05887b1aaa0db6829e2759594478cf7b47b7e1c5d`를 적용한 Pleos API 34 ARM64 격리 실행에서 `Schema19UpgradeTest` 3건(2.800초)과 `QuestStoreIntegrationTest#testActualClaimWholeReplayPrecedesNewDefinitionTimeAndCurrentBalance` 1건(0.217초)이 통과했다. v2·v10·v12의 과거 DDL과 재현용 SIMULATION 행으로 기존 열의 값, 새 `visits.host_command`의 초기 `NULL`, DB 재개방을 확인했다. v12 후기 실패 롤백·원본 보존과 교차 소유 요청 충돌도 검증했다. Quest는 정의·시각·현재 잔액이 달라져도 같은 청구의 당시 전체 결과가 우선 재생되는지 확인했다.
@@ -2571,6 +2625,15 @@ main `101de32ccfb2b8e3b5855debf6acadee491106cf`에 `GarageScrapRecoveryMainActiv
 대여·사고·가챠 후보는 시험 fixture로 준비했다. 레벨·재료·수리 각각의 독립적인 새 프로세스 복원, 일반 동시 변경, 실제 SDK 신호·전원·실차는 이 실행에서 검증하지 않았다. 이 실행은 #52 차고 관리, #46 동일 개체·처분 이력, #28 명시 모의 입력 시나리오의 일부 근거다.
 
 게시 기준 `0063e8468af25b55e383a980ce0278bc6d28d881`의 기존 생산 코드·빌드 정의와 새 시험 파일은 위 실행에 사용한 내용과 같다. 그 사이 #225가 탁송 장치 시험과 문서를 추가했다. 게시 조합 및 #226 결합본에서는 새 APK 빌드나 장치 실행을 하지 않았다.
+
+
+### #52 실제 Main의 강화 확인 반복 입력 — 2026-11-13
+
+[반복 확인 계측](../app/src/androidTest/java/io/drivegrowth/app/host/garage/GarageRepeatConfirmMainActivityTest.kt)을 [같은 제품 기준·격리 실행 절차](#탁송과-차고의-격리-계측-재현)로 Pleos API 34 ARM64에서 한 건 실행했다(3.742초, 통과). 첫 아반떼와 주차 시연 입력을 공개 온보딩 어댑터로 준비했다. 상세 열기·강화 진입·결과 확인은 좌표 입력을 사용했다. 강화 확정은 한 UI 스레드 작업에서 같은 Button에 `performClick()`을 두 번 호출했다. 첫 호출이 처리 화면으로 전환한 뒤 분리된 버튼의 리스너에 둘째 호출을 전달했다. 연속 클릭 콜백 검증이며 물리 더블탭은 미실행이다.
+
+검토까진 원장이 같았다. 두 클릭 뒤 레벨과 revision이 각각 1 증가했고 24를 한 번 차감했다. 회수 DB에 잔액 976·차량 1대·정산 2건(첫 지급과 강화)이 남았다. STARTED 슬롯과 강화 정산의 요청 ID가 같은지 대조했고 결과 확인 뒤 비교 대상 중 슬롯만 해제됐다. 회수 DB는 schema 20, `quick_check=ok`였다. 강화·재료·수리의 새 프로세스 복원, 상태 변경·주행 제한 중의 반복 확인은 별도다. 위 폐차·도감 복원 결과는 기존 실행 기록을 따른다.
+
+빌드·설치 회수 해시는 앱 `59cecf36ba223c220ae6ae7d1dee5a5a0651db4a1be6487b449eb33bb12053a3`, 계측 APK `5059011a98396e7917177c37b2aaaadf30c2c604e332ce73c815afd002910fa2`다.
 
 
 ## #45 업적 콘텐츠·원장·Main 검증 — 2026-11-11
