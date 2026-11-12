@@ -29,6 +29,35 @@ class ResultsHistoryHostTest {
         host.setControlsEnabled(true);pump(worker,main);host.remember(ResultsUiState(selectedId=saved.settlementId));host.markViewed(saved.settlementId,null,true)
         host.setControlsEnabled(false);pump(worker,main);assertEquals(0,writes)
     }
+    @Test fun reopeningGateDoesNotRunPreviouslyQueuedMarkViewed() {
+        val worker = Tasks()
+        val main = Tasks()
+        var writes = 0
+        val host = ResultsHostController(worker, main, {
+            writes++
+            ContractResult.Success(Unit)
+        }, {}, readHistory = { ContractResult.Success(history(writes > 0)) })
+        host.setControlsEnabled(true)
+        pump(worker, main)
+        host.remember(ResultsUiState(selectedId = saved.settlementId, scope = ResultsScope.ALL))
+        assertTrue(host.markViewed(saved.settlementId, null, true))
+
+        host.setControlsEnabled(false)
+        host.setControlsEnabled(true)
+        pump(worker, main)
+
+        assertEquals(0, writes)
+        assertEquals(ResultsReadState.Failed(ContractError.UX_RESTRICTED), host.uiState.readStates[saved.settlementId])
+        assertEquals(saved.settlementId, host.uiState.selectedId)
+        assertFalse((host.historyState as ResultsScreenState.Content).results.single().viewed)
+
+        assertTrue(host.markViewed(saved.settlementId, null, true))
+        pump(worker, main)
+        assertEquals(1, writes)
+        assertEquals(ResultsReadState.Done, host.uiState.readStates[saved.settlementId])
+        assertTrue((host.historyState as ResultsScreenState.Content).results.single().viewed)
+    }
+
     @Test fun failedHistoryRefreshCannotMarkPreviousSnapshot() {
         val worker=Tasks();val main=Tasks();var fails=false
         val host=ResultsHostController(worker,main,{fail("과거 snapshot 쓰기 금지");ContractResult.Success(Unit)},{},readHistory={if(fails)ContractResult.Failure(ContractError.STORAGE_FAILURE) else ContractResult.Success(history(false))})
