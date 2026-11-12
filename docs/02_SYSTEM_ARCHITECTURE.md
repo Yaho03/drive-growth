@@ -933,7 +933,7 @@ main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결
 
 #### 현재 시연 원장을 사용하는 휴식
 
-Debug Main의 휴식 포함 모의주행은 같은 `GameSessionFactory`의 `unified-simulation.db`와 SIMULATION 프로필을 사용한다. 시작 요청을 받으면 다른 조작을 제한하고, session worker에서 최초 지급 완료·공용 checkpoint·진행 중 탁송·휴식 시험 정의를 확인한 뒤 명시 논리 시연을 시작한다. 시연 표본은 `ForegroundRestObservationProducer`와 기존 관측 주행 저장에 공급한다. 진행 화면의 읽기는 위 휴식 원장 조회 계약을 따른다.
+Debug Main의 휴식 포함 모의주행은 같은 `GameSessionFactory`의 `unified-simulation.db`와 SIMULATION 프로필을 사용한다. 시작 요청을 받으면 다른 조작을 제한하고, session worker에서 최초 지급 완료·공용 checkpoint·진행 중 탁송·휴식 시험 정의를 확인한 뒤 명시 논리 시연을 시작한다. 시연 표본은 `ForegroundRestObservationProducer`와 기존 관측 주행 저장에 공급한다. 진행 화면의 읽기는 위 휴식 원장 조회 계약을 따른다. 일반 시연의 주차 종료에서 휴식 시연 첫 표본으로 넘어갈 때는 명시적인 `startsRestRun`을 대여 소비자에 전달한다. 같은 SIMULATION 프로필·boot, 연속 기록 revision, 이전 P·UX 허용 표본과 새 출발 anchor, elapsed/UTC 차이 일치 및 기존 최대 간격 안의 원본 두 표본을 확인한 경우에만 이전 주차 구간을 이어 기록한다. 실제 차량의 수신자 변경이나 누락 구간을 이 경로로 보정하지 않는다. 같은 표본 재시도는 기존 구간을 다시 추가하지 않는다.
 
 화면이 숨겨진 동안 다음 시연 표본과 논리 시간의 진행을 멈춘다. 완료 후 다시 열면 확인된 원결과를 읽는다. 프로세스 종료로 진행 중 휴식의 미저장 연속성 근거를 잃으면 시연을 보류하고 기존 확정 원장을 보존한다. 실제 차량 입력의 장소 권위와 휴식 판정은 별도 범위다. [실행 근거와 잔여 검증](06_VERIFICATION.md#일반-모의주행-휴식의-main-통합-검증--2026-11-12)
 

@@ -3173,3 +3173,42 @@ Pleos API34 ARM64의 격리 `io.drivegrowth.verify.collectionwindow28`를 공식
 | Landscape 1700×1185px·1360×948dp·200dpi | [1/1 통과, 29.476초](evidence/final-pixel-ui/final-regressions/collection-window/landscape/instrumentation.txt) |
 
 빌드·설치 회수 해시는 두 실행에서 일치했다. 앱은 `ab0403b370fd2ccd5b0829190472fd4d575382a8e32b86f3a96e6a6a534d4049`, 시험 APK는 `1fb6d537939e0aa385017f54c5fc6f1686089ddcddf58daf0da3959fab1458b4`다. 각 폴더의 result와 phase-log가 버전·단계 근거다. 격리 패키지·전용 디스플레이 제거와 전용 AVD 종료 뒤 [공유 환경 19/19 보존](evidence/final-pixel-ui/final-regressions/collection-window/preservation.json)을 확인했다. 디스크 I/O 완료 순서·강제 지연 응답·Activity 간 동일 scrollY·새 OS PID는 이 시험 범위가 아니다.
+
+
+### 일반 모의주행에서 휴식으로 전환하는 대여 구간 — 2026-11-13
+
+동일 모의 프로필의 연속 실행 v7에서 초기 지급·수익 탁송·새 PID 원정산 복원·무료권 가챠·구매 탁송·확장·주유소 구매와 보너스 10 대여 정산 열람까지 진행했다. 이후 휴식 stage2에서 `DATA_UNAVAILABLE`로 보류됐다([실제 실패](evidence/final-pixel-ui/final-regressions/rest-continuity/device-before.txt)). 당시 active 대여 두 건의 커서는 `1794294020000`, 첫 휴식 표본은 `1794294021000`이었다. 수신자 변경으로 이 원본 표본 사이 1초가 대여에 전달되지 않은 제품 결함이며, 대여의 공백 거절 자체는 유지한다. 해금용 자금 10,000·과거 대여 3건·차량 2대는 시험에서 공개 원장 API로 준비했으므로 자연 플레이만의 진행 근거는 아니다.
+
+`35f93a6`은 명시적인 같은 시연의 휴식 시작에서 두 원본 표본의 출처·boot·시각·revision·주차·출발 연속성을 검증해 누락됐던 대여 구간을 전달한다. 실제 차량 공백, 별도 프로필, 다른 boot와 시계 불일치는 허용하지 않는다. 직접 Kotlin·JUnit 표적 42개에서 [수정 전 새 회귀 1개 실패](evidence/final-pixel-ui/final-regressions/rest-continuity/unit-before.log), [수정 후 42개 통과](evidence/final-pixel-ui/final-regressions/rest-continuity/unit-after.log)를 확인했다. 원인 분석과 별도 AI 코드 검토는 차단 결함 없음으로 판단했다. 실제 SQLite 전환 계측과 수정 후 같은 프로필 연속 실행은 별도로 확인하며, 이 JVM 결과만으로 휴식 활성·후속 퀘스트까지 통과했다고 표시하지 않는다.
+
+
+#### 휴식 전환의 실제 SQLite 계측 결과
+
+`35f93a6`의 첫 표적 실행은 전환 전 주차 원장이 다음 P 표본에서 갱신되는 순서를 시험이 앞서 기대해 실패했다. `2b6b579`는 제품 코드를 바꾸지 않고 P 표본을 721000·724000·725000ms, 출발을 726000ms로 공급한다. 원 `parkedSince=721000ms`, 실제 계상 구간 724000→726000의 정상 수익 2초, 미관측 구간 0건, 동일 대여 ID·커서 및 재시도 원장 불변을 확인해 [1/1 통과, 3.814초](evidence/final-pixel-ui/final-regressions/rest-continuity/device-after.txt)했다. [소스·설치 해시](evidence/final-pixel-ui/final-regressions/rest-continuity/device-result.json)를 기록했다.
+
+### 최종 동일 모의 원장의 연속 실행 — 2026-11-13
+
+제품 소스 `35f93a6ecb2f7418aa5806525159366dd1856068`의 격리 Debug `io.drivegrowth.verify.singleledger28`에서 같은 SIMULATION 프로필과 SQLite를 끝까지 사용했다. [첫 실행 1/1, 49.958초](evidence/final-pixel-ui/final-regressions/single-ledger/01-before-stop.txt), 앱 강제 종료 뒤 [두 번째 실행 1/1, 197.315초](evidence/final-pixel-ui/final-regressions/single-ledger/03-after-stop.txt)가 통과했다. [계측 소스](evidence/final-pixel-ui/final-regressions/single-ledger/FinalSingleLedgerTest.kt)와 [단계 로그](evidence/final-pixel-ui/final-regressions/single-ledger/phase-log.txt)를 함께 보존한다.
+
+| 실제 연결 구간 | 확인한 결과 |
+|---|---|
+| 첫 지급→수익 탁송→일반 모의주행→정산 | 기본 주행과 탁송 원정산을 분리해 조회. 같은 설치를 종료하기 전 잔액 1610 |
+| 새 PID 재실행 | PID 464→13097. 같은 프로필·원 request·원정산·차량·잔액 1610을 대조하고 결과 열람으로 추가 지급하지 않음 |
+| 첫 영업 무료권→가챠→구매 탁송 | 무료권 소비 뒤 차량 증가와 구매 대금 1300의 실제 의뢰·도착·수령을 확인 |
+| 확장→주유소→후속 대여 | HOME 확장 500 차감·공간 5, 주유소 500 차감. 후속 대여의 보너스 10 원정산을 화면에서 열람 |
+| 휴식→진행→보상 | 동일 프로필의 휴식 활성 표시, 일일 결과 확인 목표의 보상 100 청구. 마지막 잔액 11937 |
+
+휴식 로그의 `confirmed drives=2`는 고정 문구여서 실측 근거로 사용하지 않았다. 회수 SQLite를 읽기 전용으로 대조한 [집계](evidence/final-pixel-ui/final-regressions/single-ledger/rest-quest-counts.tsv)는 휴식 주행 영수증 2건·휴식 출발 1건·퀘스트 청구 1건이다. [설치 결과](evidence/final-pixel-ui/final-regressions/single-ledger/result.json)의 앱 SHA-256은 `88f664e5074b8b776b6b0e821cd3eca54a2c715df7563ccb6a85c98b06268dfc`, 시험 APK는 `06951ed1c7bff487405b5694ec65e36905fd6b92fe24bb8f1c4277c30442dfe1`이다.
+
+가게 해금에 필요한 자금 10000·과거 대여 3건·차량 2대는 공개 원장 API로 준비한 시험 입력이다. 실제 화면의 거래·같은 DB·프로세스 복원 검증이며, 무보조 자연 플레이의 진행 시간·최종 밸런스·실제 차량 주행으로 확대하지 않는다. 전체 DB 바이트 동일성이 아니라 원결과·보유·잔액·미확인 정산 등의 명시된 투영을 비교했다. 첫 35f 실행은 공식 창을 제거하면서 기본 창으로 이동한 OEM 앱 목록이 첫 차량 버튼을 가려 실패했고, 그 창을 닫고 같은 APK로 위 실행을 마쳤다. 이전 v7의 휴식 실패는 위 수정 전 기록으로 유지한다.
+
+같은 제품 소스의 로컬 `:core:test` 447개·`:app:testDebugUnitTest` 839개가 실패·오류·생략 0건으로 통과했고, 앱·계측 APK 빌드와 Lint(오류0·경고50)가 통과했다. 제출용 Release·실제 SDK 도착 지급·실차·지원되지 않는 시스템 분할과 최종 제출 서류는 이 실행의 완료 범위가 아니다.
+
+
+### 최종 설치용 Debug와 장치 반환 — 2026-11-13
+
+제품 `35f93a6`의 표준 Debug `io.drivegrowth.app.simulation`을 별도 Pleos AVD에 설치하고 명시적인 Launcher Activity로 실행했다. 빌드·설치 회수·로컬 배포 사본의 SHA-256은 `47b3420535fb9fa9c7e95d1d7314af3ce27904772eeaa91fcebc68895d255c5d`로 같다. [해시](evidence/final-pixel-ui/final-regressions/latest-install/sha256.txt) · [실행](evidence/final-pixel-ui/final-regressions/latest-install/launch.txt) · [실제 화면](evidence/final-pixel-ui/final-regressions/latest-install/launch.png). 격리 연속 시험 APK와 패키지가 다르므로 해시도 구분한다. 최신 표준 APK의 AppGrid 아이콘→최상위 Back→아이콘 재진입 전체는 미확인이다. 이전 버전의 실제 아이콘 시험을 최신 APK의 실행으로 바꾸지 않는다.
+
+별도 `ed76bb5` VEHICLE 실행에서는 실제 SDK의 P→D 정차·20km/h와 Back 재진입 제한→P 복귀를 로그·화면으로 확인했다. 마지막 자동 assertion은 다른 창의 접근성 계층을 읽어 실패했으므로 이를 자동 시험 통과로 집계하지 않는다. 이 기록은 이후 SIMULATION 대여 전환만 바뀐 `35f93a6`의 실제 SDK 재시험을 뜻하지 않는다.
+
+최종 표적 `2b6b579`는 제품 변경 없이 계측 입력 순서를 수정한 소스다. 전용 AVD와 시험 프로세스를 종료했고 원래 제품 APK·DB·권한·화면·포워딩 등 [19/19 보존](evidence/final-pixel-ui/final-regressions/latest-install/preservation.json)을 확인했다. 원래 ADB 서버는 유지했다. APK는 로컬 `.local-tools/submission-candidate/20261113-35f93a6/drive-growth-35f93a6-debug.apk`에 보관하며 저장소에 바이너리를 추가하지 않는다.
