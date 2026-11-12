@@ -26,7 +26,8 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
         fun pending(p: GaragePending) {
             val details = card()
             add(content, details)
-            details.addView(text(p.name ?: p.request.id.value, 24, bold = true))
+            val title = p.name ?: if (p.command is GarageCommand.Material) "보관한 강화 대상 차량" else p.request.id.value
+            details.addView(text(title, 24, bold = true))
             p.vehicle?.let {
                 details.addView(artwork.view(it.vehicleId, it.rarity, 96), LayoutParams(-1, dp(96)))
                 details.addView(text(rarity(it.rarity), 16, rarityColor(it.rarity), bold = true))
@@ -42,7 +43,7 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
                     } ?: "게임머니 변경 없음"))
                 }
                 is GarageCommand.Material -> {
-                    details.addView(text("재료 ${command.value.material.ownedVehicleId.value}는 소비됩니다"))
+                    details.addView(text("소비 대상 · ${p.materialName ?: "보관한 재료 차량"}"))
                     details.addView(text("대상 Lv.${command.value.target.level} · 진행 ${command.value.target.levelProgressPercent}%"))
                     details.addView(text("비용 ${command.value.cost.units} 게임머니"))
                 }
@@ -60,7 +61,8 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
                 content.addView(text("같은 차종의 다른 보유·대기 차량을 선택해 주세요"))
                 if(state.value.candidates.isEmpty()) content.addView(text("사용할 수 있는 재료 차량이 없습니다"))
                 state.value.candidates.forEach { car ->
-                    action("${car.ownedVehicleId.value} · ${car.rarity} · Lv.${car.level}") { choose(VehicleRef(car.ownedVehicleId,car.revision)) }
+                    val name = state.value.candidateNames.getValue(car.ownedVehicleId)
+                    action("$name · ${car.rarity} · Lv.${car.level}") { choose(VehicleRef(car.ownedVehicleId,car.revision)) }
                 }
                 action("취소", callback = cancel)
             }

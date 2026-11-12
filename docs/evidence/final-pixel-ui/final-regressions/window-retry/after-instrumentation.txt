@@ -1,0 +1,99 @@
+## device-e824452-window-portrait-1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.simulation.FinalOfficialWindowStateTest:
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+Test results for InstrumentationTestRunner=.
+Time: 6.0
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+
+## device-e824452-window-portrait-2
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.simulation.FinalOfficialWindowStateTest:
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+Test results for InstrumentationTestRunner=.
+Time: 5.535
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+
+## device-e824452-window-portrait-3
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.simulation.FinalOfficialWindowStateTest:
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+Test results for InstrumentationTestRunner=.
+Time: 6.219
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+
+## device-e824452-window-landscape-1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.simulation.FinalOfficialWindowStateTest:
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+Test results for InstrumentationTestRunner=.
+Time: 6.566
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1

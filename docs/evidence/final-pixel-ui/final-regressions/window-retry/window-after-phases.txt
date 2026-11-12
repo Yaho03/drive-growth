@@ -1,0 +1,23 @@
+## device-e824452-window-portrait-1
+11-12 13:44:24.265  8398  8419 I DriveGrowthFinalWindow: HOME mode=OVERALL summary=visible facilities=3 decoration=preview_cancel ledger=unchanged
+11-12 13:44:24.498  8398  8419 I DriveGrowthFinalWindow: HOME mode=VEHICLES summary=visible facilities=3 decoration=preview_cancel ledger=unchanged
+11-12 13:44:26.983  8398  8419 I DriveGrowthFinalWindow: GARAGE activity=recreated selection=preserved prepared_request=revalidated ledger=unchanged
+11-12 13:44:26.985  8398  8419 I DriveGrowthFinalWindow: PASS display=6 width=840 height=1184 dpi=160 source=SIMULATION
+
+## device-e824452-window-portrait-2
+11-12 13:44:36.014  8575  8596 I DriveGrowthFinalWindow: HOME mode=OVERALL summary=visible facilities=3 decoration=preview_cancel ledger=unchanged
+11-12 13:44:36.248  8575  8596 I DriveGrowthFinalWindow: HOME mode=VEHICLES summary=visible facilities=3 decoration=preview_cancel ledger=unchanged
+11-12 13:44:38.709  8575  8596 I DriveGrowthFinalWindow: GARAGE activity=recreated selection=preserved prepared_request=revalidated ledger=unchanged
+11-12 13:44:38.710  8575  8596 I DriveGrowthFinalWindow: PASS display=7 width=840 height=1184 dpi=160 source=SIMULATION
+
+## device-e824452-window-portrait-3
+11-12 13:44:47.919  8746  8767 I DriveGrowthFinalWindow: HOME mode=OVERALL summary=visible facilities=3 decoration=preview_cancel ledger=unchanged
+11-12 13:44:48.181  8746  8767 I DriveGrowthFinalWindow: HOME mode=VEHICLES summary=visible facilities=3 decoration=preview_cancel ledger=unchanged
+11-12 13:44:51.023  8746  8767 I DriveGrowthFinalWindow: GARAGE activity=recreated selection=preserved prepared_request=revalidated ledger=unchanged
+11-12 13:44:51.024  8746  8767 I DriveGrowthFinalWindow: PASS display=8 width=840 height=1184 dpi=160 source=SIMULATION
+
+## device-e824452-window-landscape-1
+11-12 13:45:01.021  8912  8935 I DriveGrowthFinalWindow: HOME mode=OVERALL summary=visible facilities=3 decoration=preview_cancel ledger=unchanged
+11-12 13:45:01.347  8912  8935 I DriveGrowthFinalWindow: HOME mode=VEHICLES summary=visible facilities=3 decoration=preview_cancel ledger=unchanged
+11-12 13:45:04.242  8912  8935 I DriveGrowthFinalWindow: GARAGE activity=recreated selection=preserved prepared_request=revalidated ledger=unchanged
+11-12 13:45:04.248  8912  8935 I DriveGrowthFinalWindow: PASS display=9 width=1700 height=1185 dpi=200 source=SIMULATION

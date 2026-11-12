@@ -3095,3 +3095,50 @@ v1은 시연 시작 버튼 대기에서, v2는 시설 확인 버튼 대기에서
 별도 격리 APK `ef338238…b03`의 시스템 전체 90° 회전에서는 표시가 600×1080px로 바뀌어도 앱 bounds가 가로 `[360,57]–[1062,495]`로 유지되어 오른쪽 잘림이 관측됐다. 공식 Portrait에서 같은 잘림은 나타나지 않았다. 전달된 창 bounds의 관측이며 플랫폼 내부 원인을 확정하지 않는다. 시스템의 분할 화면 지원 조회는 `false`여서 Android 분할 검증 성공으로 기록하지 않는다.
 
 이 실행은 공식 모든 프리셋·긴 목표 문구 전체·임시 보관 차량 표시·실제 SDK 목적지 변경 성공을 확인한 결과가 아니다. 세로 캡처의 개체 식별자와 기본 외형 안내도 당시 표시 그대로 보존한다. 별도 DISPLAY2·브리지·AVD를 종료했고 원래 장치의 APK·데이터·권한·화면·전면·포워딩 보존은 [19/19](evidence/final-pixel-ui/form-factor/preservation.json) 일치했다. 원본 전체 로그·task·APK·DB는 공개 자료에 넣지 않았다.
+
+
+### 공식 창의 긴 목표와 보관 차량 수령 경계
+
+위 `3bd7d92` 제품 소스의 별도 계측에서 두 공식 창의 긴 목표 표시와 세로 창의 보관 차량 수령을 확인했다. 제품 APK는 `2a24028b8d5dc8d52e2bfdc5f53b0ffa79f8942493bcefdd1360dccab6ffb4db`이며 표준 Debug APK와 패키지가 다른 격리 설치다.
+
+- 고정 목표 40개를 제품 `ProgressView`에 전달했다. 공식 Portrait 1/1(6.369초), Landscape 1/1(8.782초)에서 37·40번으로 스크롤하고 상세의 전체 문구·말줄임 없음, 청구 버튼의 활성/비활성·전체 가시 영역을 확인했다. 제목 전체의 화면 영역이나 실제 청구 거래를 이 시험에서 검증한 것은 아니다. [세로 실행](evidence/final-pixel-ui/form-factor-boundary/portrait/instrumentation-1.txt) · [가로 실행](evidence/final-pixel-ui/form-factor-boundary/landscape/instrumentation-1.txt) · [세로 상세](evidence/final-pixel-ui/form-factor-boundary/portrait/long-allowed-detail.png) · [가로 청구 불가](evidence/final-pixel-ui/form-factor-boundary/landscape/long-denied-detail.png).
+- 같은 공식 Portrait의 제품 Main에서 보관 조건 재확인→수령 결과 확인은 1/1(7.678초) 통과했다. 만차·모의 도착·빈자리 확보는 공개 API 준비 거래다. 베뉴 고급은 수령 전 차고 미보유·도감 발견이고 수령 후 같은 개체가 차고와 보유 이력에 반영됐다. 원구매 1,320 차감 한 건, 수령 정산 한 건·추가 차감 없음, 보관 차량·공용 명령 슬롯 0을 회수 원장으로 대조했다. 정산 열람 상태는 0이므로 슬롯 해제와 결과 열람을 구분한다. [수령 실행](evidence/final-pixel-ui/form-factor-boundary/held/instrumentation-2.txt) · [보관 안내](evidence/final-pixel-ui/form-factor-boundary/held/held-explicit-ui.png) · [수령 전 도감](evidence/final-pixel-ui/form-factor-boundary/held/held-discovered-before.png) · [원수령 결과](evidence/final-pixel-ui/form-factor-boundary/held/held-received-receipt.png).
+- **이 실행에서 발견한 표시 결함:** 요청 슬롯이 해제된 뒤에도 차고·도감 상단에 `보관한 탁송 요청 확인` 버튼이 남았다. 원장 지급은 정상이나 이전 요청 안내가 남은 별도 문제이며, 이후 수정·재시험 결과와 구분한다. [수령 후 차고](evidence/final-pixel-ui/form-factor-boundary/held/held-garage-after.png) · [수령 후 도감](evidence/final-pixel-ui/form-factor-boundary/held/held-owned-after.png).
+
+긴 목표 v1의 첫 render는 sequence 중복을 올바르게 거절해 실패했다. 시험 공급 sequence만 증가시킨 v2가 위 통과 결과다. 세로 v1 [첫 실패](evidence/final-pixel-ui/form-factor-boundary/held/instrumentation-1.txt)와 가로 [첫 실패](evidence/final-pixel-ui/form-factor-boundary/initial-landscape/instrumentation-1.txt)를 보존한다. 세로 비활성 상세의 원본 PNG는 프레임 시차로 목록이 찍혀 게시 근거에서 제외했다. 소스·설치 해시는 [세로 v2](evidence/final-pixel-ui/form-factor-boundary/portrait/result.json)·[가로 v2](evidence/final-pixel-ui/form-factor-boundary/landscape/result.json)·[수령과 첫 실패의 개별 결과](evidence/final-pixel-ui/form-factor-boundary/held/result.json)에 있다. 공식 창 입력은 [Portrait](evidence/final-pixel-ui/form-factor-boundary/portrait-preset.json)·[Landscape](evidence/final-pixel-ui/form-factor-boundary/landscape-preset.json)·[수령 Portrait](evidence/final-pixel-ui/form-factor-boundary/held-preset.json), 기존 장치 반환은 [19/19](evidence/final-pixel-ui/form-factor-boundary/preservation.json) 일치했다. 실차·실제 SDK 도착 지급·최종 통합 전체 완료로 확대하지 않는다.
+
+
+### 차량 관리·랭킹 재실행과 보험·VEHICLE 런처 회귀 — 2026-11-13
+
+Pleos API34 ARM64 에뮬레이터의 사용자 10에서 소스별 격리 APK를 설치했다. 아래 계측 링크의 JSON은 제품·시험 APK의 설치 후 회수 해시와 소스 커밋을 기록한다. 앱의 모의 원장 실행과 실제 Vehicle SDK 입력을 구분한다.
+
+| 시험 | 실제 결과와 적용 범위 |
+| --- | --- |
+| 차량 관리와 만차 유료 가챠 · `397dd96` | 같은 격리 모의 원장에서 **4/4**(5.063·4.595·4.935·3.323초). 만차 3/3의 유료 가챠 차단·잔액 2,000 유지 뒤 레벨업·재료 강화·수리를 실제 Main 화면으로 확정했다. PID `29317 → 30416 → 31533 → 32602`에서 각 같은 요청·원정산·개체 상태를 재개방하고 결과 확인으로 명령 슬롯을 해제했다. 보유 차량·자금·수리 필요 상태는 시험용 준비를 사용했다. 비교는 지정 원장 필드에 한정한다. [계측](evidence/final-pixel-ui/final-regressions/vehicle/instrumentation.txt) · [단계 로그](evidence/final-pixel-ui/final-regressions/vehicle/phases.txt) · [설치](evidence/final-pixel-ui/final-regressions/vehicle/result.json) |
+| 차량 이름과 표시 선택 · `397dd96` | **3/3**(0.371초). 단일 차종의 표시 이름과 내부 개체 선택, HOME 지도 선택의 현재 개체·revision, 강화 재료 후보·확인의 표시 이름과 원래 개체 참조를 각 View에서 검사했다. [계측](evidence/final-pixel-ui/final-regressions/labels/instrumentation.txt) · [설치](evidence/final-pixel-ui/final-regressions/labels/result.json) |
+| 내 기록·시연 랭킹 · `397dd96` → `3039731` | 수정 전에는 첫 조회가 통과했지만 새 PID의 누적 게임머니 설명에서 거래 종류 순서가 달라졌다. 설명 순서를 고정한 뒤 **2/2**(4.755·2.753초). PID `20809 → 21970`에서 같은 모의 프로필의 잔액·원정산·차량 비교값과 내 기록 6개 지표, 명시된 시연용 순위 4행을 다시 읽었다. 실제 온라인 순위나 차량 프로필의 검증 범위와 구분한다. [수정 전 실패](evidence/final-pixel-ui/final-regressions/ranking-before-fix/instrumentation.txt) · [수정 전 설치](evidence/final-pixel-ui/final-regressions/ranking-before-fix/result.json) · [수정 후 첫 실행](evidence/final-pixel-ui/final-regressions/ranking/before-instrumentation.txt) · [수정 후 새 PID](evidence/final-pixel-ui/final-regressions/ranking/after-instrumentation.txt) · [이전 표시](evidence/final-pixel-ui/final-regressions/ranking/before.json) · [이후 표시](evidence/final-pixel-ui/final-regressions/ranking/after.json) · [수정 후 설치](evidence/final-pixel-ui/final-regressions/ranking/result.json) |
+| 보관 차량 결과 확인 뒤 공통 버튼 · `3039731` | **1/1**(7.057초). 만차에서의 모의 도착·임시 보관과 빈자리 확보는 공개 원장 API로 준비했다. 실제 Main에서 수령한 뒤 도감의 보관한 요청 버튼으로 결과를 열어 확인했다. 공용 명령 슬롯이 해제되고 수동 새로고침 없이 도감에서 이전 요청 버튼이 사라졌으며 나머지 비교 원장은 동일했다. 위 공식 Portrait에서 재현한 표시 결함의 별도 회귀이며 실제 내비 입력은 사용하지 않았다. [계측](evidence/final-pixel-ui/final-regressions/delivery/instrumentation.txt) · [설치](evidence/final-pixel-ui/final-regressions/delivery/result.json) |
+| 보험 구매와 같은 원장의 사고 효과 · `a801796` | **1/1**(7.479초). 중앙 시험 정의를 읽고 고유 방문 수 99→100에서 해금됐다. 실제 모의 Main의 보험 미리보기·확정·결과 확인으로 1,500을 한 번 차감했다. 같은 프로필의 공개 원장 API에 비교용 사고 대여를 준비해 무보험 수익 60, 보험 설치 뒤 90, 최종 잔액 1,650과 공용 명령 슬롯 해제를 확인했다. 고유 방문 수는 완료 대여 건수와 구분하며 비교 사고는 시험 입력이다. [계측](evidence/final-pixel-ui/final-regressions/insurance/instrumentation.txt) · [단계 로그](evidence/final-pixel-ui/final-regressions/insurance/phase.txt) · [설치](evidence/final-pixel-ui/final-regressions/insurance/result.json) |
+| VEHICLE 앱 목록 아이콘과 Back · `397dd96` | 별도 AVD 기본 화면에서 `io.drivegrowth.verify.vehiclelauncher28`의 실제 MainActivity를 OEM AppGrid 아이콘으로 실행했다. 차고 → Back → HOME → 최상위 Back 숨김 → 같은 아이콘 재진입 뒤 실제 Vehicle SDK의 `speed=OK`, `PARK`, `ux=false`로 화면이 열렸다. PID `4146`, task `1000024`, ActivityRecord `bbffd3b`를 유지했다. Release 빌드를 개발용 Debug 키로 서명했으며 회수 APK는 빌드본과 바이트가 같다. 이 실행은 제출 서명·최신 설치용 APK·공식 DISPLAY2의 VEHICLE 런처·실차로 확대하지 않는다. [실행 결과](evidence/final-pixel-ui/final-regressions/launcher/result.json) · [설치 해시·앱 목록·task 발췌](evidence/final-pixel-ui/final-regressions/launcher/excerpts.txt) |
+
+장치 로그의 시각은 에뮬레이터 표기를 보존했다. 단계 로그는 시험용 프로필·요청·정산 식별자만 가렸다. APK·DB·전체 장치 로그는 저장소에 넣지 않았다. 최신 공식 두 창의 복합 상태 검증은 후속 실행에서 기록한다.
+
+
+### 공식 창의 차량 관리 복구와 최신 설치용 APK — 2026-11-13
+
+`a801796`의 공식 Portrait 재생성 시험은 **실패·통과·실패**(19.676·5.673·19.561초), Landscape는 **1/1**(5.772초)이었다. 두 세로 실패 모두 HOME의 전체·차량 보기와 같은 차고 선택의 복원 뒤 **같은 대상의 최신 비용 재조회**를 기다리다 실패했다. 마지막 실패의 화면 계층에는 재조회·준비 요청 닫기만 남았고 비용 리뷰가 표시되지 않았다. 실패 순간의 controller 작업 상태는 직접 관측하지 못했다. [수정 전 계측](evidence/final-pixel-ui/final-regressions/window-retry/before-instrumentation.txt) · [마지막 실패의 화면 계층 발췌](evidence/final-pixel-ui/final-regressions/window-retry/before-portrait-failure-viewport.txt)
+
+`e824452`는 복구가 시작되면 `Loading`을 알리고, 복구 중 조건 재조회 버튼을 비활성화한다. 버튼을 실행할 때 현재 조작 허용 여부·페이지·준비 요청·표시 상태도 다시 확인한다. 단위 시험은 작업자를 단계별로 실행해 `Loading`이 유지되는 동안 조건 계산이 0회이고, 복구 뒤 같은 준비 요청의 조건 조회가 1회이며 거래 저장·확정이 없음을 확인했다. 전후 장치 시험은 같은 selector와 설치 후 회수한 동일 시험 APK `9e50d79c7a2f147b6d21dd9ceb7cf4029160feea1631182306dc7a4a2b83cacc`를 사용했다. [소스·APK·공식 프리셋](evidence/final-pixel-ui/final-regressions/window-retry/window-runs.json)
+
+| 수정 후 공식 창 | 같은 격리 앱의 실제 실행 |
+| --- | --- |
+| Portrait 840×1184px·160dpi | **3/3**(6.000·5.535·6.219초), 매회 새 격리 설치 |
+| Landscape 1700×1185px·200dpi | **1/1**(6.566초), 새 격리 설치 |
+
+두 HOME 보기에서 지정한 가게 요약·시설 3개·꾸미기 미리보기와 취소를 확인했다. 차고의 준비된 레벨업 화면에서 Activity를 재생성해 같은 차량 선택, 이전 확정 버튼 부재, 최신 비용 재조회와 취소를 확인했다. 지정 원장 비교값과 공용 명령 슬롯은 유지됐다. 초기 차량은 공개 원장 API로 준비했고 입력은 View의 `performClick()`을 사용했다. 이 결과는 임의의 화면 요소 전체, 차량 관리의 확정 도중 프로세스 종료, 시스템 분할·회전이나 실차 시험과 범위가 다르다. [수정 후 계측](evidence/final-pixel-ui/final-regressions/window-retry/after-instrumentation.txt) · [단계 로그](evidence/final-pixel-ui/final-regressions/window-retry/window-after-phases.txt)
+
+같은 `e824452`의 다른 격리 앱에서 만차 유료 가챠 차단, 레벨업·재료 강화·수리의 실제 원결과를 **4/4**(7.245·5.081·5.511·3.869초)로 재검증했다. PID `29514 → 30996 → 32169 → 1065`에서 같은 원요청·원정산과 비교 원장을 다시 읽었다. JDK 17·Android SDK 35에서 코어 단위 **447개**, 앱 단위 **837개**가 실패·오류·생략 0으로 통과했고 Debug 앱·시험 APK 빌드 및 Lint 오류 0·경고 50을 확인했다. [차량 재실행](evidence/final-pixel-ui/final-regressions/window-retry/vehicle/process-summary.txt) · [단계 로그](evidence/final-pixel-ui/final-regressions/window-retry/vehicle/phases.txt) · [설치 해시](evidence/final-pixel-ui/final-regressions/window-retry/vehicle/result.json) · [단위·Lint](evidence/final-pixel-ui/final-regressions/window-retry/unit-lint.json)
+
+설치용 표준 Debug APK `io.drivegrowth.app.simulation`은 별도 Pleos AVD에 설치했고 빌드와 회수본 바이트가 일치했다. SHA-256은 `a5551eb76ec6e4539e1e72d37319401a3d06ef5b753a5a350a6b6400398c275a`다. 초기 실제 앱 목록 계층을 수집하지 못했고 패키지만 지정한 MAIN/LAUNCHER Intent는 실행에 실패했다. `UnifiedSimulationActivity` 컴포넌트를 지정한 실행은 새 프로세스에서 첫 차량 안내까지 표시했다. 최신 표준 APK의 실제 앱 목록 아이콘 재진입은 이 실행에서 확인하지 못했다. 이전 `3bd7d92`의 표준 APK 앱 목록 진입 근거는 위 절을 따른다. [회수 해시와 표준 설치·실행](evidence/final-pixel-ui/final-regressions/window-retry/standard-install-and-launch.txt) · [첫 실행 화면](evidence/final-pixel-ui/final-regressions/window-retry/standard-explicit-launch.png)
+
+별도 DISPLAY2와 시험 패키지를 제거하고 전용 AVD·브리지를 종료했다. 원래 장치의 제품 APK·데이터·권한·화면·전면·포워딩 보존을 비롯해 **19/19**를 확인했다. [원래 장치 대조](evidence/final-pixel-ui/final-regressions/window-retry/preservation.json) · [DISPLAY2 반환](evidence/final-pixel-ui/final-regressions/window-retry/isolated-display-removed.json) · [전용 AVD 종료](evidence/final-pixel-ui/final-regressions/window-retry/isolated-avd-stop.txt)

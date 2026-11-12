@@ -47,6 +47,9 @@ class ShopExpansionMapperTest {
         assertEquals(ShopCommand.Expand(definition.offers.first()), option.command)
         assertTrue(option.trial)
     }
+    @Test fun shopUsesDefaultSignBeforeDecorationSelection() {
+        assertEquals("기본 간판", mapped().screen.appearance.sign)
+    }
     @Test fun unknownCapacityAndUnsupportedFacilitiesAndDecorationsCannotSubmit() {
         val value=mapped(capacity=6)
         assertEquals(6,value.screen.capacity);assertEquals(ShopAvailability.UNKNOWN,value.screen.expansion!!.availability)

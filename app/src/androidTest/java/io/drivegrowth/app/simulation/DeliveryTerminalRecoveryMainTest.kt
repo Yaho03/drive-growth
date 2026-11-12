@@ -151,6 +151,35 @@ class DeliveryTerminalRecoveryMainTest :
             .put("snapshot", after.toString()).toString())
     }
 
+    fun testAcknowledgingHeldVehicleReceiptClearsCollectionPendingRoute() {
+        val scenario = isolatedScenario()
+        assertEquals(Scenario.CLAIM, scenario)
+        assertFalse(database.exists())
+        assertFalse(prefs.contains("stage"))
+        prepare(scenario)
+        awaitReceipt(scenario, recovered = false)
+        val before = snapshot()
+        assertEquals(HostCheckpointPhase.STARTED, before.checkpoint?.phase)
+        assertTrue(before.holdResult?.outcome is HoldOutcome.Claimed)
+
+        val root = activity.window.decorView
+        fun onCollection(): Boolean {
+            val menu = root.mainPage(HostPage.COLLECTION)?.takeIf { it.isShown && it.isEnabled } ?: return false
+            if (!menu.isSelected) root.openMainPage(HostPage.COLLECTION)
+            return root.mainPage(HostPage.COLLECTION)?.isSelected == true
+        }
+        awaitUi("수령 확인 전 도감의 보관한 탁송 요청 버튼") { onCollection() && storedDeliveryButton(root) != null }
+        awaitUi("도감에서 보관한 탁송 요청 열기") { storedDeliveryButton(root)?.performClick() == true }
+        awaitUi("보관 차량 수령 결과 확인") { button("delivery:acknowledge")?.performClick() == true }
+        await("공용 슬롯 해제") { snapshot().checkpoint == null }
+        awaitUi("재조회 버튼을 누르지 않아도 도감의 보관한 탁송 요청 버튼이 사라져야 합니다") {
+            onCollection() && views(root).filterIsInstance<Button>().none {
+                it.isShown && it.text.toString() == "보관한 탁송 요청 확인"
+            }
+        }
+        assertEquals(before.copy(checkpoint = null), snapshot())
+    }
+
     fun testColdMainReopensOriginalTerminalResultAndClearsOnlyCheckpoint() {
         val scenario = isolatedScenario()
         assertTrue(database.isFile)
@@ -317,9 +346,7 @@ class DeliveryTerminalRecoveryMainTest :
             if (button("delivery:acknowledge") != null && views(root).filterIsInstance<TextView>()
                     .any { it.isShown && it.text.toString() == scenario.message }) return@awaitUi true
             if (recovered) {
-                val pending = views(root).filterIsInstance<Button>().firstOrNull {
-                    it.isShown && it.isEnabled && it.text.toString() == "보관한 탁송 요청 확인"
-                }
+                val pending = storedDeliveryButton(root)
                 if (pending != null) {
                     pending.performClick()
                     return@awaitUi false
@@ -331,6 +358,10 @@ class DeliveryTerminalRecoveryMainTest :
             root.openMainPage(HostPage.DELIVERY)
             false
         }
+    }
+
+    private fun storedDeliveryButton(root: View): Button? = views(root).filterIsInstance<Button>().firstOrNull {
+        it.isShown && it.isEnabled && it.text.toString() == "보관한 탁송 요청 확인"
     }
 
     private fun views(view: View): Sequence<View> = sequence {

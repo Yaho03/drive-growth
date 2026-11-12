@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
 import android.widget.ScrollView
+import io.drivegrowth.core.contract.OwnedVehicleId
 
 /** 장치 사용 조율 후 실행한다. UI 스레드 실패는 시험 스레드에서 보고한다. */
 @Suppress("DEPRECATION")
@@ -35,6 +36,21 @@ class GarageViewTest : InstrumentationTestCase() {
         view.render(GaragePreviewStates.normal, true)
         assertFalse(button(view, "판매 조건 확인").isEnabled)
         assertFalse(texts(view).any { it.contains("판매 완료") })
+    }
+
+    fun testSingleVehicleUsesModelNameAndKeepsOwnedIdForSelection() = runOnUiTest {
+        val events = mutableListOf<GarageEvent>()
+        val view = GarageView(instrumentation.targetContext, events::add)
+        val sample = GaragePreviewStates.normal.data.vehicles.first()
+        val id = OwnedVehicleId("initial-grant")
+        val single = sample.copy(vehicle = sample.vehicle.copy(ownedVehicleId = id), instanceLabel = "")
+        view.render(GarageScreenState.Content(GaragePreviewStates.normal.data.copy(vehicles = listOf(single))), true)
+        val select = view.findViewWithTag<Button>(id)
+        assertTrue(select.contentDescription.toString().startsWith("캐스퍼,"))
+        assertTrue(select.performClick())
+        assertEquals(listOf(GarageEvent.SelectVehicle(id)), events)
+        assertTrue(texts(view).contains("캐스퍼"))
+        assertFalse(texts(view).any { id.value in it })
     }
 
     fun testMissingSelectionAndRestrictedContent() = runOnUiTest {

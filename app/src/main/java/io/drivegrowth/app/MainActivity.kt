@@ -286,7 +286,7 @@ open class MainActivity : Activity() {
         }, { request, frame ->
             delivery.complete(request, frame)
             session.deliveryUi = delivery.saveUiState()
-        }, queries::refresh)
+        }, onDiscoverySaved = queries::refresh, onOriginalResolved = ::refreshPendingRoute)
         session.deliveryNavigation.changed = { if (active && allowed() && navigation.page == HostPage.DELIVERY) render() }
         queries.attach {
             screen = it
@@ -737,9 +737,14 @@ open class MainActivity : Activity() {
         }
         if (navigation.page == HostPage.GACHA && session.gacha.failed)
             chrome.addView(style.button("보관한 미실행 가챠 요청 취소") { session.gacha.cancelUnstarted() })
-        navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE && !managementVisible }?.let {
+        navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE && !managementVisible }?.let { request ->
             chrome.addView(style.text("이전 관리 준비 요청입니다. 최신 상태와 비용을 다시 확인해 주세요."))
-            chrome.addView(style.button("관리 조건 다시 조회") { managementVisible = true; management.controller.open(it) })
+            chrome.addView(style.button("관리 조건 다시 조회", enabled = managementState != GarageCommandState.Loading) {
+                if (!allowed() || navigation.page != HostPage.GARAGE || navigation.pendingGarageRequest != request ||
+                    managementVisible || managementState == GarageCommandState.Loading) return@button
+                managementVisible = true
+                management.controller.open(request)
+            })
             chrome.addView(style.button("준비 요청 닫기") { cancelPreparation() })
         }
         when (navigation.page) {

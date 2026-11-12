@@ -1,0 +1,151 @@
+## device-a801796-window-portrait
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.simulation.FinalOfficialWindowStateTest:
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stack=junit.framework.AssertionFailedError: 같은 대상의 최신 비용 재조회
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.await(FinalOfficialWindowStateTest.kt:208)
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.expose(FinalOfficialWindowStateTest.kt:182)
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.checkGarageRecreation(FinalOfficialWindowStateTest.kt:133)
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.testHomeModesAndPreparedGarageCommandInOfficialWindow(FinalOfficialWindowStateTest.kt:62)
+	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+
+INSTRUMENTATION_STATUS: stream=
+Failure in testHomeModesAndPreparedGarageCommandInOfficialWindow:
+junit.framework.AssertionFailedError: 같은 대상의 최신 비용 재조회
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.await(FinalOfficialWindowStateTest.kt:208)
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.expose(FinalOfficialWindowStateTest.kt:182)
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.checkGarageRecreation(FinalOfficialWindowStateTest.kt:133)
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.testHomeModesAndPreparedGarageCommandInOfficialWindow(FinalOfficialWindowStateTest.kt:62)
+	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_RESULT: stream=
+Test results for InstrumentationTestRunner=.F
+Time: 19.676
+
+FAILURES!!!
+Tests run: 1,  Failures: 1,  Errors: 0
+
+
+INSTRUMENTATION_CODE: -1
+
+## device-a801796-window-portrait-trace
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.simulation.FinalOfficialWindowStateTest:
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+Test results for InstrumentationTestRunner=.
+Time: 5.673
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
+
+## device-a801796-window-portrait-trace2
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.simulation.FinalOfficialWindowStateTest:
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stack=junit.framework.AssertionFailedError: 같은 대상의 최신 비용 재조회
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.await(FinalOfficialWindowStateTest.kt:208)
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.expose(FinalOfficialWindowStateTest.kt:182)
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.checkGarageRecreation(FinalOfficialWindowStateTest.kt:133)
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.testHomeModesAndPreparedGarageCommandInOfficialWindow(FinalOfficialWindowStateTest.kt:62)
+	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+
+INSTRUMENTATION_STATUS: stream=
+Failure in testHomeModesAndPreparedGarageCommandInOfficialWindow:
+junit.framework.AssertionFailedError: 같은 대상의 최신 비용 재조회
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.await(FinalOfficialWindowStateTest.kt:208)
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.expose(FinalOfficialWindowStateTest.kt:182)
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.checkGarageRecreation(FinalOfficialWindowStateTest.kt:133)
+	at io.drivegrowth.app.simulation.FinalOfficialWindowStateTest.testHomeModesAndPreparedGarageCommandInOfficialWindow(FinalOfficialWindowStateTest.kt:62)
+	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_RESULT: stream=
+Test results for InstrumentationTestRunner=.F
+Time: 19.561
+
+FAILURES!!!
+Tests run: 1,  Failures: 1,  Errors: 0
+
+
+INSTRUMENTATION_CODE: -1
+
+## device-a801796-window-landscape
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.simulation.FinalOfficialWindowStateTest:
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FinalOfficialWindowStateTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=testHomeModesAndPreparedGarageCommandInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+Test results for InstrumentationTestRunner=.
+Time: 5.772
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1

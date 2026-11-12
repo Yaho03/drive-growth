@@ -1,0 +1,26 @@
+소스 e824452467bf1b3179f3ec1825cef0db1ded3dfc / b5d3646b3db2a11327497597a1c2fa4ff9e75045
+a5551eb76ec6e4539e1e72d37319401a3d06ef5b753a5a350a6b6400398c275a  app-debug.apk
+a5551eb76ec6e4539e1e72d37319401a3d06ef5b753a5a350a6b6400398c275a  installed-standard.apk
+회수 APK·빌드 APK·로컬 보관본 바이트 일치. 최초 설치 기록:
+Performing Streamed Install
+Success
+
+앱 목록 계층 수집 실패:
+cat: /data/local/tmp/drive28e-launcher.xml: No such file or directory
+
+컴포넌트 확인 뒤 package-only Intent 실패:
+priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+io.drivegrowth.app.simulation/.UnifiedSimulationActivity
+Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] pkg=io.drivegrowth.app.simulation }
+Error: Activity not started, unable to resolve Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=io.drivegrowth.app.simulation }
+
+명시적 component 실행:
+Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=io.drivegrowth.app.simulation/.UnifiedSimulationActivity }
+Status: ok
+LaunchState: COLD
+Activity: io.drivegrowth.app.simulation/.UnifiedSimulationActivity
+TotalTime: 489
+WaitTime: 505
+Complete
+    topResumedActivity=ActivityRecord{217a4df u10 io.drivegrowth.app.simulation/.UnifiedSimulationActivity t1000034}
+      app=ProcessRecord{2905230 9365:io.drivegrowth.app.simulation/u10a194}

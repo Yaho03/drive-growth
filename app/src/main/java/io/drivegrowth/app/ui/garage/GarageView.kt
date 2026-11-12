@@ -7,6 +7,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.pixel.PixelStyle
+import io.drivegrowth.app.ui.vehicleDisplayName
 import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.progression.VehicleAction
 import io.drivegrowth.core.progression.VehicleActivity
@@ -113,12 +114,13 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
 
     private fun vehicleCard(value: VehiclePresentation): LinearLayout = with(style) {
         val selected = interaction.selectedId == value.vehicle.ownedVehicleId
+        val title = vehicleDisplayName(value.name, value.instanceLabel)
         card(selected).apply {
             addView(row().apply {
                 gravity = Gravity.CENTER_VERTICAL
                 addView(artwork.view(value.vehicle.vehicleId, value.vehicle.rarity, 76), LayoutParams(dp(88), dp(76)))
                 addView(column().apply {
-                    addView(text("${value.name} ${value.instanceLabel}", 20, bold = true))
+                    addView(text(title, 20, bold = true))
                     addView(text(rarity(value.vehicle.rarity), 16, rarityColor(value.vehicle.rarity), bold = true))
                     addView(activityBadge(value))
                 }, LayoutParams(0, -2, 1f).apply { marginStart = dp(PixelStyle.gapDp) })
@@ -134,7 +136,7 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
             add(this, button(s(R.string.garage_select), primary = selected) {
                 if (interaction.selectedId != value.vehicle.ownedVehicleId) { detailY = 0; detailScroll = null }
                 interaction.select(value.vehicle.ownedVehicleId); drawScreen()
-            }.apply { tag = value.vehicle.ownedVehicleId; isSelected = selected; contentDescription = "${value.name} ${value.instanceLabel}, ${s(R.string.garage_select)}" })
+            }.apply { tag = value.vehicle.ownedVehicleId; isSelected = selected; contentDescription = "$title, ${s(R.string.garage_select)}" })
         }
     }
 
@@ -158,7 +160,7 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
                 addView(artwork.view(value.vehicle.vehicleId, value.vehicle.rarity, 144), LayoutParams(-1, dp(144)))
                 if (!artwork.hasSprite(value.vehicle.vehicleId))
                     addView(text(s(R.string.garage_art_placeholder), 16, muted))
-                addView(text("${value.name} ${value.instanceLabel}", 28, bold = true))
+                addView(text(vehicleDisplayName(value.name, value.instanceLabel), 28, bold = true))
                 addView(text(context.getString(R.string.garage_level, value.vehicle.level), 22, bold = true))
                 addView(progressTrack(value.vehicle.levelProgressPercent), LayoutParams(-1, dp(8)))
                 addView(text(progress(value), 16, muted))

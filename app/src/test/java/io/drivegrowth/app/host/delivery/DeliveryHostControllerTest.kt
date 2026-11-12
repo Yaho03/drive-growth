@@ -17,6 +17,8 @@ class DeliveryHostControllerTest {
         val operation=DeliveryHostOperation.Abandon(DeliveryChangeRules(RuleVersion("r"),10),RequestId("active"))
         var pending:DeliveryHostOperation?=null;var fail=false;var cancelFailure=false;var finishFailure=false
         var prepareHook:(()->Unit)?=null;var readHook:(()->Unit)?=null;var suppliedIdentity=identity
+        var readFailure = false
+        var prepareFailure = false
         var screen:DeliveryScreen=DeliveryScreen.Destination(null,null,"모의 입력",true)
         val shown = mutableListOf<DeliveryProposed>()
         var discoveryFailure = false
@@ -35,8 +37,17 @@ class DeliveryHostControllerTest {
             }
         }
         val source=object:DeliveryHostSource {
-            override fun read():ContractResult<DeliveryHostRead>{calls+="read";val hook=readHook;readHook=null;hook?.invoke();return ContractResult.Success(DeliveryHostRead(suppliedIdentity,screen,displayedProposal=proposal,pending=pending))}
-            override fun prepare(identity:GameIdentity,command:DeliveryCommand):ContractResult<DeliveryHostPrepared>{calls+="prepare";prepareHook?.invoke();return ContractResult.Success(DeliveryHostPrepared(screen,operation))}
+            override fun read(): ContractResult<DeliveryHostRead> {
+                calls += "read"
+                val hook = readHook; readHook = null; hook?.invoke()
+                if (readFailure) return ContractResult.Failure(ContractError.STORAGE_FAILURE)
+                return ContractResult.Success(DeliveryHostRead(suppliedIdentity, screen, displayedProposal = proposal, pending = pending))
+            }
+            override fun prepare(identity: GameIdentity, command: DeliveryCommand): ContractResult<DeliveryHostPrepared> {
+                calls += "prepare"; prepareHook?.invoke()
+                return if (prepareFailure) ContractResult.Failure(ContractError.STATE_CONFLICT)
+                    else ContractResult.Success(DeliveryHostPrepared(screen, operation))
+            }
             override fun execute(identity:GameIdentity,operation:DeliveryHostOperation):ContractResult<DeliveryHostRead>{calls+="execute";pending=operation;return if(fail)ContractResult.Failure(ContractError.STORAGE_FAILURE)else ContractResult.Success(DeliveryHostRead(identity,screen,displayedProposal=proposal,pending=operation,receipt=receipt))}
             override fun cancelUnstarted(identity:GameIdentity,operation:DeliveryHostOperation):ContractResult<Unit>{calls+="cancel";if(cancelFailure)return ContractResult.Failure(ContractError.STATE_CONFLICT);pending=null;return ContractResult.Success(Unit)}
             override fun finish(identity:GameIdentity,operation:DeliveryHostOperation):ContractResult<Unit>{calls+="finish";if(finishFailure)return ContractResult.Failure(ContractError.STORAGE_FAILURE);pending=null;return ContractResult.Success(Unit)}
@@ -49,8 +60,9 @@ class DeliveryHostControllerTest {
         var frame:DeliveryFrame?=null;var enabled=false;val completed=mutableListOf<DeliveryRequest>()
         val host=DeliveryHostController(source,Executor{tasks.addLast(it)},Executor{replies.addLast(it)})
         var discoveryRefreshes = 0
+        var originalResolutions = 0
         init { host.attach({ f, e -> frame = f; enabled = e }, { r, f -> completed += r; frame = f },
-            onDiscoverySaved = { discoveryRefreshes++ }) }
+            onDiscoverySaved = { discoveryRefreshes++ }, onOriginalResolved = { originalResolutions++ }) }
         fun drain(){while(tasks.isNotEmpty()||replies.isNotEmpty()){if(tasks.isNotEmpty())tasks.removeFirst().run();if(replies.isNotEmpty())replies.removeFirst().run()}}
         fun start(){host.setControlsEnabled(true);host.refresh();drain()}
     }
@@ -93,22 +105,50 @@ class DeliveryHostControllerTest {
     @Test fun `명시 취소가 성공한 미실행 요청만 해소하고 현재 상태를 다시 읽는다`() {
         val h=Harness();h.pending=h.operation;h.fail=true;h.start();h.host.cancelUnstarted();h.drain()
         assertNull(h.pending);assertEquals(listOf("read","execute","cancel","read"),h.calls)
+        assertEquals(1, h.originalResolutions)
     }
     @Test fun `시작됐거나 불명인 요청의 취소 거절은 원명령을 보존한다`() {
         val h=Harness();h.pending=h.operation;h.fail=true;h.cancelFailure=true;h.start();h.host.cancelUnstarted();h.drain()
         assertEquals(h.operation,h.pending);assertEquals(listOf("read","execute","cancel"),h.calls)
+        assertEquals(0, h.originalResolutions)
     }
     @Test fun `확정 결과를 미실행 요청으로 취소하지 않는다`() {
         val h=Harness();h.pending=h.operation;h.start();h.host.cancelUnstarted();h.drain();assertEquals(listOf("read","execute"),h.calls)
     }
 
     @Test fun `확정 결과 확인 뒤에만 finish하고 다음 상태를 읽는다`() {
-        val h=Harness();h.pending=h.operation;h.start();h.host.acknowledge();h.drain()
+        val h=Harness();h.pending=h.operation;h.start();h.host.acknowledge()
+        assertEquals(0, h.originalResolutions)
+        h.tasks.removeFirst().run()
+        assertNull(h.pending)
+        assertEquals(0, h.originalResolutions)
+        h.drain()
         assertNull(h.pending);assertEquals(listOf("read","execute","finish","read"),h.calls)
+        assertEquals(1, h.originalResolutions)
     }
     @Test fun `finish 실패는 원명령을 보존하고 새 준비로 바꾸지 않는다`() {
         val h=Harness();h.pending=h.operation;h.finishFailure=true;h.start();h.host.acknowledge();h.drain()
         assertEquals(h.operation,h.pending);assertEquals(listOf("read","execute","finish"),h.calls)
+        assertEquals(0, h.originalResolutions)
+    }
+
+    @Test fun `슬롯 해제는 후속 탁송 조회가 실패해도 Main에 알린다`() {
+        val h = Harness(); h.pending = h.operation; h.start()
+        h.readFailure = true
+        h.host.acknowledge(); h.drain()
+        assertNull(h.pending)
+        assertEquals(1, h.originalResolutions)
+        assertTrue(h.frame!!.screen is DeliveryScreen.Failure)
+    }
+
+    @Test fun `다음 요청의 준비 실패와 먼저 해제한 원요청을 구분한다`() {
+        val h = Harness(); h.pending = h.operation; h.start()
+        h.prepareFailure = true
+        h.host.onRequest(DeliveryRequest(1, h.frame!!.version, DeliveryCommand.ChooseDestination(null)))
+        h.drain()
+        assertEquals(listOf("read", "execute", "finish", "prepare"), h.calls)
+        assertNull(h.pending)
+        assertEquals(1, h.originalResolutions)
     }
 
     @Test fun `명령 준비 중 gate가 닫히면 미저장 명령을 실행 불명으로 오인하지 않는다`() {

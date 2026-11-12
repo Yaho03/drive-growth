@@ -319,20 +319,32 @@ class ShopViewTest : InstrumentationTestCase() {
         val opened = mutableListOf<Pair<OwnedVehicleId, Revision>>()
         val view = ShopView(instrumentation.targetContext) { fail("지도 탐색에서 거래 요청 발생") }
         view.onOpenVehicle = { id, revision -> opened += id to revision }
-        val state = ShopPreviewStates.normal()
-        val id = state.vehicles.first().id
+        val preview = ShopPreviewStates.normal()
+        val id = OwnedVehicleId("initial-grant")
+        val secondId = OwnedVehicleId("owned-second")
+        val first = preview.vehicles.first().copy(id = id, name = "캐스퍼")
+        val second = first.copy(id = secondId)
+        val state = preview.copy(vehicles = listOf(first, second))
         val tag = "shop:map-vehicle:${id.value}"
         view.render(state, true)
+        val firstListTag = "shop:list-vehicle:${id.value}"
+        val secondListTag = "shop:list-vehicle:${secondId.value}"
+        assertEquals("캐스퍼 1번", button(view, firstListTag).text.toString())
+        assertEquals("캐스퍼 2번", button(view, secondListTag).text.toString())
+        assertFalse(text(view).contains(id.value) || text(view).contains(secondId.value))
         val stale = view.findViewWithTag<View>(tag)
-        val newer = state.copy(revision = Revision(state.revision.value + 1))
+        assertTrue(stale.contentDescription.toString().contains("캐스퍼 1번"))
+        val newer = state.copy(revision = Revision(state.revision.value + 1), vehicles = listOf(second, first))
         view.render(newer, true)
         stale.performClick()
         assertTrue(opened.isEmpty())
         assertTrue(view.findViewWithTag<View>(tag).performClick())
-        assertEquals(listOf(id to newer.revision), opened)
+        assertEquals("캐스퍼 2번", button(view, secondListTag).text.toString())
+        assertTrue(button(view, secondListTag).performClick())
+        assertEquals(listOf(id to newer.revision, secondId to newer.revision), opened)
         view.render(newer.copy(capacity = null), true)
         assertNull(view.findViewWithTag<View>(tag))
-        assertNotNull(view.findViewWithTag<Button>("shop:list-vehicle:${id.value}"))
+        assertNotNull(view.findViewWithTag<Button>(firstListTag))
     }
 
     fun testSceneModeAndScrollRestoreDoNotCreateTransactionsOrPreviewSuccess() = onUi {
