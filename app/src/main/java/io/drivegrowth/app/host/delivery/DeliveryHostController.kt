@@ -70,9 +70,10 @@ class DeliveryHostController(private val source: DeliveryHostSource, private val
         if (confirmed) return
         resolveOriginal { source.cancelUnstarted(identity!!, command) }
     }
+    val canAcknowledge: Boolean get() = valid() && !busy && confirmed && original != null
     fun acknowledge() {
+        if (!canAcknowledge) return
         val command = original ?: return
-        if (!confirmed) return
         resolveOriginal { source.finish(identity!!, command) }
     }
     private fun resolveOriginal(resolve: () -> ContractResult<Unit>) {

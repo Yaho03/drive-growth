@@ -781,7 +781,9 @@ open class MainActivity : Activity() {
                 }
             }
             details.addView(style.text(message))
-            details.addView(style.button("처리 결과 확인하고 새로 조회") { session.delivery.acknowledge() }.apply { tag = "delivery:acknowledge" })
+            details.addView(style.button("처리 결과 확인하고 새로 조회", enabled = session.delivery.canAcknowledge) {
+                session.delivery.acknowledge()
+            }.apply { tag = "delivery:acknowledge" })
         }
         if (canCancel)
             details.addView(style.button("미실행 요청 취소 확인") { session.delivery.cancelUnstarted() })
