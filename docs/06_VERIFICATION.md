@@ -2247,6 +2247,17 @@ GREEN 앱 SHA-256은 `853db02efb5bf98cbf4f9761842901a4ba5fc342c8aa7bd7e5f26b9cfc
 게시 기준 `e1f3961a071a258bc225478b90f4f8272c127db8`에는 장치 실행 기준 이후 #228의 Main·탁송 변경, #230의 문서 변경과 #231의 Main·종료 영업 변경이 있다. 이번 표시 코드와 두 계측 파일은 실행한 최종 GREEN과 동일하다. 게시 조합의 새 APK 빌드·장치 시험은 미수행이다. 실제 차량의 휴식 장소·입력, 공식 폼 팩터, 전체 #57·#28 검증은 남는다.
 
 
+#### 실제 VEHICLE 진행 상세의 D 정차와 P 복귀
+
+2026-11-13 KST, main `03ee44b4916955d2b9f5dd246a303ee532f7e93e`에 계측 메서드만 추가한 트리 `4ea573e9991f8a062cd59c434088a58df62cc982`에서 실행했다. Pleos API 34 ARM64, Android 사용자 10, 1080×600px·120dpi의 새 격리 설치다. `:app:assembleDebug :app:assembleDebugAndroidTest` 빌드와 설치 회수 해시 일치를 확인했다. `ProgressionFirstPlayActivityTest#testQuestDetailRemainsUnclaimedAcrossActualStationaryDriveAndPark` 단독 계측은 1건 통과(16.082초), 실패·생략 0건이었다.
+
+최초 캐스퍼 지급과 원정산 열람 뒤 [P 청구 가능 상세](evidence/issue57-vehicle-gate/claimable-park.png)에서 일일 ‘결과 확인하기’ 1/1회·100 게임머니·활성 버튼을 확인했다. 실제 SDK의 같은 PID에서 DRIVE·UX 제한을 수신한 뒤 [D 정차 제한](evidence/issue57-vehicle-gate/restricted-drive.png)에 상세·청구·탐색이 숨었다. 이전 청구 좌표로 터치 입력을 주입했다. 해당 이벤트의 대상 창 수신은 별도로 계측하지 않았다. SDK PARK·UX 허용 이후 추가 메뉴 선택 없이 [같은 목표·기간의 상세](evidence/issue57-vehicle-gate/restored-park.png)로 돌아왔고 청구 버튼은 활성 상태였다. 복귀 전후 캡처의 스크롤 위치는 달랐으며 scrollY·복원 시점을 계측하지 않았다. 동일 상세 선택 복귀를 확인한 범위다. 콘솔은 D와 복귀 P에서 각각 0km/h를 확인했다.
+
+전후 계정·프로필·퀘스트 원인·청구·보상 정산·공용 슬롯 비교가 일치했다. 회수 DB의 quick_check는 ok, 잔액 1,000, 열람 1건, 청구·보상 정산·공용 슬롯 각각 0건이었다. 01:20:11 KST에 격리 패키지·계측을 정리하고 제품·장치 보호 항목 19/19를 확인했다. [시험 트리·APK·원본 로그 및 회수 DB 해시](evidence/issue57-vehicle-gate/verification.json)를 연결한다.
+
+게시 기준 `d2759b60f97eeae3011e8f07bbb6d27e42a3f310`은 #238·#239의 계측·문서 변경을 포함한다. 실제 실행 기준과 제품 소스는 동일하고 실행한 시험 파일을 그대로 인계했다. 게시 조합의 새 장치 실행, 실차, 스크롤 위치·기간 전환·미확정 청구 복원은 이번 실행에서 확인하지 않았다.
+
+
 ### Rest 6a4 세 수정의 main188 통합 검토 대기 — 2026-11-10
 
 정확6a4d820645cbd58c05959d7dd8a48f73746a5972를main188 c6c345d1866569cb3156229ba363312d1778fede 위에정상통합했다. 소스충돌/추가수정0이며변경41파일전부6a4와바이트동일하다. Main/HostSession/PendingRoute/factory/VehicleInput·Location6·시설12·Results14를보존했다. marker생산API는그대로이며시험fixture만schema16으로갱신했다. RankingReadSource의공통Rest주행reader소비는원본의의도된변경이고기존Provenance hook/typedFailure catch는보존했다. core/Gradle/Manifest불변·B0dd미포함이다. **이main188 로컬후보당시에는새SQLite결과대기였다. 후속c28의실제47통과는아래별도조합으로기록하며, #190이후Main조합·최종독립회수전까지머지보류다.**
