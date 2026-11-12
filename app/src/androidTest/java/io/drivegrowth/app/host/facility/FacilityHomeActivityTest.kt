@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.Spinner
+import android.widget.TextView
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.R
 import io.drivegrowth.app.data.HostCheckpointCommand
@@ -73,6 +74,11 @@ class FacilityHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity>(
             game.identity to ok(game.store.listOwnedVehicles()).single()
         }
         click(first, R.string.onboarding_to_shop)
+        await(first, "실제 HOME의 중앙 주유소 보너스") {
+            tree(first.window.decorView).filterIsInstance<TextView>().any {
+                it.text.toString() == context.getString(R.string.shop_effect, "대여당 10 게임머니 추가 수익")
+            }
+        }
         val tag = "facility:rest:${initial.second.ownedVehicleId.value}"
         await(first, "실제 HOME 시설·쉬기 화면과 현재 OFF") {
             tree(first.window.decorView).any { it is FacilityControlsView } &&

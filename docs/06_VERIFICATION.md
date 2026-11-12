@@ -1718,6 +1718,21 @@ JDK 17·SDK 35에서 `./gradlew --offline --no-daemon --max-workers=1 -Pkotlin.c
 #56과 #44의 설치·DB·앱 데이터는 서로 분리했다. 12:37:40 KST에 최종 제품·환경 보존 19/19와 격리 패키지·프로세스·계측 정리를 확인해 장치를 반환했다. 두 계측 파일의 원본과 빌드에 사용한 제품 입력을 게시 기준 `466f80c624da2e33c080ae9ccf28fe9751cb4d6d`에 대조했다. 게시 준비에서 Gradle·장치 실행을 다시 하지 않았다.
 
 
+### #44 주유소 표시와 대여 원정산의 중앙 정의 소비 — 2026-11-12
+
+기기 실행 소스는 `26354b4cc3702d025d54bf02175ea34a9f2b7d72`에 시설 호스트·시험 6개 파일을 적용한 사본이다. `FacilityHostMapperTest` 5개가 통과했고 실패·오류·생략은 0개였다. 격리 Debug 앱과 시험 APK를 조립한 뒤 API 34 ARM64 에뮬레이터의 user 10에서 두 계측을 각각 실행했다.
+
+| 입력·실행 | 관측 결과 |
+|---|---|
+| 격리 SIMULATION SQLite, `FactoryFacilityHostSourceTest#testFuelDisplayAndLedgerFollowOneTrialDefinitionThroughAboveThresholdPurchases` | 1건 통과, 0.970초. 기존 APK 중앙 정의의 주유소 대여당 10 게임머니가 화면 모델과 실제 대여 입금에 일치했다. 값을 17로 바꾼 명시적 시험 정의도 모델·새 입금에 함께 반영됐고 이전 10 원영수증은 그대로 재생됐다. 세차장 설치 뒤 세차 리뷰 효과를 확인했다. |
+| 같은 계측의 해금 초과 입력 | 보유 6대·가게 Lv4의 격리 입력으로 주유소 500, 세차장 1,000을 각각 한 번 차감했다. 같은 요청 재시도는 원결과를 반환했고 새 ID의 중복 구매는 상태 충돌로 거절했다. |
+| 격리 VEHICLE, `FacilityHomeActivityTest#testActualHomeRestingRequestSurvivesRecreationAndChangesNoMoneyOrVehicle` | 1건 통과, 16.834초. 에뮬레이터 SDK의 P 허용 뒤 실제 Main/HOME에서 첫 차량 지급과 주유소 문구를 확인했다. 영업 쉬기 켜기 → Activity 재생성 → 원결과 확인 → 영업 쉬기 끄기에서 잔액과 차량은 보존됐다. |
+
+빌드본과 설치 회수본의 SHA-256은 앱 `773f38925be1c369486198ded9fb33adcf210f5c305985b9e5dac614b012e6f4`, 시험 `13257d3e78288ca6fe5a6ee29e0365bad8aa9bede9a9b9b58ffd9f20fb706cc4`로 일치했다. 격리 패키지는 `io.drivegrowth.verify.fueldisplay44` 및 `.test`이고 runner는 `android.test.InstrumentationTestRunner`다. 격리 패키지·프로세스·계측을 정리하고 제품 및 환경 보존 19/19를 확인해 13:39:36 KST에 장치를 반환했다.
+
+게시 기준 `321d3dfe38a785dab3a01f5b7bcf74d42ebc342c`에서 실행 당시 시설 호스트·시험 6개 파일의 SHA-256이 모두 일치했다. #228 이후 조합의 Gradle·기기 실행은 게시 준비에서 수행하지 않았다. #44의 전체 해금 경계, 동일 운전 프레임의 평가 불변, 실제 Main 시설 구매, 새 OS 프로세스와 실차는 남은 검증 범위다. 보험 해금·사고 정산은 위 별도 계측을 따른다.
+
+
 ### 랭킹 모듈·Android JSON 오류 분리 수정 검증 — 2026-11-10
 
 b35c0bf의독립코드APPROVE와실제원본13중12PASS/1FAIL을별도보존한다. rewarded=1.5의Cursor.integer가던진Android checkedJSONException이RuntimeException catch를벗어나outerFailure가된P2다. 원58407d173ae4d5135404243db4b5c8d0d4a66d3e는명시import/catch만추가하고DB/숫자/정책/기존기대값을바꾸지않았다.

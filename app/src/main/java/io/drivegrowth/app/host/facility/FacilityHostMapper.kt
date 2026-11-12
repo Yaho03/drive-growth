@@ -22,11 +22,17 @@ object FacilityHostMapper {
             Facility.CAR_WASH->"가게 레벨 ${facts.shop.progress.shopLevel}/3"
         }+if(offer!=null && facts.balance.units<offer.price.units)" · 잔액 부족" else ""
         val title=when(facility){Facility.FUEL_STATION->"주유소";Facility.INSURANCE->"보험 시설";Facility.CAR_WASH->"세차장"}
-        val effect=when {
-            installed->"기존 설치 기록"
-            !journalAvailable->"구매 원명령 저장 연결 미지원"
-            offer==null->"중앙 시설 정의 미제공"
-            else->when(facility){Facility.FUEL_STATION->"대여당 추가 수익";Facility.INSURANCE->"사고 손실 절반 보전";Facility.CAR_WASH->"리뷰 상승"}
+        val effect = when {
+            installed && (facility != Facility.FUEL_STATION || offer == null) -> "기존 설치 기록"
+            !installed && !journalAvailable -> "구매 원명령 저장 연결 미지원"
+            offer == null -> "중앙 시설 정의 미제공"
+            facility == Facility.FUEL_STATION -> {
+                val fuelEffect = facts.fuelBonusPerRental?.let { "대여당 ${it.units} 게임머니 추가 수익" }
+                    ?: "대여당 추가 수익 · 금액 미제공"
+                if (installed) "기존 설치 기록 · $fuelEffect" else fuelEffect
+            }
+            facility == Facility.INSURANCE -> "사고 손실 절반 보전"
+            else -> "리뷰 상승"
         }
         ShopFacility(facility,ShopOption("facility-${facility.name}",title,condition,effect,availability,
             if(availability==ShopAvailability.AVAILABLE)ShopCommand.BuyFacility(offer!!) else null,
