@@ -2,12 +2,17 @@ package io.drivegrowth.app.simulation
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.graphics.Bitmap
+import android.graphics.Rect
 import android.os.SystemClock
 import android.test.ActivityInstrumentationTestCase2
 import android.util.Log
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
@@ -36,7 +41,11 @@ import java.util.concurrent.TimeUnit
 class UnifiedSimulationRestActivityTest :
     ActivityInstrumentationTestCase2<UnifiedSimulationActivity>(UnifiedSimulationActivity::class.java) {
 
-    fun testExplicitRestRunPaysAndShowsConfirmedStateInTheMainProfile() {
+    fun testExplicitRestRunPaysAndShowsConfirmedStateInTheMainProfile() = exerciseRestRun(checkViewport = false)
+
+    fun testConfirmedRestCanBeReadInTheShallowMainWindow() = exerciseRestRun(checkViewport = true)
+
+    private fun exerciseRestRun(checkViewport: Boolean) {
         val context = instrumentation.targetContext
         assertTrue("새 격리 시험 패키지가 필요합니다", context.packageName.startsWith("io.drivegrowth.verify."))
         for (name in listOf("unified-simulation.db", "game-ledger-vehicle.db", RestSimulationActivity.DATABASE)) {
@@ -162,6 +171,7 @@ class UnifiedSimulationRestActivityTest :
                 }
                 found.all { it }
             }
+            if (checkViewport) assertRestVisibleAfterTouchScroll(nextRoot, context, expectedLabels)
             assertEquals(result, ok(readRestDemo(games)))
             assertNull(ok(games.open()).use { ok(it.store.delivery.inProgress()) })
             assertFalse(context.getDatabasePath(RestSimulationActivity.DATABASE).exists())
@@ -169,6 +179,86 @@ class UnifiedSimulationRestActivityTest :
         } finally {
             onUi { reopened.finish() }
         }
+    }
+
+    private fun assertRestVisibleAfterTouchScroll(root: View, context: Context, expected: List<String>) {
+        fun currentScroll(): ScrollView? = tree(root).filterIsInstance<ProgressView>().singleOrNull()
+            ?.let(::tree)?.filterIsInstance<ScrollView>()?.singleOrNull()
+
+        fun touchBounds(scroll: ScrollView): Rect {
+            val bounds = Rect()
+            check(scroll.getLocalVisibleRect(bounds)) { "REST_WINDOW: no visible scroll area" }
+            val origin = IntArray(2)
+            scroll.getLocationOnScreen(origin)
+            bounds.offset(origin[0], origin[1])
+            return bounds
+        }
+
+        await("REST_WINDOW: the progress overview must be laid out at the top") {
+            val scroll = currentScroll()
+            scroll?.isLaidOut == true && !scroll.isLayoutRequested && scroll.scrollY == 0 && root.hasWindowFocus()
+        }
+        val window = onUi { touchBounds(checkNotNull(currentScroll())) }
+        val density = context.resources.displayMetrics.density
+        Log.i("RestViewport", "REST_WINDOW viewport=$window density=$density dpi=${context.resources.displayMetrics.densityDpi}")
+        assertTrue("REST_WINDOW: expected an 80–150dp shallow viewport and a narrow ProgressView",
+            window.height() / density in 80f..150f &&
+                onUi { tree(root).filterIsInstance<ProgressView>().single().width / density < 1000f })
+
+        val seen = mutableSetOf<String>()
+        for (step in 0..6) {
+            instrumentation.waitForIdleSync()
+            val (position, visible) = onUi {
+                val scroll = checkNotNull(currentScroll())
+                scroll.scrollY to tree(scroll).filterIsInstance<TextView>().filter { view ->
+                    val bounds = Rect()
+                    view.text.toString() in expected && view.isShown && view.getLocalVisibleRect(bounds) &&
+                        bounds == Rect(0, 0, view.width, view.height)
+                }.map { it.text.toString() }
+            }
+            val withinBudget = position <= window.height() * 2
+            val newlyVisible = if (withinBudget) visible.filter(seen::add) else emptyList()
+            Log.i("RestViewport", "REST_STEP step=$step y=$position visible=$visible newlyVisible=$newlyVisible")
+            if (step == 0 || newlyVisible.isNotEmpty()) {
+                instrumentation.uiAutomation.takeScreenshot()?.let { screenshot ->
+                    try {
+                        context.openFileOutput("rest-viewport-$step.png", Context.MODE_PRIVATE).use {
+                            screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)
+                        }
+                    } finally { screenshot.recycle() }
+                }
+            }
+            if (seen.containsAll(expected)) return
+            if (!withinBudget || step == 6) break
+            swipeRestViewport(window)
+            await("REST_TOUCH: swipe must advance the actual Main ScrollView") {
+                (currentScroll()?.scrollY ?: 0) > position
+            }
+        }
+        fail("REST_VISIBLE_BUDGET: fully visible within two viewports=$seen; missing=${expected - seen}")
+    }
+
+    private fun swipeRestViewport(bounds: Rect) {
+        val x = bounds.exactCenterX()
+        val bottom = bounds.top + bounds.height() * 0.85f
+        val top = bounds.top + bounds.height() * 0.15f
+        val down = SystemClock.uptimeMillis()
+        fun send(action: Int, y: Float) {
+            val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y, 0)
+            event.source = InputDevice.SOURCE_TOUCHSCREEN
+            try {
+                assertTrue("REST_TOUCH: Android must accept the touchscreen event",
+                    instrumentation.uiAutomation.injectInputEvent(event, true))
+            } finally { event.recycle() }
+        }
+        send(MotionEvent.ACTION_DOWN, bottom)
+        for (move in 1..8) {
+            SystemClock.sleep(45)
+            send(MotionEvent.ACTION_MOVE, bottom + (top - bottom) * move / 8)
+        }
+        SystemClock.sleep(150) // Prevent a fling from skipping a text row.
+        send(MotionEvent.ACTION_MOVE, top)
+        send(MotionEvent.ACTION_UP, top)
     }
 
     private fun selectedDeliveryRequest(delivery: DeliveryView): DeliveryRequest {

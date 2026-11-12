@@ -1,10 +1,26 @@
 package io.drivegrowth.app.ui.progress
 
+import android.content.res.Configuration
+import android.graphics.Rect
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ScrollView
 import android.widget.TextView
+import io.drivegrowth.app.R
+import io.drivegrowth.app.data.RestActiveGrant
+import io.drivegrowth.app.data.RestDrivingProjection
+import io.drivegrowth.app.host.GameIdentity
+import io.drivegrowth.app.host.progression.ProgressionJournalState
+import io.drivegrowth.app.host.progression.ProgressionMapper
+import io.drivegrowth.app.host.progression.ProgressionRead
+import io.drivegrowth.core.contract.ContractResult
+import io.drivegrowth.core.contract.InputSource
+import io.drivegrowth.core.contract.ProfileId
+import io.drivegrowth.core.contract.RuleVersion
+import io.drivegrowth.core.driving.RestBonusState
+import io.drivegrowth.core.driving.RestRules
 
 /** 기기 슬롯 배정 뒤 실행한다. 지금은 컴파일 검증만 하며 실제 실행으로 보고하지 않는다. */
 @Suppress("DEPRECATION")
@@ -61,6 +77,89 @@ class ProgressViewTest : InstrumentationTestCase() {
         assertTrue(texts(active).contains("저장된 활성 버프"))
         assertTrue(texts(active).contains("잔여 12분 · 고정 시험 표시"))
     }
+    fun testConfirmedRestIsReadableNearTheTopOfTheShallowOverview() = onUi {
+        val base = instrumentation.targetContext
+        val context = base.createConfigurationContext(Configuration(base.resources.configuration).apply { fontScale = 1f })
+        val view = ProgressView(context) { fail("Reading a rest card must not send an action") }
+        val activeLabel = context.getString(R.string.progress_buff_active)
+        val remaining = "원장 잔여 1100초"
+        val source = "모의 입력 · 저장된 확정 상태"
+        val content = ProgressPreviewStates.normal.copy(
+            sourceLabel = "모의 입력 프로필 · 원장 기록",
+            rest = RestPresentation(null, BuffPhase.ACTIVE, remainingLabel = remaining, note = source),
+        )
+        view.render(content, true)
+
+        val density = context.resources.displayMetrics.density
+        val width = (936 * density).toInt()
+        val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), heightSpec)
+        val title = view.getChildAt(0)
+        val viewport = (131 * density).toInt() // 98 px at the observed 120 dpi.
+        val height = title.measuredHeight + view.paddingTop + view.paddingBottom + viewport
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+        )
+        view.layout(0, 0, width, height)
+
+        val scroll = all(view).filterIsInstance<ScrollView>().single()
+        assertEquals(viewport, scroll.height)
+        for (label in listOf(activeLabel, remaining, source)) {
+            val text = all(scroll).filterIsInstance<TextView>().single { it.text.toString() == label }
+            val bounds = Rect(0, 0, text.width, text.height)
+            scroll.offsetDescendantRectToMyCoords(text, bounds)
+            scroll.scrollTo(0, (bounds.bottom - viewport).coerceAtLeast(0))
+            assertTrue("Expected $label within two short viewport scrolls", scroll.scrollY <= viewport * 2)
+            assertTrue("Expected the entire $label inside the viewport",
+                bounds.top >= scroll.scrollY && bounds.bottom <= scroll.scrollY + viewport)
+        }
+        assertTrue(all(view).filterIsInstance<Button>().any { it.tag == ProgressPreviewStates.firstKey })
+
+        view.render(content, false)
+        assertFalse(texts(view).any { it == activeLabel || it == remaining || it == source })
+        assertTrue(all(view).none { it is Button })
+    }
+
+    fun testActiveNeverGrantedAndConsumedRestKeepTheirStoredMeaning() = onUi {
+        val context = instrumentation.targetContext
+        val view = ProgressView(context) { fail("A stored rest state must not send an action") }
+        val identity = GameIdentity(ProfileId("rest-placement"), InputSource.SIMULATION)
+        val rules = RestRules(RuleVersion("rest-placement-test"), 1, 1, 1_200_000, 150)
+        val mapper = ProgressionMapper()
+        val active = RestBonusState(1_100_000, 1)
+        val neverGranted = RestBonusState.NONE
+        val consumed = RestBonusState(0, 1)
+        val activeLabel = context.getString(R.string.progress_buff_active)
+        val inactiveLabel = context.getString(R.string.progress_buff_inactive)
+        val source = "모의 입력 · 저장된 확정 상태"
+        for (stored in listOf(active, neverGranted, consumed)) {
+            val grant = if (stored == active) RestActiveGrant(1, rules) else null
+            val content = mapper.content(ProgressionRead(identity, emptyList(), emptyMap(),
+                ProgressionJournalState.Clear, true, rest = ContractResult.Success(
+                    RestDrivingProjection(2, stored, stored, 2, 0, grant))))
+            val mapped = requireNotNull(content.rest)
+            val expectedPhase = if (stored == active) BuffPhase.ACTIVE else BuffPhase.INACTIVE
+            val expectedRemaining = if (stored == active) "원장 잔여 1100초" else "원장 잔여 0초"
+            assertEquals("stored=$stored", expectedPhase, mapped.buffPhase)
+            assertEquals(expectedRemaining, mapped.remainingLabel)
+            assertEquals(source, mapped.note)
+            assertNull(mapped.recognition)
+
+            assertTrue(view.render(content, true))
+            val labels = texts(view)
+            assertEquals(1, labels.count { it == expectedRemaining })
+            assertEquals(1, labels.count { it == source })
+            assertEquals(stored == active, activeLabel in labels)
+            assertEquals(stored != active, inactiveLabel in labels)
+            if (stored != active) {
+                val achievements = context.getString(R.string.progress_achievements)
+                assertTrue("Inactive or consumed rest must stay after achievements",
+                    labels.indexOf(achievements) in 0 until labels.indexOf(expectedRemaining))
+            }
+        }
+    }
+
     fun testLongListsMeasureAtNarrowAndWideWidthsWithoutHorizontalContentOverflow() = onUi {
         val context = instrumentation.targetContext
         for (widthDp in listOf(440, 1360)) {
