@@ -30,7 +30,7 @@ import kotlin.math.roundToInt
 internal class ShopSceneView(
     context: Context,
     private val content: ShopScreenState.Content,
-    mode: ShopMode,
+    private val mode: ShopMode,
     private val background: Bitmap,
     sprites: VehicleSprites,
     onVehicle: ((OwnedVehicleId) -> Unit)?,
@@ -122,28 +122,37 @@ internal class ShopSceneView(
             badge(canvas, context.getString(R.string.shop_scene_spaces_unknown), 770f, 652f, 360f)
         }
         placed.forEach { (vehicle, slot) -> drawVehicle(canvas, vehicle, slot.first.toFloat(), slot.second.toFloat()) }
+        if (mode == ShopMode.OVERALL) {
+            val unknown = context.getString(R.string.shop_unknown)
+            val summary = context.getString(R.string.shop_scene_summary, content.level?.toString() ?: unknown,
+                content.ownedCount?.toString() ?: unknown, content.capacity?.toString() ?: unknown)
+            badge(canvas, summary, 1360f, 42f, 296f, size = 32f)
+        }
         canvas.restore()
     }
 
     private fun drawFacility(canvas: Canvas, facility: Facility, status: ShopAvailability) {
-        val x: Float
-        val y: Float
+        val (x, y) = when (facility) {
+            Facility.FUEL_STATION -> 295f to 154f
+            Facility.INSURANCE -> 377f to 434f
+            Facility.CAR_WASH -> 1355f to 546f
+        }
         if (status != ShopAvailability.INSTALLED) {
-            // 합성 원본에 그려진 건물의 외곽과 간판을 덮고 주변 마을은 보존한다.
+            // 합성 원본의 설치 건물과 간판을 가리고 바닥의 예약 부지를 표시한다.
             val outline = when (facility) {
                 Facility.FUEL_STATION -> fuelCover
                 Facility.INSURANCE -> insuranceCover
                 Facility.CAR_WASH -> washCover
             }
-            polygon(canvas, outline, PixelStyle.panel)
+            polygon(canvas, outline, if (facility == Facility.FUEL_STATION) 0xff747987.toInt() else 0xff86b350.toInt())
+            canvas.save()
+            canvas.translate(x, y)
+            polygon(canvas, lotPad, 0xffead6a7.toInt())
+            polygon(canvas, lotInterior, 0xffbea072.toInt())
+            canvas.restore()
         }
-        when (facility) {
-            Facility.FUEL_STATION -> { x = 295f; y = 154f }
-            Facility.INSURANCE -> { x = 377f; y = 434f }
-            Facility.CAR_WASH -> { x = 1355f; y = 546f }
-        }
-        badge(canvas, "${facilityName(facility)} · ${facilityStatus(status)}", x, y, 248f,
-            if (status == ShopAvailability.AVAILABLE) PixelStyle.focus else PixelStyle.text)
+        badge(canvas, "${facilityName(facility)} · ${facilityStatus(status)}", x, y, 264f,
+            if (status == ShopAvailability.AVAILABLE) PixelStyle.focus else PixelStyle.text, size = 30f)
     }
 
     private fun facilityName(facility: Facility) = context.getString(when (facility) {
@@ -225,10 +234,19 @@ internal class ShopSceneView(
         canvas.drawPath(shape, paint)
     }
 
-    private fun badge(canvas: Canvas, text: String, x: Float, y: Float, width: Float, ink: Int = PixelStyle.text) {
+    private fun badge(
+        canvas: Canvas,
+        text: String,
+        x: Float,
+        y: Float,
+        width: Float,
+        ink: Int = PixelStyle.text,
+        size: Float = 23f,
+    ) {
         paint.color = PixelStyle.panel
-        canvas.drawRoundRect(x - width / 2, y - 18f, x + width / 2, y + 18f, 9f, 9f, paint)
-        drawText(canvas, text, x, y, width - 12f, 23f, ink)
+        val halfHeight = size * .78f
+        canvas.drawRoundRect(x - width / 2, y - halfHeight, x + width / 2, y + halfHeight, 9f, 9f, paint)
+        drawText(canvas, text, x, y, width - 12f, size, ink)
     }
 
     private fun drawText(canvas: Canvas, text: String, x: Float, y: Float, width: Float, size: Float, ink: Int) {
@@ -248,6 +266,8 @@ internal class ShopSceneView(
         private val washCover = floatArrayOf(
             1159f, 472f, 1373f, 359f, 1536f, 432f, 1536f, 658f, 1370f, 726f, 1148f, 631f,
         )
+        private val lotPad = floatArrayOf(-130f, 0f, 0f, -65f, 130f, 0f, 0f, 65f)
+        private val lotInterior = floatArrayOf(-111f, 0f, 0f, -55f, 111f, 0f, 0f, 55f)
         private val closedSlot = floatArrayOf(-108f, 26f, 40f, -62f, 108f, -29f, -39f, 58f)
     }
 }

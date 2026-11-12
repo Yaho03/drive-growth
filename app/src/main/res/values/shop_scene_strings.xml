@@ -7,4 +7,5 @@
     <string name="shop_scene_layout_note">차량과 시설의 위치는 표시용입니다.</string>
     <string name="shop_scene_slot_closed">확장 예정</string>
     <string name="shop_scene_vehicle_detail">%1$s 자세히 · %2$s</string>
+    <string name="shop_scene_summary">Lv.%1$s · %2$s/%3$s</string>
 </resources>
