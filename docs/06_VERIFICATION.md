@@ -2117,6 +2117,30 @@ Pleos 2.1.0/API 34/ARM64, Android 사용자 10의 격리 Debug Main에서 실행
 
 2026-11-13 · [#247](https://github.com/Yaho03/drive-growth/pull/247)을 main `752cd59c50b2a2c799577785ea2f21ced4904054`에 반영했다. [#37](https://github.com/Yaho03/drive-growth/issues/37)은 실제 SDK 구매 원의뢰 복원과 기존 입력·결제 실패 근거를 대조해 종료했다. [#39](https://github.com/Yaho03/drive-growth/issues/39)는 기존 공용 SQLite의 보관 생성, #228의 모의 Main 도착 복원, 이번 네 가지 모의 종료·새 PID를 대조해 1차 범위를 종료했다. [#38](https://github.com/Yaho03/drive-growth/issues/38)의 변경 성공·차액 비교와 [#53](https://github.com/Yaho03/drive-growth/issues/53)의 탁송 화면 실제 D/P·미확정 요청 복원은 [#28](https://github.com/Yaho03/drive-growth/issues/28)의 통합 검증과 연결한다. 도착 귀속 근거가 없는 실제 SDK 입력은 확인 대기·미지급을 유지한다.
 
+#### #38·#53 Main 변경·포기·미실행 복원과 실제 정지 D/P — 2026-11-13
+
+Pleos 2.1.0/API 34/ARM64 사용자 10의 격리 Debug Main에서 지정 계측 **6/6**이 통과했다. 장치 제품 기준은 `60d54fe8759bb9d8379fd81dcc0c44de1477d682`, 계측만 추가한 실행 트리는 `2b32b002f9d7fcb4183638f9b0b741d2e94f49a0`이다. 게시 부모는 #257·#258이 반영된 `6945c000540105f5db74d3e98aced1d9b235dc5c`다. 가게·시설 구현과 다른 계측 및 문서 차이가 있으며, 이번 계측 소스 두 파일은 게시 사본과 바이트가 일치한다. 게시 조합의 새 컴파일·장치 실행은 미수행이다. [실행·설치 회수 APK 해시와 선별 근거](evidence/issue53-change-gate/results.json).
+
+| 계측 | 입력과 확인 결과 |
+| --- | --- |
+| SIMULATION 포기 · 7.630초 | Main이 결제 1,500의 수수료 150·예정 환급 1,350을 별도로 표시했다. 미리보기와 Back에서 거래·원의뢰를 유지했다. 확정 버튼 반복 입력 후 환급 1건, 잔액 10,850, 신규 차량 0대, 확인 후 checkpoint 0건을 대조했다. |
+| SIMULATION 변경 · 10.414초 | 이동 관측이 없을 때 변경 거절과 원의뢰 보존을 확인했다. 이후 시험값 30km 이동과 새 예상 36km를 사용했다. 변경 전·후 각 열의 거리·차량·희귀도, 66km의 50km 초과 구간(`band=2`), 추가 결제 200 표시, Back 뒤 거래 보존을 확인했다. 반복 확정 뒤 같은 의뢰의 변경 거래 1건·잔액 9,800·변경 기회 사용을 대조했다. |
+| SIMULATION 미실행 원명령 · 7.374초 + 2.586초 | Main에서 비교한 변경을 typed `SAVED` fixture로 남겨 실행 전 거래가 없음을 확인했다. 같은 DB를 PID 17802 → 21235로 열어 같은 의뢰·원명령·새 경로를 복원했다. 원 요청의 추가 결제 700 1건, 잔액 9,300, 확인 후 checkpoint 0건을 확인했다. |
+| 실제 42dot 견적과 정지 D/P · 11.412초 + 19.681초 | 50m 실제 내비 SDK 견적을 표본 수신 119ms 뒤 확인했다. 시험 자금을 사용해 VEHICLE 원장에서 1,300을 한 번 차감했다. 같은 DB를 PID 21838 → 24994로 다시 열었다. 정지 D/P 두 차례에 걸쳐 각 요청 이후 같은 PID의 SDK 표본에서 D·0m/s·UX 제한과 P·0m/s·UX 해제를 확인했다. D에서 검토 화면·버튼·보관 요청 진입이 숨었고 첫 P에서 같은 활성 의뢰를 다시 읽었다. 두 번째 D에서 준비한 미실행 포기 `SAVED` fixture는 그대로 유지됐다. P에서 같은 명령의 포기 환급 1,170을 한 번 처리하고 확인 뒤 슬롯을 해제했다. |
+
+위 [격리 계측 재현 절차](#탁송과-차고의-격리-계측-재현)의 JDK 17·SDK 35·`:app:assembleDebug :app:assembleDebugAndroidTest`와 개별 셀렉터를 사용했다. 앱 ID는 `io.drivegrowth.verify.` 뒤에 아래 접미사를 붙인다. 단계 사이에는 해당 격리 앱만 종료하고 PID가 사라진 뒤 같은 설치와 DB를 사용한다.
+
+| 앱 접미사 | 시험 클래스와 실행 순서 |
+| --- | --- |
+| `purchase28cancel` | [PurchaseDeliveryMainFlowTest](../app/src/androidTest/java/io/drivegrowth/app/simulation/PurchaseDeliveryMainFlowTest.kt)의 `testPurchaseThenAbandonRefundsExactlyOnce` |
+| `issue53change` | 같은 클래스의 `testChangeComparisonRejectsMissingTravelThenCommitsOnce` |
+| `issue53recover` | 같은 클래스의 `testSaveReviewedChangeForColdRecovery` → `testColdMainExecutesOriginalSavedChange` |
+| `issue37buy` | [Issue37NativeMainPurchaseTest](../app/src/androidTest/java/io/drivegrowth/app/host/delivery/Issue37NativeMainPurchaseTest.kt)의 `testNativePurchaseForColdRestore` → `testActualDriveParkHidesDeliveryReviewAndPreservesSavedRequest`. 42dot 안내를 유지하고 진단 SDK를 해제한 뒤 실행한다. 외부 실행자는 `DeliveryGate53` marker마다 Virtual Console에서 0km/h를 유지하며 D/P만 전환한다. |
+
+콘솔을 P·0km/h와 시작 제어 상태로 복원하고 이번 forward·heartbeat를 정리했다. 시험 안내를 종료하고 진단 APK 원본과 격리 패키지 8개 정리를 확인했다. 제품 APK·데이터 6개를 포함한 보호 19/19 확인 후 03:56:07.697867 KST에 슬롯을 반환했다.
+
+[#38](https://github.com/Yaho03/drive-growth/issues/38)의 Main 변경 성공·거절과 차액, [#53](https://github.com/Yaho03/drive-growth/issues/53)의 비교·포기·Back·반복 확정·새 PID 및 실제 정지 D/P에 연결할 근거다. 변경 성공과 이동값은 SIMULATION 범위이며, 실제 SDK의 새 목적지 입력은 앞선 #247의 관측 부족 거절 근거를 따른다. 실제 이동값이 있는 SDK 경로 변경 성공, 확인 대기·만차 보관 화면에서의 보유 표시와 기본 주행 수익 구분, 실제 도착 귀속·지급과 전원·실차는 별도 확인 범위다.
+
 #### Schema19 이전과 Quest 원결과 재생의 별도 계측 — 2026-11-12
 
 `c03a333427acf4c1b4a37045ad2e2033365ddba1`에 계측 전용 패치 `108a79a9d3636ba83e777fa05887b1aaa0db6829e2759594478cf7b47b7e1c5d`를 적용한 Pleos API 34 ARM64 격리 실행에서 `Schema19UpgradeTest` 3건(2.800초)과 `QuestStoreIntegrationTest#testActualClaimWholeReplayPrecedesNewDefinitionTimeAndCurrentBalance` 1건(0.217초)이 통과했다. v2·v10·v12의 과거 DDL과 재현용 SIMULATION 행으로 기존 열의 값, 새 `visits.host_command`의 초기 `NULL`, DB 재개방을 확인했다. v12 후기 실패 롤백·원본 보존과 교차 소유 요청 충돌도 검증했다. Quest는 정의·시각·현재 잔액이 달라져도 같은 청구의 당시 전체 결과가 우선 재생되는지 확인했다.

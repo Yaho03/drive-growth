@@ -1,0 +1,240 @@
+{
+  "executionProductCommit": "60d54fe8759bb9d8379fd81dcc0c44de1477d682",
+  "executionTree": "2b32b002f9d7fcb4183638f9b0b741d2e94f49a0",
+  "publicationBase": "6945c000540105f5db74d3e98aced1d9b235dc5c",
+  "testSourceSha256": {
+    "app/src/androidTest/java/io/drivegrowth/app/host/delivery/Issue37NativeMainPurchaseTest.kt": "25b62713bdae7fec2dbba43e2a6f3ba4565b0cda2961afe86d6f6c601b6d7a4f",
+    "app/src/androidTest/java/io/drivegrowth/app/simulation/PurchaseDeliveryMainFlowTest.kt": "d3f3465038ef370efbdf9d81eb085ba156b379d22705a8af0829574df0c052a0"
+  },
+  "localBuild": {
+    "cancel": {
+      "package": "io.drivegrowth.verify.purchase28cancel",
+      "apkSha256": {
+        "app-debug.apk": "a5616b1801decb042da7c86c0b9f21a16efe3fa968a0c33435fd48f4da885174",
+        "app-debug-androidTest.apk": "e06792a9a8c4f06c2d3bbfb91ad2d78644c5f662f9cf29ce54fdbc2fcbda278f"
+      }
+    },
+    "change": {
+      "package": "io.drivegrowth.verify.issue53change",
+      "apkSha256": {
+        "app-debug.apk": "c6d0fc70e8bef2c2ae717e4517fabc5c36b58f84e1d8d6c2181dd62bc3357637",
+        "app-debug-androidTest.apk": "a047092b0653eef9d31c266c5f2a38131f3b73c5230729b32413d86ebfc0e4a0"
+      }
+    },
+    "recover": {
+      "package": "io.drivegrowth.verify.issue53recover",
+      "apkSha256": {
+        "app-debug.apk": "dd8ad0b46791b2cd3eeabf3e0fd772275d7d7274e463589b575655250c200645",
+        "app-debug-androidTest.apk": "0b1b3115f8dbc5aab5e80f41be59ea7e97268b6263ce04cfa855c705bbdc54ca"
+      }
+    },
+    "buy": {
+      "package": "io.drivegrowth.verify.issue37buy",
+      "apkSha256": {
+        "app-debug.apk": "2a26cd1c157f50fbf5f116f76478a09fc379447e397c01f812c6f9a4a15ea17f",
+        "app-debug-androidTest.apk": "39a306eaf9b0abd13bbdb99313e7ae18095400f67e9dab7c9e4056c36257b293"
+      }
+    }
+  },
+  "simulation": {
+    "abandon": {
+      "selector": "testPurchaseThenAbandonRefundsExactlyOnce",
+      "seconds": 7.63,
+      "initialPurchase": {
+        "request": "delivery-choice-df06a81c-807a-40eb-9aeb-812855f10377",
+        "settlement": "f9e71c5c-a644-4ec7-88ae-5c2b7bd3191e",
+        "money": {
+          "direction": "DEBIT",
+          "amount": 1500
+        },
+        "balance": 9500
+      },
+      "fee": 150,
+      "refund": {
+        "request": "delivery/delivery-choice-df06a81c-807a-40eb-9aeb-812855f10377/settle",
+        "settlement": "fdedc5e6-5348-42ee-8193-1290cd06a14b",
+        "money": {
+          "direction": "CREDIT",
+          "amount": 1350
+        },
+        "balance": 10850
+      }
+    },
+    "change": {
+      "selector": "testChangeComparisonRejectsMissingTravelThenCommitsOnce",
+      "seconds": 10.414,
+      "request": "delivery-choice-e98d92f2-6a89-4eba-b259-e67bcfd5c3b4",
+      "route": "delivery-route-3082948a-d5f9-4157-8c06-404143c32be2",
+      "observedMeters": 30000,
+      "estimatedMeters": 36000,
+      "combinedMeters": 66000,
+      "band": 2,
+      "settlement": {
+        "request": "delivery/delivery-choice-e98d92f2-6a89-4eba-b259-e67bcfd5c3b4/change",
+        "settlement": "c6d1ee9f-5ccb-4f04-97b8-f3d083c5d1d0",
+        "money": {
+          "direction": "DEBIT",
+          "amount": 200
+        },
+        "balance": 9800
+      }
+    },
+    "recovery": {
+      "save": {
+        "selector": "testSaveReviewedChangeForColdRecovery",
+        "seconds": 7.374
+      },
+      "restore": {
+        "selector": "testColdMainExecutesOriginalSavedChange",
+        "seconds": 2.586
+      },
+      "pids": [
+        17802,
+        21235
+      ],
+      "savedOperationMatches": true,
+      "request": "delivery-choice-0878b05d-f490-4f9a-bc23-1512ac7b85d3",
+      "route": "issue53-saved-route",
+      "observedMeters": 30000,
+      "estimatedMeters": 36000,
+      "combinedMeters": 66000,
+      "band": 2,
+      "settlement": {
+        "request": "delivery/delivery-choice-0878b05d-f490-4f9a-bc23-1512ac7b85d3/change",
+        "settlement": "c6d68714-39dd-4422-aeb2-90692804ee18",
+        "money": {
+          "direction": "DEBIT",
+          "amount": 700
+        },
+        "balance": 9300
+      }
+    }
+  },
+  "vehicle": {
+    "purchase": {
+      "selector": "testNativePurchaseForColdRestore",
+      "seconds": 11.412
+    },
+    "gate": {
+      "selector": "testActualDriveParkHidesDeliveryReviewAndPreservesSavedRequest",
+      "seconds": 19.681
+    },
+    "quote": {
+      "route": "4bf8b9c3-deca-11f1-9cbd-72e3ec72fa29",
+      "generation": "1",
+      "ageMs": "119",
+      "meters": "50",
+      "mode": "ROUTE_GUIDING"
+    },
+    "purchasePid": 21838,
+    "samples": [
+      {
+        "kind": "dp_sdk_sample",
+        "elapsedMs": 90776521,
+        "marker": "REQUEST_DRIVE_STATIONARY review",
+        "pid": "24994",
+        "markerElapsedMs": "90775726",
+        "sampleElapsedMs": "90776490",
+        "source": "VEHICLE",
+        "gear": "DRIVE",
+        "speedMps": "0.0",
+        "uxRestricted": "true",
+        "gate": "RESTRICTED"
+      },
+      {
+        "kind": "dp_sdk_sample",
+        "elapsedMs": 90781143,
+        "marker": "REQUEST_PARK review",
+        "pid": "24994",
+        "markerElapsedMs": "90776569",
+        "sampleElapsedMs": "90780485",
+        "source": "VEHICLE",
+        "gear": "PARK",
+        "speedMps": "0.0",
+        "uxRestricted": "false",
+        "gate": "ALLOWED"
+      },
+      {
+        "kind": "dp_sdk_sample",
+        "elapsedMs": 90782523,
+        "marker": "REQUEST_DRIVE_STATIONARY pending",
+        "pid": "24994",
+        "markerElapsedMs": "90781431",
+        "sampleElapsedMs": "90782489",
+        "source": "VEHICLE",
+        "gear": "DRIVE",
+        "speedMps": "0.0",
+        "uxRestricted": "true",
+        "gate": "RESTRICTED"
+      },
+      {
+        "kind": "dp_sdk_sample",
+        "elapsedMs": 90787116,
+        "marker": "REQUEST_PARK pending",
+        "pid": "24994",
+        "markerElapsedMs": "90782643",
+        "sampleElapsedMs": "90786493",
+        "source": "VEHICLE",
+        "gear": "PARK",
+        "speedMps": "0.0",
+        "uxRestricted": "false",
+        "gate": "ALLOWED"
+      }
+    ],
+    "consoleRestored": true,
+    "initialPurchase": {
+      "request": "delivery-choice-bc642615-c44e-4704-b833-e6ccd4fb3fc9",
+      "settlement": "aea25f2c-81b8-4113-81be-b8bd639baee0",
+      "money": {
+        "direction": "DEBIT",
+        "amount": 1300
+      },
+      "balance": 9700
+    },
+    "fee": 130,
+    "refund": {
+      "request": "delivery/delivery-choice-bc642615-c44e-4704-b833-e6ccd4fb3fc9/settle",
+      "settlement": "3221cc7b-e59b-4f72-9175-2ac27db074f0",
+      "money": {
+        "direction": "CREDIT",
+        "amount": 1170
+      },
+      "balance": 10870
+    }
+  },
+  "slot": {
+    "releasedAt": "2026-11-13T03:56:07.697867+09:00",
+    "released": true,
+    "owner": "C",
+    "next": "E",
+    "preservation": "19/19",
+    "bootCompleted": true,
+    "device": "emulator-5556",
+    "androidUser": 10,
+    "adbPort": 5038,
+    "base": "60d54fe8759bb9d8379fd81dcc0c44de1477d682",
+    "noFurtherAdb": true,
+    "noFurtherGradle": true
+  },
+  "protectionChecks": {
+    "boot": true,
+    "abi": true,
+    "sdk": true,
+    "user": true,
+    "boot_count": true,
+    "size": true,
+    "density": true,
+    "night": true,
+    "font": true,
+    "overlay": true,
+    "forward": true,
+    "permissions": true,
+    "foreground": true,
+    "car_state": true,
+    "product_data6": true,
+    "product_apk_sha256": true,
+    "no_active_instrumentation": true,
+    "own_packages_absent": true,
+    "no_own_processes": true
+  }
+}
