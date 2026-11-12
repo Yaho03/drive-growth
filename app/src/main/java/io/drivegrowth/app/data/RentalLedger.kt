@@ -30,6 +30,9 @@ data class ShopState(val progress: ShopProgress, val capacity: Int, val faciliti
 
 class RentalLedger internal constructor(private val store: SqliteGameChangeStore) : CompletedRentalSource {
     internal companion object {
+        const val completedColumns = """r.id,r.owned_id,s.result,r.accident,r.match_review,r.wash_review,
+            r.bonus,r.weighted,r.regular_customer,r.settlement_request,s.request_id,s.settlement_id"""
+
         fun createTables(db: SQLiteDatabase) {
             db.execSQL("""CREATE TABLE rentals (
                 id TEXT PRIMARY KEY NOT NULL, owned_id TEXT NOT NULL, version TEXT NOT NULL,
@@ -230,8 +233,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             else ContractResult.Success(countSettledAccidents(db, ownedVehicleId))
         }
 
-    private val completedSelect = """SELECT r.id,r.owned_id,s.result,r.accident,r.match_review,r.wash_review,
-        r.bonus,r.weighted,r.regular_customer,r.settlement_request,s.request_id,s.settlement_id FROM rentals r
+    private val completedSelect = """SELECT $completedColumns FROM rentals r
         LEFT JOIN settlements s ON s.request_id=r.settlement_request
         WHERE r.settlement_request IS NOT NULL"""
 
@@ -273,7 +275,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         }
     }
 
-    private fun decodeCompleted(row: Cursor): CompletedRental {
+    internal fun decodeCompleted(row: Cursor): CompletedRental {
         if (row.isNull(2) || row.isNull(10) || row.isNull(11)) throw SQLiteException("대여 정산 누락")
         val rentalId = RequestId(row.getString(0))
         val settlement = LedgerJson.settlement(JSONObject(row.getString(2)))

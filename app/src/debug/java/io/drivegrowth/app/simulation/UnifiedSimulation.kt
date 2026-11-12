@@ -176,25 +176,24 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
     override fun stop() { generation++; accept = null; inFlight = false; handler.removeCallbacksAndMessages(null) }
 
     /** 입력용 seed를 기존 planner로 고른다. 가격/분포/사고 계산이나 지급을 복제하지 않는다. */
-    override fun rentalRandom(games: GameSessionFactory): Random {
+    override fun rentalRandom(games: GameSessionFactory, authority: RentalPreparationInputs): Random {
         val current = checkNotNull(progress)
         val run = current.runStartMs
         if (prefs.getLong("seedRun", -1) == run && prefs.contains("seed")) return Random(prefs.getInt("seed", 0))
         val seed = when (val opened = games.open()) {
             is ContractResult.Failure -> throw IllegalStateException(opened.toString())
             is ContractResult.Success -> opened.value.use { game ->
-                val content = (game.content as? ContractResult.Success)?.value ?: error("중앙 콘텐츠 미제공")
                 val owned = when (val read = game.store.listOwnedVehicles()) {
                     is ContractResult.Failure -> error("보유 조회 실패: ${read.error}")
                     is ContractResult.Success -> read.value
                 }
-                val target = owned.firstOrNull { it.lifecycle == VehicleLifecycle.OWNED }?.vehicleId
-                if (target == null) { notice = "보유 차량 없음 · 일반 모의 고객의 미배정 결과를 사용합니다."; return Random.Default }
-                val definition = (AssetTrialDefinitionProvider(context.assets).load() as? ContractResult.Success)?.value
-                    ?.rentalVisitDefinition()?.let { (it as? ContractResult.Success)?.value } ?: error("중앙 영업 정의 미제공")
+                val target = owned.firstOrNull {
+                    it.lifecycle == VehicleLifecycle.OWNED && (authority.definition.demand[it.vehicleId] ?: 0) > 0
+                }?.vehicleId
+                if (target == null) { notice = "수요 대상 보유 차량 없음 · 일반 모의 고객의 미배정 결과를 사용합니다."; return Random.Default }
                 val planner = RentalVisitPlanner()
                 (0..100_000).first { candidate ->
-                    val draft = (planner.prepare(game.identity, content.catalog, definition,
+                    val draft = (planner.prepare(game.identity, authority.catalog, authority.definition,
                         RentalVisitCursor(Revision(0), 0, current.clock), current.clock, Random(candidate),
                         { RequestId("simulation-seed-probe") }) as? ContractResult.Success)?.value
                     draft != null && draft.visit.request.desired == target && draft.visit.request.hours == 1 &&

@@ -902,6 +902,14 @@ main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결
 `RentalResultBasisReader.read(rentalId)`와 `SettlementHistoryEntry.rentalBasis`는 `ContractResult<Observation<RentalResultBasis>>` 경계로 원래 profile/source/rule·대여/정산 ID와 정상/감액/상한 제외 시간·원본 구간을 제공한다. 신규/옛 결과를 섞어 추정하지 않는다. 기존 완료 행의 metadata 없음은 Missing(NO_DATA), 존재하는 원문/숫자/연속 구간/원래 대여·금융 연결 손상은 STORAGE_FAILURE다. schema18에서 표 자체가 사라지면 읽기 실패이며 자동 재생성하지 않는다. 구버전 active 대여도 중간부터 이력을 채우지 않는다. 기존 Main의 정산 조회 경로에 이 입력을 전달하며 `ResultsHostMapper`와 `ResultsView`에서 원래 구간을 표시한다. 열람 저장과 주행 제한 경계는 유지한다.
 
 
+### 자동 방문의 수요 권위와 원요청 조회
+
+신규 방문은 같은 `GameSession`의 콘텐츠와 가게 레벨에서 해금 차종의 가중치와 방문 간격을 얻는다. Lv1~4의 간격은 30/25/20/15분이다. 이미 저장된 방문 시각은 유지하고, 해당 방문을 처리할 때 읽은 정의로 다음 방문을 예약한다. 계획과 저장은 당시 카탈로그·정의로 검증하며 미저장 draft 재시도도 그 입력을 재사용한다. 현재 정의를 읽기 전에 영속 pending과 같은 ID의 최초 결과를 확인한다. Debug 신규 run의 seed도 같은 해금 분포를 사용한다.
+
+가상 도시는 기존 차종·기간·고객·사고 추첨 뒤에 고른다. 희망 차종과 용도는 원방문의 기존 필드를 사용한다. 도시를 포함한 준비 v2는 배정과 함께 기존 `visits.host_command`에 저장된다. v1의 원문 바이트와 정산 산식은 유지한다.
+
+정산 조회는 한 SELECT 행에서 정산, 완료 대여, 방문 원문, 배정 차량, 프로필·출처를 함께 읽고 기존 원문 검증을 재사용한다. 전체 조회를 감싸는 쓰기 거래 없이 해당 행의 연결을 확인한다. 원문이 없는 구형 방문과 연결이 깨진 원문을 구분한다. 과거 고객 표시는 원래 카탈로그의 이름을 사용한다. [화면 규칙](09_UI_UX_SPEC.md#영업-정산의-가상-고객-요청)
+
 ### #40·#57 진행 화면의 휴식 원장 읽기
 
 `FactoryProgressionSource`의 선택적 읽기 포트는 퀘스트와 같은 `GameSession`에서 `restDriving.state(profileId)`를 조회할 수 있다. 저장소가 검증한 `RestDrivingProjection`과 `ContractResult` 오류를 진행 상태에 전달한다. 포트가 없으면 `UNSUPPORTED`를 유지한다. 기록 없음, 읽기 실패, 빈 원장, 미확정 주행은 잔여 시간 미확인으로 표시하며, 미확정 투영으로 활성 버프를 표시하지 않는다.

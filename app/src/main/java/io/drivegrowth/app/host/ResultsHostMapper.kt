@@ -1,9 +1,13 @@
 package io.drivegrowth.app.host
 
+import io.drivegrowth.app.data.SettlementHistoryEntry
+import io.drivegrowth.app.ui.results.RentalDemandPresentation
 import io.drivegrowth.app.ui.results.ResultPresentation
 import io.drivegrowth.app.ui.results.ResultsOrigin
 import io.drivegrowth.app.ui.results.ResultsScreenState
 import io.drivegrowth.core.contract.ContractError
+import io.drivegrowth.core.contract.Observation
+import io.drivegrowth.core.contract.TransactionKind
 import java.util.Collections
 
 /** 저장된 당시 정산을 표시한다. 최신 차량/잔액으로 바꾸거나 수익을 재계산하지 않는다. */
@@ -37,14 +41,29 @@ class ResultsHostMapper {
                 rows.map { it.settlement.transaction.requestId }.distinct().size != rows.size ||
                 rows.any { it.settlement.transaction.source != data.identity.source ||
                     (it.rental != null && it.rental.receipt.settlement != it.settlement) ||
-                    !rentalBasisMatches(it, data.identity) })
+                    !rentalBasisMatches(it, data.identity) || !rentalDemandMatches(it, data.identity) })
                 ResultsScreenState.Error("정산 이력의 식별·출처·영업 연결을 확인할 수 없어요")
             else ResultsScreenState.Content(Collections.unmodifiableList(rows.map {
                 ResultPresentation(it.settlement, it.settlement.changedVehicle?.vehicleId?.let(data.vehicleNames::get),
-                    it.viewed, it.rental, it.rentalVehicleId?.let(data.vehicleNames::get), it.rentalBasis)
+                    it.viewed, it.rental, it.rentalVehicleId?.let(data.vehicleNames::get), it.rentalBasis,
+                    when (val demand = it.rentalDemand) {
+                        is Observation.Missing -> demand
+                        is Observation.Available -> Observation.Available(RentalDemandPresentation(
+                            demand.value.desired.displayName, demand.value.purpose, demand.value.city,
+                        ))
+                    })
             }), ResultsOrigin.STORED, historyAvailable = true)
         }
     }
+    private fun rentalDemandMatches(entry: SettlementHistoryEntry, identity: GameIdentity): Boolean {
+        val demand = (entry.rentalDemand as? Observation.Available)?.value ?: return true
+        val rental = entry.rental ?: return false
+        val transaction = entry.settlement.transaction
+        return demand.identity == identity && demand.rental == rental &&
+            transaction.kind == TransactionKind.RENTAL &&
+            transaction.requestId.value == "rental/settle/" + rental.rentalId.value
+    }
+
     private fun rentalBasisMatches(entry: io.drivegrowth.app.data.SettlementHistoryEntry, identity: GameIdentity): Boolean {
         val basis = (entry.rentalBasis as? io.drivegrowth.core.contract.Observation.Available)?.value ?: return true
         val rental = entry.rental ?: return false

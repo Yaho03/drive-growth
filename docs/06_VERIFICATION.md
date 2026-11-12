@@ -2646,6 +2646,23 @@ Temurin JDK 17과 Kotlin 2.2.21의 캐시된 CLI 컴파일러로 수정 전·후
 
 01:33:42 KST에 장치를 반환했다. 보호 항목 19/19, 기존 APK·데이터, 창·권한·차량 설정과 포워드, 계측/격리 프로세스 종료를 확인했다.
 
+### #41 대여 수요와 정산 상세 검증 — 2026-11-13
+
+main `5cee77322a764c9c05b81a1658e6330d0690249c`에 #41 결합을 적용했다. API 34 ARM64 Pleos, Android 사용자 10의 격리 Debug 앱에서 실제 SQLite, View와 Main Activity를 사용했다. 가상 고객·차량 표본·시연 시각은 SIMULATION이다. 14개 셀렉터의 최종 판정 중 12개는 초기 트리 `08e496559064754c0d70f691289ce2ac037d44e1`에서, 잠금 단독과 정산 요청 View 클래스 2개는 비교 단언을 보정한 트리 `4874ec6abf20f92b17180d902ce82477710cfb71`에서 통과했다.
+
+| 실행 범위 | 결과 |
+| --- | --- |
+| [저널](../app/src/androidTest/java/io/drivegrowth/app/data/RentalProductJournalTest.kt)·[제품 source](../app/src/androidTest/java/io/drivegrowth/app/host/rental/RentalProductSourceBindingTest.kt) | v1 원문 바이트, pending·확정 원결과 재생, v2 도시 필수와 동일 ID 충돌, 저장 실패 뒤 최초 레벨 권위 재사용을 확인했다. 이미 잡힌 30분 방문은 유지되고 다음 신규 방문 간격은 25분이었다. 전체 저널 50/50, source 28/28 통과. |
+| [정산 요청 표시](../app/src/androidTest/java/io/drivegrowth/app/ui/results/ResultsRentalDemandViewTest.kt) | 5/5 통과. 당시 도시·용도·희망 차종과 실제 대여 차량을 구분했고 v1 도시 미기록, 원문 미기록, 손상·방문 행 누락의 조회 실패를 확인했다. 다른 연결이 미확정 쓰기를 유지하는 동안 커밋된 정산과 원방문을 읽었다. |
+| [시연 터미널](../app/src/androidTest/java/io/drivegrowth/app/simulation/SimulationTerminalOriginalsTest.kt)·[Debug Main](../app/src/androidTest/java/io/drivegrowth/app/simulation/UnifiedSimulationActivityTest.kt) | 터미널 2/2, 실제 Debug Main 1/1 통과. 신규 seed로 해금된 희망 차종·도시·1시간·무사고를 저장했다. 원주행·대여·탁송 정산과 첫 보상을 확인하고 Activity 재생성 뒤 같은 원장을 읽었다. |
+| 기존 정산 회귀 | 정산 조회 4/4, 초기화 원정산 4/4, 대여 시간 근거 View 7/7, 전체 정산 View 6/6 통과. |
+
+호스트 SQLite 대조에서 다른 연결이 쓰기 거래를 가진 동안 기존 전체 읽기의 `BEGIN IMMEDIATE`가 잠겼고, 수정 SELECT는 커밋된 정산·프로필·원방문·배정을 함께 읽었다. Android 초기 계측도 그 조건에서 기존 원방문을 읽었으나 시간 근거 객체의 참조를 비교해 단언이 실패했다. 저장된 결과와 시간 구간 값으로 비교하도록 계측을 보정한 뒤 잠금 단독 1/1과 정산 표시 5/5가 통과했다. 보정 전후 제품 APK의 바이트가 같으며 해당 시험 파일 외의 계측 파일도 같다. 전체 계획 14개 셀렉터의 최종 판정이 통과했다.
+
+Gradle core 단위 447개와 app 단위 825개, lintDebug, 앱·계측 APK 빌드가 통과했다. 두 실행의 제품 APK 설치 회수 SHA-256은 모두 `5e62c3096c1a0e0cf8ee4a2305b8c65317b5152148bea4c04087948d51e3f4c5`다. 계측 APK 설치 회수 SHA-256은 초기 `7a288eb0cc4270e4176f2761654921458e3b98152697284922e9ef132ad2c28f`, 보정 후 `a673f441b9f412ffc113961169e3a53e75f60d51228f6d53420b09c116ae688b`다. 두 트리의 차이는 잠금 비교 단언을 고친 계측 파일 1개이며, 게시 사본의 제품과 계측 파일은 보정 후 트리와 동일하다.
+
+장치는 03:28:29~03:34:34 KST에 사용했다. 격리 시험 패키지를 정리한 뒤 제품 APK·데이터와 장치 설정을 포함한 보호 항목 19/19가 일치했다. 실제 차량 입력과 전체 보유 구성의 운영 기대 수익은 이 실행 범위 밖이다.
+
 ## 탁송 발견 저장과 도감 갱신 — 2026-11-11
 
 후보 표시 확인 뒤 저장 성공 시 같은 세션 도감 조회를 갱신한다. 일시 저장 실패 뒤에는 원 표시를 다시 제출한다. 원 표시가 무효면 실패 화면에서 새 후보 조회로 진행할 수 있다. 확정 결과 확인과 미실행 요청 취소의 저장 결과는 발견 저장과 독립적으로 처리한다. 기존 #116 발견 API와 #181 탁송 호스트를 사용한다.

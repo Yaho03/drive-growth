@@ -70,6 +70,93 @@ class RentalProductJournalTest:InstrumentationTestCase() {
         ok(reopened.finish(p));assertNull(ok(reopened.pending(identity)));assertEquals(car.ownedVehicleId,ok(reopened.execute(p)))
         assertEquals(Revision(1),ok(store.listOwnedVehicles()).single().revision)
     }
+    fun testCityDraftSurvivesLevelChangeAndPersistsTheOriginalCommand() {
+        val trial = ok(AssetTrialDefinitionProvider(context.assets).load())
+        fun authority(game: GameSession): RentalPreparationInputs {
+            val content = ok(game.content)
+            val level = ok(game.store.rental.shop()).progress.shopLevel
+            return RentalPreparationInputs(content.catalog, ok(trial.rentalVisitDefinition(content, level)), now)
+        }
+        var definitionsRead = 0
+        val journal = SqliteRentalProductJournal(games, {
+            definitionsRead++
+            ContractResult.Success(authority(it).definition)
+        }, { ContractResult.Success(now) }, { ContractResult.Success(origin) })
+        val cursor = ok(journal.activate(identity))
+        val first = ok(games.open()).use(::authority)
+        val planner = RentalVisitPlanner()
+        fun plan(inputs: RentalPreparationInputs, at: RentalVisitCursor, id: String): PreparedRentalVisit =
+            checkNotNull(ok(planner.prepare(identity, inputs.catalog, inputs.definition,
+                at, now, Random(17)) { RequestId(id) }))
+        val visit = plan(first, cursor, "city-original")
+        assertNotNull(visit.city)
+        assertEquals(30 * 60_000L, visit.next.nextAt.elapsedMs - cursor.nextAt.elapsedMs)
+        val before = rows()
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), journal.saveDraft(visit.copy(city = null), first))
+        assertEquals(before, rows())
+        raw { it.execSQL("CREATE TRIGGER reject_city_save BEFORE UPDATE ON rental_product_state " +
+            "BEGIN SELECT RAISE(ABORT, 'injected city save failure'); END") }
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), journal.saveDraft(visit, first))
+        raw {
+            it.execSQL("DROP TRIGGER reject_city_save")
+            it.execSQL("UPDATE shop SET level=2,capacity=5")
+        }
+        assertEquals(cursor, ok(journal.cursor(identity)))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), journal.save(visit))
+        assertEquals(visit, ok(journal.saveDraft(visit, first)))
+
+        val fresh = GameSessionFactory(context, mapOf(source to name, InputSource.VEHICLE to name + "-vehicle"), source)
+        val replay = SqliteRentalProductJournal(fresh, { error("원방문보다 현재 정의를 먼저 읽음") },
+            { error("원방문보다 현재 시각을 먼저 읽음") }, { ContractResult.Success(origin) })
+        assertEquals(visit, ok(replay.pending(identity)))
+        assertEquals(visit, ok(replay.save(visit)))
+        assertNull(ok(replay.execute(visit)))
+        ok(replay.finish(visit))
+        val stored = RentalProductJson.prepared(visit).toString()
+        raw { db ->
+            db.rawQuery("SELECT host_command FROM visits WHERE id=?", arrayOf(visit.visit.request.id.value)).use {
+                assertTrue(it.moveToFirst())
+                assertEquals(stored, it.getString(0))
+                assertEquals("rental-prepared-v2", JSONObject(it.getString(0)).getString("type"))
+            }
+        }
+        val committed = rows()
+        val changed = visit.copy(city = RentalCity.entries.first { it != visit.city })
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), replay.save(changed))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), replay.execute(changed))
+        assertNull(ok(replay.execute(visit)))
+        assertEquals(committed, rows())
+
+        now = visit.next.nextAt
+        val second = ok(games.open()).use(::authority)
+        val next = plan(second, ok(journal.cursor(identity)), "city-next")
+        assertEquals(visit.next, next.expected)
+        assertEquals(25 * 60_000L, next.next.nextAt.elapsedMs - next.expected.nextAt.elapsedMs)
+        assertNotNull(next.city)
+        assertEquals(next, ok(journal.save(next)))
+        assertEquals(3, definitionsRead)
+    }
+
+    fun testPreparedJsonPreservesLegacyBytesAndRejectsMissingOrInvalidCity() {
+        val legacy = """{"type":"rental-prepared-v1","profile":"p","source":"SIMULATION","definition":"legacy","trial":true,"expected":{"revision":0,"sequence":0,"next":{"boot":"b","epoch":1000,"elapsed":0}},"next":{"revision":1,"sequence":1,"next":{"boot":"b","epoch":1801000,"elapsed":1800000}},"request":"visit","desired":"v","hours":1,"catalogVersion":"catalog","catalog":[{"id":"v","name":"V"}],"categories":[{"id":"v","value":"SMALL"}],"rates":[{"id":"v","value":100}],"rules":"rules","age":30,"licensed":36,"roll":99,"start":1000,"return":15,"fuel":0,"rounding":"DOWN","regular":false}"""
+        val original = RentalProductJson.prepared(JSONObject(legacy))
+        assertNull(original.city)
+        assertEquals(legacy, RentalProductJson.prepared(original).toString())
+        val visit = original.copy(city = RentalCity.SUBURBAN)
+        val v2 = RentalProductJson.prepared(visit)
+        assertEquals("rental-prepared-v2", v2.getString("type"))
+        assertEquals(visit, RentalProductJson.prepared(v2))
+        assertFalse(original == visit)
+        for (invalid in listOf(
+            JSONObject(v2.toString()).apply { remove("city") },
+            JSONObject(v2.toString()).put("city", "GPS"),
+            JSONObject(v2.toString()).put("city", JSONObject.NULL),
+            JSONObject(legacy).put("city", "SUBURBAN"),
+        )) {
+            assertTrue(runCatching { RentalProductJson.prepared(invalid) }.isFailure)
+        }
+    }
+
     fun testRevisitIsAnOriginalResultAndCannotAssignNewlyAddedVehicle() {
         val p=prepare();ok(journal().save(p));assertNull(ok(journal().execute(p)));ok(journal().finish(p));add(p.visit.request.desired)
         val before=rows();assertNull(ok(journal().execute(p)));assertEquals(before,rows())

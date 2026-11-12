@@ -102,6 +102,20 @@ key,value
 interval_ms,1800000
 max_replay_visits,16
 rounding,DOWN
+demand_definition_version,rental-demand-trial-v1
+
+[rental_visit_intervals]
+shop_level,interval_ms
+1,1800000
+2,1500000
+3,1200000
+4,900000
+
+[rental_city_uses]
+city,SMALL,SEDAN,SUV,VAN,ECO
+URBAN,6,4,1,1,4
+SUBURBAN,2,2,6,4,2
+TRANSPORT_HUB,2,4,2,6,2
 
 [rental_categories]
 vehicle_id,category,basis,demand_weight

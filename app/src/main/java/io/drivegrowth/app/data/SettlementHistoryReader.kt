@@ -1,11 +1,14 @@
 package io.drivegrowth.app.data
 
+import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.app.host.GameSessionFactory
+import io.drivegrowth.app.runtime.rental.product.RentalCity
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.rental.CompletedRental
+import io.drivegrowth.core.rental.RentalCategory
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
@@ -13,7 +16,15 @@ import java.util.Collections
 
 data class SettlementHistoryEntry(val settlement:Settlement,val viewed:Boolean,
     val rental:CompletedRental?=null,val rentalVehicleId:VehicleId?=null,
-    val rentalBasis:Observation<RentalResultBasis> = Observation.Missing(MissingReason.NO_DATA))
+    val rentalBasis:Observation<RentalResultBasis> = Observation.Missing(MissingReason.NO_DATA),
+    val rentalDemand: Observation<RentalDemandHistory> = Observation.Missing(MissingReason.NO_DATA))
+data class RentalDemandHistory(
+    val identity: GameIdentity,
+    val rental: CompletedRental,
+    val desired: VehicleDefinition,
+    val purpose: RentalCategory,
+    val city: Observation<RentalCity>,
+)
 data class SettlementHistorySnapshot(val identity:GameIdentity,val entries:List<SettlementHistoryEntry>,
     val vehicleNames:Map<VehicleId,String> = emptyMap())
 
@@ -33,29 +44,77 @@ class SettlementHistoryReader(private val store:SqliteGameChangeStore) {
             } }
         }
     }
-    fun read():ContractResult<SettlementHistorySnapshot> = store.readResult { db ->
+    fun read():ContractResult<SettlementHistorySnapshot> = store.readResult(::readIn)
+
+    private fun readIn(db: SQLiteDatabase): ContractResult<SettlementHistorySnapshot> =
         try {
             db.rawQuery("SELECT source FROM account WHERE id=1",null).use {
                 if(!it.moveToFirst() || it.text(0)!=store.source.name)bad("원장 출처 불일치")
             }
             val profile=required(store.localProfileId())
+            val identity = GameIdentity(profile, store.source)
             val ids=HashSet<SettlementId>();val requests=HashSet<RequestId>()
-            val entries=db.rawQuery("SELECT request_id,settlement_id,command,result,viewed FROM settlements ORDER BY rowid",null).use { rows->buildList {
+            val entries=db.rawQuery(historySelect,null).use { rows->buildList {
                 while(rows.moveToNext()) {
-                    val raw=rows.text(3);val receipt=decode(raw)
-                    if(receipt.transaction.requestId.value!=rows.text(0) || receipt.settlementId.value!=rows.text(1) ||
-                        receipt.transaction.source!=store.source || !ids.add(receipt.settlementId) || !requests.add(receipt.transaction.requestId))bad("정산 키·출처 불일치")
-                    val rental=checkCommand(db,profile,rows.text(2),receipt)
-                    val car=rental?.let{store.findVehicle(db,it.ownedVehicleId)}
+                    val receipt=decode(rows.text(2))
+                    if(receipt.transaction.requestId.value!=rows.text(10) || receipt.settlementId.value!=rows.text(11) ||
+                        receipt.transaction.source!=store.source || !ids.add(receipt.settlementId) || !requests.add(receipt.transaction.requestId))
+                        bad("정산 키·출처 불일치")
+                    if (rows.field("history_profile") != profile.value ||
+                        rows.field("history_profile_source") != store.source.name ||
+                        rows.field("history_account_source") != store.source.name) bad("정산 원장 프로필·출처 불일치")
+                    val rental=checkCommand(db,profile,rows.field("history_command"),receipt,rows)
+                    val car=rental?.let {
+                        val col = rows.getColumnIndexOrThrow("history_car")
+                        if (rows.isNull(col)) null else LedgerJson.vehicle(JSONObject(rows.text(col)))
+                    }
                     if(car!=null && car.ownedVehicleId!=rental.ownedVehicleId)bad("대여 차량 키 불일치")
                     val basis = rental?.let { RentalResultBasisReader(store).readIn(db, it) }
                         ?: Observation.Missing(MissingReason.NO_DATA)
-                    add(SettlementHistoryEntry(receipt,rows.flag(4),rental,car?.vehicleId,basis))
+                    val demand = rental?.let { readRentalDemand(rows, identity, it) }
+                        ?: Observation.Missing(MissingReason.NO_DATA)
+                    add(SettlementHistoryEntry(receipt,rows.flag(rows.getColumnIndexOrThrow("history_viewed")),
+                        rental,car?.vehicleId,basis,demand))
                 }
             } }
-            ContractResult.Success(SettlementHistorySnapshot(GameIdentity(profile,store.source),Collections.unmodifiableList(entries)))
+            ContractResult.Success(SettlementHistorySnapshot(identity,Collections.unmodifiableList(entries)))
         } catch(error:ReadFailure) {ContractResult.Failure(error.error)}
+
+    // RentalLedger의 완료 대여 열 순서를 재사용한다. 원방문과 배정 차량도 같은 행에서 읽는다.
+    private val historySelect = """SELECT ${RentalLedger.completedColumns},
+        s.command AS history_command, s.viewed AS history_viewed, p.profile_id AS history_profile,
+        p.source AS history_profile_source, a.source AS history_account_source,
+        car.payload AS history_car, ${RentalProductStorage.originalColumns}
+        FROM settlements s
+        LEFT JOIN rentals r ON substr(s.request_id,1,14)='rental/settle/' AND r.id=substr(s.request_id,15)
+        LEFT JOIN visits v ON v.id=r.id
+        LEFT JOIN vehicles car ON car.owned_id=r.owned_id
+        LEFT JOIN initialization_profile p ON p.id=1
+        LEFT JOIN account a ON a.id=1
+        ORDER BY s.rowid"""
+
+    private fun Cursor.field(name: String): String = text(getColumnIndexOrThrow(name))
+
+    private fun readRentalDemand(
+        row: Cursor,
+        identity: GameIdentity,
+        rental: CompletedRental,
+    ): Observation<RentalDemandHistory> {
+        val command = row.getColumnIndexOrThrow("visit_host_command")
+        if (row.isNull(command)) return Observation.Missing(MissingReason.NO_DATA)
+        val prepared = RentalProductJson.prepared(JSONObject(row.text(command)))
+        val visit = prepared.visit
+        if (prepared.identity != identity || visit.source != identity.source || visit.request.id != rental.rentalId)
+            bad("원래 방문의 프로필·출처·요청 불일치")
+        if (RentalProductStorage.original(row, prepared) != rental.ownedVehicleId)
+            bad("원래 방문 배정 불일치")
+        val desired = visit.catalog.vehicles.singleOrNull { it.vehicleId == visit.request.desired }
+            ?: bad("방문에 희망 차종이 없음")
+        val purpose = visit.categories[desired.vehicleId] ?: bad("방문에 희망 차종의 유형이 없음")
+        val city = prepared.city?.let { Observation.Available(it) } ?: Observation.Missing(MissingReason.NO_DATA)
+        return Observation.Available(RentalDemandHistory(identity, rental, desired, purpose, city))
     }
+
     private fun decode(raw:String):Settlement {
         val json=JSONObject(raw)
         LedgerJson.integer(json,"balance",0,Long.MAX_VALUE)
@@ -64,9 +123,9 @@ class SettlementHistoryReader(private val store:SqliteGameChangeStore) {
         if(LedgerJson.settlement(receipt).toString()!=raw)bad("정산 원문 형식 불일치")
         return receipt
     }
-    private fun checkCommand(db:SQLiteDatabase,profile:ProfileId,raw:String,s:Settlement):CompletedRental? {
+    private fun checkCommand(db:SQLiteDatabase,profile:ProfileId,raw:String,s:Settlement,row: Cursor):CompletedRental? {
         return when(val json=JSONTokener(raw).nextValue()) {
-            is JSONArray->checkArray(db,json,raw,s)
+            is JSONArray->checkArray(json,raw,s,row)
             is JSONObject->{
                 when(json.optString("type")) {
                     ""->{
@@ -174,16 +233,17 @@ class SettlementHistoryReader(private val store:SqliteGameChangeStore) {
             if(!it.moveToFirst() || it.text(0)!=command)bad("기능 원래 행 누락·불일치")
             it.text(1)
         }
-    private fun checkArray(db:SQLiteDatabase,j:JSONArray,raw:String,s:Settlement):CompletedRental? {
+    private fun checkArray(j:JSONArray,raw:String,s:Settlement,row: Cursor):CompletedRental? {
         when(j.getString(0)) {
             "settle"->{
                 if(j.length()!=2 || j.toString()!=raw || s.transaction.kind!=TransactionKind.RENTAL)bad("영업 정산 명령 오류")
-                val id=RequestId(j.getString(1));val rental=required(store.rental.completedRental(id))?:bad("완료 대여 누락")
-                if(rental.receipt.settlement!=s || s.transaction.money?.direction!=MoneyDirection.CREDIT)bad("대여 원래 정산 불일치")
-                db.rawQuery("SELECT r.version,r.settlement_request,v.assigned FROM rentals r LEFT JOIN visits v ON v.id=r.id WHERE r.id=?",arrayOf(id.value)).use {
-                    if(!it.moveToFirst() || it.text(0)!=s.transaction.ruleVersion.value || it.text(1)!=s.transaction.requestId.value ||
-                        it.text(2)!=rental.ownedVehicleId.value)bad("대여 규칙·정산·배정 연결 불일치")
-                }
+                val id = RequestId(j.getString(1))
+                if (row.getString(0) != id.value || row.field("original_rules") != s.transaction.ruleVersion.value)
+                    bad("완료 대여 또는 규칙 연결 불일치")
+                val rental = store.rental.decodeCompleted(row)
+                if (rental.receipt.settlement != s || s.transaction.money?.direction != MoneyDirection.CREDIT ||
+                    row.field("visit_id") != id.value || row.field("visit_assigned") != rental.ownedVehicleId.value)
+                    bad("대여 원래 정산·배정 연결 불일치")
                 return rental
             }
             "facility","expand"->{
