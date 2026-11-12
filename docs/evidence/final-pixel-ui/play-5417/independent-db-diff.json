@@ -1,0 +1,49 @@
+{
+  "source_head": "5417c63e31cdb3140182c389a5581d39faa17fa2",
+  "method": "SQLite immutable read-only, integrity and schema checks, and row multiset comparison for all tables",
+  "before": {
+    "path": "/private/tmp/drive-e-28-combined.Xrc4NI/play-5417/ledger-before-cold.db",
+    "sha256": "2dd92670a425116f81c7836ac700b8bc94c1bd00c6dde97a7bc29643e9232d29"
+  },
+  "after": {
+    "path": "/private/tmp/drive-e-28-combined.Xrc4NI/play-5417/ledger-after-viewed.db",
+    "sha256": "2de0963d935a66db6dfef43eafc185bffc769b61de7a50c5ba13a6fb060aac0b"
+  },
+  "compared_tables": 51,
+  "unchanged_tables": 48,
+  "changed_tables": {
+    "host_command_checkpoint": {
+      "rows_before": 1,
+      "rows_after": 0,
+      "removed_rows": 1
+    },
+    "quest_events": {
+      "rows_before": 1,
+      "rows_after": 2,
+      "added_rows": 1,
+      "added_action": "RESULT_VIEWED",
+      "source": "SIMULATION",
+      "matches_viewed_driving_request_and_settlement": true
+    },
+    "settlements": {
+      "rows_before": 5,
+      "rows_after": 5,
+      "updated_rows": 1,
+      "updated_kind": "DRIVING",
+      "changed_fields": {
+        "viewed": {
+          "before": 0,
+          "after": 1
+        }
+      },
+      "request_id_settlement_id_command_and_result_unchanged_for_all_rows": true
+    }
+  },
+  "unchanged_account_and_vehicle_rows": true,
+  "unchanged_counts": {
+    "account": 1,
+    "vehicles": 1,
+    "quest_claims": 0,
+    "gacha_requests": 0
+  }
+}

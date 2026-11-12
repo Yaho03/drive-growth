@@ -3049,3 +3049,14 @@ Pleos 에뮬레이터에서 별도 SIMULATION factory 대신 실제 Vehicle SDK 
 사용자 설치용 표준 Debug APK도 `3bd7d92`에서 빌드했다. 패키지 `io.drivegrowth.app.simulation`, 버전 `0.1.0`/1, 런처 `UnifiedSimulationActivity`, SHA-256 `6a41e671741781d706025138bf07f964f141210138f162249c39c18f834eb745`이다. 장치에서 실행한 격리 패키지와 DEX·assets는 동일하며 Manifest와 resources의 패키지 차이가 있다. 표준 APK 자체의 설치는 이 실행에서 하지 않았고 Release/실차 검증으로 표시하지 않는다. [산출물 대조](evidence/final-pixel-ui/standard-debug-artifact-comparison.json)
 
 이 묶음의 장치 반환에서 제품 APK·기존 데이터 6개·권한·화면 설정·차량 P·전면 지도 등 **19/19**가 일치했다. [반환 결과](evidence/final-pixel-ui/final-device-return-preservation.json). 같은 프로필의 무료권→구매 탁송→시설 확정→퀘스트 청구 연속 실행, 공식 창 프리셋·시스템 분할·회전과 실제 SDK 변경 성공은 이 결과에 포함되지 않는다. 실제 SDK 변경은 현재 미지원 경로이며, 나머지 실행 가능한 통합 검증은 #28에서 이어간다.
+
+
+### 같은 프로필의 모의 주행·탁송·정산 열람
+
+제품 소스 `5417c63e31cdb3140182c389a5581d39faa17fa2`의 격리 모의 앱에서 실제 화면 입력으로 첫 차량 지급 → 수익 탁송 선택 → 모의 주행 중 첫 대여·개업 선물 → 도착 정산 → 새 프로세스의 원결과 → 정산 열람을 연결했다. 이 실행은 이후 가게 표시 정리 전 소스의 부분 연속 플레이이며, 실제 차량 입력이나 모든 기능의 최종 통합 실행으로 표시하지 않는다.
+
+- 최초 지급 1,000, 대여 수익 120, 기본 주행 수익 360과 수익 탁송 170은 각각 별도 원정산이다. 주행 상세는 360·해당 정산 당시 잔액 1,480, 탁송 상세는 170·당시 잔액 1,650으로 표시한다. 현재 총잔액을 각 결과의 수익으로 표시하지 않는다.
+- PID `10453 → 9823` 뒤 같은 request·settlement를 다시 조회했다. 확인·열람 후 공용 슬롯 `1 → 0`, 주행 결과의 열람 상태 `0 → 1`과 퀘스트 진행 이벤트 한 건 추가를 확인했다. 원정산 내용·계정·차량은 유지됐고 보상 청구는 0건이다.
+- 이 실행에서 무료 뽑기권은 한 장 지급됐지만 가챠 거래와 퀘스트 청구는 모두 0건이다. 그 두 기능을 사용한 연속 플레이 성공으로 확대하지 않는다.
+
+[원장 전후 대조](evidence/final-pixel-ui/play-5417/manual-ledger-diff.json) · [독립 전체 DB 대조](evidence/final-pixel-ui/play-5417/independent-db-diff.json) · [설치 해시](evidence/final-pixel-ui/play-5417/install-sha256.txt) · [탁송 수익](evidence/final-pixel-ui/play-5417/65-delivery-detail.png) · [기본 주행 수익](evidence/final-pixel-ui/play-5417/69-driving-detail.png) · [새 프로세스 원결과](evidence/final-pixel-ui/play-5417/57-cold-original.png) · [열람 후](evidence/final-pixel-ui/play-5417/73-viewed.png). 설치 APK SHA-256은 `60ab0bf8bcfadd08b8ff86163bba3677d7f23e26cb3a2f86fe29c6434a9e9a2f`다.
