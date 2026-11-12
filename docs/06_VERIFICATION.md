@@ -2096,6 +2096,25 @@ adb -P 5038 -s emulator-5556 shell am instrument --user 10 -w -r \
 
 Manifest의 앱 ID·계측 대상·runner·서명과 APK 해시를 확인해 두 APK를 해당 사용자에 설치한다. #37은 기존 #80 진단 절차로 42dot 안내를 준비하고 진단 SDK를 해제한다. 격리 앱의 `NAVI_ROUTE`와 `CAR_SPEED` 허용을 확인한다. 시험 자금은 각 시험이 격리 `databases/game-ledger-vehicle.db`에 생성하며 SDK 입력은 주입하지 않는다. 실행별 SDK·선택 기록은 앱의 `files/issue37-native-main.jsonl`에서 회수한다. #52는 공개 초기화 어댑터로 첫 아반떼와 주차 시연 설정을 준비하고 격리 `databases/unified-simulation.db`를 사용한다. 각 시험은 새 DB와 전용 앱 ID를 요구하므로 기본 Debug 전체 계측 대신 표의 셀렉터를 개별 실행한다.
 
+#### #37–39 실제 SDK 견적의 구매 복원·변경 거절과 모의 종료 결과 — 2026-11-13
+
+Pleos 2.1.0/API 34/ARM64, Android 사용자 10의 격리 Debug Main에서 실행했다. 장치 제품 기준은 main `4d23249c2c091c37c2cb7bda15c659d7f54884fb`이고, 게시 기준은 main `27da696529727d50e79a8883347cbb784b901b23`다. 두 기준 사이에 #242의 Update 재생 검증과 Quest checkpoint 후조건 등 저장 구현 차이가 있다. 게시 조합의 빌드·장치 실행은 이번 슬롯에서 수행하지 않았다. 실행·설치 회수 해시와 PID는 [선별 실행 기록](evidence/issue37-39-main-recovery/results.json)에 남겼다.
+
+- **#37 실제 SDK 견적·시험 재화.** 42dot 경로의 남은 예상거리 50m를 표본 수신 뒤 214ms에 확인했다. VEHICLE 프로필의 첫 지급 뒤 시험 자금 10,000을 넣고 Main 버튼으로 후보를 선택해 1,800을 한 번 차감했다. 11.794초에 통과했다. 같은 설치와 DB에서 PID 13648 → 16303으로 다시 열어 동일 의뢰·경로·결제와 비교 원장 해시를 확인했다. 8.631초에 통과했다. 도착 증거는 `Missing`으로 유지됐으며, 도착 지급과 차량 추가는 없었다.
+- **#38 실제 SDK의 다른 목적지 견적.** 기존 안내를 종료하고 내비 UI에서 판교역 신분당선의 새 안내를 시작했다. 첫 계측은 3,100m 견적을 받은 뒤 `Destination` 화면을 놓쳐 확정 전 타임아웃했다. 대기 조건에 `Destination`을 포함하고 기존 앱과 DB를 유지한 채 계측 APK만 교체했다. PID 19839의 재실행에서 이동 관측값 부족에 따른 거절과 원의뢰·결제·경로·비교 원장 해시 보존을 확인했다. 8.115초에 통과했다. 변경 성공·차액 비교와 실제 도착은 미검증이다.
+- **#39 SIMULATION 종료·재조회.** 36km 모의 목록과 시험 시각으로 종료 조건을 만들었다. 보관 두 사례의 만차 도착은 공용 원장에 모의 도착 입력으로 준비했다. Main에서 만료 처리 또는 수령을 확인하고, 확인 전 종료해 같은 DB를 새 PID에서 열었다. 원결과 조회 후 확인했을 때 비교 대상 거래 상태는 유지되고 checkpoint가 해제됐다. 회수 SQLite를 테이블별로 대조하면 `host_command_checkpoint`와 전경 `observed_driving_state`가 달라졌다. 수익 기한 종료는 선택·만료·재조회·확인의 정산 행이 일치했고 신규 정산은 없었다. 회수한 네 DB는 schema 20, `quick_check=ok`였다.
+
+| #39 조건 | 최초 처리 | 새 PID 재조회·확인 |
+| --- | ---: | ---: |
+| 미도착 구매 전액 환급 | 3.721초 | 2.917초 |
+| 보관 차량 수령 | 3.281초 | 2.706초 |
+| 보관 만료 수수료 공제 환급 | 2.800초 | 2.473초 |
+| 미도착 수익 의뢰 기한 종료 | 2.684초 | 2.448초 |
+
+위 격리 빌드·계측 명령과 [#37·#38 시험 소스](../app/src/androidTest/java/io/drivegrowth/app/host/delivery/Issue37NativeMainPurchaseTest.kt), [#39 시험 소스](../app/src/androidTest/java/io/drivegrowth/app/simulation/DeliveryTerminalRecoveryMainTest.kt)를 사용한다. `io.drivegrowth.verify.issue37buy`의 새 설치에서 42dot 안내를 유지하며 `testNativePurchaseForColdRestore`와 `testColdMainRestoresNativePurchaseWithoutInferringArrival`을 각 새 프로세스에서 순서대로 실행한다. 내비 UI에서 다른 안내로 교체한 후 같은 앱 데이터로 `testColdMainRejectsChangedSdkDestinationWithoutObservedTravel`을 실행한다. #39는 `io.drivegrowth.verify.delivery39`에 `missed`, `claim`, `fee`, `income`을 붙인 전용 앱을 각각 사용한다. 각 새 설치에서 `testMainProcessesPreparedTerminalCondition`을 먼저 실행하고, 같은 데이터의 새 프로세스에서 `testColdMainReopensOriginalTerminalResultAndClearsOnlyCheckpoint`을 실행한다. 단계 사이에는 해당 격리 앱만 종료하고 PID가 사라졌는지 확인한다.
+
+시험 안내 종료와 진단 SDK 해제 후 원래 진단 APK의 바이트를 확인했고, 격리 앱·계측 패키지 10개를 제거했다. 제품 APK와 데이터 파일 6개를 포함한 보호 19/19가 일치했으며 02:22:46.786307 KST에 슬롯을 반환했다. 실제 SDK 견적 근거는 P·0km/h에서 확보했다. 실제 D/P 전환, 도착 귀속과 지급, 전원·실차 검증은 남아 있다.
+
 #### Schema19 이전과 Quest 원결과 재생의 별도 계측 — 2026-11-12
 
 `c03a333427acf4c1b4a37045ad2e2033365ddba1`에 계측 전용 패치 `108a79a9d3636ba83e777fa05887b1aaa0db6829e2759594478cf7b47b7e1c5d`를 적용한 Pleos API 34 ARM64 격리 실행에서 `Schema19UpgradeTest` 3건(2.800초)과 `QuestStoreIntegrationTest#testActualClaimWholeReplayPrecedesNewDefinitionTimeAndCurrentBalance` 1건(0.217초)이 통과했다. v2·v10·v12의 과거 DDL과 재현용 SIMULATION 행으로 기존 열의 값, 새 `visits.host_command`의 초기 `NULL`, DB 재개방을 확인했다. v12 후기 실패 롤백·원본 보존과 교차 소유 요청 충돌도 검증했다. Quest는 정의·시각·현재 잔액이 달라져도 같은 청구의 당시 전체 결과가 우선 재생되는지 확인했다.

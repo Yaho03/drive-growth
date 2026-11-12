@@ -1,6 +1,7 @@
 package io.drivegrowth.app.host.delivery
 
 import android.content.pm.PackageManager
+import android.os.Process
 import android.os.SystemClock
 import android.test.ActivityInstrumentationTestCase2
 import android.view.View
@@ -21,7 +22,9 @@ import io.drivegrowth.app.vehicle.navigation.NavigationSource
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.delivery.DeliveryOffer
 import io.drivegrowth.core.garage.CollectionKey
+import org.json.JSONArray
 import org.json.JSONObject
+import java.security.MessageDigest
 import kotlin.math.abs
 
 /** 진단 앱이 준비하고 해제한 안내 A를 기존 Main의 실제 SDK 어댑터로 읽는다. */
@@ -39,6 +42,177 @@ class Issue37NativeMainPurchaseTest :
     fun testNativeQuoteDisplaysAndConfirmsOnePurchase() = verifyPurchase("buy", affordable = true)
 
     fun testNativeQuoteShowsInsufficientFundsWithoutChanges() = verifyPurchase("poor", affordable = false)
+
+    fun testNativePurchaseForColdRestore() {
+        verifyPurchase("buy", affordable = true)
+        record("cold_fixture", "pid" to Process.myPid(), "ledgerSha256" to purchaseLedgerSha256())
+    }
+
+    fun testColdMainRestoresNativePurchaseWithoutInferringArrival() {
+        val fixture = coldFixture()
+        openOriginalActive(fixture)
+        val sdk = awaitSdkQuote { it.route == fixture.sdkRoute }
+        awaitUi("재연결 SDK 안내와 별개로 원의뢰가 도착 확인 대기를 유지함") {
+            val state = session.delivery.state ?: return@awaitUi false
+            val active = (state.screen as? DeliveryScreen.Active)?.delivery ?: return@awaitUi false
+            val navigation = state.navigation ?: return@awaitUi false
+            if (active.active.requestId.value != fixture.request) return@awaitUi false
+            assertTrue(navigation.arrival is Observation.Missing)
+            val reconnected = ok(session.deliveryNavigation.port.read(state.identity))
+            assertEquals(sdk.generation, checkNotNull(reconnected.metadata?.connectionGeneration))
+            assertNull("현재 SDK 안내를 저장된 선택으로 자동 연결하지 않음", reconnected.destination)
+            assertTrue(reconnected.estimated is Observation.Missing)
+            assertTrue(reconnected.arrival is Observation.Missing)
+            assertNull(active.destinationName)
+            context.getString(R.string.delivery_destination_missing) in labels() &&
+                "목적지 도착 증거를 확인하고 있어요." in labels()
+        }
+        assertOriginalPurchase(fixture)
+        record("cold_restored", "pid" to Process.myPid(), "sdkRoute" to sdk.route,
+            "generation" to sdk.generation, "sdkMeters" to sdk.meters, "request" to fixture.request,
+            "appRoute" to fixture.appRoute, "ledgerSha256" to fixture.ledgerSha256, "arrival" to "Missing")
+    }
+
+    fun testColdMainRejectsChangedSdkDestinationWithoutObservedTravel() {
+        val fixture = coldFixture()
+        openOriginalActive(fixture)
+        awaitUi("원래 의뢰의 이동 관측은 누락 상태") {
+            val navigation = session.delivery.state?.navigation ?: return@awaitUi false
+            navigation.observed is Observation.Missing && navigation.arrival is Observation.Missing
+        }
+        awaitUi("현재 의뢰의 목적지 변경 요청") { button("delivery:destination")?.performClick() == true }
+        awaitUi("새 목적지의 SDK 확인 대기") {
+            val screen = session.delivery.state?.screen
+            (screen is DeliveryScreen.Destination || screen is DeliveryScreen.AwaitingResult) &&
+                labelledButton("내비 목적지 다시 조회") != null
+        }
+        val sdk = awaitSdkQuote {
+            it.route != fixture.sdkRoute &&
+                (abs(it.latitude - fixture.latitude) > 0.001 || abs(it.longitude - fixture.longitude) > 0.001)
+        }
+        awaitUi("다른 SDK 목적지의 유효한 견적을 Main에서 확인") {
+            val live = readSdkQuote() ?: return@awaitUi false
+            if (live.route != sdk.route || live.latitude != sdk.latitude || live.longitude != sdk.longitude)
+                return@awaitUi false
+            val confirm = labelledButton("이 목적지와 남은 예상거리 확인") ?: return@awaitUi false
+            assertTrue(confirm.performClick())
+            val identity = checkNotNull(session.delivery.state).identity
+            val selected = ok(session.deliveryNavigation.port.read(identity))
+            assertNotNull("SDK 목적지 확인 성공", selected.destination)
+            assertEquals(EstimatedRouteDistance(live.meters, InputSource.VEHICLE),
+                (selected.estimated as? Observation.Available)?.value)
+            assertTrue(selected.arrival is Observation.Missing)
+            true
+        }
+        awaitUi("이동 근거가 없는 변경 거절") {
+            "탁송에 필요한 정보를 확인할 수 없어요. 원래 요청은 유지돼요." in labels() &&
+                button("delivery:change") == null
+        }
+        assertOriginalPurchase(fixture)
+        record("change_rejected", "pid" to Process.myPid(), "sdkRoute" to sdk.route,
+            "generation" to sdk.generation, "sdkMeters" to sdk.meters, "request" to fixture.request,
+            "appRoute" to fixture.appRoute, "ledgerSha256" to fixture.ledgerSha256, "arrival" to "Missing")
+    }
+
+    private data class ColdFixture(
+        val profile: String, val request: String, val settlement: String, val appRoute: String, val price: Long,
+        val sdkRoute: String, val latitude: Double, val longitude: Double, val ledgerSha256: String,
+    )
+
+    private fun coldFixture(): ColdFixture {
+        assertEquals("io.drivegrowth.verify.issue37buy", context.packageName)
+        assertTrue(context.getDatabasePath("game-ledger-vehicle.db").isFile)
+        val rows = evidence.readLines().map { JSONObject(it) }
+        fun event(kind: String) = rows.single { it.getString("kind") == kind }
+        val baseline = event("cold_fixture")
+        assertFalse("구매를 실행한 프로세스와 다른 PID여야 합니다.", baseline.getString("pid").toInt() == Process.myPid())
+        val purchase = event("purchase")
+        val sdk = event("sdk_quote")
+        return ColdFixture(event("discovery").getString("profile"), purchase.getString("request"),
+            purchase.getString("settlement"), purchase.getString("route"), purchase.getString("price").toLong(),
+            sdk.getString("route"), sdk.getString("latitude").toDouble(), sdk.getString("longitude").toDouble(),
+            baseline.getString("ledgerSha256"))
+    }
+
+    private fun openOriginalActive(fixture: ColdFixture) {
+        assertOriginalPurchase(fixture)
+        activity
+        awaitUi("새 PID의 Main에 같은 활성 구매 표시") {
+            assertNull(session.simulation)
+            val active = (session.delivery.state?.screen as? DeliveryScreen.Active)?.delivery
+            if (active?.active?.requestId?.value == fixture.request &&
+                context.getString(R.string.delivery_active) in labels()) return@awaitUi true
+            val spinner = activity.window.decorView.findViewWithTag<Spinner>("host:destination")
+                ?.takeIf { it.isEnabled && it.isShown && it.isLaidOut && !it.isLayoutRequested }
+                ?: return@awaitUi false
+            val index = (0 until spinner.count).single { spinner.getItemAtPosition(it).toString() == "탁송" }
+            if (spinner.selectedItemPosition != index) spinner.setSelection(index)
+            false
+        }
+    }
+
+    private fun assertOriginalPurchase(fixture: ColdFixture) {
+        assertEquals("원의뢰·결제·활성 경로·잔액과 비교 원장 행 보존",
+            fixture.ledgerSha256, purchaseLedgerSha256())
+        read { game ->
+            assertEquals(InputSource.VEHICLE, game.identity.source)
+            assertEquals(fixture.profile, game.identity.profileId.value)
+            val progress = checkNotNull(ok(game.store.delivery.inProgress()))
+            val terms = checkNotNull(ok(game.store.delivery.terms()))
+            assertEquals(fixture.request, progress.active.requestId.value)
+            assertEquals(fixture.appRoute, progress.route.value)
+            assertEquals(progress.active, terms.active)
+            assertEquals(GameMoney(fixture.price), terms.paid)
+            assertFalse("변경 기회 보존", terms.changeUsed)
+            val receipt = ok(game.store.listUnviewedSettlements()).single { it.transaction.kind == TransactionKind.DELIVERY }
+            assertEquals(fixture.settlement, receipt.settlementId.value)
+            assertEquals(progress.active.requestId, receipt.transaction.requestId)
+            assertEquals(MoneyChange(MoneyDirection.DEBIT, GameMoney(fixture.price)), receipt.transaction.money)
+            assertEquals(GameMoney(11_000 - fixture.price), ok(game.store.balance()))
+            assertEquals(1, ok(game.store.listOwnedVehicles()).size)
+            assertNull(ok(game.store.delivery.arrivalResult(progress.active.requestId)))
+            assertNull(ok(game.store.hostCommands.load(game.identity.profileId)))
+        }
+    }
+
+    private data class SdkQuote(
+        val route: String, val generation: Long, val meters: Long, val latitude: Double, val longitude: Double,
+    )
+
+    private fun awaitSdkQuote(matches: (SdkQuote) -> Boolean): SdkQuote {
+        awaitUi("새 프로세스의 SDK 연결 후 내비 조회") {
+            val raw = session.deliveryNavigation.snapshot ?: return@awaitUi false
+            if (raw.connection != NavigationConnection.CONNECTED_OBSERVED || raw.failure != null) return@awaitUi false
+            labelledButton("내비 목적지 다시 조회")?.performClick() == true
+        }
+        return awaitUiValue("현재 SDK 연결 세대의 신선한 안내 견적") { readSdkQuote()?.takeIf(matches) }
+    }
+
+    private fun readSdkQuote(): SdkQuote? {
+        val raw = session.deliveryNavigation.snapshot ?: return null
+        if (raw.connection != NavigationConnection.CONNECTED_OBSERVED || raw.failure != null) return null
+        val route = raw.routeId as? NavigationField.Value ?: return null
+        val destination = raw.destination as? NavigationField.Value ?: return null
+        val distance = raw.remainingEstimatedMeters as? NavigationField.Value ?: return null
+        val guidance = raw.guidance as? NavigationField.Value ?: return null
+        val generation = raw.stamp.connectionGeneration
+        val now = SystemClock.elapsedRealtime()
+        if (route.value.isBlank() || guidance.value.mode != "ROUTE_GUIDING" || distance.value <= 0 ||
+            distance.stamp != destination.stamp || listOf(route.stamp, distance.stamp, guidance.stamp).any {
+                it.connectionGeneration != generation || it.source != NavigationSource.PLEOS_NAVI_SDK
+            } || now - distance.stamp.receivedElapsedMillis !in 0L..5_000L ||
+            now - guidance.stamp.receivedElapsedMillis !in 0L..5_000L) return null
+        return SdkQuote(route.value, generation, distance.value, destination.value.latitude, destination.value.longitude)
+    }
+
+    private fun purchaseLedgerSha256(): String {
+        val tables = JSONArray()
+        for ((table, rows) in ledger(includeObservationBinding = false)) {
+            tables.put(JSONArray().put(table).put(JSONArray(rows.map { JSONArray(it) })))
+        }
+        return MessageDigest.getInstance("SHA-256").digest(tables.toString().toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+    }
 
     private fun verifyPurchase(scenario: String, affordable: Boolean) {
         assertEquals("io.drivegrowth.verify.issue37$scenario", context.packageName)
@@ -206,11 +380,13 @@ class Issue37NativeMainPurchaseTest :
     }
 
     // 후보/발견 및 차량 관측은 정당하게 바뀌므로 거래와 의뢰 표만 비교한다.
-    private fun ledger() = read { game ->
+    private fun ledger(includeObservationBinding: Boolean = true) = read { game ->
         ok(game.store.read { db ->
             listOf("account", "vehicles", "settlements", "delivery_requests", "delivery_active",
                 "delivery_routes", "delivery_route_history", "delivery_outcomes", "host_command_checkpoint").associateWith { table ->
-                db.rawQuery("SELECT * FROM $table ORDER BY rowid", null).use { cursor ->
+                // 관측 수신 세션의 참조 열은 새 프로세스에서 바뀔 수 있다. 원의뢰 경로와 시작 시각은 비교한다.
+                val columns = if (!includeObservationBinding && table == "delivery_routes") "request_id, route, started_at" else "*"
+                db.rawQuery("SELECT $columns FROM $table ORDER BY rowid", null).use { cursor ->
                     buildList { while (cursor.moveToNext()) add((0 until cursor.columnCount).map(cursor::getString)) }
                 }
             }
