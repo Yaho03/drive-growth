@@ -131,13 +131,14 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
     private fun items(parent: LinearLayout, entries: List<ProgressItem>) = with(style) {
         if (entries.isEmpty()) add(parent, text(s(R.string.progress_group_empty), color = muted))
         for (item in entries) {
-            val card = if (item.status == RewardStatus.CLAIMABLE) card(amber) else card()
+            val enabled = interaction.canClaim(item)
+            val card = if (enabled) card(amber) else card()
             add(card, text(item.title, 24, bold = true), 0)
-            add(card, text(status(item), color = if (item.status == RewardStatus.CLAIMED) green else amber), 0)
+            add(card, statusText(item, enabled), 0)
             progress(card, item)
             add(card, text(item.rewardLabel ?: s(R.string.progress_unknown_reward), color = muted), 0)
             item.note?.let { add(card, text(it, 18, muted), 0) }
-            add(card, button(s(R.string.progress_details), primary = item.status == RewardStatus.CLAIMABLE) {
+            add(card, button(s(R.string.progress_details), primary = enabled) {
                 interaction.select(item.key); detailY = 0; drawScreen()
             }.apply { tag = item.key })
             add(parent, card)
@@ -161,7 +162,7 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
         } else {
             val enabled = interaction.canClaim()
             val card = if (enabled) card(amber) else card()
-            add(card, text(item.title, 28, bold = true), 0); add(card, text(status(item), color = amber)); progress(card, item)
+            add(card, text(item.title, 28, bold = true), 0); add(card, statusText(item, enabled)); progress(card, item)
             add(card, text(s(R.string.progress_confirm_title), 24, bold = true))
             add(card, text(item.rewardLabel ?: s(R.string.progress_unknown_reward), 24))
             add(card, text(s(R.string.progress_confirm_body)))
@@ -177,11 +178,19 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
         }
         add(parent, button(s(R.string.progress_close)) { handleBack() })
     }
-    private fun status(item: ProgressItem): String = s(if (interaction.isPending(item)) R.string.progress_pending else when (item.status) {
+    private fun statusText(item: ProgressItem, canClaim: Boolean) = with(style) {
+        val color = when {
+            canClaim -> amber
+            item.status == RewardStatus.CLAIMED && !interaction.isPending(item) -> green
+            else -> muted
+        }
+        text(status(item, canClaim), color = color)
+    }
+    private fun status(item: ProgressItem, canClaim: Boolean): String = s(if (interaction.isPending(item)) R.string.progress_pending else when (item.status) {
         RewardStatus.LOCKED -> R.string.progress_locked
         RewardStatus.IN_PROGRESS -> R.string.progress_in_progress
         RewardStatus.COMPLETE -> R.string.progress_complete
-        RewardStatus.CLAIMABLE -> R.string.progress_claimable
+        RewardStatus.CLAIMABLE -> if (canClaim) R.string.progress_claimable else R.string.progress_complete
         RewardStatus.PENDING -> R.string.progress_pending
         RewardStatus.CLAIMED -> R.string.progress_claimed
         RewardStatus.EXPIRED -> R.string.progress_expired

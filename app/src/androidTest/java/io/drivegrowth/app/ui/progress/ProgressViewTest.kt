@@ -2,6 +2,7 @@ package io.drivegrowth.app.ui.progress
 
 import android.content.res.Configuration
 import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
@@ -15,6 +16,7 @@ import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.app.host.progression.ProgressionJournalState
 import io.drivegrowth.app.host.progression.ProgressionMapper
 import io.drivegrowth.app.host.progression.ProgressionRead
+import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.InputSource
 import io.drivegrowth.core.contract.ProfileId
@@ -50,6 +52,35 @@ class ProgressViewTest : InstrumentationTestCase() {
         assertTrue(texts(view).contains("수령 확인됨")); assertFalse(claim(view).isEnabled)
         assertFalse(view.render(ProgressPreviewStates.normal, true))
     }
+    fun testOverviewHighlightsOnlyCurrentlyClaimableOffers() = onUi {
+        val context = instrumentation.targetContext
+        val events = mutableListOf<ProgressEvent>()
+        val view = ProgressView(context, events::add)
+        val ready = ProgressPreviewStates.normal.entries.single { it.key == ProgressPreviewStates.firstKey }
+        val disabled = ready.copy(key = ProgressKey("disabled", ready.key.periodId),
+            claim = ClaimOffer("disabled", false))
+        fun buttonColor(key: ProgressKey): Int? {
+            val button = view.findViewWithTag<Button>(key)
+            assertTrue("상세 보기는 계속 열 수 있다", button.isEnabled)
+            return (button.background as GradientDrawable).color?.defaultColor
+        }
+        val claimable = context.getString(R.string.progress_claimable)
+        view.render(ProgressPreviewStates.normal.copy(entries = listOf(ready, disabled)), true)
+        assertEquals(PixelStyle.primary, buttonColor(ready.key))
+        assertEquals(PixelStyle.inset, buttonColor(disabled.key))
+        assertEquals(1, texts(view).count { it == claimable })
+
+        select(view)
+        assertTrue(claim(view).performClick())
+        assertTrue(view.handleBack())
+
+        assertEquals(PixelStyle.inset, buttonColor(ready.key))
+        assertEquals(PixelStyle.inset, buttonColor(disabled.key))
+        assertFalse(texts(view).contains(claimable))
+        assertTrue(texts(view).contains(context.getString(R.string.progress_pending)))
+        assertEquals(1, events.filterIsInstance<ProgressEvent.ClaimReward>().size)
+    }
+
     fun testRestrictionAndSelectionDisappearanceCannotCreateAReward() = onUi {
         val events = mutableListOf<ProgressEvent>(); val view = ProgressView(instrumentation.targetContext, events::add)
         view.render(ProgressPreviewStates.normal, true); select(view)

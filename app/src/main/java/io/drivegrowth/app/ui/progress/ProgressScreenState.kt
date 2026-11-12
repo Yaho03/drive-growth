@@ -134,11 +134,14 @@ class ProgressInteraction(private val onEvent: (ProgressEvent) -> Unit) {
     }
     fun isPending(item: ProgressItem): Boolean = item.status == RewardStatus.PENDING || uiState.pending?.key == item.key ||
         uiState.pendingConflicts.any { it.key == item.key }
-    fun canClaim(): Boolean {
-        val item = selectedItem ?: return false; val offer = item.claim ?: return false
-        if (item.revision < (uiState.acceptedRevisions[item.key] ?: -1L)) return false
+    fun canClaim(): Boolean = selectedItem?.let(::canClaim) == true
+
+    internal fun canClaim(item: ProgressItem): Boolean {
+        val entries = (state as? ProgressScreenState.Content)?.entries ?: return false
+        val offer = item.claim ?: return false
+        if (item !in entries || item.revision < (uiState.acceptedRevisions[item.key] ?: -1L)) return false
         return controlsEnabled && uiState.pending == null && uiState.pendingConflicts.isEmpty() &&
-            (state as? ProgressScreenState.Content)?.entries?.none { it.status == RewardStatus.PENDING } == true && offer.enabled && offer.requestKey !in uiState.requestedKeys &&
+            entries.none { it.status == RewardStatus.PENDING } && offer.enabled && offer.requestKey !in uiState.requestedKeys &&
             item.rewardLabel != null && item.status in listOf(RewardStatus.CLAIMABLE, RewardStatus.FAILED)
     }
     fun claim(expected: ClaimReference? = selectedItem?.let { item -> item.claim?.let { ClaimReference(item.key, item.revision, it.requestKey) } }): Boolean {

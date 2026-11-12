@@ -22,6 +22,34 @@ class ProgressInteractionTest {
         assertEquals(RewardStatus.CLAIMABLE, ui.selectedItem!!.status)
         assertTrue(ui.isPending(ui.selectedItem!!))
     }
+    @Test fun overviewEligibilityMatchesDetailForDisabledOffersAndLocalPending() {
+        val events = mutableListOf<ProgressEvent>()
+        val ui = interaction(events)
+        val ready = item()
+        val disabled = item(token = "disabled").copy(key = ProgressKey("disabled", "fixture-day"),
+            claim = ClaimOffer("disabled", false))
+        val other = item(token = "other").copy(key = ProgressKey("other", "fixture-day"))
+        ui.render(content(entries = listOf(ready, disabled, other)), true)
+
+        assertTrue(ui.canClaim(ready))
+        assertFalse(ui.canClaim(disabled))
+        ui.select(disabled.key)
+        assertFalse(ui.canClaim())
+        assertFalse(ui.claim())
+        ui.select(ready.key)
+        assertTrue(ui.canClaim())
+        assertTrue(ui.claim())
+        ui.closeDetail()
+
+        assertTrue(ui.isPending(ready))
+        assertFalse(ui.canClaim(ready))
+        assertFalse(ui.canClaim(other))
+        ui.select(ready.key)
+        assertFalse(ui.canClaim())
+        assertFalse(ui.claim())
+        assertEquals(1, events.filterIsInstance<ProgressEvent.ClaimReward>().size)
+    }
+
     @Test fun rerenderTabsRestrictionAndRemovedSelectionDoNotUnlockAnOffer() {
         val events = mutableListOf<ProgressEvent>(); val ui = interaction(events)
         ui.render(content(), true); ui.select(key); ui.claim()
