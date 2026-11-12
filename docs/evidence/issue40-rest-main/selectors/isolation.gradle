@@ -1,0 +1,15 @@
+def verificationPackage = gradle.startParameter.projectProperties['verificationPackage']
+if (!(verificationPackage in ['io.drivegrowth.verify.restnegativef'])) {
+    throw new GradleException('Select the prepared rest negative verification package.')
+}
+gradle.beforeProject { project ->
+    if (project.path == ':app') {
+        project.pluginManager.withPlugin('com.android.application') {
+            project.extensions.getByName('androidComponents').finalizeDsl { android ->
+                android.defaultConfig.applicationId = verificationPackage
+                android.defaultConfig.testApplicationId = verificationPackage + '.test'
+                android.buildTypes.getByName('debug').applicationIdSuffix = null
+            }
+        }
+    }
+}
