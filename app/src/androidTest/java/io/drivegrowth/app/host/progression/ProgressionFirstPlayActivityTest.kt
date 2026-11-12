@@ -1,8 +1,10 @@
 package io.drivegrowth.app.host.progression
 
 import android.graphics.Rect
+import android.os.Process
 import android.os.SystemClock
 import android.test.ActivityInstrumentationTestCase2
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -19,6 +21,7 @@ import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.FirstGrant
 import io.drivegrowth.core.quest.*
+import java.time.Instant
 import java.time.ZoneId
 
 /** cold 정상 첫 플레이를 UI로만 수행한다. DB 접근은 실제 결과의 읽기 검증이며 gate/사건/거래를 주입하지 않는다. */
@@ -62,13 +65,15 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
     private fun claimed(a:MainActivity)=progress(a)?.let{v->tree(v).filterIsInstance<TextView>().any{it.text.toString()==instrumentation.targetContext.getString(R.string.progress_claimed)}}==true
     fun testActualFirstGrantResultsViewQuestClaimAndRecreationNeverDoubleCredit() {
         val context=instrumentation.targetContext
-        assertTrue("제품 패키지 실행 금지",context.packageName!="io.drivegrowth.app")
+        assertEquals("이번 계측의 전용 패키지", QUEST_PID_PACKAGE, context.packageName)
         for(n in listOf("game-ledger-vehicle.db","game-ledger-simulation.db"))
             assertFalse("새 격리 패키지 cold 첫 플레이가 필요함. 기존 DB 삭제 금지: $n",context.getDatabasePath(n).exists())
         val definitions=ok(ok(AssetTrialDefinitionProvider(context.assets).load()).questDefinitions(ZoneId.systemDefault()))
         val definition=definitions.definitions.single{it.id=="daily-result-viewed"}
         assertEquals("이 시나리오는 중앙 정의의 결과 열람 1회 목표를 검증한다",1,definition.goal)
-        val expectedPeriod=questPeriod(definition.cadence,definition.zone,EpochMillis(System.currentTimeMillis()))
+        val startedAt = EpochMillis(System.currentTimeMillis())
+        val expectedPeriod = questPeriod(definition.cadence, definition.zone, startedAt)
+        Log.i("QuestMainNewPid", "STARTED pid=${Process.myPid()} observedAt=${Instant.ofEpochMilli(startedAt.value)}")
         val first=activity
         gate(first)
         await(first,"NEW 최초 안내") { attached<OnboardingView>(first)!=null }
@@ -141,5 +146,92 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
             instrumentation.removeMonitor(monitor)
             recreated?.let{a->instrumentation.runOnMainSync{a.finish()}}
         }
+        val saved = questSnapshot()
+        assertEquals(receipt, saved.receipt)
+        reportQuest("CLAIMED", saved, requireCurrentPeriod(receipt))
+    }
+
+    fun testNewProcessShowsSameDailyQuestClaimAndReplaysWithoutExtraCredit() {
+        val context = instrumentation.targetContext
+        assertEquals("이번 계측의 전용 패키지", QUEST_PID_PACKAGE, context.packageName)
+        assertTrue("이전 selector의 VEHICLE 원장이 필요합니다", context.getDatabasePath("game-ledger-vehicle.db").exists())
+        assertFalse(context.getDatabasePath("game-ledger-simulation.db").exists())
+        val before = questSnapshot()
+        val receipt = before.receipt
+        reportQuest("REOPEN_START", before, requireCurrentPeriod(receipt))
+
+        val next = activity
+        page(next, "퀘스트·진행")
+        val key = progressKey(receipt.command.definition, receipt.command.period)
+        click(next, key)
+        awaitClaimDisabled(next, key)
+        refresh(next)
+        awaitClaimDisabled(next, key)
+        assertEquals("새 Main의 조회만으로 추가 지급할 수 없습니다", before, questSnapshot())
+
+        // The UI offers no claim. Separately retry the exact saved command at the real SQLite boundary.
+        read { game -> assertEquals(receipt, ok(game.store.quests.claim(receipt.command))) }
+        val after = questSnapshot()
+        assertEquals("같은 원요청 재시도는 새 보상·원정산·슬롯을 만들지 않습니다", before, after)
+        reportQuest("REOPENED", after, requireCurrentPeriod(receipt))
+    }
+
+    private fun awaitClaimDisabled(main: MainActivity, key: ProgressKey) {
+        val disabledText = instrumentation.targetContext.getString(R.string.progress_no_claim)
+        await(main, "동일 기간 Quest 상세의 수령 상태와 청구 비활성") {
+            val claim = main.window.decorView.findViewWithTag<Button>("progress-claim")
+            progress(main)?.uiState?.selectedKey == key && claimed(main) &&
+                claim?.isShown == true && !claim.isEnabled && claim.text.toString() == disabledText
+        }
+    }
+
+    private data class QuestSnapshot(
+        val receipt: QuestClaimSettlement,
+        val balance: GameMoney,
+        val unviewed: List<Settlement>,
+        val owned: List<OwnedVehicle>,
+    )
+
+    private fun questSnapshot(): QuestSnapshot = read { game ->
+        assertEquals(InputSource.VEHICLE, game.identity.source)
+        assertNull(ok(game.store.hostCommands.load(game.identity.profileId)))
+        val request = ok(game.store.quests.claimedRequestIds(game.identity.profileId)).single()
+        val receipt = checkNotNull(ok(game.store.quests.settlement(request)))
+        assertEquals(game.identity.profileId, receipt.command.profileId)
+        assertEquals(game.identity.source, receipt.command.source)
+        assertEquals("daily-result-viewed", receipt.command.definition.id)
+        assertEquals(QuestCadence.DAILY, receipt.command.period.cadence)
+        assertEquals(QuestStatus.CLAIMED, receipt.progress.status)
+        assertEquals(MoneyChange(MoneyDirection.CREDIT, receipt.command.definition.reward), receipt.settlement.transaction.money)
+        val balance = ok(game.store.balance())
+        assertEquals(receipt.settlement.balance, balance)
+        val unviewed = ok(game.store.listUnviewedSettlements())
+        assertEquals(receipt.settlement, unviewed.single { it.transaction.requestId == request })
+        QuestSnapshot(receipt, balance, unviewed, ok(game.store.listOwnedVehicles()))
+    }
+
+    private fun requireCurrentPeriod(receipt: QuestClaimSettlement): EpochMillis {
+        val period = receipt.command.period
+        val at = EpochMillis(System.currentTimeMillis())
+        if (ZoneId.systemDefault() != period.zone || at.value !in period.startsAt.value until period.endsAt.value) {
+            throw IllegalStateException("ENVIRONMENT_PERIOD_CHANGED: 저장 기간 $period, 현재 ${Instant.ofEpochMilli(at.value)} / ${ZoneId.systemDefault()}")
+        }
+        assertTrue(receipt.settlement.confirmedAt.value in period.startsAt.value until period.endsAt.value)
+        return at
+    }
+
+    private fun reportQuest(phase: String, snapshot: QuestSnapshot, at: EpochMillis) {
+        val (command, _, settlement) = snapshot.receipt
+        val period = command.period
+        Log.i("QuestMainNewPid", "$phase pid=${Process.myPid()} profile=${command.profileId.value} source=${command.source} " +
+            "quest=${command.definition.id} version=${command.definition.version.value} zone=${period.zone} " +
+            "period=[${Instant.ofEpochMilli(period.startsAt.value)},${Instant.ofEpochMilli(period.endsAt.value)}) " +
+            "observedAt=${Instant.ofEpochMilli(at.value)} confirmedAt=${Instant.ofEpochMilli(settlement.confirmedAt.value)} " +
+            "request=${command.requestId.value} settlement=${settlement.settlementId.value} " +
+            "reward=${command.definition.reward.units} balance=${snapshot.balance.units}")
+    }
+
+    private companion object {
+        const val QUEST_PID_PACKAGE = "io.drivegrowth.app.verify.questpid"
     }
 }
