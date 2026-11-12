@@ -265,9 +265,13 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
 
     /** 경로까지 시작한 활성 의뢰. 활성 의뢰가 없거나 경로를 아직 시작하지 않았으면 null이다. */
     fun inProgress(): ContractResult<DeliveryInProgress?> = store.atomic { db ->
-        val active = readActive(db) ?: return@atomic ContractResult.Success(null)
-        val route = readRoute(db, active.requestId) ?: return@atomic ContractResult.Success(null)
-        ContractResult.Success(DeliveryInProgress(active, route.first, route.second))
+        ContractResult.Success(inProgress(db))
+    }
+
+    internal fun inProgress(db: SQLiteDatabase): DeliveryInProgress? {
+        val active = readActive(db) ?: return null
+        val route = readRoute(db, active.requestId) ?: return null
+        return DeliveryInProgress(active, route.first, route.second)
     }
 
     /**
@@ -389,6 +393,7 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         db.update("delivery_routes", ContentValues().apply {
             put("route", input.route.value)
             put("started_at", started.value)
+            putNull("observed_binding")
         }, "request_id = ?", arrayOf(requestId.value))
         ContractResult.Success(ChangeCommit(changed.terms, recorded))
     }

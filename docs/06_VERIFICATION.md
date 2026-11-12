@@ -1926,6 +1926,18 @@ A가 API 34 ARM64 에뮬레이터에서 RED와 GREEN을 차례로 각 1회 실�
 
 이 항목의 입력은 Debug 모의 주행이다. 실제 내비 거리 수신과 실차 검증은 별도 검증 항목에 따른다.
 
+#### #38 관측 거리 결합과 schema20 검증 — 2026-11-12
+
+기준 `34461f75d0291f9f97b5b7312a948fa7f6c2152b`에 #38 rev4를 적용했다. 시험 트리는 `732916bcbe283e441244acd37f97220cf64be1d6`, 구현 패치 SHA-256은 `56ca7ba9b00164f3b74ac035829878a7b329cd2448b5f1f906de7806e329a4de`다. rev2의 잘못된 `RouteId` import와 rev3 시험의 `abandon` 인자 순서로 컴파일이 각각 중단됐다. 두 수정은 각 한 줄이며, 컴파일 실패는 동작 RED 집계에서 제외했다.
+
+| 검사 | 실행 근거 |
+|---|---|
+| 자동 검사 | Temurin 17.0.6·Gradle 8.11.1·Android SDK 35, 오프라인·worker 1개·Kotlin in-process·힙 2GB. `:app:testDebugUnitTest` 799개 통과(실패·오류·생략 0), `:app:assembleDebug :app:assembleDebugAndroidTest` 성공. |
+| 격리 SQLite 계측 | Pleos API 34 ARM64, 사용자 10에서 `DeliveryObservedDistanceTest` 12개 통과(7.199초, 실패·오류 0). 선택 전 출발 차단, 주차 표본 만료 및 중복 재전송, v19→v20의 DB 버전·SQL `NULL`·원래 행 보존, 근거 없는 최초 확정 거부와 명시 취소, 확정 원영수증 재생, 참조 쓰기 실패의 롤백·동일 입력 재시도를 대조했다. |
+| APK 및 반환 | 격리 앱 `2223933de07d256d56fd2530f3170604c766c18294069254e1ce57513eb608a1`, 계측 APK `fd4b31cf5cf378f74de3891863e4a2d13f7e1032279e0e45cd0e33a73cf62ddf`의 설치 회수본 SHA-256이 빌드본과 같았다. 격리 앱·계측 패키지만 제거했고 제품·환경 보존 19/19를 확인했다. 11:22:25 KST에 반환했다. |
+
+계측은 고정 차량 관측 표본을 `VEHICLE` 시험 원장에 공급했다. 실제 차량 신호·내비 SDK 목적지 변경/도착, 설치된 구버전 APK 업데이트, 최종 #38 변경·구매 취소·환급 제품 흐름은 미수행이다. #219가 반영된 게시 후보에서 거리 소스와 시험이 실행본과 동일하고 #219 화면·시험이 보존됐음을 정적으로 대조했다. 이 조합의 신규 Gradle·장치 시험과 F r8 결합 실행은 미수행이다. SDK 도착은 `Missing`을 유지한다.
+
 #### 결합 APK의 지정 계측 시험
 
 A는 코드 커밋 `dce75aea611904d2f94d754e4cbeb080c38e9848`의 Debug 앱 `io.drivegrowth.app.simulation`을 API 34 ARM64에서 설치하고 아래 네 시험을 각각 한 번 실행했다. 네 설치 앱의 SHA-256은 `33479608b9d1baf46ad202481c57c8a196be11556a80a44e954adba9bf6711a9`로 동일했다.

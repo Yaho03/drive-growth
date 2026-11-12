@@ -104,7 +104,7 @@ class HostCheckpointStoreIntegrationTest : InstrumentationTestCase() {
         assertEquals(before, rows())
         assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT), store.hostCommands.save(profile, sale))
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), store.commitGameChange(sale.value))
-        raw { assertEquals(19, it.version) }
+        raw { assertEquals(20, it.version) }
     }
 
     fun testV18SavedReservedPrefixExecutesOnlyTheExactPersistedSale() {
@@ -184,7 +184,7 @@ class HostCheckpointStoreIntegrationTest : InstrumentationTestCase() {
         assertNull(ok(store.hostCommands.load(profile)))
         val c = command(first.grant.changedVehicle!!)
         ok(store.hostCommands.save(profile, c)); ok(store.hostCommands.execute(profile, c))
-        raw { assertEquals(19, it.version) }
+        raw { assertEquals(20, it.version) }
     }
     fun testV9MigrationPreservesProfileProgressAndOriginalResults() = upgrade(9)
     fun testV8MigrationAddsGiftAndCheckpointWithoutReplacingProfile() = upgrade(8)

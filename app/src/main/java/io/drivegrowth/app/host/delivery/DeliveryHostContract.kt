@@ -33,7 +33,7 @@ sealed interface DeliveryHostOperation {
     data class Select(val proposed: DeliveryProposed, val offerId: DeliveryOfferId, val requestId: RequestId,
         val route: RouteId, val at: EpochMillis) : DeliveryHostOperation
     data class Change(val rules: DeliveryChangeRules, val offer: DeliveryChangeOffer, val offerId: DeliveryOfferId,
-        val route: RouteId) : DeliveryHostOperation
+        val route: RouteId, val observedRoute: RouteId? = null) : DeliveryHostOperation
     data class Abandon(val rules: DeliveryChangeRules, val requestId: RequestId) : DeliveryHostOperation
     data class Arrival(val rules: DeliverySettlementRules, val requestId: RequestId,
         val evidence: Observation<DeliveryArrivalEvidence>, val now: EpochMillis,

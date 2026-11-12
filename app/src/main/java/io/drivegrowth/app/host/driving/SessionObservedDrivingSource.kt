@@ -8,6 +8,8 @@ import io.drivegrowth.core.driving.DrivingIncomeRules
 import io.drivegrowth.app.data.RestDriveContext
 import io.drivegrowth.app.data.RestDepartureInput
 import io.drivegrowth.app.data.ObservedDrivingJson
+import io.drivegrowth.app.data.DeliveryObservedDistance
+import io.drivegrowth.app.data.DeliveryDistanceSession
 
 data class RestObservationBatch(val contexts:List<RestDriveContext>,val departures:List<RestDepartureInput>)
 /** 실제 수신/boot/장소 근거에서 원문을 만든다. DB·게임 상태 변경을 수행하지 않는 공급자다. */
@@ -33,22 +35,30 @@ class SessionObservedDrivingSource(
   var batch:RestObservationBatch?=null
  }
  private var restCapture:RestCapture?=null
- fun observe(receiver:String,frame:DrivingFrame,now:RecordingClock):ContractResult<DrivingRecordingResult> =
-  if(restObservationProvider!=null) captureAndDrain(RestInput(receiver,frame,now)) { state->reducer.observe(state,receiver,frame,now,rules()) }
+ fun observe(receiver:String,frame:DrivingFrame,now:RecordingClock):ContractResult<DrivingRecordingResult> {
+  val result = if(restObservationProvider!=null) captureAndDrain(RestInput(receiver,frame,now)) { state->reducer.observe(state,receiver,frame,now,rules()) }
   else withSession { session,db,state ->
    when(val next=reducer.observe(state,receiver,frame,now,rules())) {
     is ContractResult.Failure -> next
     is ContractResult.Success -> persistAndDrain(session,db,state,next.value)
    }
   }
- fun pause(receiver:String,at:RecordingClock):ContractResult<DrivingRecordingResult> =
-  if(restObservationProvider!=null) captureAndDrain(RestInput(receiver,null,at)) { state->reducer.pause(state,receiver,at) }
+  val state = (result as? ContractResult.Success)?.value?.state
+  games.deliveryDistanceSession = receiver.takeIf {
+   state != null && state.identity.source == InputSource.VEHICLE && state.receiver == receiver && state.anchor == frame.observation
+  }?.let { DeliveryDistanceSession(it, reducer.policy.maxAgeMs, games.deliveryDistanceElapsedRealtime) }
+  return result
+ }
+ fun pause(receiver:String,at:RecordingClock):ContractResult<DrivingRecordingResult> {
+  games.deliveryDistanceSession = null
+  return if(restObservationProvider!=null) captureAndDrain(RestInput(receiver,null,at)) { state->reducer.pause(state,receiver,at) }
   else withSession { session,db,state ->
    when(val next=reducer.pause(state,receiver,at)) {
     is ContractResult.Failure -> next
     is ContractResult.Success -> persistAndDrain(session,db,state,next.value)
    }
   }
+ }
  /** 관측/원증거 보관과 최종 금융 확정은 별도 거래다. 지급 실패 때문에 새 실제 관측을 버리지 않는다. */
  private fun captureAndDrain(input:RestInput,reduce:(RecordingState)->ContractResult<RecordingState>):ContractResult<DrivingRecordingResult> {
   val provider=restObservationProvider?:return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
@@ -120,7 +130,11 @@ class SessionObservedDrivingSource(
   when(val saved=journal.save(db,session.identity,previous.revision,next)) {is ContractResult.Failure->return saved;is ContractResult.Success->Unit}
   return when(val read=journal.read(db,session.identity)) {
    is ContractResult.Failure -> read
-   is ContractResult.Success -> if(read.value==next)ContractResult.Success(Unit) else ContractResult.Failure(ContractError.STORAGE_FAILURE)
+   is ContractResult.Success -> {
+    if(read.value!=next)return ContractResult.Failure(ContractError.STORAGE_FAILURE)
+    DeliveryObservedDistance.advance(db,previous,next,reducer.policy)
+    ContractResult.Success(Unit)
+   }
   }
  }
  private fun persistAndDrain(session:GameSession,db:SQLiteDatabase,previous:RecordingState,next:RecordingState):ContractResult<DrivingRecordingResult> {

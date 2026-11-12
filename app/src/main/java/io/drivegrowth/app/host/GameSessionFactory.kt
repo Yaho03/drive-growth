@@ -6,7 +6,9 @@ import android.database.DatabaseErrorHandler
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import android.os.Looper
+import android.os.SystemClock
 import io.drivegrowth.app.data.AssetGameContent
+import io.drivegrowth.app.data.DeliveryDistanceSession
 import io.drivegrowth.app.data.InitializationAuthority
 import io.drivegrowth.app.data.MaterialVersions
 import io.drivegrowth.app.data.SqliteGameChangeStore
@@ -59,6 +61,9 @@ class GameSessionFactory internal constructor(context: Context, private val data
         InputSource.entries.associateWith { "game-ledger-${it.name.lowercase()}.db" }, newProfileSource, questDefinitions, System::currentTimeMillis)
     private val context = context.applicationContext
     private var bound: GameIdentity? = null
+    // 현재 호스트에서 수락한 수신자만 거리 조회에 공급한다. 새 호스트는 과거 수신자를 상속하지 않는다.
+    @Volatile internal var deliveryDistanceSession: DeliveryDistanceSession? = null
+    internal var deliveryDistanceElapsedRealtime: () -> Long = SystemClock::elapsedRealtime
     private var achievementTracking = false
 
     internal fun enableAchievements() { achievementTracking = true }
@@ -108,6 +113,7 @@ class GameSessionFactory internal constructor(context: Context, private val data
                         is ContractResult.Success -> ContractResult.Success(MaterialVersions(content.value.catalog.contentVersion, content.value.ruleVersion))
                     }
                 })
+            store.currentDeliveryDistanceSession = { deliveryDistanceSession }
             val achievementAuthority by lazy {
                 when (content) {
                     is ContractResult.Failure -> content

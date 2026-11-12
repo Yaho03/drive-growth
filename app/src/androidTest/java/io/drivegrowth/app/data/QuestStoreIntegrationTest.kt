@@ -45,7 +45,7 @@ class QuestStoreIntegrationTest: InstrumentationTestCase() {
     }
     fun testActualFreshHelperIssuesTrackingAndCentralSixDefinitionsWithoutReentry() {
         val before=rows();assertEquals(6,states().size);assertTrue(states().all{it.count==0&&it.status==QuestStatus.IN_PROGRESS&&it.definition.zone==zone})
-        raw{db->assertEquals(19, db.version)
+        raw{db->assertEquals(20, db.version)
             for(table in listOf("quest_tracking","quest_events","quest_claims","host_command_checkpoint","observed_driving_marker","observed_driving_state","observed_driving_receipts"))db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name=?",arrayOf(table)).use{assertTrue(table,it.moveToFirst())}
             for(table in listOf("delivery_requests","delivery_changes","delivery_outcomes","delivery_hold_outcomes"))db.rawQuery("PRAGMA table_info($table)",null).use{r->var found=false;while(r.moveToNext())if(r.getString(1)=="host_command")found=true;assertTrue(table,found)}
             db.rawQuery("SELECT profile,source,complete_since FROM quest_tracking",null).use{assertTrue(it.moveToFirst());assertEquals(profile.value,it.getString(0));assertEquals(source.name,it.getString(1));assertEquals(0L,it.getLong(2));assertFalse(it.moveToNext())}}

@@ -192,6 +192,6 @@ class AchievementLedgerTest : InstrumentationTestCase() {
         assertEquals(AchievementStatus.IN_PROGRESS, state(AchievementMetric.OWNED).status)
         assertEquals(AchievementMeasure(1), state(AchievementMetric.OWNED).measure)
         assertEquals(AchievementStatus.CLAIMABLE, state(AchievementMetric.COLLECTION).status)
-        raw { assertEquals(19, it.version) }
+        raw { assertEquals(20, it.version) }
     }
 }

@@ -89,7 +89,7 @@ class ObservedDrivingJournalTest:InstrumentationTestCase() {
     }
     fun testV12UpgradeAddsUnsupportedModuleWithoutBackfillingExistingDrivingDays() {
         val t=trip();val original=ok(store.driving.settle(rules,t.confirmed(source)!!));store.close();raw{db->stripRentalProductFixture(db);listOf("observed_driving_marker","observed_driving_state","observed_driving_receipts").forEach{db.execSQL("DROP TABLE $it")};db.version=12};store=open()
-        assertEquals(original,ok(store.driving.settle(rules,t.confirmed(source)!!)));assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),store.atomic{journal.read(it,actor)});assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),store.observedDrivingReceipt(t.id));raw{assertEquals(19, it.version)}
+        assertEquals(original,ok(store.driving.settle(rules,t.confirmed(source)!!)));assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),store.atomic{journal.read(it,actor)});assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),store.observedDrivingReceipt(t.id));raw{assertEquals(20, it.version)}
     }
     fun testRawNanGapBitsSurviveReopenAndCannotChangeUnderSameOutboxId() {
         ok(store.activateObservedDriving(actor.profileId));fun gap(bits:Long)=DrivingGap(DrivingGapReason.INVALID_SIGNAL,null,RecordingClock(200000,EpochMillis(1794279800000)),observation(200000,Double.fromBits(bits)))
