@@ -38,7 +38,9 @@ internal interface HostSimulation {
 internal enum class SimulationInputState { READY, PROCESSING, RETRYABLE_FAILURE, UNAVAILABLE }
 
 internal data class SimulationRestSample(val clock: RestClockDomain, val area: Observation<RestAreaProof>,
-    val restRun: Boolean, val ordinaryTerminal: Boolean)
+    val restRun: Boolean, val ordinaryTerminal: Boolean, val startsRestRun: Boolean = false)
+
+internal const val SIMULATION_REST_RECEIVER = "unified-simulation-rest"
 
 internal fun interface RentalClockReader { fun read(): ContractResult<RentalClock> }
 

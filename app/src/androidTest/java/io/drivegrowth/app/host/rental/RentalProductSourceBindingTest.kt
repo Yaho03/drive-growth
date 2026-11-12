@@ -216,6 +216,53 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
         return restProducer().also { driving = restRecorder(it) }
     }
 
+    fun testActiveRentalCrossesFromOrdinaryTerminalIntoRestAndBackWithoutLosingTime() {
+        val active = activeRentalAtStage13(null)
+        val firstPark = 721_000L
+        val terminal = 724_000L
+        for (at in listOf(firstPark, terminal)) {
+            val (frame, result) = record(at, null, receiver = "simulation-rest", parked = true)
+            assertTrue(ok(producer.observe(frame, result)).deferred.isEmpty())
+        }
+        val before = ok(games.open()).use { ok(it.store.rental.pending()).single() }
+        assertEquals(active.id, before.id)
+        assertEquals(clock().epoch, before.cursor)
+        assertEquals(EpochMillis(base + firstPark), before.parkedSince)
+
+        ok(games.open()).use { ok(it.store.restDriving.activate(identity.profileId)) }
+        val rest = restProducer().also { driving.restObservationProvider = it }
+        val restStart = terminal + 1_000
+        val (start, recorded) = record(restStart, rest, receiver = SIMULATION_REST_RECEIVER)
+        val crossing = ok(producer.observeSimulationRestStart(start, recorded, restClock))
+        assertTrue(crossing.deferred.isEmpty())
+        assertEquals(EpochMillis(base + restStart), crossing.pending.single().cursor)
+        val crossingRows = rentalRows()
+        assertTrue(ok(producer.observeSimulationRestStart(start, recorded, restClock)).deferred.isEmpty())
+        assertEquals(crossingRows, rentalRows())
+
+        val restPark = restStart + 61_000
+        for (at in listOf(restStart + 60_000, restPark, restPark + 3_000)) {
+            val (frame, result) = record(at, rest, receiver = SIMULATION_REST_RECEIVER, parked = at >= restPark)
+            assertTrue(ok(producer.observe(frame, result)).deferred.isEmpty())
+        }
+        val nextOrdinary = restPark + 4_000
+        val (ordinaryFrame, ordinaryRecord) = record(nextOrdinary, rest, receiver = SIMULATION_REST_RECEIVER)
+        val continued = ok(producer.observe(ordinaryFrame, ordinaryRecord))
+        assertTrue(continued.deferred.isEmpty())
+        assertEquals(active.id, continued.pending.single().id)
+        assertEquals(EpochMillis(base + nextOrdinary), continued.pending.single().cursor)
+        ok(games.open()).use { game ->
+            ok(game.store.read { db ->
+                val basis = checkNotNull(RentalBasisStorage.load(db, game.store, active.id))
+                val transition = basis.periods.single { it.from == EpochMillis(base + firstPark) }
+                assertEquals(EpochMillis(base + restStart), transition.through)
+                assertEquals(RentalIncomeKind.PARKED, transition.kind)
+                assertEquals(4_000L, transition.normalMillis)
+                ContractResult.Success(Unit)
+            })
+        }
+    }
+
     fun testOrdinarySimulationReplayAdvancesRentalFromStage13Through14And15Once() {
         val originalRest = enableRestRecorder()
         val rental = activeRentalAtStage13(originalRest)

@@ -28,8 +28,29 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
     private var resumeAt: RentalClock? = null
     private var needsResume = true
     private var inactiveRecorded = false
-    private data class AcceptedFrame(val at: RentalClock, val motion: Observation<RentalMotion>,
-        val receiver: String?, val revision: Long, val unobservedSince: RentalClock?)
+    internal data class AcceptedFrame(val at: RentalClock, val motion: Observation<RentalMotion>,
+        val receiver: String?, val revision: Long, val unobservedSince: RentalClock?) {
+        fun deltaTo(next: RentalClock, state: RecordingState, previous: VehicleObservation?,
+            restStartBoot: String?, maxGapMs: Long): Long? {
+            if (receiver == null || at.bootId != next.bootId) return null
+            val delta = next.elapsedMs - at.elapsedMs
+            if (receiver == state.receiver) return delta
+            // 같은 시연의 주차→출발에서 Rest 기록기만 교체된다. 이전 주차 원점을 그대로 사용한다.
+            val anchor = state.anchor ?: return null
+            val trip = state.trip ?: return null
+            if ((motion as? Observation.Available)?.value !is RentalMotion.Parked) return null
+            return delta.takeIf {
+                restStartBoot == at.bootId && state.receiver == SIMULATION_REST_RECEIVER &&
+                    state.identity.source == InputSource.SIMULATION && state.revision - revision == 1L &&
+                    previous?.source == InputSource.SIMULATION && previous.receivedAt == at.epoch &&
+                    previous.receivedElapsedMs == at.elapsedMs && previous.gear == Observation.Available(Gear.PARK) &&
+                    previous.uxRestricted == Observation.Available(false) &&
+                    anchor.source == InputSource.SIMULATION && trip.departure == anchor &&
+                    anchor.receivedAt == next.epoch && anchor.receivedElapsedMs == next.elapsedMs &&
+                    delta in 1..maxGapMs && next.epoch.value - at.epoch.value == delta
+            }
+        }
+    }
     private var previous: AcceptedFrame? = null
     private var parkedBeforeJump: AcceptedFrame? = null
     private var parkedJumpEnd: RentalClock? = null
@@ -179,6 +200,12 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
     fun observe(frame: DrivingFrame, recorded: ContractResult<DrivingRecordingResult>): ContractResult<RentalRuntimeSnapshot> =
         observe(frame, recorded, null, false)
 
+    internal fun observeSimulationRestStart(
+        frame: DrivingFrame,
+        recorded: ContractResult<DrivingRecordingResult>,
+        clock: RestClockDomain,
+    ): ContractResult<RentalRuntimeSnapshot> = observe(frame, recorded, null, false, restStartBoot = clock.bootId)
+
     internal fun observeOrdinarySimulationReplay(
         frame: DrivingFrame,
         recorded: ContractResult<DrivingRecordingResult>,
@@ -191,6 +218,7 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
         recorded: ContractResult<DrivingRecordingResult>,
         originalClock: RestClockDomain?,
         ordinaryTerminal: Boolean,
+        restStartBoot: String? = null,
     ): ContractResult<RentalRuntimeSnapshot> {
         val state = when (recorded) {
             is ContractResult.Failure -> { previous = null; latest = null; parkedBeforeJump = null; parkedJumpEnd = null; return recorded }
@@ -273,8 +301,7 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
         val before = previous
         // 같은 원표본의 금융/도착 재시도는 motion 원점과 이미 보존한 span을 다시 만들지 않는다.
         if (before?.at != at || latest != input) {
-            val delta = before?.takeIf { it.receiver != null && it.receiver == state.receiver && it.at.bootId == at.bootId }
-                ?.let { at.elapsedMs - it.at.elapsedMs }
+            val delta = before?.deltaTo(at, state, latest, restStartBoot, policy.maxGapMs)
             val continuous = delta != null && delta in 1..policy.maxGapMs
             if (!continuous) { parkCandidate = null; canConfirmEnd = false }
             if (moving) { canConfirmEnd = true; parkCandidate = null; physicalEnd = null }
@@ -291,7 +318,7 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
                 else -> Observation.Missing(MissingReason.NO_DATA)
             }
             visitFloor = before?.at ?: at
-            if (continuous && before != null) {
+            if (continuous) {
                 append(RentalTick(input.source, before.at, at, before.motion, before.unobservedSince))
             }
             // 수락한 recorder revision이 건너뛰면 그 사이의 관측을 공백으로 단정하지 않는다.
