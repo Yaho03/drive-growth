@@ -35,6 +35,14 @@ class MainNavigationBarTest : InstrumentationTestCase() {
             bar.showSelected(HostPage.ONBOARDING)
             layout()
             val scroll = bar.findViewWithTag<HorizontalScrollView>("host:pages")
+            val back = checkNotNull(bar.findViewWithTag<View>("host:back"))
+            val refresh = checkNotNull(bar.findViewWithTag<View>("host:refresh"))
+            val minimumTouchSize = (48 * density).toInt()
+            assertTrue("bar=${bar.width}, back=${back.width}, pages=${scroll.width}, refresh=${refresh.width}",
+                scroll.width >= (140 * density).toInt())
+            for (control in listOf(back, refresh)) {
+                assertTrue(control.width >= minimumTouchSize && control.height >= minimumTouchSize)
+            }
             assertTrue(scroll.scrollX > 0)
             fun assertFullyVisible(page: HostPage) {
                 val selected = checkNotNull(bar.mainPage(page))

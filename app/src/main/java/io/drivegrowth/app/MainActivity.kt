@@ -105,7 +105,7 @@ open class MainActivity : Activity() {
     private var deliveryReceipt: DeliveryHostReceipt? = null
     private var deliveryFrame = DeliveryFrame(0, DeliveryScreen.Loading)
     private lateinit var gacha: GachaView
-    private lateinit var navigationBar: MainNavigationBar
+    private var navigationBar: MainNavigationBar? = null
     private var simulationControlsExpanded = false
     private var simulationToggle: Button? = null
     private var simulationDetails: ScrollView? = null
@@ -235,10 +235,6 @@ open class MainActivity : Activity() {
         managementView = GarageCommandView(this, { management.controller.confirm() }, ::cancelPreparation,
             { management.controller.retry() }, { management.controller.cancelPending() }, { management.controller.chooseMaterial(it) }, { management.controller.acknowledge() })
         panel = style.column().apply { setBackgroundColor(PixelStyle.background) }
-        navigationBar = MainNavigationBar(this, destinations,
-            { page -> if (allowed() && page != navigation.page) select(page) },
-            { if (allowed()) onBackPressed() },
-            ::refresh)
         if (session.simulation != null) panel.addView(createSimulationControls())
         chrome = style.column().apply { setPadding(style.dp(16), 0, style.dp(16), 0) }
         body = FrameLayout(this)
@@ -597,6 +593,7 @@ open class MainActivity : Activity() {
 
     private fun updateAccess() {
         val enabled = allowed()
+        updateNavigationBar(enabled)
         onControlsAvailabilityChanged(enabled)
         renderSimulationControls(enabled)
         session.results.setControlsEnabled(enabled && navigation.page == HostPage.RESULTS)
@@ -632,8 +629,28 @@ open class MainActivity : Activity() {
         else if (screen != HostQueryState.Loading) queries.refresh()
     }
 
+    private fun updateNavigationBar(enabled: Boolean) {
+        val page = navigation.page
+        val previous = navigationBar
+        if (enabled && previous?.selectedPage == page) return
+        navigationBar = null
+        previous?.let(panel::removeView)
+        if (!enabled) return
+
+        lateinit var bar: MainNavigationBar
+        fun isCurrent() = navigationBar === bar && navigation.page == page && allowed()
+        bar = MainNavigationBar(this, destinations,
+            { target -> if (isCurrent() && target != page) select(target) },
+            { if (isCurrent()) onBackPressed() },
+            { if (isCurrent()) refresh() })
+        bar.showSelected(page)
+        navigationBar = bar
+        panel.addView(bar, LinearLayout.LayoutParams(-1, -2))
+    }
+
     private fun render() {
         val enabled = allowed()
+        updateNavigationBar(enabled)
         val garageState = when (val current = screen) {
             is HostQueryState.Content -> GarageActionAvailability.map(mapper.garage(current.snapshot), current.snapshot)
             is HostQueryState.Failure -> GarageScreenState.Error("차량 정보를 읽지 못했어요. 다시 조회해 주세요.")
@@ -661,7 +678,6 @@ open class MainActivity : Activity() {
         chrome.removeAllViews()
         renderSimulationControls(enabled)
         if (!enabled) {
-            panel.removeView(navigationBar)
             val simulation = session.simulation
             val message = when (simulation?.inputState) {
                 null -> "주차 후 조작이 허용되면 이용할 수 있습니다."
@@ -673,8 +689,6 @@ open class MainActivity : Activity() {
             showBody(style.text(message).apply { if (simulation != null) tag = "simulation:blocked" })
             return
         }
-        if (navigationBar.parent == null) panel.addView(navigationBar, LinearLayout.LayoutParams(-1, -2))
-        navigationBar.showSelected(navigation.page)
         if (session.simulation == null) drivingStatus?.let { chrome.addView(style.text(it)) }
         if (navigation.page == HostPage.HOME && homeEnabled) {
             val home = session.home.state

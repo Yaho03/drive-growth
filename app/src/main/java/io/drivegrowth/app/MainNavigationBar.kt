@@ -21,13 +21,11 @@ internal class MainNavigationBar(
     back: () -> Unit,
     refresh: () -> Unit,
 ) : LinearLayout(context) {
-    private var selectedPage: HostPage? = null
+    var selectedPage: HostPage? = null
+        private set
     private var revealSelection = false
     private val buttons = destinations.associate { (page, label) ->
-        page to control(context, label) { select(page) }.apply {
-            tag = "host:page:${page.name}"
-            ellipsize = TextUtils.TruncateAt.END
-        }
+        page to control(context, label) { select(page) }.apply { tag = "host:page:${page.name}" }
     }
     private val pages = object : HorizontalScrollView(context) {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -70,15 +68,19 @@ internal class MainNavigationBar(
 
     init {
         tag = "host:destination"
+        orientation = HORIZONTAL
+        isBaselineAligned = false
         gravity = Gravity.CENTER_VERTICAL
         setBackgroundColor(PixelStyle.panel)
         setPadding(dp(6), dp(4), dp(6), dp(4))
-        addView(control(context, "뒤로", back).apply { tag = "host:back" })
+        addView(control(context, "뒤로", back).apply { tag = "host:back" },
+            LayoutParams(dp(64), LayoutParams.WRAP_CONTENT))
         addView(pages, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
             marginStart = dp(4)
             marginEnd = dp(4)
         })
-        addView(control(context, "새로고침", refresh).apply { tag = "host:refresh" })
+        addView(control(context, "새로고침", refresh).apply { tag = "host:refresh" },
+            LayoutParams(dp(96), LayoutParams.WRAP_CONTENT))
     }
 
     fun showSelected(page: HostPage) {
@@ -94,6 +96,7 @@ internal class MainNavigationBar(
         textSize = 16f
         isAllCaps = false
         setSingleLine()
+        ellipsize = TextUtils.TruncateAt.END
         setTextColor(PixelStyle.text)
         minWidth = dp(48)
         minHeight = dp(48)
