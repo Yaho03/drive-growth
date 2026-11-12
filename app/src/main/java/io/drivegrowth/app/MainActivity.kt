@@ -137,10 +137,23 @@ open class MainActivity : Activity() {
         results = ResultsView(this, ::onResultsEvent)
         shop = ShopView(this, ::onShopEvent)
         facilityControls = io.drivegrowth.app.ui.shop.FacilityControlsView(this, ::onFacilityEvent)
-        facilityHome = style.column().apply {
-            addView(shop, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(android.widget.ScrollView(this@MainActivity).apply { addView(facilityControls) },
-                LinearLayout.LayoutParams(-1, style.dp(220)))
+        val facilityPanel = android.widget.ScrollView(this).apply { addView(facilityControls) }
+        facilityHome = object : LinearLayout(this) {
+            init {
+                orientation = VERTICAL
+                addView(shop, LayoutParams(-1, 0, 1f))
+                addView(facilityPanel, LayoutParams(-1, style.dp(220)))
+            }
+
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                val available = MeasureSpec.getSize(heightMeasureSpec)
+                if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY) {
+                    // Leave room for the shop header and controls in a short app window.
+                    facilityPanel.layoutParams.height = minOf(style.dp(220),
+                        maxOf(available / 3, available - style.dp(150)))
+                }
+                super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+            }
         }
         val shopMode = ShopMode.entries.firstOrNull { it.name == savedInstanceState?.getString("shopMode") } ?: ShopMode.OVERALL
         var restoredFacility: io.drivegrowth.app.host.facility.FacilityCommand.Buy? = null
