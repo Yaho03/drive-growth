@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>렌터카 가게 시제품</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700;900&family=IBM+Plex+Sans+KR:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@500;700;900&family=IBM+Plex+Sans+KR:wght@500;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
@@ -94,6 +94,54 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--info);outline-
 .tabs button{min-height:44px;padding:0 14px;border-radius:12px;background:var(--card2);font-weight:700}
 .tabs button[aria-pressed="true"]{background:var(--accent)}
 @media (prefers-reduced-motion:no-preference){.pop{animation:pop .45s ease-out}@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}}
+
+/* ── 시작화면: 1280×720 무대를 화면에 꽉 차게 키운다. 가운데 960px 안에 중요한 것을 둔다 ── */
+.ts{position:fixed;inset:0;z-index:60;overflow:hidden;background:#86c05a;cursor:pointer;outline:none;transition:opacity .45s ease}
+.ts.go{opacity:0;pointer-events:none}
+.ts-stage{position:absolute;left:0;top:0;width:1280px;height:720px;transform-origin:0 0}
+.ts .map{position:absolute;left:-11px;top:-33px;width:1408px;max-width:none;border-radius:0;transform-origin:62% 34%;animation:tsCam 18s ease-in-out infinite alternate}
+.ts.go .map{animation:none;transform:scale(1.14);transition:transform .5s cubic-bezier(.5,0,.75,0)}
+@keyframes tsCam{from{transform:translate(0,0) scale(1)}to{transform:translate(-26px,-10px) scale(1.04)}}
+.ts-road{position:absolute;inset:0}
+.ts-road img{position:absolute;image-rendering:pixelated}
+.ts-cloud{position:absolute;left:0;image-rendering:pixelated;animation:tsDrift linear infinite}
+@keyframes tsDrift{from{transform:translateX(-360px)}to{transform:translateX(1500px)}}
+.ts-shade{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 620px 400px at 330px 190px,rgba(12,16,32,.62),rgba(12,16,32,0) 72%),
+             linear-gradient(to top,rgba(12,16,32,.55),rgba(12,16,32,0) 26%)}
+.ts-logo{position:absolute;left:172px;top:58px;width:560px;display:flex;flex-direction:column;align-items:flex-start;animation:tsIn .8s cubic-bezier(.34,1.56,.64,1) both}
+.ts-float{animation:tsFloat 3.2s ease-in-out .8s infinite}
+@keyframes tsIn{from{opacity:0;transform:translateY(-70px) scale(1.25)}to{opacity:1;transform:none}}
+@keyframes tsFloat{50%{transform:translateY(-6px)}}
+.ts-badge{display:flex;align-items:center;gap:8px;margin:0 0 6px 10px;padding:6px 14px 6px 8px;border-radius:999px;background:#1c1e2c;color:#fcdc64;font:700 15px/1 var(--font);letter-spacing:.18em;box-shadow:0 0 0 3px #fcdc64}
+.ts-word{position:relative;display:block;font:400 136px/1.02 'Black Han Sans',var(--font);letter-spacing:-.01em;white-space:nowrap;transform:rotate(-4deg);transform-origin:0 50%}
+.ts-word + .ts-word{margin:-14px 0 0 64px}
+.ts-word span{display:block}
+.ts-word .bk{position:absolute;inset:0;color:#1c1e2c;-webkit-text-stroke:22px #1c1e2c;text-shadow:0 12px 0 #1c1e2c}
+.ts-word .fg{position:relative;-webkit-background-clip:text;background-clip:text;color:transparent}
+.ts-word .sh{position:absolute;inset:0;-webkit-background-clip:text;background-clip:text;color:transparent;
+  background-image:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.9) 50%,transparent 58%);background-size:300% 100%;background-position:100% 0;animation:tsShine 4.2s ease-in-out 1.2s infinite}
+@keyframes tsShine{0%{background-position:100% 0}35%,100%{background-position:0 0}}
+.ts-gold .fg{background-image:linear-gradient(#fff7c8 8%,#fcdc64 46%,#f6a83c 92%)}
+.ts-sky .fg{background-image:linear-gradient(#ffffff 10%,#cfe4ff 50%,#68a0f0 94%)}
+.ts-ribbon{position:relative;margin:18px 0 0 40px;padding:10px 46px;background:#2f6fe8;color:#fff;font:900 24px/1.2 var(--font);white-space:nowrap;
+  clip-path:polygon(0 0,100% 0,calc(100% - 18px) 50%,100% 100%,0 100%,18px 50%);box-shadow:inset 0 -5px 0 #1d4fb4;animation:tsRib .5s ease-out .55s both}
+@keyframes tsRib{from{opacity:0;transform:translateX(-30px)}to{opacity:1;transform:none}}
+.ts-spark{position:absolute;width:22px;height:22px;background:#fff7c8;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);animation:tsTw 1.8s ease-in-out infinite}
+@keyframes tsTw{0%,100%{transform:scale(.2);opacity:0}50%{transform:scale(1);opacity:1}}
+.ts-start{position:absolute;left:640px;bottom:74px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:16px 34px;border-radius:999px;
+  background:rgba(18,22,34,.86);box-shadow:0 0 0 3px rgba(255,255,255,.18),0 8px 0 rgba(12,16,32,.45);color:#fff;font:900 28px/1 var(--font);white-space:nowrap;animation:tsFade .5s ease 1.1s both}
+.ts-start i{display:block;width:0;height:0;border-left:16px solid #fcdc64;border-top:10px solid transparent;border-bottom:10px solid transparent;animation:tsNudge 1.1s ease-in-out infinite}
+.ts-start b{animation:tsPulse 1.4s ease-in-out infinite}
+@keyframes tsFade{from{opacity:0;transform:translate(-50%,14px)}to{opacity:1;transform:translateX(-50%)}}
+@keyframes tsPulse{50%{opacity:.55}}
+@keyframes tsNudge{50%{transform:translateX(5px)}}
+.ts-foot{position:absolute;bottom:22px;color:rgba(255,255,255,.78);font:700 15px/1 var(--font);text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.ts-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.ts.go .ts-flash{animation:tsFlash .14s ease-out}
+.ts.go .ts-logo{animation:none;transform:scale(1.06);opacity:0;transition:.35s ease-in}
+@keyframes tsFlash{40%{opacity:.5}}
+@media (prefers-reduced-motion:reduce){.ts *{animation:none!important;transition:none!important}}
 </style>
 
 <div class="app" id="app">
@@ -105,6 +153,9 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--info);outline-
   <nav class="nav" id="nav" aria-label="화면 이동"></nav>
 </div>
 <div id="layer"></div>
+<div class="ts" id="title" role="button" tabindex="0" aria-label="르르르 렌터카. 눌러서 시작" hidden>
+  <div class="ts-stage" id="tsStage"></div>
+</div>
 
 <script>
 const IMG = {ground:"{{ground}}", cover1:"{{cover_lv1}}", cover2:"{{cover_lv2}}", cover3:"{{cover_lv3}}",
@@ -222,23 +273,27 @@ function renderOnboarding(){
 }
 
 // ── 가게(지도) ──
+const pct=(v,base)=>v/base*100;
+function mapBase(){
+  const b = S.level===1?BUILD.main_lv1:BUILD.main_lv2, sign = b.sign; // [bl,br,tr,tl]
+  const sw = Math.hypot(sign[1][0]-sign[0][0], sign[1][1]-sign[0][1]), sh = sign[0][1]-sign[3][1];
+  return `<img class="full px" src="${IMG.ground}" alt="">
+    ${S.level<4?`<img class="full px" src="${IMG["cover"+S.level]}" alt="">`:""}
+    <img class="px" src="${S.level===1?IMG.b1:IMG.b2}" alt="가게 본관" style="left:${pct(b.left,640)}%;top:${pct(b.top,464)}%;width:${pct(b.w,640)}%">
+    <div class="sign" style="left:${pct(sign[3][0],640)}%;top:${pct(sign[3][1],464)}%;width:${pct(sw*Math.cos(Math.atan2(sign[1][1]-sign[0][1],sign[1][0]-sign[0][0])),640)}cqw;height:${pct(sh,640)}cqw;font-size:${pct(sh*.9,640)}cqw;transform:skewY(26.565deg)">${esc(S.sign||"렌터카")}</div>`;
+}
+const parkedCar = (m, sl, extra="") => { const [w,h]=SPR[m.type];
+  return `<img class="px" src="${IMG[m.type]}" alt="${esc(m.name)}" style="left:${pct(sl.x-w*.58,640)}%;top:${pct(sl.y-h+14,464)}%;width:${pct(w,640)}%;transform:scaleX(-1);filter:hue-rotate(${m.hue}deg) ${extra}">`; };
 function renderShop(){
-  const b = S.level===1?BUILD.main_lv1:BUILD.main_lv2;
-  const pct=(v,base)=>v/base*100;
   const cars = S.cars.slice(0,cap()).map((c,i)=>{ const sl=SLOTS[i], m=M[c.model], [w,h]=SPR[m.type];
     return {c,sl,m,w,h,y:sl.y}; }).sort((a,b)=>a.y-b.y);
-  const sign = b.sign; // [bl,br,tr,tl]
-  const sw = Math.hypot(sign[1][0]-sign[0][0], sign[1][1]-sign[0][1]), sh = sign[0][1]-sign[3][1];
   const next = EXPAND[S.level+1];
   const canExp = next && S.customers>=next.cust && S.money>=next.cost;
   $("#screen").innerHTML = `<div class="shop">
    <div class="map" aria-label="가게 지도. 주차 ${S.cars.length}/${cap()}칸">
-    <img class="full px" src="${IMG.ground}" alt="">
-    ${S.level<4?`<img class="full px" src="${IMG["cover"+S.level]}" alt="">`:""}
-    <img class="px" src="${S.level===1?IMG.b1:IMG.b2}" alt="가게 본관" style="left:${pct(b.left,640)}%;top:${pct(b.top,464)}%;width:${pct(b.w,640)}%">
-    <div class="sign" style="left:${pct(sign[3][0],640)}%;top:${pct(sign[3][1],464)}%;width:${pct(sw*Math.cos(Math.atan2(sign[1][1]-sign[0][1],sign[1][0]-sign[0][0])),640)}cqw;height:${pct(sh,640)}cqw;font-size:${pct(sh*.9,640)}cqw;transform:skewY(26.565deg)">${esc(S.sign||"렌터카")}</div>
+    ${mapBase()}
     ${cars.map(({c,sl,m,w,h})=>`<span class="ring ${c.rar}" style="left:${pct(sl.x-28,640)}%;top:${pct(sl.y-9,464)}%;width:${pct(56,640)}%;height:${pct(20,464)}%"></span>
-      <img class="px" src="${IMG[m.type]}" alt="${esc(m.name)}" style="left:${pct(sl.x-w*.58,640)}%;top:${pct(sl.y-h+14,464)}%;width:${pct(w,640)}%;transform:scaleX(-1);filter:hue-rotate(${m.hue}deg) ${c.st==="repair"?"saturate(.4)":""}">
+      ${parkedCar(m, sl, c.st==="repair"?"saturate(.4)":"")}
       ${c.st==="repair"||c.rest?`<span class="hud" style="left:${pct(sl.x-14,640)}%;top:${pct(sl.y-h,464)}%;padding:2px 8px">${c.st==="repair"?"수리":"쉼"}</span>`:""}
       <button class="slotbtn" data-act="openCar" data-arg="${c.id}" aria-label="${esc(m.name)} 자세히" style="left:${pct(sl.x-34,640)}%;top:${pct(sl.y-h+8,464)}%;width:${pct(68,640)}%;height:${pct(h,464)}%"></button>`).join("")}
     <div class="hud" style="left:2%;top:3%"><span style="width:10px;height:10px;border-radius:50%;background:var(--ok);display:inline-block"></span>정상 영업 중</div>
@@ -267,7 +322,8 @@ function renderShop(){
         <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoGacha" data-arg="reduced">움직임 줄이기</button>
         <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="grant">첫 지급</button>
         <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="settle">정산 동전</button>
-        <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="expand">가게 확장</button></div>
+        <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="expand">가게 확장</button>
+        <button class="btn" style="min-height:44px;padding:0 12px" data-act="showTitle">시작화면</button></div>
       <button class="btn danger" data-act="resetAsk">처음부터 다시</button>
       <div class="mut" style="font-size:13px">${S.day}일째 · 오늘 반영 거리 ${S.kmToday} / ${KM_CAP}km</div>
     </div>
@@ -579,7 +635,58 @@ function giftModal(){ modal(`<div class="pop" style="display:grid;gap:14px;justi
   <div class="row"><button class="btn" data-act="close">나중에</button><button class="btn p" data-act="toGacha">지금 뽑으러 가기</button></div></div>`); }
 ACT.toGacha = ()=>{ closeModal(); go("gacha"); };
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
+
+// ── 시작화면 ──
+// ponytail: "르르르" 이름 사용은 #19 권리 확인 전이다. 바뀌면 이 한 줄만 고친다.
+const GAME_TITLE = ["르르르", "렌터카"];
+const cloudSVG = (fill, op) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="16" shape-rendering="crispEdges"><path fill="${fill}" fill-opacity="${op}" d="M4 9h2V7h3V5h2V4h3V3h6v1h2v1h1v1h2V5h5v1h2v2h1v2h2v2h1v2H2v-3h2z"/></svg>`);
+const isoXY = (i, j) => [304 + (i - j) * 16, -70 + (i + j) * 8];   // map/make_map.py와 같은 투영
+const LANES = [{j:27.75, v:2.1}, {j:29.25, v:2.7}];                 // 도로 두 차선, 둘 다 ↘ 방향
+const TS = {raf:0, cars:[], last:0, next:0};
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+function fitTitle(){ const W=innerWidth, H=innerHeight, s=Math.min(Math.max(W/1280, H/720), W/960);
+  $("#tsStage").style.transform = `translate(${(W-1280*s)/2}px,${(H-720*s)/2}px) scale(${s})`; }
+function tsSpawn(lane, i){ const m = MODELS[Math.floor(Math.random()*MODELS.length)], [w,h] = SPR[m.type], img = document.createElement("img");
+  img.src = IMG[m.type]; img.alt = ""; img.style.width = pct(w,640)+"%"; img.style.filter = `hue-rotate(${m.hue}deg)`;
+  $("#tsRoad").appendChild(img); const c = {img, w, h, lane, i}; TS.cars.push(c); tsPlace(c, 0); }
+function tsPlace(c, t){ const [x,y] = isoXY(c.i, LANES[c.lane].j);
+  c.img.style.left = pct(x - c.w*.42, 640)+"%"; c.img.style.top = pct(y - c.h + 14 + Math.sin(t/80 + c.i*3)*.5, 464)+"%"; c.img.style.zIndex = Math.round(y); }
+function tsTick(t){ const dt = Math.min(.05, (t - (TS.last || t))/1000); TS.last = t;
+  if(t > TS.next){ const lane = Math.random() < .5 ? 0 : 1, back = TS.cars.filter(c=>c.lane===lane).reduce((a,c)=>Math.min(a,c.i), 99);
+    if(back > 11) tsSpawn(lane, 5); TS.next = t + 1400 + Math.random()*2400; }
+  TS.cars = TS.cars.filter(c=>{ c.i += LANES[c.lane].v*dt; tsPlace(c, t); if(c.i > 50){ c.img.remove(); return false; } return true; });
+  TS.raf = requestAnimationFrame(tsTick); }
+function showTitle(){
+  const el = $("#title"), st = $("#tsStage");
+  const parked = (S.cars.length ? S.cars.slice(0,cap()).map(c=>M[c.model]) : ["hyundai_casper","hyundai_avante","hyundai_tucson"].map(id=>M[id]))
+    .map((m,i)=>[m, SLOTS[i]]).sort((a,b)=>a[1].y-b[1].y);
+  const word = (t, cls) => `<div class="ts-word ${cls}"><span class="bk">${t}</span><span class="fg">${t}</span><span class="sh">${t}</span></div>`;
+  const clouds = [[70,0,48],[250,-18,60],[150,-34,54]].map(([y,d,dur])=>{ const a = `animation-duration:${dur}s;animation-delay:${d}s`;
+    return `<img class="ts-cloud" src="${cloudSVG("#1c1e2c",.12)}" alt="" style="left:70px;top:${y+170}px;width:260px;${a}"><img class="ts-cloud" src="${cloudSVG("#ffffff",.92)}" alt="" style="top:${y}px;width:260px;${a}">`; }).join("");
+  st.innerHTML = `<div class="map">${mapBase()}${parked.map(([m,sl])=>parkedCar(m,sl)).join("")}<div class="ts-road" id="tsRoad"></div></div>
+    ${clouds}<div class="ts-shade"></div>
+    <div class="ts-logo"><div class="ts-float" style="display:flex;flex-direction:column;align-items:flex-start">
+      <div class="ts-badge"><span class="coin" style="width:18px;height:18px"></span>RENT-A-CAR</div>
+      ${word(esc(GAME_TITLE[0]),"ts-gold")}${word(esc(GAME_TITLE[1]),"ts-sky")}
+      <div class="ts-ribbon">달린 만큼 커지는 우리 동네 렌터카</div></div>
+      ${[[500,30,0],[-26,140,.7],[540,236,1.2],[300,-6,.35]].map(([x,y,d])=>`<i class="ts-spark" style="left:${x}px;top:${y}px;animation-delay:${d}s"></i>`).join("")}</div>
+    <div class="ts-start"><b>화면을 눌러 시작</b><i></i></div>
+    <div class="ts-foot" style="left:172px">주행·영업 수치는 시험값이에요</div>
+    <div class="ts-foot" style="right:172px">시제품</div>
+    <div class="ts-flash"></div>`;
+  el.hidden = false; document.body.style.overflow = "hidden"; fitTitle(); el.focus();
+  TS.cars = []; TS.last = 0; TS.next = 0; tsSpawn(0, 16); tsSpawn(1, 30);
+  if(!reduceMotion()) TS.raf = requestAnimationFrame(tsTick);
+}
+function startGame(){ const el = $("#title"); if(el.hidden || el.classList.contains("go")) return; el.classList.add("go");
+  setTimeout(()=>{ cancelAnimationFrame(TS.raf); TS.cars = []; $("#tsStage").innerHTML = ""; el.hidden = true; el.classList.remove("go"); document.body.style.overflow = ""; }, 480); }
+ACT.showTitle = showTitle;
+$("#title").addEventListener("click", startGame);
+$("#title").addEventListener("keydown", e=>{ if(e.key==="Enter" || e.key===" "){ e.preventDefault(); startGame(); } });
+addEventListener("resize", ()=>{ if(!$("#title").hidden) fitTitle(); });
 render();
+showTitle();
 </script>
 <script type="text/babel" data-presets="react">
 {{motion}}
