@@ -16,10 +16,12 @@ object FacilityHostMapper {
             offer.planPurchase(facts.shop.progress,facts.shop.facilities,facts.balance) is ContractResult.Success->ShopAvailability.AVAILABLE
             else->ShopAvailability.LOCKED
         }
+        val progress = facility.progress(facts.shop.progress)
+        val required = facility.requiredProgress
         val condition=when(facility) {
-            Facility.FUEL_STATION->"보유 차량 ${facts.shop.progress.ownedVehicles}/5대"
-            Facility.INSURANCE->"누적 고객 ${facts.shop.progress.servedCustomers}/100명"
-            Facility.CAR_WASH->"가게 레벨 ${facts.shop.progress.shopLevel}/3"
+            Facility.FUEL_STATION->"보유 차량 $progress/${required}대"
+            Facility.INSURANCE->"누적 고객 $progress/${required}명"
+            Facility.CAR_WASH->"가게 레벨 $progress/$required"
         }+if(offer!=null && facts.balance.units<offer.price.units)" · 잔액 부족" else ""
         val title=when(facility){Facility.FUEL_STATION->"주유소";Facility.INSURANCE->"보험 시설";Facility.CAR_WASH->"세차장"}
         val effect = when {
