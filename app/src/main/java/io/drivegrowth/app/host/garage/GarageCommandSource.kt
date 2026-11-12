@@ -13,10 +13,12 @@ sealed interface GarageCommand {
 }
 
 data class GaragePending(val request: GarageEvent.RequestAction, val contentVersion: ContentVersion, val command: GarageCommand,
-    val balance: GameMoney? = null, val vehicle: OwnedVehicle? = null, val name: String? = null)
+    val balance: GameMoney? = null, val vehicle: OwnedVehicle? = null, val name: String? = null,
+    val materialName: String? = null)
 sealed interface GaragePreparation {
     data class Ready(val pending: GaragePending) : GaragePreparation
-    data class Materials(val request: GarageEvent.RequestAction, val candidates: List<OwnedVehicle>) : GaragePreparation
+    data class Materials(val request: GarageEvent.RequestAction, val candidates: List<OwnedVehicle>,
+        val candidateNames: Map<OwnedVehicleId, String>) : GaragePreparation
 }
 sealed interface GarageReceipt {
     data class Single(val value: Settlement) : GarageReceipt

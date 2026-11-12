@@ -9,6 +9,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.pixel.VehicleSprites
+import io.drivegrowth.app.ui.vehicleDisplayName
+import io.drivegrowth.app.ui.vehicleInstanceLabels
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.OwnedVehicleId
@@ -121,7 +123,11 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                         open(id, c.revision)
                 }
             }
-            addView(ShopSceneView(context, c, uiState.mode, townBackground, sprites, openVehicle))
+            val labels = vehicleInstanceLabels(c.vehicles.map { it.id to it.name })
+            val display = if (labels.isEmpty()) c else c.copy(vehicles = c.vehicles.map { vehicle ->
+                vehicle.copy(name = vehicleDisplayName(vehicle.name, labels[vehicle.id]))
+            })
+            addView(ShopSceneView(context, display, uiState.mode, townBackground, sprites, openVehicle))
             addView(originLabel(c))
             addView(text(c.name, 30, bold = true))
             addView(text(s(R.string.shop_level, c.level?.toString() ?: s(R.string.shop_unknown)) + " · " +
@@ -148,7 +154,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                 addView(text(s(R.string.shop_after, preview.appearance.sign), 24, bold = true))
             }
             if (c.vehicles.isEmpty()) addView(text(s(R.string.shop_no_vehicles)))
-            c.vehicles.forEach { vehicle ->
+            display.vehicles.forEach { vehicle ->
                 add(this, row().apply {
                     vehicle.vehicleId?.let(sprites::drawable)?.let { sprite ->
                         addView(ImageView(context).apply {
@@ -164,7 +170,6 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                             contentDescription = s(R.string.shop_scene_vehicle_detail, vehicle.name, vehicle.status)
                         })
                         addView(text(vehicle.status, 20))
-                        addView(text(vehicle.id.value, 16, color = muted))
                     }, LayoutParams(0, -2, 1f))
                 })
             }

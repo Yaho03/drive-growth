@@ -1,6 +1,10 @@
 package io.drivegrowth.app.host.garage
 
 import io.drivegrowth.app.ui.garage.GarageEvent
+import io.drivegrowth.app.host.GarageHostMapper
+import io.drivegrowth.app.host.HostSnapshot
+import io.drivegrowth.app.ui.garage.GarageScreenState
+import io.drivegrowth.app.ui.vehicleDisplayName
 import io.drivegrowth.core.content.*
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.VehicleRef
@@ -20,9 +24,10 @@ class GarageStoreCommandSourceTest {
     private inner class Ledger : GarageCommandLedger {
         override val source=InputSource.SIMULATION
         var cars=listOf(car,material);var state:ContractResult<VehicleActivity> = ContractResult.Success(VehicleActivity.IDLE);var accidents=0
+        var rented: OwnedVehicleId? = null
         var calls=mutableListOf<GarageCommand>()
         override fun balance()=ContractResult.Success(GameMoney(500))
-        override fun activity(id:OwnedVehicleId)=state
+        override fun activity(id:OwnedVehicleId)=if (id == rented) ContractResult.Success(VehicleActivity.RENTED) else state
         override fun listOwnedVehicles()=ContractResult.Success(cars)
         override fun firstCompletedRental()=ContractResult.Success<CompletedRental?>(null)
         override fun completedRental(id:RequestId)=ContractResult.Success<CompletedRental?>(null)
@@ -63,6 +68,30 @@ class GarageStoreCommandSourceTest {
         val c=(ready(prepare(l,VehicleAction.USE_MATERIAL,VehicleRef(material.ownedVehicleId,material.revision))).command as GarageCommand.Material).value
         assertEquals(4,c.target.level);assertEquals(0,c.target.levelProgressPercent);assertEquals(VehicleLifecycle.CONSUMED,c.material.lifecycle)
         assertEquals(GameMoney(0),c.cost);assertTrue(l.calls.isEmpty())
+    }
+    @Test fun materialNamesFollowTheWholeGarageEvenWhenCandidatesAreFiltered() {
+        val rentedVehicle = material.copy(ownedVehicleId = OwnedVehicleId("ahead-rented"))
+        val other = material.copy(ownedVehicleId = OwnedVehicleId("other"))
+        val l = Ledger().apply {
+            cars = listOf(other, car, material, rentedVehicle)
+            rented = rentedVehicle.ownedVehicleId
+        }
+        val garage = GarageHostMapper().garage(HostSnapshot(content, l.source, GameMoney(500), l.cars, emptyList())) as GarageScreenState.Content
+        val names = garage.data.vehicles.associate { it.vehicle.ownedVehicleId to vehicleDisplayName(it.name, it.instanceLabel) }
+        val choices = (prepare(l, VehicleAction.USE_MATERIAL) as ContractResult.Success).value as GaragePreparation.Materials
+        assertEquals(listOf(other, material), choices.candidates)
+        assertEquals(mapOf(other.ownedVehicleId to "시험 차량 3번", material.ownedVehicleId to "시험 차량 2번"), choices.candidateNames)
+        assertEquals(names.filterKeys { it in choices.candidateNames }, choices.candidateNames)
+
+        val ref = VehicleRef(material.ownedVehicleId, material.revision)
+        val prepared = ready(prepare(l, VehicleAction.USE_MATERIAL, ref))
+        assertEquals(names.getValue(car.ownedVehicleId), prepared.name)
+        assertEquals(choices.candidateNames.getValue(ref.ownedVehicleId), prepared.materialName)
+        val update = (prepared.command as GarageCommand.Material).value.material
+        assertEquals(ref, VehicleRef(update.ownedVehicleId, update.expectedRevision))
+        l.cars = listOf(car)
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), prepare(l, VehicleAction.USE_MATERIAL, ref))
+        assertTrue(l.calls.isEmpty())
     }
     @Test fun repairUsesStoredQuoteAndCommitDispatchKeepsExactCommandAndFailure() {
         val l=Ledger();val source=GarageStoreCommandSource(content,l)

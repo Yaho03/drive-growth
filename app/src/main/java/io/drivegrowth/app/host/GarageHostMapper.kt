@@ -6,6 +6,7 @@ import io.drivegrowth.app.ui.garage.CollectionScreenState
 import io.drivegrowth.app.ui.garage.GarageContent
 import io.drivegrowth.app.ui.garage.GarageScreenState
 import io.drivegrowth.app.ui.garage.VehiclePresentation
+import io.drivegrowth.app.ui.vehicleInstanceLabels
 import io.drivegrowth.core.contract.ContractError
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.InputSource
@@ -37,6 +38,7 @@ class GarageHostMapper {
         val capacity = if (rawCapacity is ContractResult.Success && rawCapacity.value < 0)
             ContractResult.Failure(ContractError.STORAGE_FAILURE) else rawCapacity
         val names = snapshot.content.catalog.vehicles.associate { it.vehicleId to it.displayName }
+        val instanceLabels = vehicleInstanceLabels(owned.map { it.ownedVehicleId to names.getValue(it.vehicleId) })
         val prices = snapshot.content.vehicles.groupBy { it.vehicleId }
         return GarageScreenState.Content(GarageContent(
             vehicles = owned.map { vehicle ->
@@ -54,7 +56,7 @@ class GarageHostMapper {
                 VehiclePresentation(
                     vehicle = vehicle,
                     name = names.getValue(vehicle.vehicleId),
-                    instanceLabel = "개체 ${vehicle.ownedVehicleId.value}",
+                    instanceLabel = instanceLabels[vehicle.ownedVehicleId].orEmpty(),
                     activity = (activity as? ContractResult.Success)?.value,
                     accidentLabel = count?.toString(),
                     modelPriceLabel = price?.let { "${it.units} 게임머니" },

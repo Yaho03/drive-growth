@@ -29,7 +29,7 @@ internal fun mapShopExpansion(profile: ProfileId, source: InputSource, definitio
             if(installed)ShopAvailability.INSTALLED else ShopAvailability.UNKNOWN))
     }
     val screen=ShopScreenState.Content(Revision(0),"내 가게 · 저장 상태",shop.progress.shopLevel,shop.progress.ownedVehicles,
-        shop.capacity,balance,ShopAppearance("외형 미연결",0xff8fbcff.toInt()),Collections.unmodifiableList(ArrayList(vehicles)),
+        shop.capacity,balance,ShopAppearance("기본 간판",0xff8fbcff.toInt()),Collections.unmodifiableList(ArrayList(vehicles)),
         Collections.unmodifiableList(facilities),expansion,listOf(ShopOption("decoration-unsupported","꾸미기",
             "품목/가격/보유 공급 미연결","이번 연결 미지원",ShopAvailability.UNKNOWN)),ShopOrigin.STORED)
     return ShopExpansionSnapshot(profile,source,definition.version,completed,screen)
