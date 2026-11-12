@@ -1,0 +1,81 @@
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FormFactorBoundaryTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.simulation.FormFactorBoundaryTest:
+INSTRUMENTATION_STATUS: test=testLongGoalClaimLabelsAndScrollInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.FormFactorBoundaryTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stack=java.util.concurrent.ExecutionException: junit.framework.AssertionFailedError
+	at java.util.concurrent.FutureTask.report(FutureTask.java:122)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:191)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest.ui(FormFactorBoundaryTest.kt:49)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest.testLongGoalClaimLabelsAndScrollInOfficialWindow(FormFactorBoundaryTest.kt:97)
+	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+Caused by: junit.framework.AssertionFailedError
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest.testLongGoalClaimLabelsAndScrollInOfficialWindow$lambda$0(FormFactorBoundaryTest.kt:97)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest.$r8$lambda$kvw-Ek2-NSUkZ6R5OnlMnpHgOSI(Unknown Source:0)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest$$ExternalSyntheticLambda22.invoke(D8$$SyntheticClass:0)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest.ui$lambda$0(FormFactorBoundaryTest.kt:49)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest.$r8$lambda$fihlmlwn_gnxUFTfpBhKgTu8JIs(Unknown Source:0)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest$$ExternalSyntheticLambda5.call(D8$$SyntheticClass:0)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2420)
+	at android.os.Handler.handleCallback(Handler.java:958)
+	at android.os.Handler.dispatchMessage(Handler.java:99)
+	at android.os.Looper.loopOnce(Looper.java:205)
+	at android.os.Looper.loop(Looper.java:294)
+	at android.app.ActivityThread.main(ActivityThread.java:8194)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+
+INSTRUMENTATION_STATUS: stream=
+Error in testLongGoalClaimLabelsAndScrollInOfficialWindow:
+java.util.concurrent.ExecutionException: junit.framework.AssertionFailedError
+	at java.util.concurrent.FutureTask.report(FutureTask.java:122)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:191)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest.ui(FormFactorBoundaryTest.kt:49)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest.testLongGoalClaimLabelsAndScrollInOfficialWindow(FormFactorBoundaryTest.kt:97)
+	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+Caused by: junit.framework.AssertionFailedError
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest.testLongGoalClaimLabelsAndScrollInOfficialWindow$lambda$0(FormFactorBoundaryTest.kt:97)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest.$r8$lambda$kvw-Ek2-NSUkZ6R5OnlMnpHgOSI(Unknown Source:0)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest$$ExternalSyntheticLambda22.invoke(D8$$SyntheticClass:0)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest.ui$lambda$0(FormFactorBoundaryTest.kt:49)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest.$r8$lambda$fihlmlwn_gnxUFTfpBhKgTu8JIs(Unknown Source:0)
+	at io.drivegrowth.app.simulation.FormFactorBoundaryTest$$ExternalSyntheticLambda5.call(D8$$SyntheticClass:0)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2420)
+	at android.os.Handler.handleCallback(Handler.java:958)
+	at android.os.Handler.dispatchMessage(Handler.java:99)
+	at android.os.Looper.loopOnce(Looper.java:205)
+	at android.os.Looper.loop(Looper.java:294)
+	at android.app.ActivityThread.main(ActivityThread.java:8194)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+
+INSTRUMENTATION_STATUS: test=testLongGoalClaimLabelsAndScrollInOfficialWindow
+INSTRUMENTATION_STATUS_CODE: -1
+INSTRUMENTATION_RESULT: stream=
+Test results for InstrumentationTestRunner=.E
+Time: 1.116
+
+FAILURES!!!
+Tests run: 1,  Failures: 0,  Errors: 1
+
+
+INSTRUMENTATION_CODE: -1
