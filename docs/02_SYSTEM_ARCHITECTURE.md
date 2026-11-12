@@ -271,6 +271,8 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 | 차량·화면 입력 | `DeliveryDistanceInput`에서 `ObservedDistance`와 `EstimatedRouteDistance`를 별도 타입과 출처로 받는다. `Observation.Missing`에는 누락 사유가 필수다. |
 | 공통 실패 | `ContractResult.Failure`에 `ContractError`를 제공한다. 권한 거부와 데이터 없음, 정책 미정, 충돌, 저장 실패를 구분한다. |
 
+`ContractResult.Failure.detail`은 선택 필드(`ContractFailureDetail?`)이며 기본값은 `null`이다. 가챠에서는 가게 레벨·공간이 유효하고 카탈로그에서 확인한 후보가 모두 현재 레벨에서 잠겨 있을 때 `DATA_UNAVAILABLE`에 `GACHA_NO_UNLOCKED_CANDIDATES`를 붙여 후보 없음 안내에 사용한다. 일반 실패의 오류 코드와 안내, 거래 거절 조건, 같은 요청의 확정 정산 재생은 기존 계약을 따른다.
+
 거리 m와 게임머니 최소 단위는 0 이상 `Long`, UTC Unix ms는 `Long`, revision은 0 이상 `Int`다. 재화 방향은 별도 필드로 전달한다. 공통 계약은 정수 결과를 받고, 소수 거리 환산과 경제 산식의 반올림은 값을 계산하는 호출 측 정책에서 정한다. 저장 구현은 범위 초과를 저장 전에 실패 처리한다.
 
 `core/src/testFixtures`의 `RentalContractFixtures`에서 시험 차량 v1/v2, 관측 30,000m·예상 20,000m, 고정 시각·규칙 버전·seed 33, 성공·실패 카탈로그와 메모리 저장소를 얻는다. `:core:test --tests '*RentalContractConsumerTest'`로 소비 예제를 실행한다. 다른 모듈의 테스트에서는 필요할 때 `testFixtures(project(":core"))`를 테스트 의존성으로 사용한다.
