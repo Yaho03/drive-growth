@@ -1,0 +1,81 @@
+{
+  "head": "5417c63e31cdb3140182c389a5581d39faa17fa2",
+  "pid_before": "10453",
+  "pid_after": "9823",
+  "settlements": [
+    {
+      "request": "delivery/delivery-choice-4574276d-2eec-48ab-8b68-ac326ff29a47/settle",
+      "settlement": "195c4757-d87b-47b1-95d1-e2a524de1a96",
+      "kind": "DELIVERY",
+      "source": "SIMULATION",
+      "money": {
+        "direction": "CREDIT",
+        "amount": 170
+      },
+      "balance": 1650
+    },
+    {
+      "request": "drive/756096eb-b21c-413b-9c9c-7b6eb15b16bd",
+      "settlement": "2c252ed0-20a8-4555-a21f-798219d28181",
+      "kind": "DRIVING",
+      "source": "SIMULATION",
+      "money": {
+        "direction": "CREDIT",
+        "amount": 360
+      },
+      "balance": 1480
+    },
+    {
+      "request": "initial-grant",
+      "settlement": "f6f6d214-690c-4040-b725-b88d3dc497e5",
+      "kind": "GARAGE",
+      "source": "SIMULATION",
+      "money": {
+        "direction": "CREDIT",
+        "amount": 1000
+      },
+      "balance": 1000
+    },
+    {
+      "request": "opening-gift",
+      "settlement": "2ffabd62-665b-484d-8d4a-2520c12ab6f7",
+      "kind": "GARAGE",
+      "source": "SIMULATION",
+      "money": null,
+      "balance": 1120
+    },
+    {
+      "request": "rental/settle/rental-visit-03658559-bb80-4fad-bf6c-1eaf6f26a01f",
+      "settlement": "826d9bf0-a92a-4625-86cc-120fe1977a33",
+      "kind": "RENTAL",
+      "source": "SIMULATION",
+      "money": {
+        "direction": "CREDIT",
+        "amount": 120
+      },
+      "balance": 1120
+    }
+  ],
+  "slot_before": 1,
+  "slot_after": 0,
+  "account_unchanged": true,
+  "vehicles_unchanged": true,
+  "viewed": [
+    {
+      "request": "drive/756096eb-b21c-413b-9c9c-7b6eb15b16bd",
+      "settlement": "2c252ed0-20a8-4555-a21f-798219d28181",
+      "before": 0,
+      "after": 1
+    }
+  ],
+  "gacha_transactions": 0,
+  "quest_claims": 0,
+  "gacha_progress": [
+    {
+      "id": 1,
+      "revision": 1,
+      "counter": 0,
+      "tickets": 1
+    }
+  ]
+}

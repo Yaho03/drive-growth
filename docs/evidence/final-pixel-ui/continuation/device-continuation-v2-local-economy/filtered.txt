@@ -1,0 +1,164 @@
+--------- beginning of main
+11-12 12:38:34.344 12677 12677 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+11-12 12:38:34.350 12677 12677 I AndroidRuntime: Using default boot image
+11-12 12:38:34.350 12677 12677 I AndroidRuntime: Leaving lock profiling enabled
+11-12 12:38:34.488 12677 12677 D AndroidRuntime: Calling main entry com.android.commands.am.Am
+11-12 12:38:34.812 12740 12814 I TestRunner: started: testOneIsolatedSimulationProfileFreeTicketPurchaseFacilityAndQuest(io.drivegrowth.app.simulation.LocalEconomyContinuationTest)
+11-12 12:38:35.035 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=0 elapsedMs=0 utcMs=1794279600000
+11-12 12:38:39.786 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=1 elapsedMs=1000 utcMs=1794279601000
+11-12 12:38:40.314 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=2 elapsedMs=61000 utcMs=1794279661000
+11-12 12:38:41.054 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=3 elapsedMs=121000 utcMs=1794279721000
+11-12 12:38:41.474 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=4 elapsedMs=181000 utcMs=1794279781000
+11-12 12:38:41.911 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=5 elapsedMs=241000 utcMs=1794279841000
+11-12 12:38:42.341 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=6 elapsedMs=301000 utcMs=1794279901000
+11-12 12:38:42.782 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=7 elapsedMs=361000 utcMs=1794279961000
+11-12 12:38:43.208 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=8 elapsedMs=421000 utcMs=1794280021000
+11-12 12:38:43.654 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=9 elapsedMs=481000 utcMs=1794280081000
+11-12 12:38:44.091 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=10 elapsedMs=541000 utcMs=1794280141000
+11-12 12:38:44.534 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=11 elapsedMs=601000 utcMs=1794280201000
+11-12 12:38:44.976 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=12 elapsedMs=661000 utcMs=1794280261000
+11-12 12:38:45.429 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=13 elapsedMs=721000 utcMs=1794280321000
+11-12 12:38:45.869 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=14 elapsedMs=781000 utcMs=1794280381000
+11-12 12:38:46.298 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=15 elapsedMs=841000 utcMs=1794280441000
+11-12 12:38:46.764 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=16 elapsedMs=901000 utcMs=1794280501000
+11-12 12:38:47.201 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=17 elapsedMs=961000 utcMs=1794280561000
+11-12 12:38:47.642 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=18 elapsedMs=1021000 utcMs=1794280621000
+11-12 12:38:48.099 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=19 elapsedMs=1081000 utcMs=1794280681000
+11-12 12:38:48.548 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=20 elapsedMs=1141000 utcMs=1794280741000
+11-12 12:38:49.015 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=21 elapsedMs=1201000 utcMs=1794280801000
+11-12 12:38:49.459 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=22 elapsedMs=1261000 utcMs=1794280861000
+11-12 12:38:49.912 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=23 elapsedMs=1321000 utcMs=1794280921000
+11-12 12:38:50.367 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=24 elapsedMs=1381000 utcMs=1794280981000
+11-12 12:38:50.821 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=25 elapsedMs=1441000 utcMs=1794281041000
+11-12 12:38:51.261 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=26 elapsedMs=1501000 utcMs=1794281101000
+11-12 12:38:51.732 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=27 elapsedMs=1561000 utcMs=1794281161000
+11-12 12:38:52.172 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=28 elapsedMs=1621000 utcMs=1794281221000
+11-12 12:38:52.616 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=29 elapsedMs=1681000 utcMs=1794281281000
+11-12 12:38:53.073 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=30 elapsedMs=1741000 utcMs=1794281341000
+11-12 12:38:53.552 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=31 elapsedMs=1801000 utcMs=1794281401000
+11-12 12:38:54.214 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=32 elapsedMs=1861000 utcMs=1794281461000
+11-12 12:38:54.671 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=33 elapsedMs=1921000 utcMs=1794281521000
+11-12 12:38:55.116 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=34 elapsedMs=1981000 utcMs=1794281581000
+11-12 12:38:55.571 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=35 elapsedMs=2041000 utcMs=1794281641000
+11-12 12:38:56.047 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=36 elapsedMs=2101000 utcMs=1794281701000
+11-12 12:38:56.532 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=37 elapsedMs=2161000 utcMs=1794281761000
+11-12 12:38:57.003 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=38 elapsedMs=2221000 utcMs=1794281821000
+11-12 12:38:57.480 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=39 elapsedMs=2281000 utcMs=1794281881000
+11-12 12:38:57.938 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=40 elapsedMs=2341000 utcMs=1794281941000
+11-12 12:38:58.438 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=41 elapsedMs=2401000 utcMs=1794282001000
+11-12 12:38:58.919 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=42 elapsedMs=2461000 utcMs=1794282061000
+11-12 12:38:59.405 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=43 elapsedMs=2521000 utcMs=1794282121000
+11-12 12:38:59.908 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=44 elapsedMs=2581000 utcMs=1794282181000
+11-12 12:39:00.398 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=45 elapsedMs=2641000 utcMs=1794282241000
+11-12 12:39:00.857 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=46 elapsedMs=2701000 utcMs=1794282301000
+11-12 12:39:01.328 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=47 elapsedMs=2761000 utcMs=1794282361000
+11-12 12:39:01.802 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=48 elapsedMs=2821000 utcMs=1794282421000
+11-12 12:39:02.299 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=49 elapsedMs=2881000 utcMs=1794282481000
+11-12 12:39:02.799 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=50 elapsedMs=2941000 utcMs=1794282541000
+11-12 12:39:03.276 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=51 elapsedMs=3001000 utcMs=1794282601000
+11-12 12:39:03.747 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=52 elapsedMs=3061000 utcMs=1794282661000
+11-12 12:39:04.226 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=53 elapsedMs=3121000 utcMs=1794282721000
+11-12 12:39:04.684 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=54 elapsedMs=3181000 utcMs=1794282781000
+11-12 12:39:05.145 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=55 elapsedMs=3241000 utcMs=1794282841000
+11-12 12:39:05.607 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=56 elapsedMs=3301000 utcMs=1794282901000
+11-12 12:39:06.096 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=57 elapsedMs=3361000 utcMs=1794282961000
+11-12 12:39:06.555 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=58 elapsedMs=3421000 utcMs=1794283021000
+11-12 12:39:07.007 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=59 elapsedMs=3481000 utcMs=1794283081000
+11-12 12:39:07.483 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=60 elapsedMs=3541000 utcMs=1794283141000
+11-12 12:39:07.959 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=61 elapsedMs=3601000 utcMs=1794283201000
+11-12 12:39:08.626 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=62 elapsedMs=3602000 utcMs=1794283202000
+11-12 12:39:09.088 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=63 elapsedMs=3603000 utcMs=1794283203000
+11-12 12:39:09.550 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=64 elapsedMs=3604000 utcMs=1794283204000
+11-12 12:39:10.013 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=65 elapsedMs=3605000 utcMs=1794283205000
+11-12 12:39:12.911 12740 12814 I LocalEconomyContinuation: FREE profile=local-e7d5cb37-808f-4271-b912-99c258cb7c61 request=b744d404-5015-4191-befe-c242fd341429 balance=1480 owned=2
+11-12 12:39:15.845 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=1 elapsedMs=3606000 utcMs=1794283206000
+11-12 12:39:16.259 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=2 elapsedMs=3666000 utcMs=1794283266000
+11-12 12:39:16.613 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=3 elapsedMs=3726000 utcMs=1794283326000
+11-12 12:39:16.974 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=4 elapsedMs=3786000 utcMs=1794283386000
+11-12 12:39:17.352 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=5 elapsedMs=3846000 utcMs=1794283446000
+11-12 12:39:17.724 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=6 elapsedMs=3906000 utcMs=1794283506000
+11-12 12:39:18.107 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=7 elapsedMs=3966000 utcMs=1794283566000
+11-12 12:39:18.478 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=8 elapsedMs=4026000 utcMs=1794283626000
+11-12 12:39:18.830 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=9 elapsedMs=4086000 utcMs=1794283686000
+11-12 12:39:19.213 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=10 elapsedMs=4146000 utcMs=1794283746000
+11-12 12:39:19.573 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=11 elapsedMs=4206000 utcMs=1794283806000
+11-12 12:39:19.941 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=12 elapsedMs=4266000 utcMs=1794283866000
+11-12 12:39:20.314 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=13 elapsedMs=4326000 utcMs=1794283926000
+11-12 12:39:20.675 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=14 elapsedMs=4386000 utcMs=1794283986000
+11-12 12:39:21.032 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=15 elapsedMs=4446000 utcMs=1794284046000
+11-12 12:39:21.407 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=16 elapsedMs=4506000 utcMs=1794284106000
+11-12 12:39:21.787 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=17 elapsedMs=4566000 utcMs=1794284166000
+11-12 12:39:22.158 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=18 elapsedMs=4626000 utcMs=1794284226000
+11-12 12:39:22.543 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=19 elapsedMs=4686000 utcMs=1794284286000
+11-12 12:39:22.927 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=20 elapsedMs=4746000 utcMs=1794284346000
+11-12 12:39:23.336 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=21 elapsedMs=4806000 utcMs=1794284406000
+11-12 12:39:23.748 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=22 elapsedMs=4866000 utcMs=1794284466000
+11-12 12:39:24.138 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=23 elapsedMs=4926000 utcMs=1794284526000
+11-12 12:39:24.521 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=24 elapsedMs=4986000 utcMs=1794284586000
+11-12 12:39:24.927 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=25 elapsedMs=5046000 utcMs=1794284646000
+11-12 12:39:25.320 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=26 elapsedMs=5106000 utcMs=1794284706000
+11-12 12:39:25.737 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=27 elapsedMs=5166000 utcMs=1794284766000
+11-12 12:39:26.142 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=28 elapsedMs=5226000 utcMs=1794284826000
+11-12 12:39:26.539 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=29 elapsedMs=5286000 utcMs=1794284886000
+11-12 12:39:26.926 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=30 elapsedMs=5346000 utcMs=1794284946000
+11-12 12:39:27.314 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=31 elapsedMs=5406000 utcMs=1794285006000
+11-12 12:39:27.870 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=32 elapsedMs=5466000 utcMs=1794285066000
+11-12 12:39:28.279 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=33 elapsedMs=5526000 utcMs=1794285126000
+11-12 12:39:28.680 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=34 elapsedMs=5586000 utcMs=1794285186000
+11-12 12:39:29.083 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=35 elapsedMs=5646000 utcMs=1794285246000
+11-12 12:39:29.485 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=36 elapsedMs=5706000 utcMs=1794285306000
+11-12 12:39:29.926 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=37 elapsedMs=5766000 utcMs=1794285366000
+11-12 12:39:30.345 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=38 elapsedMs=5826000 utcMs=1794285426000
+11-12 12:39:30.744 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=39 elapsedMs=5886000 utcMs=1794285486000
+11-12 12:39:31.157 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=40 elapsedMs=5946000 utcMs=1794285546000
+11-12 12:39:31.560 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=41 elapsedMs=6006000 utcMs=1794285606000
+11-12 12:39:31.958 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=42 elapsedMs=6066000 utcMs=1794285666000
+11-12 12:39:32.366 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=43 elapsedMs=6126000 utcMs=1794285726000
+11-12 12:39:32.784 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=44 elapsedMs=6186000 utcMs=1794285786000
+11-12 12:39:33.193 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=45 elapsedMs=6246000 utcMs=1794285846000
+11-12 12:39:33.604 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=46 elapsedMs=6306000 utcMs=1794285906000
+11-12 12:39:34.020 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=47 elapsedMs=6366000 utcMs=1794285966000
+11-12 12:39:34.431 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=48 elapsedMs=6426000 utcMs=1794286026000
+11-12 12:39:34.849 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=49 elapsedMs=6486000 utcMs=1794286086000
+11-12 12:39:35.287 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=50 elapsedMs=6546000 utcMs=1794286146000
+11-12 12:39:35.687 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=51 elapsedMs=6606000 utcMs=1794286206000
+11-12 12:39:36.102 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=52 elapsedMs=6666000 utcMs=1794286266000
+11-12 12:39:36.501 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=53 elapsedMs=6726000 utcMs=1794286326000
+11-12 12:39:36.901 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=54 elapsedMs=6786000 utcMs=1794286386000
+11-12 12:39:37.304 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=55 elapsedMs=6846000 utcMs=1794286446000
+11-12 12:39:37.737 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=56 elapsedMs=6906000 utcMs=1794286506000
+11-12 12:39:38.159 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=57 elapsedMs=6966000 utcMs=1794286566000
+11-12 12:39:38.580 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=58 elapsedMs=7026000 utcMs=1794286626000
+11-12 12:39:39.006 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=59 elapsedMs=7086000 utcMs=1794286686000
+11-12 12:39:39.406 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=60 elapsedMs=7146000 utcMs=1794286746000
+11-12 12:39:39.818 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=61 elapsedMs=7206000 utcMs=1794286806000
+11-12 12:39:40.404 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=62 elapsedMs=7207000 utcMs=1794286807000
+11-12 12:39:40.533 12740 12852 I DriveGrowthSimulation: simulation_arrival source=SIMULATION route=delivery-route-1bd9f01f-c9f1-4279-9a7f-bba1f5f056d4 utcMs=1794286807000
+11-12 12:39:40.834 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=63 elapsedMs=7208000 utcMs=1794286808000
+11-12 12:39:41.239 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=64 elapsedMs=7209000 utcMs=1794286809000
+11-12 12:39:41.642 12740 12740 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=65 elapsedMs=7210000 utcMs=1794286810000
+11-12 12:39:43.114 12740 12814 I LocalEconomyContinuation: DELIVERED profile=local-e7d5cb37-808f-4271-b912-99c258cb7c61 request=delivery-choice-bef61ad0-45cf-47a8-a861-3c3917fa1c96 price=1700 owned=3
+11-12 12:41:14.933 12740 12814 I TestRunner: failed: testOneIsolatedSimulationProfileFreeTicketPurchaseFacilityAndQuest(io.drivegrowth.app.simulation.LocalEconomyContinuationTest)
+11-12 12:41:14.933 12740 12814 I TestRunner: ----- begin exception -----
+11-12 12:41:14.934 12740 12814 I TestRunner: junit.framework.AssertionFailedError: active button shop:confirm
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at junit.framework.Assert.fail(Assert.java:50)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at junit.framework.Assert.assertTrue(Assert.java:20)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at io.drivegrowth.app.simulation.LocalEconomyContinuationTest.awaitUi(LocalEconomyContinuationTest.kt:37)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at io.drivegrowth.app.simulation.LocalEconomyContinuationTest.click(LocalEconomyContinuationTest.kt:40)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at io.drivegrowth.app.simulation.LocalEconomyContinuationTest.testOneIsolatedSimulationProfileFreeTicketPurchaseFacilityAndQuest(LocalEconomyContinuationTest.kt:193)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at java.lang.reflect.Method.invoke(Native Method)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at android.test.ActivityInstrumentationTestCase2.runTest(ActivityInstrumentationTestCase2.java:192)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at junit.framework.TestCase.runBare(TestCase.java:134)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at junit.framework.TestResult$1.protect(TestResult.java:115)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at junit.framework.TestResult.runProtected(TestResult.java:133)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at junit.framework.TestResult.run(TestResult.java:118)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at junit.framework.TestCase.run(TestCase.java:124)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+11-12 12:41:14.934 12740 12814 I TestRunner: 	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+11-12 12:41:14.934 12740 12814 I TestRunner: ----- end exception -----
+11-12 12:41:14.936 12740 12814 I TestRunner: finished: testOneIsolatedSimulationProfileFreeTicketPurchaseFacilityAndQuest(io.drivegrowth.app.simulation.LocalEconomyContinuationTest)
+11-12 12:41:14.943 12677 12677 I AndroidRuntime: VM exiting with result code 0.

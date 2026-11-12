@@ -1,0 +1,164 @@
+{
+  "검토": {
+    "범위": "#28 같은 프로필의 무료권 사용, 구매 탁송, 주유소 구매, 퀘스트 청구",
+    "판정": "네 제품 명령이 같은 격리 SIMULATION 프로필의 실제 SQLite에 확정됐음을 독립 대조했다. 중간 준비는 시험에서 공개 원장 API를 호출했다.",
+    "검토 방법": "계측 소스, 실행기, 원본 결과·로그, 설치 회수 APK SHA-256 및 회수 SQLite를 읽기 전용으로 대조했다. 새 시험은 실행하지 않았다.",
+    "기준 커밋": "3bd7d925c1133fd5a45ecf3cc5ee8d72faabbdfb",
+    "기준 트리": "cc9a75d325b1112b236fd4d5351725719d4e8121",
+    "제품 소스 기준": "0b43637880e4a46cde827da96b1c419a58853629",
+    "기준 차이": "0b43637에서 3bd7d92까지의 차이는 ShopExpansionLiveSourceTest.kt와 ShopExpansionMapperTest.kt 두 시험 파일이다. 같은 프로필 시험은 기준 위에 별도 계측 소스와 격리 패키지 설정을 추가했다.",
+    "별도 패치": "이 실행의 독립 패치 파일은 인계 디렉터리에서 확인되지 않았다. 아래 신규 시험 Kotlin 원본이 실행 결과에 해시로 연결된 소스 오버레이다."
+  },
+  "원본": {
+    "기준 경로": "/private/tmp/drive-e-28-combined.Xrc4NI",
+    "계측 소스": {
+      "경로": "continuation/app/src/androidTest/java/io/drivegrowth/app/simulation/LocalEconomyContinuationTest.kt",
+      "sha256": "080ba1db90b5cc249e5e7b18677abece21b8e1efdab44a7a904734e87b851bee"
+    },
+    "패키지 격리 설정": {
+      "경로": "continuation-isolation.gradle",
+      "sha256": "14a7368c2e5b0e5d1a82b4735bc01a0d65a917fffd461f9374ead50c3fe98bbb"
+    },
+    "실행기": {
+      "경로": "run-local-economy-continuation-v3.py",
+      "sha256": "31369734161ee5a994275e140549b2c58f4530971fc0e3aee2619508b8e58fbe"
+    },
+    "실행 결과": {
+      "경로": "device-continuation-v3-local-economy/result.json",
+      "sha256": "05184396d476149f5fe471578506e98260f09fad170754293d4145d0ac4b0ed8"
+    },
+    "계측 출력": {
+      "경로": "device-continuation-v3-local-economy/instrumentation.txt",
+      "sha256": "65cfde4da76ccba7f187c42414263105093a81e6c0d587d4bf33558c4c30ffd7",
+      "결과": "OK (1 test)",
+      "시간 초": 84.788
+    },
+    "단계 로그": {
+      "경로": "device-continuation-v3-local-economy/filtered.txt",
+      "sha256": "3e2da7a9714c4aa46f8cdd74cf639bfe9f0f03b1c4cc0bb8be0fb718cc6332e0",
+      "대조": "FREE, DELIVERED, FACILITY, QUEST의 PID와 로컬 프로필이 동일했다."
+    },
+    "설치 회수 앱 APK": {
+      "경로": "device-continuation-v3-local-economy/app-debug.apk",
+      "sha256": "c5c9bcbdfd2955e4004fba2c88803e6e5c5e973b93a7971bb42d0b27e526c744",
+      "패키지": "io.drivegrowth.verify.e2e28continuation"
+    },
+    "설치 회수 계측 APK": {
+      "경로": "device-continuation-v3-local-economy/app-debug-androidTest.apk",
+      "sha256": "d96f0dc28dcc6e2b444377456f34e68e2759fe1fcf272fda63e58500e4b2b89d",
+      "패키지": "io.drivegrowth.verify.e2e28continuation.test"
+    },
+    "회수 원장 참조": {
+      "경로": "device-continuation-v3-local-economy/unified-simulation.db",
+      "sha256": "bb479fb41c7ab20218301941a5ae8927fdcac40d9fee136439aa17dfe489e83a",
+      "quick_check": "ok"
+    }
+  },
+  "같은 원장 대조": {
+    "출처": "SIMULATION",
+    "initialization_profile 행": 1,
+    "동일 프로필 확인": [
+      "first_gift_markers",
+      "facility_command_results",
+      "quest_claims"
+    ],
+    "settlements 전체 행": 17,
+    "settlements SIMULATION 행": 17,
+    "최종 host_command_checkpoint 행": 0,
+    "최종 delivery_active 행": 0,
+    "최종 잔액": 10118
+  },
+  "제품 거래": [
+    {
+      "동작": "첫 모의 주행 뒤 첫 영업 선물로 받은 무료권 가챠 확정",
+      "관련 표": [
+        "first_gift_markers",
+        "gacha_requests",
+        "gacha_progress",
+        "settlements",
+        "vehicles"
+      ],
+      "명령": "FREE 가챠 1건",
+      "무료권 전후": [
+        1,
+        0
+      ],
+      "잔액 전후": [
+        1480,
+        1480
+      ],
+      "차량 취득가": 0,
+      "지급 직후 보유": 2
+    },
+    {
+      "동작": "구매 탁송 선택·확정 및 모의 도착",
+      "관련 표": [
+        "delivery_requests",
+        "delivery_outcomes",
+        "settlements",
+        "vehicles"
+      ],
+      "명령": "유료 구매 요청 1건과 동일 요청 ID의 도착 결과 1건",
+      "구매 차감": 1200,
+      "도착 금융 변경": null,
+      "차량 취득가": 1200,
+      "지급 직후 보유": 3
+    },
+    {
+      "동작": "HOME의 주유소 미리보기·확정·결과 확인",
+      "관련 표": [
+        "facilities",
+        "facility_command_results",
+        "settlements",
+        "host_command_checkpoint"
+      ],
+      "명령": "FUEL_STATION 구매 1건",
+      "차감": 500,
+      "잔액 전후": [
+        10518,
+        10018
+      ]
+    },
+    {
+      "동작": "첫 지급 정산 열람 뒤 일간 퀘스트 청구",
+      "관련 표": [
+        "quest_claims",
+        "settlements",
+        "account"
+      ],
+      "명령": "daily-result-viewed 청구 1건",
+      "입금": 100,
+      "잔액 전후": [
+        10018,
+        10118
+      ]
+    }
+  ],
+  "중간 준비": {
+    "구매 탁송 전": "공개 commitGameChange로 시험용 게임머니 10000을 입금했다.",
+    "주유소 해금 전": "같은 프로필에서 공개 rental.assign/account/settle/finishReturn으로 완료 대여 3건을 마련했다. 공개 rental.expand로 가게 Lv2·5칸을 만들고 500을 차감했다. 공개 commitGameChange로 준비 차량 2대를 추가해 보유 5대를 만들었다.",
+    "저장 방식": "준비 단계가 실제 원장에 기록되며 계측에서 공개 API를 직접 호출했다. 준비 단계에서 직접 SQL 행 삽입은 사용하지 않았다."
+  },
+  "선행 실패": [
+    {
+      "시도": "v1",
+      "결과 경로": "device-continuation-local-economy/instrumentation.txt",
+      "시험 소스 sha256": "d2a177318d55af2f1ba820ceac6db8dc9648d010ac668ef6c57e6ac045733326",
+      "관측된 실패": "simulation:start 활성 버튼 대기에서 시간 초과. 이 로그만으로 제품 실패 원인을 확정할 수 없다."
+    },
+    {
+      "시도": "v2",
+      "결과 경로": "device-continuation-v2-local-economy/instrumentation.txt",
+      "시험 소스 경로": "continuation-v2-source.kt",
+      "시험 소스 sha256": "d712f6bfc4eb27242b597f1db437849e2a9b0b15753f5567fa1cd093f78365f1",
+      "관측된 실패": "무료권과 구매 탁송 지급 후 shop:confirm 활성 버튼 대기에서 시간 초과.",
+      "v3 보완": "HOME 새로고침을 먼저 호출하고 같은 UI 이벤트에서 현재 선택이 FUEL_STATION이고 확인 버튼이 표시·활성임을 확인한 뒤 눌렀다. 이후 실제 시설 설치, STARTED 원명령, 단일 차감, 슬롯 해제의 단언을 유지했다."
+    }
+  ],
+  "증거 한계": [
+    "Debug UnifiedSimulationActivity가 기존 MainActivity, 제품 View·Host와 SQLite를 사용했다.",
+    "화면 단계는 표시·활성 상태의 버튼을 프로그램으로 호출한 performClick 계측이다. 좌표 터치, 공식 창 프리셋, 표준 제품 런처 실행을 검증하지 않았다.",
+    "주행과 도착은 모의 입력이다. 실제 SDK·실차·프로세스 재시작은 이 계측의 검증 범위 밖이다.",
+    "원장에 명시적인 준비 거래가 섞여 있으므로 준비 없이 자연스럽게 모든 해금을 달성한 시연이나 전체 #28 완료로 인용할 수 없다."
+  ]
+}

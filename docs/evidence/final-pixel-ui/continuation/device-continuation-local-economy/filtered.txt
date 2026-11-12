@@ -1,0 +1,32 @@
+--------- beginning of main
+11-12 12:35:45.672 11556 11556 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+11-12 12:35:45.675 11556 11556 I AndroidRuntime: Using default boot image
+11-12 12:35:45.675 11556 11556 I AndroidRuntime: Leaving lock profiling enabled
+11-12 12:35:45.747 11556 11556 D AndroidRuntime: Calling main entry com.android.commands.am.Am
+11-12 12:35:45.988 11606 11664 I TestRunner: started: testOneIsolatedSimulationProfileFreeTicketPurchaseFacilityAndQuest(io.drivegrowth.app.simulation.LocalEconomyContinuationTest)
+11-12 12:35:46.218 11606 11606 I DriveGrowthSimulation: simulation_input source=SIMULATION stage=0 elapsedMs=0 utcMs=1794279600000
+11-12 12:37:19.135 11606 11664 I TestRunner: failed: testOneIsolatedSimulationProfileFreeTicketPurchaseFacilityAndQuest(io.drivegrowth.app.simulation.LocalEconomyContinuationTest)
+11-12 12:37:19.135 11606 11664 I TestRunner: ----- begin exception -----
+11-12 12:37:19.136 11606 11664 I TestRunner: junit.framework.AssertionFailedError: active button simulation:start
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at junit.framework.Assert.fail(Assert.java:50)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at junit.framework.Assert.assertTrue(Assert.java:20)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at io.drivegrowth.app.simulation.LocalEconomyContinuationTest.awaitUi(LocalEconomyContinuationTest.kt:37)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at io.drivegrowth.app.simulation.LocalEconomyContinuationTest.click(LocalEconomyContinuationTest.kt:40)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at io.drivegrowth.app.simulation.LocalEconomyContinuationTest.drive(LocalEconomyContinuationTest.kt:71)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at io.drivegrowth.app.simulation.LocalEconomyContinuationTest.testOneIsolatedSimulationProfileFreeTicketPurchaseFacilityAndQuest(LocalEconomyContinuationTest.kt:96)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at java.lang.reflect.Method.invoke(Native Method)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at android.test.ActivityInstrumentationTestCase2.runTest(ActivityInstrumentationTestCase2.java:192)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at junit.framework.TestCase.runBare(TestCase.java:134)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at junit.framework.TestResult$1.protect(TestResult.java:115)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at junit.framework.TestResult.runProtected(TestResult.java:133)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at junit.framework.TestResult.run(TestResult.java:118)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at junit.framework.TestCase.run(TestCase.java:124)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+11-12 12:37:19.136 11606 11664 I TestRunner: 	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+11-12 12:37:19.136 11606 11664 I TestRunner: ----- end exception -----
+11-12 12:37:19.140 11606 11664 I TestRunner: finished: testOneIsolatedSimulationProfileFreeTicketPurchaseFacilityAndQuest(io.drivegrowth.app.simulation.LocalEconomyContinuationTest)
+11-12 12:37:19.147 11556 11556 I AndroidRuntime: VM exiting with result code 0.
