@@ -1,5 +1,10 @@
 package io.drivegrowth.app.simulation
 
+import io.drivegrowth.app.mainNavigation
+import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.showSimulationControls
+import io.drivegrowth.app.host.HostPage
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.graphics.Bitmap
@@ -13,7 +18,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.R
@@ -66,7 +70,7 @@ class UnifiedSimulationRestActivityTest :
         assertEquals(InputSource.SIMULATION, identity.source)
         assertNull(ok(readRestDemo(games)))
 
-        choosePage(root, "탁송")
+        choosePage(root, HostPage.DELIVERY)
         click(root, "simulation:destination")
         var offer: Any? = null
         await("미확정 탁송 제안이 보여야 합니다") {
@@ -75,6 +79,7 @@ class UnifiedSimulationRestActivityTest :
             offer != null
         }
         click(root, checkNotNull(offer))
+        onUi { root.showSimulationControls() }
         await("탁송 확정과 휴식 시작이 모두 선택 가능한 상태여야 합니다") {
             root.findViewWithTag<Button>("delivery:confirm")?.isEnabled == true &&
                 root.findViewWithTag<Button>("simulation:rest-start")?.isEnabled == true
@@ -137,30 +142,29 @@ class UnifiedSimulationRestActivityTest :
             assertEquals(GameMoney(15), result.original.observed.commit.amount)
 
             await("시연 완료 후 기존 진행 메뉴가 다시 허용되어야 합니다") {
-                nextRoot.findViewWithTag<Spinner>("host:destination")?.isEnabled == true
+                nextRoot.mainNavigation()?.isEnabled == true
             }
             val pageField = MainActivity::class.java.getDeclaredField("navigation").apply { isAccessible = true }
-            val generationField = MainActivity::class.java.getDeclaredField("navigationGeneration").apply { isAccessible = true }
             val frameField = MainActivity::class.java.getDeclaredField("progressionFrame").apply { isAccessible = true }
             val expectedLabels = listOf(context.getString(R.string.progress_buff_active),
                 "원장 잔여 1100초", "모의 입력 · 저장된 확정 상태")
-            choosePage(nextRoot, "퀘스트·진행") { menu ->
+            choosePage(nextRoot, HostPage.PROGRESSION) { menu ->
                 val page = (pageField.get(reopened) as HostNavigation).page
-                Log.i("UnifiedRestActivityTest", "progressSelect page=$page generation=${generationField.getLong(reopened)} " +
-                    "menu=${System.identityHashCode(menu)} selected=${menu.selectedItem} target=퀘스트·진행")
+                Log.i("UnifiedRestActivityTest", "progressSelect page=$page " +
+                    "menu=${System.identityHashCode(menu)} selected=${menu.isSelected} target=퀘스트·진행")
             }
             var lastProgressState: String? = null
             await("기존 진행 카드가 같은 원장의 확정 잔여 시간을 표시해야 합니다") {
                 val card = tree(nextRoot).filterIsInstance<ProgressView>().singleOrNull()
                 val labels = card?.let(::tree).orEmpty().filterIsInstance<TextView>().map { it.text.toString() }
-                val menu = nextRoot.findViewWithTag<Spinner>("host:destination")
+                val menu = nextRoot.mainNavigation()
                 val page = (pageField.get(reopened) as HostNavigation).page
                 val frame = frameField.get(reopened) as? ProgressionFrame
                 val screen = frame?.screen
                 val rest = (screen as? ProgressScreenState.Content)?.rest
                 val found = expectedLabels.map { it in labels }
-                val state = "page=$page generation=${generationField.getLong(reopened)} " +
-                    "menu=${menu?.let { System.identityHashCode(it) }} selected=${menu?.selectedItem} " +
+                val state = "page=$page " +
+                    "menu=${menu?.let { System.identityHashCode(it) }} navShown=${menu?.isShown} " +
                     "controls=${frame?.controlsEnabled} frame=${screen?.javaClass?.simpleName} " +
                     "rest=${rest?.buffPhase}/${rest?.remainingLabel}/${rest?.note} " +
                     "cardAttached=${card?.isAttachedToWindow} cardShown=${card?.isShown} " +
@@ -328,12 +332,12 @@ class UnifiedSimulationRestActivityTest :
         fail("90초 안에 시험 장소 주차 구간에 도달하지 못했습니다. 마지막 상태: $lastStatus")
     }
 
-    private fun choosePage(root: View, label: String, beforeSelection: ((Spinner) -> Unit)? = null) {
-        await("페이지 메뉴가 허용되어야 합니다") { root.findViewWithTag<Spinner>("host:destination")?.isEnabled == true }
+    private fun choosePage(root: View, page: HostPage, beforeSelection: ((Button) -> Unit)? = null) {
+        await("페이지 메뉴가 허용되어야 합니다") { root.mainNavigation()?.isEnabled == true }
         onUi {
-            val menu = checkNotNull(root.findViewWithTag<Spinner>("host:destination"))
+            val menu = checkNotNull(root.mainPage(page))
             beforeSelection?.invoke(menu)
-            menu.setSelection((0 until menu.count).single { menu.getItemAtPosition(it).toString() == label })
+            root.openMainPage(page)
         }
     }
 

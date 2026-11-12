@@ -1,5 +1,9 @@
 package io.drivegrowth.app.host.delivery
 
+import io.drivegrowth.app.mainNavigation
+import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.host.HostPage
 import android.content.pm.PackageManager
 import android.os.Process
 import android.os.SystemClock
@@ -8,7 +12,6 @@ import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.R
@@ -186,7 +189,7 @@ class Issue37NativeMainPurchaseTest :
 
     private fun deliveryRestricted(): Boolean {
         val root = activity.window.decorView
-        return root.findViewWithTag<Spinner>("host:destination") == null &&
+        return root.mainNavigation() == null &&
             views(root).none { it.isShown && it is io.drivegrowth.app.ui.delivery.DeliveryView } &&
             listOf("delivery:abandon", "delivery:change", "delivery:acknowledge").all {
                 root.findViewWithTag<View>(it)?.isShown != true
@@ -263,11 +266,10 @@ class Issue37NativeMainPurchaseTest :
             val active = (session.delivery.state?.screen as? DeliveryScreen.Active)?.delivery
             if (active?.active?.requestId?.value == fixture.request &&
                 context.getString(R.string.delivery_active) in labels()) return@awaitUi true
-            val spinner = activity.window.decorView.findViewWithTag<Spinner>("host:destination")
+            val spinner = activity.window.decorView.mainPage(HostPage.DELIVERY)
                 ?.takeIf { it.isEnabled && it.isShown && it.isLaidOut && !it.isLayoutRequested }
                 ?: return@awaitUi false
-            val index = (0 until spinner.count).single { spinner.getItemAtPosition(it).toString() == "탁송" }
-            if (spinner.selectedItemPosition != index) spinner.setSelection(index)
+            activity.window.decorView.openMainPage(HostPage.DELIVERY)
             false
         }
     }
@@ -366,11 +368,10 @@ class Issue37NativeMainPurchaseTest :
         val before = ledger()
         awaitUi("Main의 탁송 화면") {
             if (button("delivery:destination") != null) return@awaitUi true
-            val spinner = activity.window.decorView.findViewWithTag<Spinner>("host:destination")
+            val spinner = activity.window.decorView.mainPage(HostPage.DELIVERY)
                 ?.takeIf { it.isEnabled && it.isShown && it.isLaidOut && !it.isLayoutRequested }
                 ?: return@awaitUi false
-            val index = (0 until spinner.count).single { spinner.getItemAtPosition(it).toString() == "탁송" }
-            if (spinner.selectedItemPosition != index) spinner.setSelection(index)
+            activity.window.decorView.openMainPage(HostPage.DELIVERY)
             false
         }
         awaitUi("SDK 연결 후 내비 조회") {

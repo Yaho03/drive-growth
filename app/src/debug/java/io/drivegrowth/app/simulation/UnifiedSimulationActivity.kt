@@ -24,10 +24,9 @@ class UnifiedSimulationActivity : MainActivity() {
         outState.putBoolean("restDemoOpening", restOpening)
     }
 
-    @Suppress("DEPRECATION")
-    override fun setContentView(view: View) {
+    override fun addSimulationActions(content: LinearLayout) {
         val style = GarageStyle(this)
-        val entry = style.button("휴식 모의 시연 · 별도 원장", enabled = false) {
+        val entry = style.button("휴식 시연 (별도)", enabled = false) {
             if (!restOpening && allowed()) {
                 restOpening = true
                 updateRestEntry()
@@ -38,18 +37,14 @@ class UnifiedSimulationActivity : MainActivity() {
             visibility = View.GONE
         }
         restButton = entry
-        val restInMain = style.button("휴식 포함 모의주행 · 현재 시연 원장", enabled = false, onClick = ::startRestSimulation).apply {
+        val restInMain = style.button("휴식 포함 모의주행", enabled = false, onClick = ::startRestSimulation).apply {
             tag = "simulation:rest-start"
             visibility = View.GONE
         }
         restInMainButton = restInMain
-        super.setContentView(style.column().apply {
-            setBackgroundColor(style.base)
-            addView(style.row().apply {
-                addView(entry, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(restInMain, LinearLayout.LayoutParams(0, -2, 1f))
-            })
-            addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
+        content.addView(style.row().apply {
+            addView(entry, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(restInMain, LinearLayout.LayoutParams(0, -2, 1f))
         })
     }
 

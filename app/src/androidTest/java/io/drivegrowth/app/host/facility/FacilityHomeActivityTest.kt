@@ -6,8 +6,8 @@ import android.test.ActivityInstrumentationTestCase2
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.Spinner
 import android.widget.TextView
+import io.drivegrowth.app.mainNavigation
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.R
 import io.drivegrowth.app.data.AssetShopExpansionProvider
@@ -36,7 +36,7 @@ import io.drivegrowth.core.rental.SimulatedCustomer
 class FacilityHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity>(MainActivity::class.java) {
     private fun tree(view: View): List<View> = listOf(view) + if (view is ViewGroup)
         (0 until view.childCount).flatMap { tree(view.getChildAt(it)) } else emptyList()
-    private fun menu(a: MainActivity) = a.window.decorView.findViewWithTag<Spinner>("host:destination")
+    private fun menu(a: MainActivity) = a.window.decorView.mainNavigation()
     private fun await(a: MainActivity, label: String, check: () -> Boolean) {
         val until = SystemClock.uptimeMillis() + 15000
         var success = false

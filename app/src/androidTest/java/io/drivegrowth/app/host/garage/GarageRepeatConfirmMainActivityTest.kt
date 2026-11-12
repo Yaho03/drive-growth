@@ -1,5 +1,8 @@
 package io.drivegrowth.app.host.garage
 
+import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.host.HostPage
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.graphics.Rect
@@ -10,7 +13,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.Spinner
 import io.drivegrowth.app.data.HostCheckpointCommand
 import io.drivegrowth.app.data.HostCheckpointPhase
 import io.drivegrowth.app.data.HostCommandCheckpoint
@@ -52,10 +54,9 @@ class GarageRepeatConfirmMainActivityTest :
         await("보유 차량 화면 부착") {
             val garage = shownGarage(root)
             if (garage != null) return@await garage
-            val menu = root.findViewWithTag<Spinner>("host:destination")
+            val menu = root.mainPage(HostPage.GARAGE)
             if (menu != null && menu.isShown && menu.isEnabled && menu.isLaidOut && !menu.isLayoutRequested) {
-                val position = (0 until menu.count).singleOrNull { menu.getItemAtPosition(it).toString() == "보유 차량" }
-                if (position != null && menu.selectedItemPosition != position) menu.setSelection(position)
+                root.openMainPage(HostPage.GARAGE)
             }
             null
         }

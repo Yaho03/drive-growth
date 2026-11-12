@@ -1,12 +1,15 @@
 package io.drivegrowth.app.simulation
 
+import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.showSimulationControls
+import io.drivegrowth.app.host.HostPage
 import android.os.Process
 import android.os.SystemClock
 import android.test.ActivityInstrumentationTestCase2
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.R
@@ -110,6 +113,7 @@ class PurchaseDeliveryMainFlowTest :
     fun testPurchaseThenSimulatedArrivalPersistsOneVehicle() {
         requireFresh("io.drivegrowth.verify.purchase28arrival")
         val purchase = buyFromMain()
+        instrumentation.runOnMainSync { activity.window.decorView.showSimulationControls() }
         click("simulation:start")
         await("모의 주행 입력이 마지막 주차 단계에 도달", timeoutMs = 75_000) { prefs.getInt("stage", 0) == 65 }
         awaitReceipt("구매 차량 지급이 확정됐어요.")
@@ -473,12 +477,10 @@ class PurchaseDeliveryMainFlowTest :
         val root = activity.window.decorView
         awaitUi("Main 최초 탁송 조회 완료") {
             if (enabledButton("delivery:destination") != null) return@awaitUi true
-            val menu = root.findViewWithTag<Spinner>("host:destination")
+            val menu = root.mainPage(HostPage.DELIVERY)
                 ?.takeIf { it.isShown && it.isEnabled && it.isLaidOut && !it.isLayoutRequested }
                 ?: return@awaitUi false
-            val delivery = (0 until menu.count).single { menu.getItemAtPosition(it).toString() == "탁송" }
-            // 조회가 Spinner를 교체하면 현재 메뉴에서 다시 선택한다.
-            if (menu.selectedItemPosition != delivery) menu.setSelection(delivery)
+            root.openMainPage(HostPage.DELIVERY)
             false
         }
     }

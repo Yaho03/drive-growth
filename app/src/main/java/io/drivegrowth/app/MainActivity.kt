@@ -15,9 +15,9 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.View
 import android.widget.FrameLayout
-import android.widget.Spinner
-import android.widget.ArrayAdapter
-import android.widget.AdapterView
+import android.widget.Button
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.LinearLayout
 import io.drivegrowth.app.host.garage.GarageCommandHost
 import io.drivegrowth.app.host.garage.GarageCommandState
@@ -28,6 +28,7 @@ import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.app.ui.shop.ShopEvent
 import io.drivegrowth.app.ui.shop.ShopMode
 import io.drivegrowth.app.ui.shop.ShopUiState
+import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.gacha.GachaView
 import io.drivegrowth.app.ui.gacha.GachaEvent
 import io.drivegrowth.app.host.GarageHostMapper
@@ -103,7 +104,13 @@ open class MainActivity : Activity() {
     private var deliveryReceipt: DeliveryHostReceipt? = null
     private var deliveryFrame = DeliveryFrame(0, DeliveryScreen.Loading)
     private lateinit var gacha: GachaView
-    private var navigationGeneration = 0L
+    private lateinit var navigationBar: MainNavigationBar
+    private var simulationControlsExpanded = false
+    private var simulationToggle: Button? = null
+    private var simulationDetails: ScrollView? = null
+    private var simulationStatus: TextView? = null
+    private var simulationStart: Button? = null
+    private var simulationRetry: Button? = null
     private val destinations = listOf(HostPage.HOME to "가게", HostPage.GARAGE to "보유 차량", HostPage.COLLECTION to "도감",
         HostPage.GACHA to "가챠", HostPage.PROGRESSION to "퀘스트·진행", HostPage.DELIVERY to "탁송", HostPage.RANKING to "기록·랭킹", HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내")
     private val mapper = GarageHostMapper()
@@ -133,6 +140,7 @@ open class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         navigation = restoreNavigation(savedInstanceState)
+        simulationControlsExpanded = savedInstanceState?.getBoolean("simulationControlsExpanded") == true
         style = GarageStyle(this)
         garage = GarageView(this, ::onGarageEvent).also { it.restoreSelection(navigation.selectedVehicleId) }
         collection = CollectionView(this, ::refresh)
@@ -225,7 +233,12 @@ open class MainActivity : Activity() {
         }
         managementView = GarageCommandView(this, { management.controller.confirm() }, ::cancelPreparation,
             { management.controller.retry() }, { management.controller.cancelPending() }, { management.controller.chooseMaterial(it) }, { management.controller.acknowledge() })
-        panel = style.column().apply { setBackgroundColor(style.base) }
+        panel = style.column().apply { setBackgroundColor(PixelStyle.background) }
+        navigationBar = MainNavigationBar(this, destinations,
+            { page -> if (allowed() && page != navigation.page) select(page) },
+            { if (allowed()) onBackPressed() },
+            ::refresh)
+        if (session.simulation != null) panel.addView(createSimulationControls())
         chrome = style.column().apply { setPadding(style.dp(16), 0, style.dp(16), 0) }
         body = FrameLayout(this)
         panel.addView(chrome)
@@ -328,8 +341,8 @@ open class MainActivity : Activity() {
                         session.progression.refresh()
                         session.ranking.refresh()
                     }
-                    if (result.value.waiting != null) "주행 기록의 정산 근거를 확인하고 있어요."
-                    else "수신한 주행 관측을 기록하고 있어요."
+                    if (result.value.waiting != null) "주행 기록을 확인하고 있어요."
+                    else null
                 }
             }
             if (drivingStatus != status) { drivingStatus = status; if (::chrome.isInitialized) render() }
@@ -480,6 +493,7 @@ open class MainActivity : Activity() {
         outState.putInt("shopControlsY", shop.uiState.controlsScrollY)
         outState.putString("returnPage", navigation.returnPage.name)
         outState.putString("page", navigation.page.name)
+        if (session.simulation != null) outState.putBoolean("simulationControlsExpanded", simulationControlsExpanded)
         outState.putString("selectedVehicle", navigation.selectedVehicleId?.value)
         navigation.pendingGarageRequest?.let {
             outState.putString("pendingVehicle", it.id.value)
@@ -507,7 +521,7 @@ open class MainActivity : Activity() {
             try {
                 if (active && simulation.controlsAllowed && navigation.page != HostPage.ONBOARDING) when (result) {
                     is ContractResult.Failure -> simulation.rejected(result.error)
-                    is ContractResult.Success -> simulation.beginRest()
+                    is ContractResult.Success -> { collapseSimulationControls(); simulation.beginRest() }
                 }
             } finally {
                 restStartTicket = null
@@ -518,9 +532,67 @@ open class MainActivity : Activity() {
 
     protected open fun onControlsAvailabilityChanged(allowed: Boolean) = Unit
 
+    protected open fun addSimulationActions(content: LinearLayout) = Unit
+
+    private fun createSimulationControls(): View {
+        val simulation = checkNotNull(session.simulation)
+        val content = style.column()
+        simulationStatus = style.text("", 16).apply { tag = "simulation:status"; content.addView(this) }
+        simulationStart = style.button("모의주행 시작") {
+            if (allowed() && navigation.page != HostPage.ONBOARDING) session.prepareSimulation { result ->
+                if (allowed()) when (result) {
+                    is ContractResult.Failure -> simulation.rejected(result.error)
+                    is ContractResult.Success -> { collapseSimulationControls(); simulation.begin() }
+                }
+            }
+        }.apply { tag = "simulation:start"; content.addView(this) }
+        addSimulationActions(content)
+        simulationRetry = style.button("같은 모의 입력 다시 시도") {
+            if (simulation.canRetry) simulation.retry()
+        }.apply { tag = "simulation:retry"; content.addView(this) }
+        val details = ScrollView(this).apply {
+            addView(content)
+            visibility = View.GONE
+        }
+        simulationDetails = details
+        val toggle = style.button("시연 · 모의 입력") {
+            simulationControlsExpanded = !simulationControlsExpanded
+            renderSimulationControls(allowed())
+        }.apply {
+            tag = "simulation:controls"
+            minimumHeight = style.dp(44)
+            minHeight = style.dp(44)
+            textSize = 16f
+            setPadding(style.dp(12), 0, style.dp(12), 0)
+        }
+        simulationToggle = toggle
+        return style.column().apply {
+            addView(toggle, LinearLayout.LayoutParams(-1, -2))
+            addView(details, LinearLayout.LayoutParams(-1, style.dp(144)))
+        }
+    }
+
+    private fun collapseSimulationControls() {
+        simulationControlsExpanded = false
+        renderSimulationControls(allowed())
+    }
+
+    private fun renderSimulationControls(enabled: Boolean) {
+        val simulation = session.simulation ?: return
+        simulationToggle?.apply {
+            isSelected = simulationControlsExpanded
+            text = if (simulationControlsExpanded) "시연 · 모의 입력 ▾" else "시연 · 모의 입력 ▸"
+        }
+        simulationDetails?.visibility = if (simulationControlsExpanded) View.VISIBLE else View.GONE
+        simulationStatus?.text = simulation.status
+        simulationStart?.isEnabled = enabled && navigation.page != HostPage.ONBOARDING
+        simulationRetry?.visibility = if (simulation.canRetry) View.VISIBLE else View.GONE
+    }
+
     private fun updateAccess() {
         val enabled = allowed()
         onControlsAvailabilityChanged(enabled)
+        renderSimulationControls(enabled)
         session.results.setControlsEnabled(enabled && navigation.page == HostPage.RESULTS)
         queries.setControlsEnabled(enabled)
         session.progression.setControlsEnabled(enabled && navigation.page == HostPage.PROGRESSION)
@@ -558,12 +630,12 @@ open class MainActivity : Activity() {
         val enabled = allowed()
         val garageState = when (val current = screen) {
             is HostQueryState.Content -> GarageActionAvailability.map(mapper.garage(current.snapshot), current.snapshot)
-            is HostQueryState.Failure -> GarageScreenState.Error("조회 실패 (${current.error})")
+            is HostQueryState.Failure -> GarageScreenState.Error("차량 정보를 읽지 못했어요. 다시 조회해 주세요.")
             else -> GarageScreenState.Loading
         }
         val collectionState = when (val current = screen) {
             is HostQueryState.Content -> mapper.collection(current.snapshot, current.snapshot.collectionHistory)
-            is HostQueryState.Failure -> CollectionScreenState.Error("조회 실패 (${current.error})")
+            is HostQueryState.Failure -> CollectionScreenState.Error("도감을 읽지 못했어요. 다시 조회해 주세요.")
             else -> CollectionScreenState.Loading
         }
         ranking.render(rankingState, enabled && navigation.page == HostPage.RANKING)
@@ -581,52 +653,23 @@ open class MainActivity : Activity() {
         onboarding.render(onboardingState, enabled)
         renderDelivery(enabled && navigation.page == HostPage.DELIVERY)
         chrome.removeAllViews()
-        session.simulation?.let { simulation ->
-            chrome.addView(style.text(simulation.status).apply { tag = "simulation:status" })
-            chrome.addView(style.button("모의주행 시작 · 논리 1시간") {
-                if (allowed() && navigation.page != HostPage.ONBOARDING) session.prepareSimulation { result ->
-                    if (allowed()) when (result) {
-                        is ContractResult.Failure -> simulation.rejected(result.error)
-                        is ContractResult.Success -> simulation.begin()
-                    }
-                }
-            }.apply {
-                tag = "simulation:start"; isEnabled = enabled && navigation.page != HostPage.ONBOARDING
-            })
-            if (simulation.canRetry) chrome.addView(style.button("같은 모의 입력 재시도") { simulation.retry() }.apply { tag = "simulation:retry" })
-        }
+        renderSimulationControls(enabled)
         if (!enabled) {
+            panel.removeView(navigationBar)
             showBody(style.text(if (session.simulation == null) "주차 후 조작이 허용되면 이용할 수 있습니다." else "명시 모의주행 중입니다. 완료 후 모의 주차 화면에서 결과를 확인하세요."))
             return
         }
-        val token = ++navigationGeneration
-        val links = style.row()
-        links.addView(style.button("뒤로") { if (token == navigationGeneration) onBackPressed() })
-        val destination = Spinner(this).apply {
-            tag = "host:destination"
-            contentDescription = "화면 선택"
-            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, destinations.map { it.second })
-            setSelection(destinations.indexOfFirst { it.first == navigation.page }.coerceAtLeast(0))
-            onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                    val target = destinations.getOrNull(position)?.first ?: return
-                    if (token == navigationGeneration && target != navigation.page) select(target)
-                }
-            }
-        }
-        links.addView(destination, LinearLayout.LayoutParams(0, style.dp(56), 1f))
-        links.addView(style.button("새로고침") { if (token == navigationGeneration) refresh() })
-        chrome.addView(links)
-        drivingStatus?.let { chrome.addView(style.text(it)) }
+        if (navigationBar.parent == null) panel.addView(navigationBar, LinearLayout.LayoutParams(-1, -2))
+        navigationBar.showSelected(navigation.page)
+        if (session.simulation == null) drivingStatus?.let { chrome.addView(style.text(it)) }
         if (navigation.page == HostPage.HOME && homeEnabled) {
             val home = session.home.state
             if (home.activationRequired) chrome.addView(style.button("꾸미기 기능 사용 시작") {
                 if (allowed() && navigation.page == HostPage.HOME && !shopRestoreFailed) session.home.activateDecoration()
             }.apply { tag = "decoration:activate"; isEnabled = homeEnabled })
             (home.decoration?.receipt ?: (home.original as? io.drivegrowth.app.data.HostCheckpointResult.Decoration)?.value)?.let { receipt ->
-                chrome.addView(style.text("꾸미기 원결과 · ${receipt.command.decorationId} · 비용 ${receipt.command.expectedPrice.units} · " +
-                    (if (receipt.settlement == null) "비금융 결과" else "확정 금융 정산") + " · 당시 잔액 ${receipt.state.balance.units}")
+                val cost = if (receipt.settlement == null) "비용 없음" else "사용한 게임머니 ${receipt.command.expectedPrice.units}"
+                chrome.addView(style.text("꾸미기 적용 완료 · $cost · 적용 당시 잔액 ${receipt.state.balance.units}")
                     .apply { tag = "decoration:receipt" })
             }
             val recovered = when (val original = home.original) {
@@ -635,23 +678,23 @@ open class MainActivity : Activity() {
                 else -> null
             }
             recovered?.let { (kind, receipt) ->
-                chrome.addView(style.text("$kind 원결과 확인 · 당시 잔액 ${receipt.balance.units} · 현재 상태는 별도 조회합니다.")
+                chrome.addView(style.text("$kind 완료 · 적용 당시 잔액 ${receipt.balance.units}")
                     .apply { tag = "shop:original-receipt" })
             }
             if (home.decoration?.pending != null && home.decoration.receipt?.command != home.decoration.pending)
-                chrome.addView(style.button("보관한 미실행 꾸미기 요청 취소") {
+                chrome.addView(style.button("아직 적용되지 않은 꾸미기 취소") {
                     if (allowed() && navigation.page == HostPage.HOME) session.home.cancelDecorationSaved()
                 }.apply { tag = "decoration:cancel-saved"; isEnabled = homeEnabled })
-            if (home.screen is ShopScreenState.Failure) chrome.addView(style.button("보관한 미실행 확장 요청 취소") {
+            if (home.screen is ShopScreenState.Failure) chrome.addView(style.button("아직 적용되지 않은 확장 취소") {
                 if (allowed() && navigation.page == HostPage.HOME) session.home.cancelExpansionSaved()
             }.apply { isEnabled = homeEnabled })
         }
         if (navigation.page == HostPage.PROGRESSION) {
             if (progressionRestoreFailed) chrome.addView(style.text("화면 상태를 복원하지 못해 저장 기록을 다시 확인합니다."))
-            chrome.addView(style.button("미시작 보상 청구 취소 확인") { if (allowed()) session.progression.cancelSaved() })
+            chrome.addView(style.button("아직 처리되지 않은 보상 요청 취소") { if (allowed()) session.progression.cancelSaved() })
         }
         if (pendingRouteFailed)
-            chrome.addView(style.button("보관 요청 종류를 다시 확인") { refreshPendingRoute() })
+            chrome.addView(style.button("처리 중인 요청 다시 확인") { refreshPendingRoute() })
         pendingPage?.takeIf { it != navigation.page }?.let { target ->
             chrome.addView(style.button(when (target) {
                 HostPage.GACHA -> "보관한 가챠 요청 확인"
@@ -722,9 +765,9 @@ open class MainActivity : Activity() {
             details.addView(style.text("내비에서 목적지를 먼저 설정한 뒤 여기서 조회하고 확인해 주세요."))
             details.addView(style.button("내비 목적지 다시 조회") { session.deliveryNavigation.refresh() })
             if (destination != null && distance != null && destination.stamp == distance.stamp) {
-                details.addView(style.text("내비 반환 목적지: ${destination.value.name ?: "이름 없음"} · ${destination.value.address ?: "주소 없음"}"))
-                details.addView(style.text("남은 예상거리 ${distance.value}m · 수신 UTC ${destination.stamp.receivedAtMillis}ms"))
-                details.addView(style.text("남은 예상거리는 실제 이동거리·도착 증거와 별개예요."))
+                details.addView(style.text("내비 목적지: ${destination.value.name ?: "이름 없음"} · ${destination.value.address ?: "주소 없음"}"))
+                details.addView(style.text("남은 예상거리 ${distance.value}m"))
+                details.addView(style.text("남은 거리는 내비가 계산한 예상거리예요."))
                 details.addView(style.button("이 목적지와 남은 예상거리 확인") {
                     when (session.deliveryNavigation.confirm()) {
                         is ContractResult.Success -> session.delivery.refresh()
@@ -732,7 +775,6 @@ open class MainActivity : Activity() {
                     }
                 })
             }
-            details.addView(style.text("실제 이동거리와 도착 상관 근거는 확인 대기예요. 프로필만으로 실차 주행을 확정하지 않아요."))
         }
         return details
     }

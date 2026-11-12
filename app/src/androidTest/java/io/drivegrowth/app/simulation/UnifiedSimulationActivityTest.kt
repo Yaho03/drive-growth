@@ -1,11 +1,14 @@
 package io.drivegrowth.app.simulation
 
+import io.drivegrowth.app.mainNavigation
+import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.showSimulationControls
+import io.drivegrowth.app.host.HostPage
 import android.os.SystemClock
 import android.test.ActivityInstrumentationTestCase2
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.Spinner
 import io.drivegrowth.app.R
 import io.drivegrowth.app.data.*
 import io.drivegrowth.app.host.*
@@ -64,11 +67,9 @@ class UnifiedSimulationActivityTest : ActivityInstrumentationTestCase2<UnifiedSi
             assertEquals(SimulationTimeline().clock.epoch,original.grant.confirmedAt)
             game.identity
         }
-        awaitUi(first,"기존 화면 선택") { first.window.decorView.findViewWithTag<Spinner>("host:destination")?.isEnabled == true }
+        awaitUi(first,"기존 화면 선택") { first.window.decorView.mainNavigation()?.isEnabled == true }
         instrumentation.runOnMainSync {
-            val menu=first.window.decorView.findViewWithTag<Spinner>("host:destination")!!
-            val index=(0 until menu.count).first { menu.getItemAtPosition(it).toString().contains("탁송") }
-            menu.setSelection(index)
+            first.window.decorView.openMainPage(HostPage.DELIVERY)
         }
         click(first,"simulation:destination")
         var offerTag:String?=null
@@ -82,10 +83,11 @@ class UnifiedSimulationActivityTest : ActivityInstrumentationTestCase2<UnifiedSi
         }
         click(first,"delivery:offer:${income.id.value}");click(first,"delivery:confirm");click(first,"delivery:acknowledge")
         val route=read { game ->checkNotNull(ok(game.store.delivery.inProgress())).also { assertEquals(initial.source,it.active.proposed.estimated.source) } }
+        instrumentation.runOnMainSync { first.window.decorView.showSimulationControls() }
         click(first,"simulation:start")
         awaitUi(first,"시나리오 입력 종료와 모의 주차") {
             context.getSharedPreferences("unified-simulation-v1",0).getInt("stage",0)==65 &&
-                first.window.decorView.findViewWithTag<Spinner>("host:destination")?.isEnabled == true
+                first.window.decorView.mainNavigation()?.isEnabled == true
         }
         awaitStored("기존 원장의 세 정산과 첫 보상") { read { game ->
             val results=ok(game.store.listUnviewedSettlements())
@@ -110,7 +112,7 @@ class UnifiedSimulationActivityTest : ActivityInstrumentationTestCase2<UnifiedSi
             instrumentation.runOnMainSync { first.recreate() }
             next=instrumentation.waitForMonitorWithTimeout(monitor,15_000) as? UnifiedSimulationActivity
             assertNotNull(next)
-            awaitUi(next!!,"재생성 후 모의 상태/기존 UI") { next!!.window.decorView.findViewWithTag<Spinner>("host:destination")?.isEnabled==true }
+            awaitUi(next!!,"재생성 후 모의 상태/기존 UI") { next!!.window.decorView.mainNavigation()?.isEnabled==true }
             read { game ->
                 assertEquals(initial,game.identity);assertEquals(saved.first,ok(game.store.balance()))
                 assertEquals(saved.second,ok(game.store.listUnviewedSettlements()))

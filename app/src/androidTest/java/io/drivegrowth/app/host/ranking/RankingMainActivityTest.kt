@@ -1,11 +1,13 @@
 package io.drivegrowth.app.host.ranking
 
+import io.drivegrowth.app.mainNavigation
+import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.host.HostPage
 import android.os.SystemClock
 import android.test.ActivityInstrumentationTestCase2
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.Spinner
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.host.GameSessionFactory
@@ -32,8 +34,7 @@ class RankingMainActivityTest : ActivityInstrumentationTestCase2<MainActivity>(M
         assertTrue("제품 패키지에서 실행하지 않는다",instrumentation.targetContext.packageName!="io.drivegrowth.app")
         val first=activity
         await("실제 gate 이후 랭킹 진입과 실제6지표 조회",{
-            val menu=first.window.decorView.findViewWithTag<Spinner>("host:destination")
-            if(menu!=null&&menu.selectedItem.toString()!="기록·랭킹")menu.setSelection((0 until menu.count).first{menu.getItemAtPosition(it).toString()=="기록·랭킹"})
+            if (first.window.decorView.mainNavigation() != null) first.window.decorView.openMainPage(HostPage.RANKING)
             ranking(first)!=null && RankingMetric.entries.all{metric->descendants(ranking(first)!!).filterIsInstance<TextView>().any{it.text.toString()==metric.title}}
         })
         val before=balanceAndVehicles()
@@ -45,7 +46,7 @@ class RankingMainActivityTest : ActivityInstrumentationTestCase2<MainActivity>(M
             instrumentation.runOnMainSync{first.recreate()}
             next=instrumentation.waitForMonitorWithTimeout(monitor,15000) as? MainActivity
             assertNotNull("실제 새 Activity 인스턴스",next);val recreated=next!!;assertNotSame(first,recreated)
-            await("새 gate 관측 이후 원래 페이지/시연 선택 복원",{ranking(recreated)?.uiState?.let{it.mode==RankingMode.DEMO&&it.metric==RankingMetric.WEEKLY_DISTANCE}==true && recreated.window.decorView.findViewWithTag<Spinner>("host:destination")!=null})
+            await("새 gate 관측 이후 원래 페이지/시연 선택 복원",{ranking(recreated)?.uiState?.let{it.mode==RankingMode.DEMO&&it.metric==RankingMetric.WEEKLY_DISTANCE}==true && recreated.window.decorView.mainNavigation()!=null})
             instrumentation.runOnMainSync{recreated.onBackPressed();assertEquals(RankingMode.MY_RECORD,ranking(recreated)!!.uiState.mode)}
             instrumentation.runOnMainSync{recreated.onBackPressed()}
             await("두 번째 Back은 가게",{descendants(recreated.window.decorView).any{it is ShopView}})
