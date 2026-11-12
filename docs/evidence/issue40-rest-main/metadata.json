@@ -1,0 +1,415 @@
+{
+  "firstArtifacts": {
+    "source": "0bbaeba314f241923de201d14872e431d5c926ee",
+    "tree": "3d674e2b4ad93a0e3941cddac794d9073f3461b0",
+    "patchSHA256": "1b118680d5bc77602162c3d3723730eab946e0eed02988a520b988253154da63",
+    "artifacts": {
+      "app": {
+        "package": "io.drivegrowth.verify.restnegativef",
+        "sha256": "97b2fe8df3668f1315162dde0f73a3c0aee517ffcb2a7d2854636e3f37a391f0",
+        "certificateSHA256": "aa296b1e778150ca6a3ad74d4e7f36de9cc0de95f2e0482ad59432d0ec824aa5",
+        "installed": {
+          "existing-buff": "97b2fe8df3668f1315162dde0f73a3c0aee517ffcb2a7d2854636e3f37a391f0",
+          "eligible-location": "97b2fe8df3668f1315162dde0f73a3c0aee517ffcb2a7d2854636e3f37a391f0"
+        }
+      },
+      "test": {
+        "package": "io.drivegrowth.verify.restnegativef.test",
+        "sha256": "bcce99c330a1cea560b3da6b192f191feb0480de9fa7bd71a6592c7ab2af24b0",
+        "certificateSHA256": "aa296b1e778150ca6a3ad74d4e7f36de9cc0de95f2e0482ad59432d0ec824aa5",
+        "installed": {
+          "existing-buff": "bcce99c330a1cea560b3da6b192f191feb0480de9fa7bd71a6592c7ab2af24b0",
+          "eligible-location": "bcce99c330a1cea560b3da6b192f191feb0480de9fa7bd71a6592c7ab2af24b0"
+        }
+      }
+    }
+  },
+  "finalArtifacts": {
+    "source": "0bbaeba314f241923de201d14872e431d5c926ee",
+    "tree": "4b45d30b816c809d7581eb29406751d7689596aa",
+    "patchSHA256": "009c1fd27150429d59193821c62acf4f570f5262692f80c50b9d4f1105f974d7",
+    "artifacts": {
+      "app": {
+        "package": "io.drivegrowth.verify.restnegativef",
+        "sha256": "97b2fe8df3668f1315162dde0f73a3c0aee517ffcb2a7d2854636e3f37a391f0",
+        "certificateSHA256": "aa296b1e778150ca6a3ad74d4e7f36de9cc0de95f2e0482ad59432d0ec824aa5",
+        "installed": {
+          "existing-buff": "97b2fe8df3668f1315162dde0f73a3c0aee517ffcb2a7d2854636e3f37a391f0",
+          "outside": "97b2fe8df3668f1315162dde0f73a3c0aee517ffcb2a7d2854636e3f37a391f0",
+          "missing": "97b2fe8df3668f1315162dde0f73a3c0aee517ffcb2a7d2854636e3f37a391f0",
+          "recognized": "97b2fe8df3668f1315162dde0f73a3c0aee517ffcb2a7d2854636e3f37a391f0"
+        }
+      },
+      "test": {
+        "package": "io.drivegrowth.verify.restnegativef.test",
+        "sha256": "bba8d74940cf83f47c5111dc71b891b261781610dd6f4392da88a1afce2e0a39",
+        "certificateSHA256": "aa296b1e778150ca6a3ad74d4e7f36de9cc0de95f2e0482ad59432d0ec824aa5",
+        "installed": {
+          "existing-buff": "bba8d74940cf83f47c5111dc71b891b261781610dd6f4392da88a1afce2e0a39",
+          "outside": "bba8d74940cf83f47c5111dc71b891b261781610dd6f4392da88a1afce2e0a39",
+          "missing": "bba8d74940cf83f47c5111dc71b891b261781610dd6f4392da88a1afce2e0a39",
+          "recognized": "bba8d74940cf83f47c5111dc71b891b261781610dd6f4392da88a1afce2e0a39"
+        }
+      }
+    }
+  },
+  "firstFailure": "onboarding to HOME did not expose the rest-start button before a normal page transition",
+  "eReturn": {
+    "protection": "17/19",
+    "bootCount": [
+      "25",
+      "26"
+    ],
+    "changedProtectionFields": [
+      "boot_count",
+      "foreground"
+    ]
+  },
+  "continuityFromEAfter": {
+    "checks": {
+      "boot": true,
+      "abi": true,
+      "sdk": true,
+      "user": true,
+      "boot_count": true,
+      "size": true,
+      "density": true,
+      "night": true,
+      "font": true,
+      "overlay": true,
+      "forward": true,
+      "permissions": true,
+      "foreground": true,
+      "car_state": true,
+      "product_data6": true,
+      "product_apk_sha256": true,
+      "no_active_instrumentation": true,
+      "own_packages_absent": true,
+      "no_own_processes": true
+    },
+    "passed": 19,
+    "total": 19,
+    "bootCompleted": true,
+    "diagnosticInstallStatePreserved": true
+  },
+  "returned": {
+    "returnedAt": "2026-11-13T02:58:27.993149+09:00",
+    "released": true,
+    "owner": "F",
+    "next": "D (main coordination)",
+    "device": "emulator-5556",
+    "user": 10,
+    "adbPort": 5038,
+    "protection": "19/19",
+    "changedProtectionFields": [],
+    "bootCount": [
+      "26",
+      "26"
+    ],
+    "bootCompleted": true,
+    "noActiveInstrumentation": true,
+    "noOwnedPackagesOrProcesses": true,
+    "noFurtherAdb": true,
+    "gradleSlot": "retained by F for exact PR249 host checks",
+    "source": "0bbaeba314f241923de201d14872e431d5c926ee",
+    "tree": "4b45d30b816c809d7581eb29406751d7689596aa"
+  },
+  "publicationBase": "8ca5e63e6db55bb88c71e762db03684d606226a0",
+  "cases": [
+    {
+      "name": "existing-buff",
+      "selector": "io.drivegrowth.app.simulation.UnifiedSimulationRestNegativeEvidenceTest#testOutsideAndMissingParkDoNotRefreshOrConsumeTheExistingRestGrant",
+      "runner": "OK (1 test)",
+      "seconds": 167.838,
+      "sqliteSHA256": "87654123b0965b66678503d573e653aa4cf22f24d1370325dcb2432c7bb1414d",
+      "receipts": [
+        {
+          "drive": "c1215efd-1b6a-4943-8fab-a8c1609134b4",
+          "source": "SIMULATION",
+          "ordinal": 1,
+          "after": {
+            "remaining": 0,
+            "last": null
+          },
+          "amount": 360,
+          "boostedMs": 0,
+          "departures": []
+        },
+        {
+          "drive": "ff4675b9-7046-4999-b5b5-fc5305765a7d",
+          "source": "SIMULATION",
+          "ordinal": 2,
+          "after": {
+            "remaining": 1100000,
+            "last": 0
+          },
+          "amount": 15,
+          "boostedMs": 100000,
+          "departures": [
+            "rest/departure/c0aa077f-029e-3e08-8f46-e1e5df745cfd"
+          ]
+        },
+        {
+          "drive": "3e8e55d3-6e15-437c-ad40-9af7cf6ba0e8",
+          "source": "SIMULATION",
+          "ordinal": 3,
+          "after": {
+            "remaining": 1040000,
+            "last": 0
+          },
+          "amount": 9,
+          "boostedMs": 60000,
+          "departures": []
+        },
+        {
+          "drive": "7a06c471-0807-46dd-b452-bf4c89b11cbb",
+          "source": "SIMULATION",
+          "ordinal": 4,
+          "after": {
+            "remaining": 980000,
+            "last": 0
+          },
+          "amount": 9,
+          "boostedMs": 60000,
+          "departures": []
+        },
+        {
+          "drive": "57c289a6-6d17-40fc-9a15-adaa82cb75ac",
+          "source": "SIMULATION",
+          "ordinal": 5,
+          "after": {
+            "remaining": 920000,
+            "last": 0
+          },
+          "amount": 9,
+          "boostedMs": 60000,
+          "departures": []
+        },
+        {
+          "drive": "b5b29301-efce-4c18-80b9-5fc90a05126c",
+          "source": "SIMULATION",
+          "ordinal": 6,
+          "after": {
+            "remaining": 860000,
+            "last": 0
+          },
+          "amount": 9,
+          "boostedMs": 60000,
+          "departures": []
+        }
+      ],
+      "departures": [
+        {
+          "request": "rest/departure/c0aa077f-029e-3e08-8f46-e1e5df745cfd",
+          "stop": 0,
+          "drive": "ff4675b9-7046-4999-b5b5-fc5305765a7d"
+        }
+      ]
+    },
+    {
+      "name": "outside",
+      "selector": "io.drivegrowth.app.simulation.UnifiedSimulationRestNegativeEvidenceTest#testQualifiedDrivingAndParkingGrantOnlyAtTheRecognizedPlace",
+      "runner": "OK (1 test)",
+      "seconds": 215.059,
+      "sqliteSHA256": "9d3bb7174f9e42fb9ebe91994d9cb21ae8f4e5a27e93574a368153a67188a9e5",
+      "receipts": [
+        {
+          "drive": "9ffcfbe6-e3bb-404c-b9df-054eb8235652",
+          "source": "SIMULATION",
+          "ordinal": 1,
+          "after": {
+            "remaining": 0,
+            "last": null
+          },
+          "amount": 360,
+          "boostedMs": 0,
+          "departures": []
+        },
+        {
+          "drive": "cafcfc75-4eba-4519-a048-2a7975d30d2c",
+          "source": "SIMULATION",
+          "ordinal": 2,
+          "after": {
+            "remaining": 1100000,
+            "last": 0
+          },
+          "amount": 15,
+          "boostedMs": 100000,
+          "departures": [
+            "rest/departure/45d36337-afae-3aca-baf6-02b7aad48238"
+          ]
+        },
+        {
+          "drive": "1b2f8b4a-c483-4041-892e-bc9c1293becc",
+          "source": "SIMULATION",
+          "ordinal": 3,
+          "after": {
+            "remaining": 0,
+            "last": 0
+          },
+          "amount": 415,
+          "boostedMs": 1100000,
+          "departures": []
+        },
+        {
+          "drive": "575774f8-b1c8-40d8-9530-122b4a90dadd",
+          "source": "SIMULATION",
+          "ordinal": 4,
+          "after": {
+            "remaining": 0,
+            "last": 0
+          },
+          "amount": 6,
+          "boostedMs": 0,
+          "departures": []
+        }
+      ],
+      "departures": [
+        {
+          "request": "rest/departure/45d36337-afae-3aca-baf6-02b7aad48238",
+          "stop": 0,
+          "drive": "cafcfc75-4eba-4519-a048-2a7975d30d2c"
+        }
+      ]
+    },
+    {
+      "name": "missing",
+      "selector": "io.drivegrowth.app.simulation.UnifiedSimulationRestNegativeEvidenceTest#testQualifiedDrivingAndParkingGrantOnlyAtTheRecognizedPlace",
+      "runner": "OK (1 test)",
+      "seconds": 212.059,
+      "sqliteSHA256": "6c713a5b70ea5c3182ac6d2d6571ba574f386dd32299ab2c5ac3c768982a3ac1",
+      "receipts": [
+        {
+          "drive": "d14c2051-ad26-4250-bd6c-dcace35e3a13",
+          "source": "SIMULATION",
+          "ordinal": 1,
+          "after": {
+            "remaining": 0,
+            "last": null
+          },
+          "amount": 360,
+          "boostedMs": 0,
+          "departures": []
+        },
+        {
+          "drive": "cd794923-e27e-46dc-8dc4-743d82dbe1ee",
+          "source": "SIMULATION",
+          "ordinal": 2,
+          "after": {
+            "remaining": 1100000,
+            "last": 0
+          },
+          "amount": 15,
+          "boostedMs": 100000,
+          "departures": [
+            "rest/departure/75bc78af-b428-374b-9128-997e79f2242b"
+          ]
+        },
+        {
+          "drive": "0a12eccf-fb0f-41a2-b40b-61a643c440e7",
+          "source": "SIMULATION",
+          "ordinal": 3,
+          "after": {
+            "remaining": 0,
+            "last": 0
+          },
+          "amount": 415,
+          "boostedMs": 1100000,
+          "departures": []
+        },
+        {
+          "drive": "a6ada5f1-9664-4ed2-abe2-7e2738d9200c",
+          "source": "SIMULATION",
+          "ordinal": 4,
+          "after": {
+            "remaining": 0,
+            "last": 0
+          },
+          "amount": 6,
+          "boostedMs": 0,
+          "departures": []
+        }
+      ],
+      "departures": [
+        {
+          "request": "rest/departure/75bc78af-b428-374b-9128-997e79f2242b",
+          "stop": 0,
+          "drive": "cd794923-e27e-46dc-8dc4-743d82dbe1ee"
+        }
+      ]
+    },
+    {
+      "name": "recognized",
+      "selector": "io.drivegrowth.app.simulation.UnifiedSimulationRestNegativeEvidenceTest#testQualifiedDrivingAndParkingGrantOnlyAtTheRecognizedPlace",
+      "runner": "OK (1 test)",
+      "seconds": 221.279,
+      "sqliteSHA256": "6e2a157fde3445f3be70156f9d30aa8af7df820721825eba590bde2cff117386",
+      "receipts": [
+        {
+          "drive": "8a809fac-587b-4bc6-b519-6e68b7f358e5",
+          "source": "SIMULATION",
+          "ordinal": 1,
+          "after": {
+            "remaining": 0,
+            "last": null
+          },
+          "amount": 360,
+          "boostedMs": 0,
+          "departures": []
+        },
+        {
+          "drive": "7c49b236-683c-4c9b-9b17-f411c80ceb14",
+          "source": "SIMULATION",
+          "ordinal": 2,
+          "after": {
+            "remaining": 1100000,
+            "last": 0
+          },
+          "amount": 15,
+          "boostedMs": 100000,
+          "departures": [
+            "rest/departure/ffcaa40c-90e0-3850-ba2f-6119585cc915"
+          ]
+        },
+        {
+          "drive": "c7b8e90e-fe43-481f-98fb-f73b3269a940",
+          "source": "SIMULATION",
+          "ordinal": 3,
+          "after": {
+            "remaining": 0,
+            "last": 0
+          },
+          "amount": 415,
+          "boostedMs": 1100000,
+          "departures": []
+        },
+        {
+          "drive": "92bdd74f-f3dd-4220-96f5-379c7b7ed6a1",
+          "source": "SIMULATION",
+          "ordinal": 4,
+          "after": {
+            "remaining": 1140000,
+            "last": 1
+          },
+          "amount": 9,
+          "boostedMs": 60000,
+          "departures": [
+            "rest/departure/b22ccb56-fe15-32e8-9fd9-c89dffcd3b2c"
+          ]
+        }
+      ],
+      "departures": [
+        {
+          "request": "rest/departure/ffcaa40c-90e0-3850-ba2f-6119585cc915",
+          "stop": 0,
+          "drive": "7c49b236-683c-4c9b-9b17-f411c80ceb14"
+        },
+        {
+          "request": "rest/departure/b22ccb56-fe15-32e8-9fd9-c89dffcd3b2c",
+          "stop": 1,
+          "drive": "92bdd74f-f3dd-4220-96f5-379c7b7ed6a1"
+        }
+      ]
+    }
+  ]
+}

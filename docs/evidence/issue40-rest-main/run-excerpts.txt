@@ -1,0 +1,34 @@
+[existing-buff]
+Time: 167.838
+OK (1 test)
+11-12 09:46:03.811  4074  4154 I RestNegativeMain: place=OUTSIDE parkMs=300000 heldMs=1040000 departures=1 inbound=3e8e55d3-6e15-437c-ad40-9af7cf6ba0e8 outbound=7a06c471-0807-46dd-b452-bf4c89b11cbb amount=GameMoney(units=9)
+11-12 09:47:06.217  4074  4154 I RestNegativeMain: place=MISSING parkMs=300000 heldMs=920000 departures=1 inbound=57c289a6-6d17-40fc-9a15-adaa82cb75ac outbound=b5b29301-efce-4c18-80b9-5fc90a05126c amount=GameMoney(units=9)
+
+[outside]
+Time: 215.059
+OK (1 test)
+11-12 09:50:53.529  5629  5698 I RestNegativeMain: eligible place=OUTSIDE driveMs=3600000 parkMs=300000 grants=0 boostedMs=0 amount=GameMoney(units=6)
+
+[missing]
+Time: 212.059
+OK (1 test)
+11-12 09:54:29.222 16076 16145 I RestNegativeMain: eligible place=MISSING driveMs=3600000 parkMs=300000 grants=0 boostedMs=0 amount=GameMoney(units=6)
+
+[recognized]
+Time: 221.279
+OK (1 test)
+11-12 09:58:13.760 28082 28151 I RestNegativeMain: eligible place=RECOGNIZED driveMs=3600000 parkMs=300000 grants=1 boostedMs=60000 amount=GameMoney(units=9)
+
+[first-run/existing-buff]
+INSTRUMENTATION_STATUS: stack=junit.framework.AssertionFailedError: active button simulation:rest-start
+junit.framework.AssertionFailedError: active button simulation:rest-start
+Time: 22.344
+Tests run: 1,  Failures: 1,  Errors: 0
+Android crash buffer: empty
+
+[first-run/eligible-location]
+INSTRUMENTATION_STATUS: stack=junit.framework.AssertionFailedError: active button simulation:rest-start
+junit.framework.AssertionFailedError: active button simulation:rest-start
+Time: 22.731
+Tests run: 1,  Failures: 1,  Errors: 0
+Android crash buffer: empty
