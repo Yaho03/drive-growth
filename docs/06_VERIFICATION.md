@@ -3163,17 +3163,11 @@ Pleos API34 ARM64 에뮬레이터의 사용자 10에서 소스별 격리 APK를 
 
 ### 공식 창의 도감 재조회와 저장 요청 복원 — 2026-11-13
 
-`45e2f6f9e9f6292ad116261ef50ebd7c8ce4cc28`에서 도감 재조회 중 Activity 재생성 시험을 추가했다. `e824452` 대비 제품 app·core·Gradle 소스는 같고 AndroidTest 한 파일만 달랐다. 시험 APK 조립은 성공했으며 이 변경에서 기존 단위 시험과 Lint를 다시 실행하지 않았다.
+`45e2f6f`는 `e824452`에서 Android 계측 파일 하나만 변경했다. 제품·core·Gradle 소스는 같다. Pleos API34 ARM64의 새 격리 모의 앱 `io.drivegrowth.verify.collectionwindow28`을 공식 Portrait 840×1184px·160dpi와 Landscape 1700×1185px·200dpi에서 각각 설치해 **1/1(19.222초), 1/1(29.476초)**를 확인했다. 두 설치 회수본은 각각의 앱·시험 빌드와 바이트가 같았다. 이 계측용 앱·시험 APK 조립은 17초에 통과했고 단위 시험·Lint는 다시 실행하지 않았다. [소스·설치 해시](evidence/final-pixel-ui/final-regressions/collection-window/result.json) · [세로 프리셋](evidence/final-pixel-ui/final-regressions/collection-window/portrait-preset.json) · [가로 프리셋](evidence/final-pixel-ui/final-regressions/collection-window/landscape-preset.json).
 
-Pleos API34 ARM64의 격리 `io.drivegrowth.verify.collectionwindow28`를 공식 두 창에 각각 새로 설치했다. 실제 UnifiedSimulationActivity의 도감 새로고침이 Loading을 표시한 UI 처리 중 재생성을 요청하고, 다른 Activity 인스턴스에서 같은 도감 탭과 보유·발견·미발견 표시를 확인했다. 공개 원장 API로 준비한 원 SAVED 레벨업 요청을 도감에서 열어도 원 command/request·프로필·잔액·차량 이력·미확인 정산·발견·checkpoint는 유지됐다. 확정 명령 입력은 하지 않았다.
+캐스퍼 최초 지급, 레벨업의 원 `SAVED` 명령, 아반떼 발견은 공개 원장 API로 준비했다. 실제 Main의 도감 새로고침을 실행해 같은 UI 이벤트에서 `Loading` 표시를 확인하고 Activity 재생성을 요청했다. 새 Activity는 같은 공식 창과 도감 탭을 유지했고, 보유 이력 1개·새 발견 1개·미발견을 구분해 표시했다. 발견 표시와 새로고침의 가시 영역을 확인한 뒤 도감의 보관 요청 버튼으로 차량 관리 확인에 진입했다. 원 command/request와 `SAVED` 상태, 프로필·잔액·차량 이력·미확인 정산·발견 기록은 진입 전후 같았다. 확정 명령은 입력하지 않았다. [세로 계측](evidence/final-pixel-ui/final-regressions/collection-window/portrait-instrumentation.txt) · [세로 단계](evidence/final-pixel-ui/final-regressions/collection-window/portrait-phase-log.txt) · [가로 계측](evidence/final-pixel-ui/final-regressions/collection-window/landscape-instrumentation.txt) · [가로 단계](evidence/final-pixel-ui/final-regressions/collection-window/landscape-phase-log.txt).
 
-| 공식 창 | 실제 계측 결과 |
-|---|---|
-| Portrait 840×1184px/dp·160dpi | [1/1 통과, 19.222초](evidence/final-pixel-ui/final-regressions/collection-window/portrait/instrumentation.txt) |
-| Landscape 1700×1185px·1360×948dp·200dpi | [1/1 통과, 29.476초](evidence/final-pixel-ui/final-regressions/collection-window/landscape/instrumentation.txt) |
-
-빌드·설치 회수 해시는 두 실행에서 일치했다. 앱은 `ab0403b370fd2ccd5b0829190472fd4d575382a8e32b86f3a96e6a6a534d4049`, 시험 APK는 `1fb6d537939e0aa385017f54c5fc6f1686089ddcddf58daf0da3959fab1458b4`다. 각 폴더의 result와 phase-log가 버전·단계 근거다. 격리 패키지·전용 디스플레이 제거와 전용 AVD 종료 뒤 [공유 환경 19/19 보존](evidence/final-pixel-ui/final-regressions/collection-window/preservation.json)을 확인했다. 디스크 I/O 완료 순서·강제 지연 응답·Activity 간 동일 scrollY·새 OS PID는 이 시험 범위가 아니다.
-
+디스크 I/O 완료 순서·강제 지연 응답·이전 스크롤 위치·화면의 차량 revision·새 OS 프로세스는 이 시험에서 확인하지 않았다. 별도 DISPLAY2·시험 패키지를 제거하고 전용 AVD를 종료했다. 원래 장치의 제품 APK·데이터·권한·표시를 포함해 **19/19** 보존을 확인했다. [DISPLAY2 반환](evidence/final-pixel-ui/final-regressions/collection-window/display-removed.json) · [장치 보존](evidence/final-pixel-ui/final-regressions/collection-window/preservation.json).
 
 ### 일반 모의주행에서 휴식으로 전환하는 대여 구간 — 2026-11-13
 
@@ -3212,3 +3206,4 @@ Pleos API34 ARM64의 격리 `io.drivegrowth.verify.collectionwindow28`를 공식
 별도 `ed76bb5` VEHICLE 실행에서는 실제 SDK의 P→D 정차·20km/h와 Back 재진입 제한→P 복귀를 로그·화면으로 확인했다. 마지막 자동 assertion은 다른 창의 접근성 계층을 읽어 실패했으므로 이를 자동 시험 통과로 집계하지 않는다. 이 기록은 이후 SIMULATION 대여 전환만 바뀐 `35f93a6`의 실제 SDK 재시험을 뜻하지 않는다.
 
 최종 표적 `2b6b579`는 제품 변경 없이 계측 입력 순서를 수정한 소스다. 전용 AVD와 시험 프로세스를 종료했고 원래 제품 APK·DB·권한·화면·포워딩 등 [19/19 보존](evidence/final-pixel-ui/final-regressions/latest-install/preservation.json)을 확인했다. 원래 ADB 서버는 유지했다. APK는 로컬 `.local-tools/submission-candidate/20261113-35f93a6/drive-growth-35f93a6-debug.apk`에 보관하며 저장소에 바이너리를 추가하지 않는다.
+
