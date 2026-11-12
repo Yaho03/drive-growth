@@ -219,8 +219,10 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
     fun testActiveRentalCrossesFromOrdinaryTerminalIntoRestAndBackWithoutLosingTime() {
         val active = activeRentalAtStage13(null)
         val firstPark = 721_000L
-        val terminal = 724_000L
-        for (at in listOf(firstPark, terminal)) {
+        val parkConfirmed = firstPark + policy.parkMs
+        val terminal = parkConfirmed + 1_000
+        // 주행 종료를 확인한 표본은 다음 구간의 주차 원점만 공급한다.
+        for (at in listOf(firstPark, parkConfirmed, terminal)) {
             val (frame, result) = record(at, null, receiver = "simulation-rest", parked = true)
             assertTrue(ok(producer.observe(frame, result)).deferred.isEmpty())
         }
@@ -254,10 +256,15 @@ class RentalProductSourceBindingTest : InstrumentationTestCase() {
         ok(games.open()).use { game ->
             ok(game.store.read { db ->
                 val basis = checkNotNull(RentalBasisStorage.load(db, game.store, active.id))
-                val transition = basis.periods.single { it.from == EpochMillis(base + firstPark) }
+                val transition = basis.periods.single { it.from == EpochMillis(base + parkConfirmed) }
+                assertEquals(EpochMillis(base + firstPark), transition.origin)
                 assertEquals(EpochMillis(base + restStart), transition.through)
                 assertEquals(RentalIncomeKind.PARKED, transition.kind)
-                assertEquals(4_000L, transition.normalMillis)
+                assertEquals(2_000L, transition.normalMillis)
+                assertEquals(0L, transition.reducedMillis)
+                assertEquals(0L, transition.cappedMillis)
+                assertEquals(0, transition.weightedMillis.compareTo(2_000.toBigDecimal()))
+                assertTrue(basis.periods.none { it.kind == RentalIncomeKind.UNOBSERVED })
                 ContractResult.Success(Unit)
             })
         }
