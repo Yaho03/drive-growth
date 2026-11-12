@@ -59,7 +59,11 @@ internal class HostSession(
     private var ordinaryRentalReplayClock: RestClockDomain? = null // 직렬 worker의 새 시연 세션 복원 경계.
     val rental = io.drivegrowth.app.host.rental.RentalProductHost(worker, main, { frame, recorded ->
         val replayClock = ordinaryRentalReplayClock
-        if (replayClock == null) rentalSource.observe(frame, recorded)
+        if (replayClock == null) {
+            val restStart = simulation?.restSample(frame)?.takeIf { it.startsRestRun }
+            if (restStart == null) rentalSource.observe(frame, recorded)
+            else rentalSource.observeSimulationRestStart(frame, recorded, restStart.clock)
+        }
         else rentalSource.observeOrdinarySimulationReplay(frame, recorded, replayClock,
             ordinaryTerminal = simulation?.restSample(frame)?.ordinaryTerminal == true).also { result ->
             if (result is ContractResult.Success && result.value.deferred.isEmpty()) ordinaryRentalReplayClock = null
@@ -319,6 +323,5 @@ internal class HostSession(
         worker.shutdown() // 이미 받은 관측/pause의 영속 쓰기는 폐기하지 않는다.
     }
 
-    private companion object { const val SIMULATION_REST_RECEIVER = "unified-simulation-rest" }
 
 }

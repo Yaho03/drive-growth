@@ -158,6 +158,34 @@ class DeliveryHostControllerTest {
         assertEquals(listOf("read","prepare","read"),h.calls);assertTrue(h.frame!!.screen is DeliveryScreen.Destination)
     }
 
+    @Test fun `자동 발견 저장은 표시한 후보 프레임을 유지하고 끝날 때까지 명령을 받지 않는다`() {
+        val h = Harness()
+        val proposed = h.offers()
+        h.start()
+        val offered = checkNotNull(h.frame)
+        val command = DeliveryCommand.Select(proposed, proposed.offers.single().id)
+        val request = DeliveryRequest(1, offered.version, command)
+
+        h.host.acknowledgeDisplayed(offered.version)
+        assertEquals(offered, h.frame)
+        assertTrue(h.enabled)
+        h.host.onRequest(request)
+        h.tasks.removeFirst().run()
+        assertEquals(offered, h.frame)
+        h.host.onRequest(request)
+        h.drain()
+
+        assertEquals(offered, h.frame)
+        assertEquals(listOf("read", "displayed"), h.calls)
+        assertEquals(1, h.discoveryRefreshes)
+        assertNull(h.host.state!!.displayedProposal)
+        h.host.acknowledgeDisplayed(offered.version)
+        h.host.onRequest(request)
+        h.drain()
+        assertEquals(listOf("read", "displayed", "prepare", "execute"), h.calls)
+        assertEquals(listOf(request), h.completed)
+    }
+
     @Test fun `발견 실패 뒤 재시도는 이미 표시한 원목록을 저장한다`() {
         val h = Harness()
         val original = h.offers()

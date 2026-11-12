@@ -2,6 +2,7 @@ package io.drivegrowth.app.host.delivery
 
 import android.test.InstrumentationTestCase
 import android.view.View
+import android.widget.Button
 import io.drivegrowth.app.data.AssetTrialDefinitionProvider
 import io.drivegrowth.app.host.*
 import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
@@ -128,7 +129,7 @@ class DeliveryDiscoverySessionSqliteTest : InstrumentationTestCase() {
                 }
             }
             delivery = DeliveryHostController(tracked, worker, main)
-            view = DeliveryView(context, delivery::onRequest)
+            view = DeliveryView(context, delivery::onRequest, canConfirmOffer = { !delivery.isSavingDisplayedOffers })
             delivery.attach({ next, enabled ->
                 frame = next
                 if (view.render(next, enabled) && enabled && next.screen is DeliveryScreen.Offers)
@@ -199,6 +200,30 @@ class DeliveryDiscoverySessionSqliteTest : InstrumentationTestCase() {
         assertEquals(0, attempted.size)
         val original = acknowledge()
         assertEquals(listOf(identity to original), attempted)
+        assertPersisted(before)
+    }
+
+    fun testDisplayedDiscoveryKeepsOpenDetailAndUnlocksSameOfferAfterSave() {
+        val before = snapshot
+        val shown = frame
+        val offerTag = "delivery:offer:${incomeOffer.id.value}"
+        ui {
+            assertTrue(view.findViewWithTag<Button>(offerTag).performClick())
+            val previousConfirm = view.findViewWithTag<Button>("delivery:confirm")
+            assertTrue(previousConfirm.isEnabled)
+            delivery.acknowledgeDisplayed(shown.version)
+            assertEquals(shown, frame)
+            assertEquals(incomeOffer.id, view.saveUiState().selectedOfferId)
+            assertFalse(view.findViewWithTag<Button>("delivery:confirm").isEnabled)
+            previousConfirm.performClick()
+            assertNull(view.saveUiState().pending)
+        }
+        drain()
+        ui {
+            assertEquals(shown, frame)
+            assertEquals(incomeOffer.id, view.saveUiState().selectedOfferId)
+            assertTrue(view.findViewWithTag<Button>("delivery:confirm").isEnabled)
+        }
         assertPersisted(before)
     }
 

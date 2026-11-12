@@ -1,0 +1,15 @@
+JUnit version 4.13.2
+..........E..........................
+Time: 0.069
+There was 1 failure:
+1) 자동 발견 저장은 표시한 후보 프레임을 유지하고 끝날 때까지 명령을 받지 않는다(io.drivegrowth.app.host.delivery.DeliveryHostControllerTest)
+java.lang.AssertionError: expected:<DeliveryFrame(version=2, screen=Offers(proposal=DeliveryProposalUi(proposed=DeliveryProposed(destination=DestinationKey(value=destination), estimated=EstimatedRouteDistance(meters=20000, source=SIMULATION), list=DeliveryList(band=0, source=SIMULATION, createdOn=2026-11-11, contentVersion=ContentVersion(value=cars), ruleVersion=RuleVersion(value=rules), offers=[Purchase(id=DeliveryOfferId(value=offer-0), vehicleId=VehicleId(value=casper), rarity=COMMON, price=GameMoney(units=800))], nextOfferNumber=1), offers=[Purchase(id=DeliveryOfferId(value=offer-0), vehicleId=VehicleId(value=casper), rarity=COMMON, price=GameMoney(units=800))]), destinationName=목적지, vehicleNames={VehicleId(value=casper)=캐스퍼}, availability={DeliveryOfferId(value=offer-0)=DeliveryAvailability(allowed=true, reason=null)}, confirmationTerms=수익 탁송은 도착 확인 후 보상을 받아요. 구매 탁송은 지금 결제하고 도착 확인 후 차량을 받아요.)))> but was:<DeliveryFrame(version=3, screen=Loading)>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at org.junit.Assert.assertEquals(Assert.java:146)
+	at io.drivegrowth.app.host.delivery.DeliveryHostControllerTest.자동 발견 저장은 표시한 후보 프레임을 유지하고 끝날 때까지 명령을 받지 않는다(DeliveryHostControllerTest.kt:170)
+
+FAILURES!!!
+Tests run: 36,  Failures: 1
+

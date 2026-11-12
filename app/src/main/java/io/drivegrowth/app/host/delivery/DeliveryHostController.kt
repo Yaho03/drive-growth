@@ -37,7 +37,13 @@ class DeliveryHostController(private val source: DeliveryHostSource, private val
     fun setControlsEnabled(value: Boolean) {
         if (released || value == allowed) return
         allowed = value
-        if (!value) epoch++
+        if (!value) {
+            epoch++
+            if (isSavingDisplayedOffers) {
+                show(DeliveryScreen.Loading)
+                return
+            }
+        }
         render?.invoke(frame, value && !busy)
         if (value && request != null && !busy) refresh()
     }
@@ -138,6 +144,8 @@ class DeliveryHostController(private val source: DeliveryHostSource, private val
             }
         }
     }
+    val isSavingDisplayedOffers: Boolean get() = busy && frame.screen is DeliveryScreen.Offers
+
     /** 기존 View의 실제 render 성공 뒤 같은 frame을 한 번 확인한다. 생성만 한 후보는 기록하지 않는다. */
     fun acknowledgeDisplayed(frameVersion: Long) {
         val current = state ?: return
@@ -167,8 +175,11 @@ class DeliveryHostController(private val source: DeliveryHostSource, private val
     ) {
         if (!valid() || busy) return
         val token = epoch
+        val keepDisplayedOffers = savingDiscovery && frame.screen is DeliveryScreen.Offers
         busy = true
-        show(DeliveryScreen.Loading)
+        // 자동 발견 저장은 현재 후보를 바꾸지 않는다. 상세는 유지하고 확정은 응답까지 잠근다.
+        if (keepDisplayedOffers) render?.invoke(frame, allowed)
+        else show(DeliveryScreen.Loading)
         worker.execute {
             runningEpoch = token
             val result = if (!inCurrentWork()) null else try {
@@ -208,7 +219,11 @@ class DeliveryHostController(private val source: DeliveryHostSource, private val
                         show(DeliveryScreen.Failure("처리 결과를 확인했어요. 표시한 목록의 발견 저장을 다시 시도해 주세요.", true), request)
                     else if (!bind(result.value.identity))
                         show(DeliveryScreen.Failure("다른 프로필의 응답을 사용할 수 없어요.", true), request)
-                    else { state = result.value; show(result.value.screen, request) }
+                    else {
+                        state = result.value
+                        if (keepDisplayedOffers) render?.invoke(frame, allowed)
+                        else show(result.value.screen, request)
+                    }
                 }
                 request = null
             }

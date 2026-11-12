@@ -22,6 +22,7 @@ class DeliveryView(
     restored: DeliveryInteractionState = DeliveryInteractionState(),
     private val navigationControls: () -> View? = { null },
     private val hostStatus: () -> View? = { null },
+    private val canConfirmOffer: () -> Boolean = { true },
 ) : LinearLayout(context) {
     private val style = DeliveryStyle(context)
     private val vehicleLabels = GarageStyle(context)
@@ -149,7 +150,7 @@ class DeliveryView(
                 active(body, state.delivery, actions = false)
             }
         }
-        if (state is DeliveryScreen.Offers) addNavigationControls(body)
+        if (state is DeliveryScreen.Offers && canConfirmOffer()) addNavigationControls(body)
         if (focused != null) findViewWithTag<View>(focused)?.takeIf { it.isEnabled }?.requestFocus()
     }
 
@@ -336,8 +337,9 @@ class DeliveryView(
 
     private fun action(parent: LinearLayout, label: Int, tag: String, command: DeliveryCommand, primary: Boolean = false) {
         val generation = drawGeneration
-        style.add(parent, style.button(s(label), session.canRequest(command), primary) {
-            if (generation == drawGeneration) send(command)
+        fun canSubmit() = command !is DeliveryCommand.Select || canConfirmOffer()
+        style.add(parent, style.button(s(label), canSubmit() && session.canRequest(command), primary) {
+            if (generation == drawGeneration && canSubmit()) send(command)
         }.apply { this.tag = tag })
     }
 

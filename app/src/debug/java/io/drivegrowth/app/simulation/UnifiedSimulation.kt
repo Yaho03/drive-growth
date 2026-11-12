@@ -156,7 +156,8 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
         val clock = RestClockDomain("unified-simulation-elapsed", current.clock.bootId)
         val area = if (current.restRun) Observation.Available(RestSimulationScenario.testArea(frame.observation, current.inRestArea))
             else Observation.Missing(MissingReason.NO_DATA)
-        return SimulationRestSample(clock, area, current.restRun, current.terminal && !current.restRun)
+        return SimulationRestSample(clock, area, current.restRun, current.terminal && !current.restRun,
+            startsRestRun = current.restRun && current.stage == 1)
     }
 
     private fun emit() {
