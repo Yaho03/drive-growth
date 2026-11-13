@@ -16,6 +16,26 @@ import io.drivegrowth.core.rental.Facility
 
 @Suppress("DEPRECATION")
 class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
+    fun testFacilityMenuUsesBottomSheetInPortraitAndSidePanelInLandscape() = onUi {
+        val context = instrumentation.targetContext
+        val sheet = ShopMapSheet(context, TextView(context), 0, true, {})
+
+        assertPanelPosition(sheet, 840, 1060, 8, atBottom = true)
+        assertPanelPosition(sheet, 1360, 900, 8, atBottom = false)
+    }
+
+    fun testExpansionUsesAvailableWidthWhenTheSidePanelDoesNotFit() = onUi {
+        val context = instrumentation.targetContext
+        val interaction = ShopInteraction({})
+        interaction.render(ShopPreviewStates.normal(), true)
+        val overlay = ShopMapOverlayView(context, {}, {})
+        overlay.render(ShopMapTarget.Expansion, interaction)
+
+        assertPanelPosition(overlay, 698, 425, 16, atBottom = true)
+        assertPanelPosition(overlay, 840, 1060, 16, atBottom = true)
+        assertPanelPosition(overlay, 1360, 900, 16, atBottom = false)
+    }
+
     fun testExpansionSendsOnlyCurrentOfferAndWaitsForStoredRefresh() = onUi {
         val events = mutableListOf<ShopEvent>()
         val state = ShopPreviewStates.normal()
@@ -161,7 +181,7 @@ class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
                 overlay.render(ShopMapTarget.Expansion, interaction)
                 container.addView(overlay, FrameLayout.LayoutParams(width, height))
             }
-            instrumentation.waitForIdleSync()
+            waitForLayout(overlay)
             val before = android.graphics.Rect()
             onUi {
                 assertTrue(overlay.isAttachedToWindow)
@@ -191,10 +211,48 @@ class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
         }
     }
 
+    private fun assertPanelPosition(root: FrameLayout, widthDp: Int, heightDp: Int, gapDp: Int, atBottom: Boolean) {
+        val style = ShopStyle(root.context)
+        val width = style.dp(widthDp)
+        val height = style.dp(heightDp)
+        val gap = style.dp(gapDp)
+        root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+        root.layout(0, 0, width, height)
+        val panel = root.getChildAt(0)
+        val size = "${widthDp}×${heightDp}dp"
+        assertEquals("right gap at $size", gap, width - panel.right)
+        if (atBottom) {
+            assertEquals("left gap at $size", gap, panel.left)
+            assertEquals("bottom gap at $size", gap, height - panel.bottom)
+        } else {
+            assertTrue("side panel at $size", panel.left > width / 2)
+            assertTrue("vertically centered at $size", kotlin.math.abs(panel.top - (height - panel.bottom)) <= 1)
+        }
+    }
+
     private fun text(view: View): String = when (view) {
         is TextView -> view.text.toString()
         is ViewGroup -> (0 until view.childCount).joinToString("\n") { text(view.getChildAt(it)) }
         else -> ""
+    }
+
+    private fun waitForLayout(view: View) {
+        var state = ""
+        repeat(150) {
+            instrumentation.waitForIdleSync()
+            var ready = false
+            onUi {
+                ready = view.isAttachedToWindow && view.isLaidOut && !view.isLayoutRequested &&
+                    view.width > 0 && view.height > 0
+                state = "display=${view.display?.displayId}, attached=${view.isAttachedToWindow}, " +
+                    "laidOut=${view.isLaidOut}, requested=${view.isLayoutRequested}, " +
+                    "size=${view.width}x${view.height}, window=${view.windowVisibility}, focus=${view.hasWindowFocus()}"
+            }
+            if (ready) return
+            Thread.sleep(20)
+        }
+        fail("패널의 실제 배치 대기 실패: $state")
     }
 
     private fun onUi(action: () -> Unit) {

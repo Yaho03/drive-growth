@@ -10,7 +10,7 @@ Pleos 에뮬레이터의 가로 창에서 **모의 입력**으로 실행한 `af2
 
 아래 모의 시연 다운로드는 기존 `ba38def` 빌드입니다. 차 없이 체험하려면 이 APK를 설치해 **드라이브 키우기 · 모의 시연**을 여세요. 첫 차량을 선택한 뒤 **탁송 → 시연 목적지 확인 → 수익 탁송 선택 확정**을 진행합니다. 선택이 저장되면 **처리 결과 확인하고 새로 조회**를 누릅니다. **시연 · 모의 입력**에서 **모의주행 시작**을 누르고 모의 주차가 끝나면 탁송 결과와 미확인 정산을 확인하세요. 같은 앱을 다시 열어 저장된 결과를 볼 수 있습니다. [설치·재실행 순서](docs/05_DEVELOPMENT_SETUP.md#별도-모의-시연-debug-apk)
 
-지도·패널과 다섯 메뉴의 배치·입력 장치 시험이 통과했습니다. [화면과 기능 연결](docs/09_UI_UX_SPEC.md#새-가게-지도와-기능-연결--2026-11-13)
+지도·패널과 다섯 메뉴의 배치·입력 장치 시험이 통과했습니다. [화면과 기능 연결](docs/09_UI_UX_SPEC.md#새-가게-지도와-기능-연결--2026-11-13) · [좁은 창·세로 창 수정과 실제 화면](docs/06_VERIFICATION.md#최종-모의-apk의-좁은-가로세로-지도-패널--2026-11-13)
 
 ## 대상 사용자와 해결할 문제
 
@@ -38,7 +38,7 @@ Pleos 에뮬레이터의 가로 창에서 **모의 입력**으로 실행한 `af2
 |---|---|
 | 배포된 모의 시연 Debug `ba38def` | [APK 다운로드](https://github.com/Yaho03/drive-growth/releases/download/demo-20261113-ba38def/drive-growth-ba38def-debug.apk) · [Release와 해시](https://github.com/Yaho03/drive-growth/releases/tag/demo-20261113-ba38def). 저장소 접근 권한이 필요합니다. 패키지 `io.drivegrowth.app.simulation`을 시험 기기에 설치해 **드라이브 키우기 · 모의 시연**을 엽니다. |
 | 현재 소스의 로컬 Debug | JDK 17과 Android SDK를 준비해 `./gradlew :app:assembleDebug`를 실행합니다. 산출물은 `app/build/outputs/apk/debug/app-debug.apk`입니다. |
-| 새 가게 UI 로컬 시험 APK | `af2118e`의 화면·스크롤 시험과 `e55baad`의 Main 시연에 사용한 로컬 빌드입니다. [시험별 소스·APK 해시](docs/06_VERIFICATION.md#새-가게-ui의-통합-확인-항목--2026-11-13) |
+| 새 가게 UI 로컬 시험 APK | `3358574`의 좁은·세로 패널 수정본을 모의 APK로 실행했습니다. [창별 화면·설치 해시](docs/06_VERIFICATION.md#최종-모의-apk의-좁은-가로세로-지도-패널--2026-11-13). 이전 `af2118e`의 화면·스크롤 시험과 `e55baad`의 Main 시연은 당시 근거로 구분합니다. [시험별 소스·APK 해시](docs/06_VERIFICATION.md#새-가게-ui의-통합-확인-항목--2026-11-13) |
 | #287 로컬 검증 APK | 별도로 조립한 모의 Debug와 개발 서명 차량용 Release 구성을 시험했습니다. 차량용은 `io.drivegrowth.app`으로 Pleos 런처에서 실제 SDK 입력을 받습니다. [정확한 소스·해시·실행 조건](docs/06_VERIFICATION.md#차량용-첫-실행과-마을-주민-검증--2026-11-13) |
 
 [APK 구분·설치·모의 플레이 전체 절차](docs/05_DEVELOPMENT_SETUP.md#별도-모의-시연-debug-apk). 제출용 서명과 실제 제출할 소스·APK의 조합은 [#29](https://github.com/Yaho03/drive-growth/issues/29)에서 확인합니다.

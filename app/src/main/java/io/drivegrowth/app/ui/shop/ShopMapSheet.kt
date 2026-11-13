@@ -41,14 +41,13 @@ internal class ShopMapSheet(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val height = MeasureSpec.getSize(heightMeasureSpec)
-        val wide = width >= style.dp(720)
+        val wide = width >= style.dp(720) && width > height
         val gap = style.dp(8)
         (card.layoutParams as LayoutParams).apply {
             this.width = if (wide) minOf(style.dp(520), (width * .48f).toInt()) else (width - gap * 2).coerceAtLeast(0)
             this.height = if (wide) (height - gap * 2).coerceAtLeast(0) else (height * .80f).toInt()
             gravity = (if (wide) Gravity.CENTER_VERTICAL else Gravity.BOTTOM) or Gravity.END
-            marginEnd = gap
-            bottomMargin = if (wide) 0 else gap
+            setMargins(gap, 0, gap, if (wide) 0 else gap)
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }

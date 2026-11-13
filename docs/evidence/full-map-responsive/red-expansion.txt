@@ -1,0 +1,59 @@
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest:
+INSTRUMENTATION_STATUS: test=testExpansionUsesAvailableWidthWhenTheSidePanelDoesNotFit
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stack=junit.framework.AssertionFailedError: left gap at 698×425dp expected:<12> but was:<151>
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest.assertPanelPosition(ShopMapOverlayDeviceTest.kt:226)
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest.testExpansionUsesAvailableWidthWhenTheSidePanelDoesNotFit$lambda$0(ShopMapOverlayDeviceTest.kt:34)
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest.$r8$lambda$rN2XkhRPu6vM8TJSRH82-hv9k2E(Unknown Source:0)
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest$$ExternalSyntheticLambda0.invoke(D8$$SyntheticClass:0)
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest.onUi$lambda$0(ShopMapOverlayDeviceTest.kt:242)
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest.$r8$lambda$Ap0DieTNPq_5kSngvLHiykwQT9E(Unknown Source:0)
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest$$ExternalSyntheticLambda28.run(D8$$SyntheticClass:0)
+	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2420)
+	at android.os.Handler.handleCallback(Handler.java:958)
+	at android.os.Handler.dispatchMessage(Handler.java:99)
+	at android.os.Looper.loopOnce(Looper.java:205)
+	at android.os.Looper.loop(Looper.java:294)
+	at android.app.ActivityThread.main(ActivityThread.java:8194)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+
+INSTRUMENTATION_STATUS: stream=
+Failure in testExpansionUsesAvailableWidthWhenTheSidePanelDoesNotFit:
+junit.framework.AssertionFailedError: left gap at 698×425dp expected:<12> but was:<151>
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest.assertPanelPosition(ShopMapOverlayDeviceTest.kt:226)
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest.testExpansionUsesAvailableWidthWhenTheSidePanelDoesNotFit$lambda$0(ShopMapOverlayDeviceTest.kt:34)
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest.$r8$lambda$rN2XkhRPu6vM8TJSRH82-hv9k2E(Unknown Source:0)
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest$$ExternalSyntheticLambda0.invoke(D8$$SyntheticClass:0)
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest.onUi$lambda$0(ShopMapOverlayDeviceTest.kt:242)
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest.$r8$lambda$Ap0DieTNPq_5kSngvLHiykwQT9E(Unknown Source:0)
+	at io.drivegrowth.app.ui.shop.ShopMapOverlayDeviceTest$$ExternalSyntheticLambda28.run(D8$$SyntheticClass:0)
+	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2420)
+	at android.os.Handler.handleCallback(Handler.java:958)
+	at android.os.Handler.dispatchMessage(Handler.java:99)
+	at android.os.Looper.loopOnce(Looper.java:205)
+	at android.os.Looper.loop(Looper.java:294)
+	at android.app.ActivityThread.main(ActivityThread.java:8194)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+
+INSTRUMENTATION_STATUS: test=testExpansionUsesAvailableWidthWhenTheSidePanelDoesNotFit
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_RESULT: stream=
+Test results for InstrumentationTestRunner=.F
+Time: 0.206
+
+FAILURES!!!
+Tests run: 1,  Failures: 1,  Errors: 0
+
+
+INSTRUMENTATION_CODE: -1

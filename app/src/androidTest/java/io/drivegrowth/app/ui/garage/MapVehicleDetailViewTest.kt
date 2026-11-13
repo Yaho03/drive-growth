@@ -15,6 +15,24 @@ import io.drivegrowth.core.progression.VehicleAction
 
 @Suppress("DEPRECATION")
 class MapVehicleDetailViewTest : InstrumentationTestCase() {
+    private fun waitForLayout(view: View) {
+        var state = ""
+        repeat(150) {
+            instrumentation.waitForIdleSync()
+            var ready = false
+            onUi {
+                ready = view.isAttachedToWindow && view.isLaidOut && !view.isLayoutRequested &&
+                    view.width > 0 && view.height > 0
+                state = "display=${view.display?.displayId}, attached=${view.isAttachedToWindow}, " +
+                    "laidOut=${view.isLaidOut}, requested=${view.isLayoutRequested}, " +
+                    "size=${view.width}x${view.height}, window=${view.windowVisibility}, focus=${view.hasWindowFocus()}"
+            }
+            if (ready) return
+            Thread.sleep(20)
+        }
+        fail("패널의 실제 배치 대기 실패: $state")
+    }
+
     private fun onUi(block: () -> Unit) {
         var failure: Throwable? = null
         instrumentation.runOnMainSync {
@@ -60,7 +78,7 @@ class MapVehicleDetailViewTest : InstrumentationTestCase() {
                 activity.setContentView(root)
                 view.render(state, state.data.vehicles.first().vehicle.ownedVehicleId, true, false)
             }
-            instrumentation.waitForIdleSync()
+            waitForLayout(view)
             onUi {
                 assertEntirelyVisible(view.findViewWithTag("map:vehicle-close"))
                 val manage = view.findViewWithTag<Button>("map:vehicle-manage")

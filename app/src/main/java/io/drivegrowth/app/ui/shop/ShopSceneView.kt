@@ -29,6 +29,7 @@ import android.view.ViewTreeObserver
 import android.view.animation.PathInterpolator
 import android.widget.Button
 import io.drivegrowth.app.R
+import io.drivegrowth.app.ui.garage.MapVehicleDetailView
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.core.contract.OwnedVehicleId
@@ -457,7 +458,8 @@ internal class ShopSceneView(
         if (slot == null) return ShopMapCamera(fit, (width - scene.width() * fit) / 2 - scene.left * fit,
             (height - scene.height() * fit) / 2 - scene.top * fit)
         val zoom = maxOf(width / fullTown.width(), height / fullTown.height(), fit * 2.6f)
-        val centerX = width * if (width >= 720 * resources.displayMetrics.density) .29f else .50f
+        val sidePanel = MapVehicleDetailView.usesSidePanel(width, height, resources.displayMetrics.density)
+        val centerX = width * if (sidePanel) .29f else .50f
         val centerY = height * if (fillViewport) .34f else .60f
         return ShopMapCamera(zoom, (centerX - slot.first * zoom).coerceIn(minOf(0f, width - fullTown.width() * zoom), 0f),
             (centerY - slot.second * zoom).coerceIn(minOf(0f, height - fullTown.height() * zoom), 0f))

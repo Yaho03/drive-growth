@@ -159,8 +159,9 @@ internal class ShopMapOverlayView(
         val height = MeasureSpec.getSize(heightMeasureSpec)
         if (childCount != 0) {
             val params = getChildAt(0).layoutParams as LayoutParams
-            params.width = (width - params.leftMargin - params.rightMargin).coerceIn(0, style.dp(480))
             val wide = width >= style.dp(720) && width > height
+            val availableWidth = (width - params.leftMargin - params.rightMargin).coerceAtLeast(0)
+            params.width = if (wide) minOf(availableWidth, style.dp(480)) else availableWidth
             val availableHeight = (height - params.topMargin - params.bottomMargin).coerceAtLeast(0)
             params.height = if (wide) minOf(availableHeight, style.dp(560)) else minOf(availableHeight, (height * .80f).toInt())
             params.gravity = Gravity.END or if (wide) Gravity.CENTER_VERTICAL else Gravity.BOTTOM

@@ -101,7 +101,7 @@ internal class MapVehicleDetailView(
         val margin = style.dp(12)
         val availableWidth = (width - margin * 2).coerceAtLeast(0)
         val availableHeight = (height - margin * 2).coerceAtLeast(0)
-        val side = width >= style.dp(760) && width > height
+        val side = usesSidePanel(width, height, resources.displayMetrics.density)
         val maxHeight = if (side) availableHeight else minOf(availableHeight, height * 3 / 5)
         val panelWidth = if (side) minOf(style.dp(360), availableWidth) else availableWidth
         (detailPanel.layoutParams as LayoutParams).apply {
@@ -241,8 +241,11 @@ internal class MapVehicleDetailView(
         null -> R.string.garage_activity_missing
     })
 
-    private companion object {
-        val managementActions = listOf(
+    companion object {
+        internal fun usesSidePanel(width: Int, height: Int, density: Float): Boolean =
+            width >= (760 * density).toInt() && width > height
+
+        private val managementActions = listOf(
             VehicleAction.LEVEL_UP to R.string.garage_action_level,
             VehicleAction.USE_MATERIAL to R.string.garage_action_material,
             VehicleAction.REPAIR to R.string.garage_action_repair,
