@@ -118,6 +118,7 @@ open class MainActivity : Activity() {
     private var navigationBar: View? = null
     private var navigationBarPage: HostPage? = null
     private lateinit var sectionTabs: LinearLayout
+    private lateinit var pageActions: LinearLayout
     private var homeSettings: FrameLayout? = null
     private var homeSoundButton: Button? = null
     private var simulationControlsExpanded = false
@@ -127,8 +128,6 @@ open class MainActivity : Activity() {
     private var simulationStatus: TextView? = null
     private var simulationStart: Button? = null
     private var simulationRetry: Button? = null
-    private val destinations = listOf(HostPage.HOME to "가게", HostPage.GARAGE to "보유 차량", HostPage.COLLECTION to "도감",
-        HostPage.GACHA to "가챠", HostPage.PROGRESSION to "퀘스트·진행", HostPage.DELIVERY to "탁송", HostPage.RANKING to "기록·랭킹", HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내")
     private val mapper = GarageHostMapper()
     private val resultsMapper = ResultsHostMapper()
     private lateinit var results: ResultsView
@@ -320,6 +319,8 @@ open class MainActivity : Activity() {
         }
         panel.addView(gameHeader)
         sectionTabs = style.row().apply { visibility = View.GONE }
+        pageActions = style.row().apply { visibility = View.GONE }
+        panel.addView(pageActions)
         panel.addView(sectionTabs)
         panel.addView(chrome)
         stage = FrameLayout(this).apply { addView(body, FrameLayout.LayoutParams(-1, -1)) }
@@ -767,19 +768,30 @@ open class MainActivity : Activity() {
         previous?.let(panel::removeView)
         sectionTabs.removeAllViews()
         sectionTabs.visibility = View.GONE
+        pageActions.removeAllViews()
+        pageActions.visibility = View.GONE
         if (!enabled) return
 
         lateinit var bar: View
         fun isCurrent() = navigationBar === bar && navigation.page == page &&
             homeSettings == null && gameControlsAllowed()
         val choose: (HostPage) -> Unit = { target -> if (isCurrent() && target != page) select(target) }
-        bar = if (page == HostPage.HOME) MainHomeNavigation(this, choose)
-        else MainNavigationBar(this, destinations, choose,
-            { if (isCurrent()) onBackPressed() },
-            { if (isCurrent()) refresh() }).apply { showSelected(page) }
+        bar = MainHomeNavigation(this, page, choose)
         navigationBar = bar
         navigationBarPage = page
         panel.addView(bar, LinearLayout.LayoutParams(-1, -2))
+        if (page != HostPage.HOME) {
+            for ((label, tag, action) in listOf(
+                Triple("뒤로", "host:back", ::onBackPressed),
+                Triple("새로고침", "host:refresh", ::refresh),
+            )) {
+                pageActions.addView(style.button(label) { if (isCurrent()) action() }.apply {
+                    this.tag = tag
+                    compact(style)
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+            }
+            pageActions.visibility = View.VISIBLE
+        }
 
         val sections = when (page) {
             HostPage.GARAGE, HostPage.COLLECTION -> listOf(HostPage.GARAGE to "보유 차량", HostPage.COLLECTION to "도감")
@@ -880,11 +892,30 @@ open class MainActivity : Activity() {
             snapshot.unviewedSettlements.asSequence().filter { it.transaction.source == snapshot.source }
                 .map { it.settlementId }.distinct().count()
         }
+        val homeContent = session.home.state.screen as? ShopScreenState.Content
+        val operatingStatus = homeContent?.let { content ->
+            val activities = content.vehicles.mapNotNull { it.activity }
+            if (activities.size != content.ownedCount) "영업 상태 확인 불가"
+            else {
+                val rented = activities.count { it == io.drivegrowth.core.progression.VehicleActivity.RENTED }
+                val returning = activities.count { it == io.drivegrowth.core.progression.VehicleActivity.RETURNING }
+                "대여 중 ${rented}대 · 반납 중 ${returning}대"
+            }
+        }
+        val projected = homeContent?.takeIf { it.origin == io.drivegrowth.app.ui.shop.ShopOrigin.STORED }?.let { content ->
+            val balance = content.balance ?: return@let emptyMap()
+            (listOfNotNull(content.expansion) + content.facilities.map { it.option } + content.decorations)
+                .mapNotNull { option ->
+                    val price = option.price ?: return@mapNotNull null
+                    if (option.availability != io.drivegrowth.app.ui.shop.ShopAvailability.AVAILABLE ||
+                        price.units > balance.units
+                    ) null else option.id to io.drivegrowth.core.contract.GameMoney(balance.units - price.units)
+                }.toMap()
+        }.orEmpty()
+        shop.updateMapProjectedBalance(projected)
         shop.updateMapHud(
             unviewedCount = unviewed,
-            operatingStatus = (session.home.state.screen as? ShopScreenState.Content)?.vehicles
-                ?.count { it.activity == io.drivegrowth.core.progression.VehicleActivity.RENTED }
-                ?.takeIf { it > 0 }?.let { "대여 중 ${it}대" },
+            operatingStatus = operatingStatus,
             onResults = {
                 if (homeSettings == null && navigation.page == HostPage.HOME && gameControlsAllowed()) {
                     select(HostPage.RESULTS)

@@ -6,7 +6,8 @@ import io.drivegrowth.app.host.HostPage
 
 internal fun View.mainNavigation(): View? = findViewWithTag("host:destination")
 
-internal fun View.mainPage(page: HostPage): Button? = findViewWithTag("host:page:${page.name}")
+internal fun View.mainPage(page: HostPage): Button? =
+    findViewWithTag<Button>("host:section:${page.name}") ?: findViewWithTag("host:page:${page.name}")
 
 internal fun View.openMainPage(page: HostPage) {
     val button = checkNotNull(exposeMainPage(page))
@@ -18,14 +19,16 @@ internal fun View.exposeMainPage(page: HostPage): Button? {
     fun visibleButton(tag: String) = findViewWithTag<Button>(tag)?.takeIf { it.isShown && it.isEnabled }
     visibleButton("host:section:${page.name}")?.let { return it }
     visibleButton("host:page:${page.name}")?.let { return it }
-    if (mainPage(HostPage.HOME)?.isSelected != true) return null
     val entry = when (page) {
         HostPage.COLLECTION -> mainPage(HostPage.GARAGE)
         HostPage.PROGRESSION, HostPage.RANKING -> mainPage(HostPage.RESULTS)
-        HostPage.ONBOARDING -> visibleButton("shop:map-settings")
+        HostPage.ONBOARDING -> visibleButton("shop:map-settings") ?: mainPage(HostPage.HOME)
         else -> null
     }
     if (entry?.isShown == true && entry.isEnabled) entry.performClick()
+    if (page == HostPage.ONBOARDING && visibleButton("host:page:ONBOARDING") == null) {
+        visibleButton("shop:map-settings")?.performClick()
+    }
     return visibleButton("host:section:${page.name}") ?: visibleButton("host:page:${page.name}")
 }
 

@@ -7,23 +7,32 @@ import android.widget.LinearLayout
 import io.drivegrowth.app.host.HostPage
 import io.drivegrowth.app.ui.garage.GarageStyle
 
-/** 지도에서 기존 기능 화면으로 들어가는 주요 메뉴다. */
-internal class MainHomeNavigation(context: Context, select: (HostPage) -> Unit) : LinearLayout(context) {
+/** 게임의 공통 하단 메뉴다. */
+internal class MainHomeNavigation(
+    context: Context,
+    page: HostPage,
+    select: (HostPage) -> Unit,
+) : LinearLayout(context) {
     init {
         val style = GarageStyle(context, pixelPanel = true)
         tag = "host:destination"
         setBackgroundColor(style.panel)
         setPadding(style.dp(6), style.dp(4), style.dp(6), style.dp(4))
-        for ((page, label) in listOf(
+        val section = when (page) {
+            HostPage.COLLECTION -> HostPage.GARAGE
+            HostPage.PROGRESSION, HostPage.RANKING -> HostPage.RESULTS
+            else -> page
+        }
+        for ((target, label) in listOf(
             HostPage.HOME to "가게",
             HostPage.GARAGE to "차고",
-            HostPage.GACHA to "가챠",
             HostPage.DELIVERY to "탁송",
+            HostPage.GACHA to "뽑기",
             HostPage.RESULTS to "기록",
         )) {
-            val selected = page == HostPage.HOME
-            val button = style.button(label, primary = selected) { select(page) }.apply {
-                tag = "host:page:${page.name}"
+            val selected = target == section
+            val button = style.button(label, primary = selected) { select(target) }.apply {
+                tag = "host:page:${target.name}"
                 isSelected = selected
                 compact(style)
             }

@@ -77,7 +77,7 @@ class MainNavigationAccessTest : ActivityInstrumentationTestCase2<MainActivity>(
                 assertTrue(root.mainPage(page)?.isSelected == true)
             }
             root.openMainPage(HostPage.HOME)
-            root.openMainPage(HostPage.GACHA)
+            root.openMainPage(HostPage.COLLECTION)
             val beforePageChange = captureButtons()
             root.openMainPage(HostPage.GARAGE)
             controller.javaClass.getDeclaredMethod("show", GarageCommandState::class.java)
