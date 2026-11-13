@@ -1,6 +1,8 @@
 package io.drivegrowth.app.ui.presentation
 
 import android.animation.ValueAnimator
+import android.app.ActivityOptions
+import android.hardware.display.DisplayManager
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -20,8 +22,12 @@ class RewardCelebrationDeviceTest : InstrumentationTestCase() {
 
     override fun setUp() {
         super.setUp()
-        host = instrumentation.startActivitySync(Intent(instrumentation.targetContext,
-            CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as CollectionScrollTestActivity
+        val context = instrumentation.targetContext
+        val display = context.getSystemService(DisplayManager::class.java).displays
+            .singleOrNull { it.displayId != 0 && it.name == "Emulator 2D Display" }
+        val intent = Intent(context, CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val options = display?.let { ActivityOptions.makeBasic().setLaunchDisplayId(it.displayId).toBundle() }
+        host = instrumentation.startActivitySync(intent, options) as CollectionScrollTestActivity
     }
 
     override fun tearDown() {

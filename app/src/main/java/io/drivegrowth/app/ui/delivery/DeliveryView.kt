@@ -288,13 +288,14 @@ class DeliveryView(
                 }
             }
             addView(status, LayoutParams(motionWidth(), -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
-            val availableWidth = width - paddingStart - paddingEnd
-            val remainingHeight = if (availableWidth > 0 && height > 0) {
+            val availableWidth = this@DeliveryView.width - this@DeliveryView.paddingStart - this@DeliveryView.paddingEnd
+            val remainingHeight = if (availableWidth > 0 && this@DeliveryView.height > 0) {
                 val viewWidth = View.MeasureSpec.makeMeasureSpec(availableWidth, View.MeasureSpec.EXACTLY)
                 val flexibleHeight = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
                 header.measure(viewWidth, flexibleHeight)
                 status.measure(View.MeasureSpec.makeMeasureSpec(motionWidth(), View.MeasureSpec.EXACTLY), flexibleHeight)
-                height - paddingTop - paddingBottom - header.measuredHeight - status.measuredHeight - dp(12)
+                val rootPadding = this@DeliveryView.paddingTop + this@DeliveryView.paddingBottom
+                this@DeliveryView.height - rootPadding - header.measuredHeight - status.measuredHeight - dp(6) * 2
             } else motionHeightLimit()
             motion.showHighway(road)
             addMotion(this, minOf(motionHeightLimit(), remainingHeight.coerceAtLeast(dp(48))))
