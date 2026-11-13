@@ -24,7 +24,7 @@ internal class DeliveryArtwork(context: Context, private val sprites: VehicleSpr
     val highway by lazy { load("pixel/delivery/highway.png") }
     val destination by lazy { load("pixel/delivery/destination.png", 2) }
 
-    fun vehicle(id: VehicleId) = sprites.bitmap(id)
+    fun vehicle(id: VehicleId?) = id?.let(sprites::bitmap)
 
     private fun load(name: String, sample: Int = 1): Bitmap? =
         assets.open(name).use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) }
@@ -64,7 +64,7 @@ internal class DeliveryMotionView(
     }
 
     fun showHighway(value: DeliveryHighway) {
-        if (highway?.details?.vehicleId != value.details.vehicleId || highway?.moving != value.moving) resetClock()
+        if (highway?.details != value.details) resetClock()
         highway = value
         scene = null
         invalidate()
@@ -106,7 +106,8 @@ internal class DeliveryMotionView(
         val visible = presentationAllowed() && isAttachedToWindow && isShown && windowVisibility == VISIBLE &&
             hasWindowFocus() && getLocalVisibleRect(visibleBounds)
         val motionEnabled = ValueAnimator.areAnimatorsEnabled()
-        val running = visible && motionEnabled && (current != null && elapsed < duration || road?.moving == true)
+        // 고속도로는 주차 허용 화면의 장식이며 관측 거리와 독립적으로 움직인다.
+        val running = visible && motionEnabled && (current != null && elapsed < duration || road != null)
         if (!motionEnabled && road != null) elapsed = 0
         if (running) {
             val now = SystemClock.uptimeMillis()

@@ -6,6 +6,7 @@ import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.app.host.delivery.DeliveryHostOperation
 import io.drivegrowth.app.host.delivery.DeliveryHostRead
 import io.drivegrowth.app.host.delivery.DeliveryHostReceipt
+import io.drivegrowth.app.host.delivery.DeliveryNavigationSnapshot
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.delivery.*
 import org.junit.Assert.*
@@ -105,7 +106,7 @@ class DeliveryPresentationTest {
 
     @Test fun fullGarageArrivalKeepsTheConfirmedHeldVehicleAndNeverLooksLikeOwnership() {
         val presentation = DeliveryPresentation()
-        presentation.accept(data.activeFrame, null, allowed = true)
+        presentation.accept(data.activeFrame, DeliveryHostRead(identity, data.activeFrame.screen), allowed = true)
         val held = arrival(0)
         presentation.accept(data.empty.copy(version = 3), held, allowed = true)
         val scene = presentation.scene!!
@@ -119,12 +120,80 @@ class DeliveryPresentationTest {
         assertNull(presentation.scene)
     }
 
+    @Test fun newerLoadingAndFailureReplaceAnOldArrivalScene() {
+        val receipt = arrival(0)
+        for (replacement in listOf(data.loading.screen, data.failure.screen)) {
+            val presentation = DeliveryPresentation()
+            val completed = data.empty.copy(version = 3)
+            presentation.accept(completed, receipt, allowed = true)
+            assertEquals(DeliverySceneKind.HELD, presentation.scene?.kind)
+            presentation.accept(completed.copy(version = 4), receipt, allowed = true)
+            assertEquals(DeliverySceneKind.HELD, presentation.scene?.kind)
+            presentation.accept(DeliveryFrame(5, replacement), receipt.copy(screen = replacement), allowed = true)
+            assertNull("최신 화면이 기존 도착 연출을 닫아야 한다", presentation.scene)
+            presentation.accept(completed.copy(version = 6), receipt, allowed = true)
+            assertNull("같은 정산을 다시 열지 않아야 한다", presentation.scene)
+        }
+    }
+
+    @Test fun firstReadOfConfirmedIncomeArrivalDoesNotRequireAnActiveFrame() {
+        val presentation = DeliveryPresentation()
+        val receipt = arrival(1, active.copy(offer = data.income))
+        presentation.accept(data.empty, receipt, allowed = true)
+        assertEquals(DeliverySceneKind.INCOME_ARRIVAL, presentation.scene?.kind)
+        assertEquals(data.income.reward, presentation.scene?.details?.confirmedReward)
+        assertNull(presentation.scene?.details?.vehicleId)
+        assertNull(presentation.scene?.details?.destinationName)
+        assertNull(presentation.scene?.details?.estimatedMeters)
+    }
+
+    @Test fun originalArrivalDetailsMustMatchProfileRequestAndSource() {
+        val order = active.copy(offer = data.income)
+        val receipt = arrival(1, order)
+        val details = data.active.copy(active = order, vehicleName = data.proposal.vehicleNames[data.income.vehicleId])
+        val matching = DeliveryArrivalPresentation(identity, details)
+        val foreign = matching.copy(identity = GameIdentity(ProfileId("other"), InputSource.SIMULATION))
+        val otherRequest = matching.copy(delivery = details.copy(active = order.copy(requestId = RequestId("other"))))
+        val vehicleEstimate = order.proposed.estimated.copy(source = InputSource.VEHICLE)
+        val otherSource = matching.copy(delivery = details.copy(active = order.copy(
+            proposed = order.proposed.copy(estimated = vehicleEstimate))))
+        val firstView = DeliveryPresentation()
+        firstView.accept(data.empty, receipt, allowed = true, arrivalPresentation = matching)
+        assertEquals(details.vehicleName, firstView.scene?.details?.vehicleName)
+        assertEquals(details.destinationName, firstView.scene?.details?.destinationName)
+        assertEquals(order.proposed.estimated.meters, firstView.scene?.details?.estimatedMeters)
+        for (mismatch in listOf(foreign, otherRequest, otherSource)) {
+            val presentation = DeliveryPresentation()
+            presentation.accept(data.empty, receipt, allowed = true, arrivalPresentation = mismatch)
+            assertEquals(data.income.reward, presentation.scene?.details?.confirmedReward)
+            assertNull(presentation.scene?.details?.vehicleId)
+            assertNull(presentation.scene?.details?.destinationName)
+        }
+    }
+
+    @Test fun highwayAvailabilityDoesNotDependOnObservedDistance() {
+        val presentation = DeliveryPresentation()
+        val missing = Observation.Missing(MissingReason.NO_DATA)
+        for ((index, meters) in listOf(null, 0L, 1L, 12500L).withIndex()) {
+            val frame = data.activeFrame.copy(version = index + 1L)
+            val observed = meters?.let { Observation.Available(ObservedDistance(it, InputSource.SIMULATION)) } ?: missing
+            val nav = DeliveryNavigationSnapshot(null, null, missing, observed, missing, null)
+            val read = DeliveryHostRead(identity, frame.screen, navigation = nav)
+            presentation.accept(frame, read, allowed = true)
+            assertEquals(data.purchase.vehicleId, presentation.highway?.details?.vehicleId)
+            assertEquals(meters, presentation.highway?.observedMeters)
+            assertNull(presentation.scene)
+        }
+        presentation.accept(data.activeFrame.copy(version = 5), null, allowed = false)
+        assertNull(presentation.highway)
+    }
+
     @Test fun incomeAnimationUsesSettlementRewardOnlyAfterMatchingArrival() {
         val presentation = DeliveryPresentation()
         val order = active.copy(offer = data.income)
         val incomeFrame = data.activeFrame.copy(screen = DeliveryScreen.Active(data.active.copy(active = order,
             vehicleName = data.proposal.vehicleNames[data.income.vehicleId])))
-        presentation.accept(incomeFrame, null, allowed = true)
+        presentation.accept(incomeFrame, DeliveryHostRead(identity, incomeFrame.screen), allowed = true)
         val result = arrival(1, order)
         val receipt = (result.receipt as DeliveryHostReceipt.Arrived).value
         presentation.accept(data.empty.copy(version = 3), result.copy(receipt =

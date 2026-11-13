@@ -25,6 +25,9 @@ data class DeliverySceneKey internal constructor(
     internal val arrival: Boolean,
 )
 
+/** 호스트가 도착을 확정한 동일 프로필·의뢰의 표시 정보. 원정산과 함께 공급한다. */
+data class DeliveryArrivalPresentation(val identity: GameIdentity, val delivery: DeliveryActiveUi)
+
 enum class DeliveryPresentationCue { DEPARTURE, INCOME_ARRIVAL, VEHICLE_ARRIVAL, HELD }
 
 internal enum class DeliverySceneKind(val durationMillis: Long, val cue: DeliveryPresentationCue) {
@@ -35,7 +38,7 @@ internal enum class DeliverySceneKind(val durationMillis: Long, val cue: Deliver
 }
 
 internal data class DeliverySceneDetails(
-    val vehicleId: VehicleId,
+    val vehicleId: VehicleId?,
     val vehicleName: String?,
     val rarity: Rarity?,
     val destinationName: String?,
@@ -47,17 +50,12 @@ internal data class DeliverySceneDetails(
 )
 
 internal data class DeliveryScene(val key: DeliverySceneKey, val kind: DeliverySceneKind, val details: DeliverySceneDetails)
-internal data class DeliveryHighway(val details: DeliverySceneDetails, val observedMeters: Long?) {
-    val moving get() = observedMeters != null && observedMeters > 0
-}
+internal data class DeliveryHighway(val details: DeliverySceneDetails, val observedMeters: Long?)
 
-internal class DeliveryPresentation(
-    seenKeys: Set<DeliverySceneKey> = emptySet(),
-    restoredActive: DeliveryActiveUi? = null,
-) {
+internal class DeliveryPresentation(seenKeys: Set<DeliverySceneKey> = emptySet()) {
     private val seen = seenKeys.toMutableSet()
-    private var previousActive = restoredActive
-    private var identity: GameIdentity? = null
+    private var previousActive: DeliveryArrivalPresentation? = null
+    private var sceneVersion: Long? = null
     private var version = -1L
     var scene: DeliveryScene? = null
         private set
@@ -66,9 +64,17 @@ internal class DeliveryPresentation(
 
     fun save(): Set<DeliverySceneKey> = seen.toSet()
 
-    fun dismiss() { scene = null }
+    fun dismiss() {
+        scene = null
+        sceneVersion = null
+    }
 
-    fun accept(frame: DeliveryFrame, read: DeliveryHostRead?, allowed: Boolean) {
+    fun accept(
+        frame: DeliveryFrame,
+        read: DeliveryHostRead?,
+        allowed: Boolean,
+        arrivalPresentation: DeliveryArrivalPresentation? = null,
+    ) {
         if (!allowed) { dismiss(); highway = null }
         if (frame.version < version) return
         version = frame.version
@@ -79,30 +85,31 @@ internal class DeliveryPresentation(
             is DeliveryScreen.AbandonReview -> screen.delivery
             else -> null
         }
-        if (scene?.kind == DeliverySceneKind.DEPARTURE &&
-            (frame.screen !is DeliveryScreen.Active || active?.active?.requestId != scene?.key?.requestId)) dismiss()
         val current = read?.takeIf { it.screen == frame.screen }
-        val currentIdentity = current?.identity
-        if (currentIdentity != null) {
-            if (identity != null && currentIdentity != identity) {
-                previousActive = null
-                dismiss()
+        val result = current?.let { host ->
+            when (val receipt = host.receipt) {
+                is DeliveryHostReceipt.Selected -> departure(host, receipt, active)
+                is DeliveryHostReceipt.Arrived -> arrival(host, receipt, arrivalPresentation)
+                else -> null
             }
-            identity = currentIdentity
         }
-        val observed = (current?.navigation?.observed as? Observation.Available)?.value
-            ?.takeIf { it.source == active?.active?.proposed?.estimated?.source }
-        highway = (frame.screen as? DeliveryScreen.Active)?.delivery?.takeIf { allowed }
-            ?.let { DeliveryHighway(details(it), observed?.meters) }
+        // 같은 원결과의 재렌더만 이어 간다. 최신 로딩·실패·다른 화면을 연출 뒤에 숨기지 않는다.
+        val visibleScene = scene
+        if (visibleScene != null && frame.version != sceneVersion && result?.key != visibleScene.key) dismiss()
+        if (result != null) {
+            if (seen.add(result.key) && allowed) scene = result
+            if (scene?.key == result.key) sceneVersion = frame.version
+        }
 
-        val result = current?.let { when (val receipt = it.receipt) {
-            is DeliveryHostReceipt.Selected -> departure(it, receipt, active)
-            is DeliveryHostReceipt.Arrived -> arrival(it, receipt)
-            else -> null
-        } }
-        if (result != null && seen.add(result.key) && allowed) scene = result
-        if (active != null) previousActive = active
-        else if (current?.receipt is DeliveryHostReceipt.Abandoned) previousActive = null
+        val activeScreen = frame.screen as? DeliveryScreen.Active
+        val observed = (current?.navigation?.observed as? Observation.Available)?.value
+            ?.takeIf { it.source == activeScreen?.delivery?.active?.proposed?.estimated?.source }
+        highway = activeScreen?.takeIf { allowed }?.let { DeliveryHighway(details(it.delivery), observed?.meters) }
+        if (current != null && active != null && active.active.proposed.estimated.source == current.identity.source) {
+            previousActive = DeliveryArrivalPresentation(current.identity, active)
+        } else if (current?.receipt is DeliveryHostReceipt.Abandoned) {
+            previousActive = null
+        }
     }
 
     private fun departure(read: DeliveryHostRead, receipt: DeliveryHostReceipt.Selected, active: DeliveryActiveUi?): DeliveryScene? {
@@ -125,19 +132,26 @@ internal class DeliveryPresentation(
         return DeliveryScene(DeliverySceneKey(read.identity, order.requestId, false), DeliverySceneKind.DEPARTURE, details(active))
     }
 
-    private fun arrival(read: DeliveryHostRead, receipt: DeliveryHostReceipt.Arrived): DeliveryScene? {
+    private fun arrival(
+        read: DeliveryHostRead,
+        receipt: DeliveryHostReceipt.Arrived,
+        presentation: DeliveryArrivalPresentation?,
+    ): DeliveryScene? {
+        if (read.screen !is DeliveryScreen.Offers && read.screen !is DeliveryScreen.Destination) return null
         val operation = read.pending as? DeliveryHostOperation.Arrival ?: return null
-        val prior = previousActive?.takeIf {
-            it.active.requestId == operation.requestId && it.active.proposed.estimated.source == read.identity.source
-        }
+        val prior = listOfNotNull(presentation, previousActive).firstOrNull {
+            it.identity == read.identity && it.delivery.active.requestId == operation.requestId &&
+                it.delivery.active.proposed.estimated.source == read.identity.source
+        }?.delivery
         val key = DeliverySceneKey(read.identity, operation.requestId, true)
         val settlement = receipt.value.settlement
         return when (val outcome = receipt.value.outcome) {
             is DeliveryOutcome.IncomeCompleted -> {
-                if (prior == null || prior.active.offer !is DeliveryOffer.Income ||
-                    !matchesArrival(operation.requestId, read.identity.source, outcome.change, settlement)) return null
+                if (!matchesArrival(operation.requestId, read.identity.source, outcome.change, settlement)) return null
                 val reward = settlement?.transaction?.money?.takeIf { it.direction == MoneyDirection.CREDIT }?.amount ?: return null
-                DeliveryScene(key, DeliverySceneKind.INCOME_ARRIVAL, details(prior).copy(confirmedReward = reward))
+                val details = prior?.takeIf { it.active.offer is DeliveryOffer.Income }?.let(::details)
+                    ?: DeliverySceneDetails(null, null, null, null, null, read.identity.source, purchase = false, expectedReward = null)
+                DeliveryScene(key, DeliverySceneKind.INCOME_ARRIVAL, details.copy(confirmedReward = reward))
             }
             is DeliveryOutcome.VehicleDelivered -> {
                 if (!matchesArrival(operation.requestId, read.identity.source, outcome.change, settlement)) return null

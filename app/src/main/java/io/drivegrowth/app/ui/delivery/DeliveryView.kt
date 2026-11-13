@@ -30,13 +30,14 @@ class DeliveryView(
     private val vehicleLabels = GarageStyle(context)
     private val sprites = VehicleSprites(context)
     private val session = DeliveryInteraction(restored)
-    private val presentation = DeliveryPresentation(restored.presentationKeys, (restored.frame?.screen as? DeliveryScreen.Active)?.delivery)
+    private val presentation = DeliveryPresentation(restored.presentationKeys)
     private val artwork = DeliveryArtwork(context, sprites)
     private val motion = DeliveryMotionView(context, artwork, { session.controlsEnabled }) { key, cue ->
         if (session.controlsEnabled && presentation.scene?.key == key) onPresentationCue(cue)
     }
     private var readVersion: Long? = null
     private var presentationRead: DeliveryHostRead? = null
+    private var arrivalPresentation: DeliveryArrivalPresentation? = null
     private var selectedOfferId = restored.selectedOfferId
     private var selectedFrameVersion = restored.selectedFrameVersion
     private var drawGeneration = 0L
@@ -57,14 +58,24 @@ class DeliveryView(
         render(frame, controlsEnabled, null)
 
     /** 호스트 render가 받은 같은 프레임의 원결과를 전달한다. 일반 다시 그리기는 기존 결과를 재사용한다. */
-    fun render(frame: DeliveryFrame, controlsEnabled: Boolean, read: DeliveryHostRead?): Boolean {
+    fun render(
+        frame: DeliveryFrame,
+        controlsEnabled: Boolean,
+        read: DeliveryHostRead?,
+        arrival: DeliveryArrivalPresentation? = null,
+    ): Boolean {
         val accepted = session.render(frame, controlsEnabled)
         if (accepted && (readVersion != frame.version || read != null)) {
             readVersion = frame.version
             presentationRead = read?.takeIf { it.screen == frame.screen }
+            arrivalPresentation = arrival.takeIf { presentationRead != null }
         }
         if (accepted || !session.controlsEnabled) {
-            session.frame?.let { presentation.accept(it, presentationRead.takeIf { _ -> readVersion == it.version }, session.controlsEnabled) }
+            session.frame?.let {
+                val matchingRead = readVersion == it.version
+                presentation.accept(it, presentationRead.takeIf { matchingRead }, session.controlsEnabled,
+                    arrivalPresentation.takeIf { matchingRead })
+            }
         }
         validateSelection()
         drawScreen()
@@ -104,6 +115,7 @@ class DeliveryView(
         session.release()
         presentation.dismiss()
         presentationRead = null
+        arrivalPresentation = null
         selectedOfferId = null
         selectedFrameVersion = null
         drawScreen()
@@ -202,7 +214,6 @@ class DeliveryView(
             })
             motion.showScene(scene)
             addMotion(this)
-            if (scene.kind == DeliverySceneKind.INCOME_ARRIVAL) note(this, R.string.delivery_scene_temporary_art)
             motionDetails(this, scene.details)
             if (scene.kind == DeliverySceneKind.HELD) note(this, R.string.delivery_scene_held_note)
             val key = scene.key
@@ -215,7 +226,7 @@ class DeliveryView(
     private fun highwayPanel(road: DeliveryHighway): View = with(style) {
         panel(padding = 12).apply {
             tag = "delivery:highway"
-            heading(this, if (road.moving) R.string.delivery_scene_highway else R.string.delivery_scene_waiting)
+            heading(this, R.string.delivery_scene_highway)
             motion.showHighway(road)
             addMotion(this)
             motionDetails(this, road.details)
