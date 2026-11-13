@@ -77,6 +77,30 @@ class GachaViewTest : InstrumentationTestCase() {
         button(view,"gacha:garage").performClick();button(view,"gacha:garage").performClick();assertEquals(1,events.size)
         assertEquals(OwnedVehicleId("fixture-gacha-owned"),(events.single() as GachaEvent.OpenGarage).request.ownedVehicleId)
     }
+    fun testStoredResultStageUsesFirstHeightAndShrinksAtTheSameWidth() = onUi {
+        val events = mutableListOf<GachaEvent>()
+        val view = make(events)
+        view.render(GachaPreviewStates.result(), true)
+        val density = view.resources.displayMetrics.density
+        val width = (760 * density).toInt()
+        fun layout(heightDp: Int) {
+            val height = (heightDp * density).toInt()
+            view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+            view.layout(0, 0, width, height)
+        }
+
+        layout(760)
+        val stage = view.findViewWithTag<View>("gacha:result-stage")
+        val tallHeight = stage.height
+        assertTrue("첫 배치부터 넓은 결과 그림을 사용해야 한다", tallHeight > (264 * density).toInt())
+        layout(300)
+        assertSame(stage, view.findViewWithTag<View>("gacha:result-stage"))
+        assertTrue("같은 폭에서 높이가 줄면 결과 그림도 줄어야 한다", stage.height in 1 until tallHeight)
+        assertTrue(button(view, "gacha:garage").isEnabled)
+        assertTrue(events.isEmpty())
+    }
+
     fun testBackSkipsOnlyTheLocalRevealAndRestoredResultIsStatic() = onUi {
         if (!ValueAnimator.areAnimatorsEnabled()) return@onUi
         val events = mutableListOf<GachaEvent>()

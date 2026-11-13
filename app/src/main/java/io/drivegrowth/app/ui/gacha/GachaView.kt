@@ -37,6 +37,7 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
     private var wide = false
     private var generation = 0L
     private var scroll: ScrollView? = null
+    private var resultStage: View? = null
     private var savedY = 0
     private var drawnFrame: Long? = null
     val uiState: GachaUiState get() = session.uiState
@@ -70,6 +71,20 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
         val next = w >= style.dp(900)
         if (next != wide) { wide = next; post { drawScreen() } }
     }
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        resultStage?.let { stage ->
+            val height = resultStageHeight(MeasureSpec.getSize(heightMeasureSpec))
+            if (stage.layoutParams.height != height) {
+                stage.layoutParams = stage.layoutParams.apply { this.height = height }
+            }
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    }
+
+    private fun resultStageHeight(availableHeight: Int): Int =
+        if (availableHeight > 0) (availableHeight * .73f).toInt().coerceIn(style.dp(168), style.dp(420))
+        else style.dp(264)
+
     private fun s(id: Int, vararg args: Any) = context.getString(id,*args)
     private fun money(value: GameMoney?) = value?.let { s(R.string.gacha_money,NumberFormat.getIntegerInstance(Locale.KOREA).format(it.units)) } ?: s(R.string.gacha_missing)
     private fun drawScreen(): Unit = with(style) {
@@ -77,6 +92,7 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
         drawnFrame = session.frame?.generation
         val focused = findFocus()?.tag
         generation++; celebration.rebuildContent { removeAllViews() }; scroll = null; setPadding(dp(24),dp(16),dp(24),dp(16))
+        resultStage = null
         if (!session.controlsEnabled) {
             endReveal()
             celebration.render(null, RewardCelebrationKind.GACHA)
@@ -252,11 +268,8 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
         add(parent,text(s(if(value.origin == GachaOrigin.FIXTURE) R.string.gacha_fixture else R.string.gacha_stored),color=rarityColor(Rarity.LEGEND)))
         val panels = if (wide) row() else column()
         add(parent, panels)
-        val artHeight = if (height > 0) {
-            (height * .73f / resources.displayMetrics.density).toInt().coerceIn(168, 420)
-        } else 264
         val sprite = sprites.bitmap(vehicle.vehicleId)
-        val art = if (sprite == null) artwork.view(vehicle.vehicleId, vehicle.rarity, artHeight) else ImageView(context).apply {
+        val art = if (sprite == null) artwork.view(vehicle.vehicleId, vehicle.rarity, 168) else ImageView(context).apply {
             importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
             setImageDrawable(sprites.drawable(vehicle.vehicleId))
             scaleType = ImageView.ScaleType.FIT_CENTER
@@ -264,8 +277,10 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
         }
         val tierColor = rarityColor(vehicle.rarity)
         celebration.render(null, RewardCelebrationKind.GACHA, tierColor)
-        panels.addView(celebration.over(art, fillHeight = true, stage = true),
-            if (wide) LayoutParams(0, dp(artHeight), 1.2f) else LayoutParams(-1, dp(artHeight)))
+        val stage = celebration.over(art, fillHeight = true, stage = true).apply { tag = "gacha:result-stage" }
+        resultStage = stage
+        val stageHeight = resultStageHeight(height)
+        panels.addView(stage, if (wide) LayoutParams(0, stageHeight, 1.2f) else LayoutParams(-1, stageHeight))
         val details = card().apply {
             background = GradientDrawable().apply {
                 setColor(0xff1c2342.toInt())
