@@ -92,6 +92,44 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         assertFalse(host.window.decorView.mainPage(HostPage.HOME)?.isShown == true)
     }
 
+    fun testRefreshClosesShutterWithoutAcknowledgingGachaResult() {
+        val context = instrumentation.targetContext
+        checkIsolatedPackage(context.packageName)
+        check(ValueAnimator.areAnimatorsEnabled())
+        val games = GameSessionFactory(context, mapOf(InputSource.SIMULATION to "unified-simulation.db"), InputSource.SIMULATION)
+        val host = instrumentation.startActivitySync(Intent(context, UnifiedSimulationActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as UnifiedSimulationActivity
+        try {
+            await("새 격리 프로필의 첫 안내", timeoutMillis = 30_000) {
+                button(host, R.string.onboarding_start)?.isEnabled == true && host.hasWindowFocus()
+            }
+            for (tag in listOf(R.string.onboarding_start, VehicleId("hyundai_casper"),
+                R.string.onboarding_review, R.string.onboarding_confirm)) clickOnboarding(host, tag)
+            clickOnboarding(host, R.string.onboarding_to_shop)
+            openPage(host, HostPage.GACHA)
+            click(host, "gacha:option:paid")
+            click(host, "gacha:confirm")
+            await("가챠 확정 셔터") { button(host, "gacha:reveal")?.isShown == true }
+            val original = ok(games.open()).use { game ->
+                assertEquals(GameMoney(500), ok(game.store.balance()))
+                assertEquals(2, ok(game.store.listOwnedVehicles()).size)
+                checkNotNull(ok(game.store.hostCommands.load(game.identity.profileId)))
+            }
+            onUi {
+                val refresh = checkNotNull(button(host, "host:refresh"))
+                assertTrue(refresh.isEnabled && refresh.isShown)
+                touchView(host, refresh)
+            }
+            await("새로고침 뒤 정적 원결과") { button(host, "gacha:garage")?.isEnabled == true }
+            onUi { assertNull(button(host, "gacha:reveal")) }
+            ok(games.open()).use { game ->
+                assertEquals(original, ok(game.store.hostCommands.load(game.identity.profileId)))
+                assertEquals(GameMoney(500), ok(game.store.balance()))
+                assertEquals(2, ok(game.store.listOwnedVehicles()).size)
+            }
+        } finally { finishHost(host) }
+    }
+
     fun testStoredFirstGrantSettlementAndGachaCelebrateOnlyOnFirstDisplay() {
         val context = instrumentation.targetContext
         checkIsolatedPackage(context.packageName)
@@ -418,6 +456,15 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             assertFalse(Rect(buttonOrigin[0], buttonOrigin[1],
                 buttonOrigin[0] + button.width, buttonOrigin[1] + button.height).contains(x.toInt(), y.toInt()))
         }
+        dispatchTap(decor, x, y)
+    }
+
+    private fun touchView(host: UnifiedSimulationActivity, view: View) {
+        val point = IntArray(2).also(view::getLocationInWindow)
+        dispatchTap(host.window.decorView, point[0] + view.width / 2f, point[1] + view.height / 2f)
+    }
+
+    private fun dispatchTap(decor: View, x: Float, y: Float) {
         val down = SystemClock.uptimeMillis()
         for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
             val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y, 0)

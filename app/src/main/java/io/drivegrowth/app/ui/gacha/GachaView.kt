@@ -47,14 +47,17 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
     fun completeGarageNavigation(request: GachaGarageRequest) { session.completeGarageNavigation(request); drawScreen() }
     fun resolveFailedRequest(key: RequestId): Boolean { val resolved = session.resolveFailedRequest(key); drawScreen(); return resolved }
     fun handleBack(): Boolean {
-        if (revealResult != null && session.controlsEnabled) {
-            endReveal()
-            drawScreen()
-            return true
-        }
+        if (closeReveal()) return true
         val closed = session.cancel()
         if (closed) drawScreen()
         return closed
+    }
+
+    fun closeReveal(): Boolean {
+        if (revealResult == null || !session.controlsEnabled) return false
+        endReveal()
+        drawScreen()
+        return true
     }
 
     private fun endReveal() {

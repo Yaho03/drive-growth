@@ -719,6 +719,7 @@ open class MainActivity : Activity() {
 
     private fun refresh() {
         if (!gameControlsAllowed()) { updateAccess(); return }
+        if (navigation.page == HostPage.GACHA && gacha.closeReveal()) return
         session.onboarding.refresh()
         if (navigation.page == HostPage.RESULTS) { session.results.remember(results.uiState); session.results.refreshHistory() }
         else if (navigation.page == HostPage.PROGRESSION) session.progression.refresh()
