@@ -169,7 +169,7 @@ def main():
     for lv in (1, 2, 3):
         cover(lv).save(HERE / f"cover_lv{lv}.png")
     with open(HERE / "slots.csv", "w", newline="") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator="\n")
         w.writerow(["slot", "x", "y", "opens_at_level", "row", "car_facing"])
         for n, box in enumerate(slots()):
             x, y = anchor(box)
@@ -177,7 +177,7 @@ def main():
             a_side = box[2] == ROW_A   # 두 줄 모두 가운데 통로를 보고 선다
             w.writerow([n, round(x), round(y), lv, "building_side" if a_side else "road_side", "sw" if a_side else "ne"])
     with open(HERE / "lots.csv", "w", newline="") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator="\n")
         w.writerow(["lot", "x", "y", "tiles_i", "tiles_j"])
         for name, box in LOTS.items():
             x, y = anchor(box)
