@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.onboarding
 
+import io.drivegrowth.app.ui.pixel.PlayerText
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -34,6 +35,11 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         onEvent(event)
     }
     private val sprites = VehicleSprites(context)
+    private val staffBitmap by lazy(LazyThreadSafetyMode.NONE) {   // 안내하는 정비사(마을 시안 그림)
+        try {
+            context.assets.open("pixel/prototype-actors/mechanic.png").use { BitmapFactory.decodeStream(it)?.apply { density = Bitmap.DENSITY_NONE } }
+        } catch (_: IOException) { null }
+    }
     private val townBitmap by lazy(LazyThreadSafetyMode.NONE) {
         try {
             context.assets.open("pixel/town.png").use {
@@ -88,7 +94,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             addView(label(s(R.string.onboarding_restricted_body), color = PixelStyle.muted))
             return@with
         }
-        addView(label(s(R.string.onboarding_title), 32, bold = true))
+        addView(label(s(R.string.onboarding_title), 26, bold = true))
         val body = column()
         scroll = style.scroll(body, savedY)
         addView(scroll, LayoutParams(-1, 0, 1f))
@@ -120,7 +126,6 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
                     if (interaction.selectedCandidate == null) body.addView(label(s(if (interaction.selectedId == null)
                         R.string.onboarding_select_required else R.string.onboarding_selection_missing), color = PixelStyle.muted))
                 }
-                benefits(body, state.plannedBenefits)
                 action(body, R.string.onboarding_previous) { interaction.handleBack() }
                 if (state.candidates.isNotEmpty())
                     action(this@OnboardingView, R.string.onboarding_review,
@@ -214,9 +219,15 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
     private fun intro(body: LinearLayout, state: OnboardingScreenState.Intro) = with(style) {
         val welcome = column().apply {
             add(this, pixelCard().apply {
-                heading(this, R.string.onboarding_intro_title, R.string.onboarding_intro_body)
+                addView(row().apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    staffBitmap?.let { addView(artwork(BitmapDrawable(resources, it).apply { setFilterBitmap(false) }).apply { background = null },
+                        LayoutParams(dp(40), dp(64))) }
+                    addView(label(s(R.string.onboarding_guide), color = PixelStyle.muted), LayoutParams(-2, -2).apply { marginStart = dp(8) })
+                })
+                addView(label(s(R.string.onboarding_intro_title), 40, bold = true))
+                addView(label(s(R.string.onboarding_intro_body), 22, PixelStyle.muted))
             })
-            benefits(this, state.plannedBenefits)
         }
         val town = townBitmap?.let { bitmap ->
             artwork(BitmapDrawable(resources, bitmap).apply { setFilterBitmap(false) }).apply {
@@ -239,7 +250,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         add(body, label(s(title), 30, bold = true))
         if (description != null) add(body, label(s(description), 24, PixelStyle.muted))
     }
-    private fun source(body: LinearLayout, value: String) { body.addView(label(value, color = PixelStyle.muted)) }
+    private fun source(body: LinearLayout, value: String) { PlayerText.source(value)?.let { body.addView(label(it, color = PixelStyle.muted)) } }
     private fun benefits(body: LinearLayout, lines: List<String>) = with(style) {
         add(body, pixelCard().apply {
             addView(label(s(R.string.onboarding_planned_title), 24, bold = true))
@@ -252,10 +263,24 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         val selected = interaction.selectedId == value.vehicle.vehicleId
         pixelCard(selected).apply {
             addVehicleArt(this, value.vehicle.vehicleId)
-            addView(label(value.vehicle.displayName, 28, bold = true))
-            addView(label(value.description ?: s(R.string.onboarding_description_missing), 24, PixelStyle.muted))
-            addView(label(s(R.string.onboarding_first_vehicle), color = PixelStyle.muted))
-            addView(label(s(R.string.onboarding_game_note), color = PixelStyle.muted))
+            addView(row().apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(label(value.vehicle.displayName, 28, bold = true), LayoutParams(0, -2, 1f))
+                addView(label(rarity(io.drivegrowth.core.contract.Rarity.COMMON), 16, PixelStyle.rarityColor(io.drivegrowth.core.contract.Rarity.COMMON), true).apply {   // 첫 차는 늘 일반 등급
+                    background = GradientDrawable().apply { cornerRadius = style.dp(14).toFloat(); setStroke(style.dp(2), PixelStyle.rarityColor(io.drivegrowth.core.contract.Rarity.COMMON)) }
+                    setPadding(style.dp(12), style.dp(2), style.dp(12), style.dp(2))
+                })
+            })
+            // 고를 수 있는 차에 공급된 설명이 없으면 HTML 시제품의 한 줄 소개를 쓴다
+            val blurb = value.description ?: if (!value.selectable) s(R.string.onboarding_description_missing) else when (value.vehicle.vehicleId.value) {
+                "hyundai_casper" -> "경형 SUV · 작고 높아서 짧은 대여에 좋아요"
+                "hyundai_avante" -> "준중형 세단 · 무난해서 누구나 찾아요"
+                else -> s(R.string.onboarding_description_missing)
+            }
+            addView(label(blurb, 20, PixelStyle.muted))
+            if (selectable && value.selectable) setOnClickListener {
+                if (!interaction.inputPending && interaction.pendingSelection == null) { interaction.select(value.vehicle.vehicleId); drawScreen() }
+            }
             if (!value.selectable) addView(label(value.unavailableReason ?: s(R.string.onboarding_unavailable), color = PixelStyle.muted))
             if (selected) addView(label(s(R.string.onboarding_selected), 24, bold = true))
             if (selectable) action(this, R.string.onboarding_select, value.selectable, selected, value.vehicle.vehicleId, "${value.vehicle.displayName}, ${s(R.string.onboarding_select)}") {

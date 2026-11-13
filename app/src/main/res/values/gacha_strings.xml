@@ -1,5 +1,5 @@
 <resources>
-    <string name="gacha_title">가챠 · 차량 뽑기</string>
+    <string name="gacha_title">어떤 차가 나올까요?</string>
     <string name="gacha_restricted">주차와 사용 허용을 확인한 뒤 뽑기를 표시합니다</string>
     <string name="gacha_loading">뽑기 정보를 불러오는 중</string>
     <string name="gacha_fixture">고정 시험 입력 · 실제 추첨·차감·지급 아님</string>
@@ -11,13 +11,13 @@
     <string name="gacha_pending">요청 처리 중 · 잔액·티켓·보장 상태 유지</string>
     <string name="gacha_awaiting">처리 응답을 받았습니다. 확정 획득 결과 조회를 기다립니다</string>
     <string name="gacha_previous_request">이전 요청 확인이 필요해 이 옵션을 요청할 수 없습니다</string>
-    <string name="gacha_pool">현재 해금 후보</string>
-    <string name="gacha_pool_note">공급된 후보에서 게임 차량을 뽑습니다. 희귀도는 개별 획득 차량에 붙습니다.</string>
+    <string name="gacha_pool">지금 나올 수 있는 차</string>
+    <string name="gacha_pool_note">가게 레벨이 오르면 더 많은 차종이 나와요. 등급은 뽑을 때 정해져요.</string>
     <string name="gacha_empty">현재 해금 후보가 없습니다</string>
     <string name="gacha_neutral">중립 차량 도형 · 게임 수집 표시</string>
-    <string name="gacha_rates">이번 뽑기에 공급된 적용 확률</string>
+    <string name="gacha_rates">등급별 확률</string>
     <string name="gacha_rates_missing">적용 확률을 확인할 수 없습니다. 기본 확률로 대신하지 않습니다.</string>
-    <string name="gacha_guarantee">보장 상태</string>
+    <string name="gacha_guarantee">희귀 이상 보장</string>
     <string name="gacha_next_guaranteed">이번 회차 · 보장 적용</string>
     <string name="gacha_next_normal">이번 회차 · 일반 적용</string>
     <string name="gacha_space">차고 공간</string>
@@ -64,4 +64,9 @@
     <string name="gacha_growth">레벨 %1$d · 진행량 %2$d%%</string>
     <string name="gacha_acquisition">실제 취득 기준액 · %1$s</string>
     <string name="gacha_settlement">확정 정산 ID · %1$s</string>
+    <string name="gacha_pity_line">%1$s회 안에 %2$s 이상 1대 보장 · 남은 횟수 %3$s회</string>
+    <string name="gacha_one_pull">뽑기 1회</string>
+    <string name="gacha_free_tickets">무료 뽑기권 %1$s장</string>
+    <string name="gacha_free_button">무료권으로 뽑기</string>
+    <string name="gacha_paid_button">%1$s으로 뽑기</string>
 </resources>

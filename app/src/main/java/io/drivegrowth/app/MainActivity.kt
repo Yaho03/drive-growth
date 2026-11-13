@@ -298,30 +298,46 @@ open class MainActivity : Activity() {
         }
         chrome = style.column().apply { setPadding(style.dp(16), 0, style.dp(16), 0) }
         body = FrameLayout(this)
+        // 상단은 HTML 시제품처럼 한 줄: [뒤로·새로고침] 제목 … 잔액 [시연] [소리]
+        pageActions = style.row().apply { visibility = View.GONE; gravity = Gravity.CENTER_VERTICAL }
         gameHeader = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(style.dp(12), 0, style.dp(12), 0)
+            setPadding(style.dp(12), style.dp(4), style.dp(12), style.dp(4))
+            addView(pageActions, LinearLayout.LayoutParams(-2, -2))
             addView(style.button("드라이브 키우기") {
                 if (allowed()) showPresentationTitle(true)
-            }.apply { tag = "presentation:home-title" }, LinearLayout.LayoutParams(0, -2, 1f))
+            }.apply {
+                tag = "presentation:home-title"
+                compact(style)
+                textSize = 22f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                background = null
+                setPadding(style.dp(12), 0, style.dp(12), 0)
+            }, LinearLayout.LayoutParams(0, -2, 1f))
             headerBalance = style.text("잔액 확인 중").apply {
                 tag = "presentation:balance"
                 setTextColor(PixelStyle.gold)
-                setPadding(style.dp(8), 0, style.dp(8), 0)
+                textSize = 20f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                background = style.shape(style.panel)
+                setPadding(style.dp(16), style.dp(8), style.dp(16), style.dp(8))
             }
-            addView(headerBalance)
+            addView(headerBalance, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = style.dp(6) })
+            simulationToggle?.let { toggle ->
+                (toggle.parent as? android.view.ViewGroup)?.removeView(toggle)
+                addView(toggle, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = style.dp(6) })
+            }
             soundButton = style.button("소리 꺼짐") {
                 if (allowed()) {
                     presentationAudio.enabled = !presentationAudio.enabled
                     updatePresentation(allowed())
                 }
-            }.apply { tag = "presentation:sound" }
-            addView(soundButton)
+            }.apply { tag = "presentation:sound"; compact(style); setPadding(style.dp(14), 0, style.dp(14), 0) }
+            addView(soundButton, LinearLayout.LayoutParams(-2, -2))
         }
         panel.addView(gameHeader)
         sectionTabs = style.row().apply { visibility = View.GONE }
-        pageActions = style.row().apply { visibility = View.GONE }
-        panel.addView(pageActions)
         panel.addView(sectionTabs)
         panel.addView(chrome)
         stage = FrameLayout(this).apply { addView(body, FrameLayout.LayoutParams(-1, -1)) }
@@ -677,15 +693,14 @@ open class MainActivity : Activity() {
             visibility = View.GONE
         }
         simulationDetails = details
-        val toggle = style.button("시연 · 모의 입력") {
+        val toggle = style.button("시연 ▸") {
             simulationControlsExpanded = !simulationControlsExpanded
             renderSimulationControls(allowed())
         }.apply {
             tag = "simulation:controls"
-            minimumHeight = style.dp(44)
-            minHeight = style.dp(44)
-            textSize = 16f
-            setPadding(style.dp(12), 0, style.dp(12), 0)
+            contentDescription = "시연 · 모의 입력 도구"
+            compact(style)
+            setPadding(style.dp(14), 0, style.dp(14), 0)
         }
         simulationToggle = toggle
         return style.column().apply {
@@ -693,6 +708,21 @@ open class MainActivity : Activity() {
             addView(retry, LinearLayout.LayoutParams(-1, -2))
             addView(details, LinearLayout.LayoutParams(-1, style.dp(144)))
         }
+    }
+
+    /** 시연 버튼은 상단 한 줄에 둔다. 상단이 숨는 가게 화면에서는 시연 도구 줄의 오른쪽 끝으로 옮긴다. */
+    private fun placeSimulationToggle(inHeader: Boolean) {
+        val toggle = simulationToggle ?: return
+        val column = simulationControls as? LinearLayout ?: return
+        // 가게 화면은 지도를 화면 끝까지 쓴다: 시연 버튼 줄을 숨기고 다른 메뉴의 상단 한 줄에서 연다
+        val homeMap = !inHeader && navigation.page == HostPage.HOME
+        column.visibility = if (homeMap) View.GONE else View.VISIBLE
+        val target: android.view.ViewGroup = if (inHeader) gameHeader else column
+        if (toggle.parent === target) return
+        (toggle.parent as? android.view.ViewGroup)?.removeView(toggle)
+        if (inHeader) gameHeader.addView(toggle, gameHeader.indexOfChild(soundButton),
+            LinearLayout.LayoutParams(-2, -2).apply { marginEnd = style.dp(6) })
+        else column.addView(toggle, 0, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.END; marginEnd = style.dp(12) })
     }
 
     private fun collapseSimulationControls() {
@@ -704,7 +734,7 @@ open class MainActivity : Activity() {
         val simulation = session.simulation ?: return
         simulationToggle?.apply {
             isSelected = simulationControlsExpanded
-            text = if (simulationControlsExpanded) "시연 · 모의 입력 ▾" else "시연 · 모의 입력 ▸"
+            text = if (simulationControlsExpanded) "시연 ▾" else "시연 ▸"
         }
         simulationDetails?.visibility = if (simulationControlsExpanded) View.VISIBLE else View.GONE
         simulationStatus?.text = simulation.status
@@ -783,13 +813,15 @@ open class MainActivity : Activity() {
         panel.addView(bar, LinearLayout.LayoutParams(-1, -2))
         if (page != HostPage.HOME) {
             for ((label, tag, action) in listOf(
-                Triple("뒤로", "host:back", ::onBackPressed),
-                Triple("새로고침", "host:refresh", ::refresh),
+                Triple("◀ 뒤로", "host:back", ::onBackPressed),
+                Triple("↻", "host:refresh", ::refresh),
             )) {
                 pageActions.addView(style.button(label) { if (isCurrent()) action() }.apply {
                     this.tag = tag
                     compact(style)
-                }, LinearLayout.LayoutParams(0, -2, 1f))
+                    setPadding(style.dp(14), 0, style.dp(14), 0)
+                    if (tag == "host:refresh") contentDescription = "새로고침"
+                }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = style.dp(6) })
             }
             pageActions.visibility = View.VISIBLE
         }
@@ -1019,7 +1051,8 @@ open class MainActivity : Activity() {
                 if (!gameControlsAllowed()) return@button
                 select(target)
                 if (target == HostPage.GARAGE) { managementVisible = true; management.controller.recover() }
-            })
+            }.apply { compact(style); setTextColor(PixelStyle.focus); setPadding(style.dp(16), 0, style.dp(16), 0) },
+                LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.END })   // 진행 중인 요청 안내는 작은 칩으로
         }
         if (navigation.page == HostPage.GACHA && session.gacha.failed)
             chrome.addView(style.button("보관한 미실행 가챠 요청 취소") { if (gameControlsAllowed()) session.gacha.cancelUnstarted() })
@@ -1073,8 +1106,10 @@ open class MainActivity : Activity() {
 
     private fun updatePresentation(enabled: Boolean) {
         val showingTitle = enabled && titlePending
-        gameHeader.visibility = if (enabled && !showingTitle && navigation.page != HostPage.HOME) View.VISIBLE else View.GONE
+        val headerShown = enabled && !showingTitle && navigation.page != HostPage.HOME
+        gameHeader.visibility = if (headerShown) View.VISIBLE else View.GONE
         simulationControls?.visibility = if (showingTitle) View.GONE else View.VISIBLE
+        placeSimulationToggle(headerShown)
         onControlsAvailabilityChanged(enabled && !titlePending)
         val visible = enabled && presentationFocused
         titleView.setPresentationAllowed(showingTitle && presentationFocused)

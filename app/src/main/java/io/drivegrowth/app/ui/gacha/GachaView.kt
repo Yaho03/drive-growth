@@ -13,6 +13,7 @@ import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.garage.VehicleArtwork
 import io.drivegrowth.app.ui.pixel.VehicleSprites
+import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.presentation.RewardCelebrationKind
 import io.drivegrowth.app.ui.presentation.RewardCelebrationView
 import io.drivegrowth.core.contract.*
@@ -177,83 +178,110 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
     private fun retry(parent: LinearLayout, allowed: Boolean) {
         if (allowed) button(parent,s(if(uiState.reloadToken == null) R.string.gacha_retry else R.string.gacha_retry_pending),"gacha:reload",uiState.reloadToken == null) { session.reload(); drawScreen() }
     }
+    /** HTML 시제품의 뽑기 화면 배치: 왼쪽 뽑기 카드(보장 막대·비용·버튼), 오른쪽 확률·나올 수 있는 차. */
     private fun offers(parent: LinearLayout, value: GachaOffers) = with(style) {
-        add(parent,text(s(if(value.origin == GachaOrigin.FIXTURE) R.string.gacha_fixture else R.string.gacha_stored),color=rarityColor(Rarity.LEGEND)))
-        add(parent,text(s(R.string.gacha_balance,money(value.balance)),24,bold=true))
-        value.displayProblem()?.let { add(parent,text(status(it),24,bold=true)) }
+        if(value.origin == GachaOrigin.FIXTURE) add(parent,text(s(R.string.gacha_fixture),color=rarityColor(Rarity.LEGEND)))
         if(session.awaitingConfirmation) add(parent,text(s(R.string.gacha_awaiting)))
         val panels = if(wide) row() else column()
         add(parent,panels)
-        val facts = column(); val actions = column()
-        panels.addView(facts,if(wide) LayoutParams(0,-2,1.1f) else LayoutParams(-1,-2))
-        panels.addView(actions,(if(wide) LayoutParams(0,-2,1f) else LayoutParams(-1,-2)).apply { if(wide) marginStart=dp(24) })
-        add(facts,card().apply {
-            addView(text(s(R.string.gacha_pool),28,bold=true))
-            addView(text(s(R.string.gacha_pool_note),color=muted))
-            addView(artwork.view(null, null, 116), LayoutParams(-1, dp(116)))
-            val ids = value.candidates
-            when { ids == null -> addView(text(s(R.string.gacha_missing)))
-                ids.isEmpty() -> addView(text(s(R.string.gacha_empty)))
-                else -> ids.chunked(if (wide) 2 else 1).forEach { group ->
-                    add(this, row().apply {
-                        group.forEachIndexed { index, id ->
-                            val name = value.content?.catalog?.vehicles?.singleOrNull { it.vehicleId == id }?.displayName
-                            addView(text(name ?: s(R.string.gacha_missing), 18).apply {
-                                background = shape(inset)
-                                setPadding(dp(10), dp(6), dp(10), dp(6))
-                            }, LayoutParams(0, -2, 1f).apply { if (index > 0) marginStart = dp(8) })
-                        }
-                    }, 8)
-                }
+        val main = column(); val side = column()
+        panels.addView(main,if(wide) LayoutParams(0,-2,1f) else LayoutParams(-1,-2))
+        panels.addView(side,(if(wide) LayoutParams(0,-2,1f) else LayoutParams(-1,-2)).apply { if(wide) marginStart=dp(16) })
+        fun chip(label: String, fg: Int, fill: Int) = text(label, 16, fg, bold = true).apply {
+            background = android.graphics.drawable.GradientDrawable().apply { setColor(fill); cornerRadius = dp(16).toFloat() }
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+        val rules = value.content?.gacha; val g = value.guarantee
+        val paid = value.options.firstOrNull { it.kind == GachaOptionKind.PAID }
+        val free = value.options.firstOrNull { it.kind == GachaOptionKind.FREE }
+        add(main,card().apply {
+            addView(artwork.view(null, null, 150), LayoutParams(-1, dp(150)))
+            // 보장: "30회 안에 희귀 이상 1대 보장 · 남은 횟수 N회" + 막대
+            addView(row().apply {
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                background = shape(inset); setPadding(dp(14), dp(10), dp(14), dp(10))
+                val remaining = g?.remaining
+                addView(text(s(R.string.gacha_pity_line, rules?.pity?.toString() ?: s(R.string.gacha_missing),
+                    rules?.let { rarity(it.guaranteedFrom) } ?: s(R.string.gacha_missing), remaining?.toString() ?: s(R.string.gacha_missing)), 17), LayoutParams(0, -2, 2.4f))
+                if (rules != null && rules.pity > 0 && remaining != null && remaining in 0..rules.pity)
+                    addView(progressTrack(rules.pity - remaining, rules.pity, rarityColor(Rarity.RARE)), LayoutParams(0, dp(10), 1f).apply { marginStart = dp(12) })
+            }, LayoutParams(-1, -2).apply { topMargin = dp(12) })
+            if (g?.nextGuaranteed == true) addView(text(s(R.string.gacha_next_guaranteed), 17, rarityColor(Rarity.RARE), bold = true))
+            // 비용: "뽑기 1회 ● 500" + [무료 뽑기권 N장]
+            addView(row().apply {
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                addView(text(s(R.string.gacha_one_pull), 18, muted))
+                addView(text("● " + (paid?.moneyCost?.let { java.text.NumberFormat.getIntegerInstance(Locale.KOREA).format(it.units) } ?: s(R.string.gacha_missing)), 20, PixelStyle.gold, bold = true).apply { setPadding(dp(8), 0, dp(12), 0) })
+                addView(chip(s(R.string.gacha_free_tickets, (free?.ownedTickets ?: paid?.ownedTickets)?.toString() ?: s(R.string.gacha_missing)), PixelStyle.focus, 0xff1e2f57.toInt()))
+            }, LayoutParams(-1, -2).apply { topMargin = dp(10) })
+            value.space?.let { sp ->
+                if (sp.availability != GachaAvailability.READY) addView(text(s(R.string.gacha_space_value, sp.owned.toString(), sp.capacity.toString()) + " · " + status(sp.availability), 17, 0xffffd36b.toInt(), bold = true).apply {
+                    background = shape(0xff3d3216.toInt()); setPadding(dp(14), dp(10), dp(14), dp(10)) }, LayoutParams(-1, -2).apply { topMargin = dp(10) })
             }
-        })
-        add(facts,card().apply {
-            addView(text(s(R.string.gacha_rates),28,bold=true))
-            if (!value.ratesValid()) addView(text(s(R.string.gacha_rates_missing)))
-            else Rarity.entries.forEach { r ->
-                val rate = value.appliedPercent?.let { s(R.string.gacha_rate,rarity(r),it.getValue(r).stripTrailingZeros().toPlainString()) }
-                    ?: value.appliedRatio!!.let { "${rarity(r)} · ${it.numerators.getValue(r)}/${it.denominator}" }
-                addView(text(rate,24,color=rarityColor(r)))
+            value.displayProblem()?.let { addView(text(status(it), 17, 0xffff9a8a.toInt(), bold = true)) }
+            // 버튼: [무료권으로 뽑기] [500으로 뽑기]
+            val buttons = row()
+            listOfNotNull(free, paid).forEachIndexed { index, option ->
+                val enabled = session.canSelect(option.id)
+                val label = if (option.kind == GachaOptionKind.FREE) s(R.string.gacha_free_button)
+                    else s(R.string.gacha_paid_button, option.moneyCost?.let { java.text.NumberFormat.getIntegerInstance(Locale.KOREA).format(it.units) } ?: "")
+                val primary = enabled && (option.kind == GachaOptionKind.FREE || free?.let { !session.canSelect(it.id) } != false)
+                val token = generation
+                buttons.addView(button(label, enabled, primary) {
+                    if (token == generation && session.controlsEnabled) { session.select(option.id); savedY = 0; scroll = null; drawScreen() }
+                }.apply { tag = "gacha:option:${option.id}"; contentDescription = "${option.title} · $label" },
+                    LayoutParams(0, -2, 1f).apply { if (index > 0) marginStart = dp(10) })
             }
-            addView(text(s(R.string.gacha_versions,value.content?.catalog?.contentVersion?.value ?: s(R.string.gacha_missing),value.content?.ruleVersion?.value ?: s(R.string.gacha_missing)),color=muted))
-        })
-        add(actions,card().apply {
-            addView(text(s(R.string.gacha_guarantee),28,bold=true))
-            val rules=value.content?.gacha; val g=value.guarantee
-            addView(text(s(R.string.gacha_threshold,rules?.let { rarity(it.guaranteedFrom) } ?: s(R.string.gacha_missing),rules?.pity?.toString() ?: s(R.string.gacha_missing))))
-            val remaining = g?.remaining
-            addView(text(s(R.string.gacha_remaining,remaining?.toString() ?: s(R.string.gacha_missing)), 20, bold = true))
-            if (rules != null && rules.pity > 0 && remaining != null && remaining in 0..rules.pity) {
-                addView(progressTrack(rules.pity - remaining, rules.pity, rarityColor(rules.guaranteedFrom)),
-                    LayoutParams(-1, dp(8)))
+            addView(buttons, LayoutParams(-1, -2).apply { topMargin = dp(14) })
+            listOfNotNull(free, paid).forEach { option ->
+                option.displayProblem()?.let { addView(text("${option.title} · ${status(it)}", 15, muted)) }
             }
-            addView(text(s(when(g?.nextGuaranteed) { true -> R.string.gacha_next_guaranteed; false -> R.string.gacha_next_normal; null -> R.string.gacha_missing }),
-                color = if (g?.nextGuaranteed == true) rarityColor(Rarity.RARE) else ink))
-            if (g?.available == false) addView(text(s(R.string.gacha_status_guarantee)))
-            g?.description?.let { addView(text(it,color=muted)) }
-            addView(text(s(R.string.gacha_space),24,bold=true))
-            addView(text(s(R.string.gacha_space_value,value.space?.owned?.toString() ?: s(R.string.gacha_missing),value.space?.capacity?.toString() ?: s(R.string.gacha_missing))))
-            value.space?.let { if(it.availability != GachaAvailability.READY) addView(text(status(it.availability))) }
+            addView(text(s(R.string.gacha_balance,money(value.balance)), 15, muted))
         })
         val selected = value.options.singleOrNull { it.id == uiState.selected }
-        if (selected != null) add(actions,card(true).apply {
-            addView(text(s(R.string.gacha_review),28,bold=true)); optionFacts(this,selected)
+        if (selected != null) add(main,card(true).apply {
+            addView(text(s(R.string.gacha_review),24,bold=true)); optionFacts(this,selected)
             addView(text(s(R.string.gacha_no_debit),color=muted))
             button(this,s(R.string.gacha_confirm),"gacha:confirm",session.canSelect(selected.id),true) { session.confirm(); drawScreen() }
             button(this,s(R.string.gacha_cancel),"gacha:cancel",uiState.pending == null) { session.cancel(); drawScreen() }
         })
-        add(actions,text(s(R.string.gacha_options),28,bold=true))
-        if (value.options.isEmpty()) add(actions,text(s(R.string.gacha_missing)))
-        value.options.forEach { option -> add(actions,card().apply {
-            optionFacts(this,option)
-            if(option.displayProblem() != null) addView(text(status(option.displayProblem()!!)))
-            else if(!session.canSelect(option.id) && uiState.pending == null && value.displayProblem() == null) addView(text(s(R.string.gacha_previous_request)))
-            button(this,s(R.string.gacha_open_review),"gacha:option:${option.id}",session.canSelect(option.id)) {
-                session.select(option.id); savedY=0; scroll=null; drawScreen()
+        add(side,card().apply {
+            addView(text(s(R.string.gacha_rates),24,bold=true))
+            if (!value.ratesValid()) addView(text(s(R.string.gacha_rates_missing)))
+            else Rarity.entries.forEach { r ->
+                val rate = value.appliedPercent?.let { s(R.string.gacha_rate,rarity(r),it.getValue(r).stripTrailingZeros().toPlainString()) }
+                    ?: value.appliedRatio!!.let { "${rarity(r)} · ${it.numerators.getValue(r)}/${it.denominator}" }
+                val share = value.appliedPercent?.getValue(r)?.toDouble() ?: value.appliedRatio!!.let { it.numerators.getValue(r).toDouble() * 100 / it.denominator.toDouble() }
+                addView(row().apply {
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    addView(text(rate,18,color=rarityColor(r),bold=true), LayoutParams(dp(150), -2))
+                    addView(progressTrack((share * 10).toInt().coerceIn(if (share > 0) 4 else 0, 1000), 1000, rarityColor(r)), LayoutParams(0, dp(10), 1f))
+                }, LayoutParams(-1, -2).apply { topMargin = dp(6) })
             }
-        }) }
-        add(actions,text(s(R.string.gacha_purchase_price,money(value.ticketPurchasePrice)),color=muted))
-        add(actions,text(s(R.string.gacha_purchase_unsupported),color=muted))
+            addView(text(s(R.string.gacha_pool),20,bold=true), LayoutParams(-1, -2).apply { topMargin = dp(14) })
+            val ids = value.candidates
+            when { ids == null -> addView(text(s(R.string.gacha_missing)))
+                ids.isEmpty() -> addView(text(s(R.string.gacha_empty)))
+                else -> ids.chunked(if (wide) 3 else 2).forEach { group ->
+                    add(this, row().apply {
+                        group.forEachIndexed { index, id ->
+                            val name = value.content?.catalog?.vehicles?.singleOrNull { it.vehicleId == id }?.displayName
+                            addView(row().apply {
+                                gravity = android.view.Gravity.CENTER_VERTICAL
+                                background = shape(inset)
+                                setPadding(dp(6), dp(2), dp(10), dp(2))
+                                sprites.bitmap(id)?.let { bmp -> addView(android.widget.ImageView(context).apply {
+                                    setImageBitmap(bmp); scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                                }, LayoutParams(dp(40), dp(28)).apply { marginEnd = dp(4) }) }
+                                addView(text(name ?: s(R.string.gacha_missing), 15).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+                            }, LayoutParams(0, -2, 1f).apply { if (index > 0) marginStart = dp(6) })
+                        }
+                        repeat((if (wide) 3 else 2) - group.size) { addView(View(context), LayoutParams(0, 1, 1f).apply { marginStart = dp(6) }) }
+                    }, 6)
+                }
+            }
+        })
     }
     private fun optionFacts(parent: LinearLayout, option: GachaOption) = with(style) {
         parent.addView(text(option.title,26,bold=true))

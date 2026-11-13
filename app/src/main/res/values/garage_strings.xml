@@ -54,4 +54,11 @@
     <string name="garage_map_manage">차량 관리</string>
     <string name="garage_map_back">차량 상세로</string>
     <string name="garage_map_max_level">최대 레벨</string>
+    <string name="garage_slot_empty">빈 칸</string>
+    <string name="garage_slot_empty_body">뽑기나 구매 탁송으로 채울 수 있어요</string>
+    <string name="garage_slot_locked">잠긴 칸 %1$d개</string>
+    <string name="garage_slot_locked_body">가게를 확장하면 열려요</string>
+    <string name="garage_tile_accidents">사고</string>
+    <string name="garage_tile_acquisition">구매가</string>
+    <string name="garage_tile_model_price">차종 가격</string>
 </resources>

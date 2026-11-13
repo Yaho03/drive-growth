@@ -69,7 +69,7 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
     fun testCompactPanelKeepsLongNamesAndUsesOnlyMatchingRestingFacts() = onUi {
         val context = instrumentation.targetContext
         val rests = mutableListOf<FacilityControlsEvent>()
-        val sharedExplanation = "실제 저장 상태로 비용과 결과를 먼저 확인합니다"
+        val sharedExplanation = "누르면 비용과 결과를 먼저 보여 드려요"
         val repairReason = "현재 활동에서는 이 관리를 할 수 없습니다"
         val first = GaragePreviewStates.normal.data.vehicles.first().copy(
             name = "긴 차량 이름이 잘리지 않는지 확인하는 캐스퍼 일렉트릭",

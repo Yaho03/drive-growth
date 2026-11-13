@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.shop
 
+import io.drivegrowth.app.ui.pixel.PlayerText
 import android.annotation.SuppressLint
 import android.content.Context
 import android.view.Gravity
@@ -21,35 +22,35 @@ internal class ShopMapHud(
     private val style = ShopStyle(context)
 
     init {
+        // HTML 가게 지도처럼 지도 위에 작은 칩들을 띄운다: 왼쪽 [● 가게·레벨] [대여 현황], 오른쪽 [P 보유/칸] [정산] [설정]
         tag = "shop:map-hud"
-        orientation = VERTICAL
-        gravity = Gravity.START
+        orientation = HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
         val unknown = context.getString(R.string.shop_unknown)
-        addView(style.text(
-            "${content.name} · ${context.getString(R.string.shop_level, content.level?.toString() ?: unknown)}",
-            19, bold = true,
-        ))
-        addView(style.text(
-            context.getString(R.string.shop_capacity, content.ownedCount?.toString() ?: unknown,
-                content.capacity?.toString() ?: unknown) + " · " + context.getString(R.string.shop_balance, balance),
-            16, style.accent,
-        ))
-        if (operatingStatus != null) addView(style.text(operatingStatus, 16))
-        val actions = style.row()
+        addView(chip("● ${PlayerText.shopName(content.name)} · Lv${content.level?.toString() ?: unknown}", 0xff7ee2a6.toInt()))
+        if (operatingStatus != null) addView(chip(operatingStatus, style.ink), LayoutParams(-2, -2).apply { marginStart = style.dp(6) })
+        addView(android.view.View(context), LayoutParams(0, 1, 1f))
+        addView(chip("P ${content.ownedCount?.toString() ?: unknown} / ${content.capacity?.toString() ?: unknown}", style.ink).apply {
+            contentDescription = context.getString(R.string.shop_capacity, content.ownedCount?.toString() ?: unknown,
+                content.capacity?.toString() ?: unknown) + " · " + context.getString(R.string.shop_balance, balance)
+        })
         if (onResults != null) {
-            val label = unviewedCount?.let { "미확인 정산 ${it}건" } ?: "정산 확인"
-            actions.addView(action(label, "shop:map-results", onResults))
+            val label = unviewedCount?.let { "정산 ${it}건" } ?: "정산"
+            addView(action(label, "shop:map-results", onResults), LayoutParams(-2, -2).apply { marginStart = style.dp(6) })
         }
-        if (onSettings != null) actions.addView(action("설정", "shop:map-settings", onSettings))
-        if (actions.childCount > 0) addView(actions)
-        background = style.shape(style.panel)
-        setPadding(style.dp(12), style.dp(4), style.dp(12), style.dp(4))
+        if (onSettings != null) addView(action("설정", "shop:map-settings", onSettings), LayoutParams(-2, -2).apply { marginStart = style.dp(6) })
+    }
+
+    private fun chip(label: String, color: Int) = style.text(label, 16, color, bold = true).apply {
+        background = android.graphics.drawable.GradientDrawable().apply { setColor(0xe6121622.toInt()); cornerRadius = style.dp(14).toFloat() }
+        setPadding(style.dp(14), style.dp(8), style.dp(14), style.dp(8))
     }
 
     private fun action(label: String, key: String, onClick: () -> Unit): Button =
         style.button(label, action = onClick).apply {
             tag = key
             textSize = 16f
+            background = android.graphics.drawable.GradientDrawable().apply { setColor(0xe6121622.toInt()); cornerRadius = style.dp(14).toFloat() }
             minHeight = style.dp(48)
             minimumHeight = style.dp(48)
             setPadding(style.dp(12), 0, style.dp(12), 0)

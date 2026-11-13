@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.delivery
 
+import io.drivegrowth.app.ui.pixel.PlayerText
 import android.content.Context
 import android.text.TextUtils
 import android.view.Gravity
@@ -267,25 +268,41 @@ class DeliveryView(
     private fun highwayPanel(road: DeliveryHighway, delivery: DeliveryActiveUi, header: View): View = with(style) {
         column().apply {
             tag = "delivery:highway"
-            val status = panel(padding = 8).apply {
+            // HTML 정보 띠: "학교까지 · 12.4 / 18km" + 보상 칩, 아래에 우리 가게 → 목적지 진행 막대(확인된 거리만)
+            val status = panel(padding = 14).apply {
                 tag = "delivery:highway-status"
-                addView(text(present(road.details.destinationName, R.string.delivery_destination_missing), 18, bold = true).apply {
-                    maxLines = 1
-                    ellipsize = TextUtils.TruncateAt.END
-                })
-                val progress = present(delivery.progressLabel, R.string.delivery_progress_missing)
-                val kind = s(if (road.details.purchase) R.string.delivery_purchase else R.string.delivery_income)
-                addView(text("$progress · $kind · ${sourceLabel(road.details)}", 14, color = muted))
                 val observed = road.observedMeters
                 val estimated = road.details.estimatedMeters
-                val distance = observed?.let { context.getString(R.string.delivery_scene_observed, it) }
-                    ?: context.getString(R.string.delivery_observed, s(R.string.delivery_information_missing))
-                addView(text("$distance · ${estimatedDistance(road.details)}", 14))
-                if (observed != null && estimated != null && estimated > 0L) {
-                    val progressPercent = ((observed.coerceIn(0L, estimated).toDouble() / estimated) * 100).toInt()
-                    addView(vehicleLabels.progressTrack(progressPercent, color = PixelStyle.focus),
-                        LayoutParams(-1, dp(8)).apply { topMargin = dp(4) })
+                val destination = present(road.details.destinationName, R.string.delivery_destination_missing)
+                addView(row().apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    val done = observed?.let { String.format("%.1f", it / 1000.0) } ?: "0"
+                    val total = estimated?.let { PlayerText.km(it) } ?: "-"
+                    addView(text("${destination}까지 · $done / $total", 22, bold = true).apply {
+                        maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+                    }, LinearLayout.LayoutParams(0, -2, 1f))
+                    val reward = road.details.expectedReward?.let { "보상 +${java.text.NumberFormat.getIntegerInstance(java.util.Locale.KOREA).format(it.units)}" }
+                    val chipText = if (road.details.purchase) s(R.string.delivery_purchase) else listOfNotNull(s(R.string.delivery_income), reward).joinToString(" · ")
+                    addView(text(chipText, 15, color = if (road.details.purchase) PixelStyle.gold else 0xff7ee2a6.toInt(), bold = true).apply {
+                        background = android.graphics.drawable.GradientDrawable().apply {
+                            setColor(if (road.details.purchase) 0xff3d3216.toInt() else 0xff1f3a2c.toInt()); cornerRadius = dp(16).toFloat() }
+                        setPadding(dp(12), dp(4), dp(12), dp(4))
+                    })
+                })
+                val progressPercent = if (observed != null && estimated != null && estimated > 0L)
+                    ((observed.coerceIn(0L, estimated).toDouble() / estimated) * 100).toInt() else 0
+                addView(row().apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(text(s(R.string.delivery_from_shop), 14, color = muted))
+                    addView(vehicleLabels.progressTrack(progressPercent, color = 0xff68a0f0.toInt()),
+                        LinearLayout.LayoutParams(0, dp(10), 1f).apply { marginStart = dp(10); marginEnd = dp(10) })
+                    addView(text(destination, 14, color = muted).apply { maxLines = 1 })
+                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+                val note = when {
+                    observed == null -> s(R.string.delivery_wait_first_drive)
+                    else -> delivery.progressLabel
                 }
+                if (note != null) addView(text("$note · ${sourceLabel(road.details)}", 13, color = muted))
             }
             addView(status, LayoutParams(motionWidth(), -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
             motion.showHighway(road)
@@ -297,7 +314,7 @@ class DeliveryView(
         s(if (details.source == InputSource.SIMULATION) R.string.delivery_simulation else R.string.delivery_vehicle_source)
 
     private fun estimatedDistance(details: DeliverySceneDetails) = details.estimatedMeters
-        ?.let { context.getString(R.string.delivery_estimated, it) } ?: s(R.string.delivery_distance_missing)
+        ?.let { context.getString(R.string.delivery_estimated, PlayerText.km(it)) } ?: s(R.string.delivery_distance_missing)
 
     private fun availableMotionHeight(header: View, status: View? = null): Int {
         val availableWidth = width - paddingStart - paddingEnd
@@ -335,9 +352,22 @@ class DeliveryView(
         navigationControls()?.let { controls -> style.add(parent, style.panel().apply { addView(controls) }) }
     }
 
-    private fun offers(parent: LinearLayout, value: DeliveryProposalUi) {
-        destination(parent, value.destinationName, value.proposed.estimated.meters, value.proposed.estimated.source)
+    private fun offers(host: LinearLayout, value: DeliveryProposalUi) {
         val selected = value.proposed.offers.singleOrNull { it.id == selectedOfferId }
+        // HTML 탁송 화면: 넓은 창에서는 왼쪽에 목적지, 오른쪽에 의뢰 카드 격자
+        val split = wide && selected == null && value.proposed.offers.isNotEmpty()
+        val parent: LinearLayout
+        if (split) {
+            val columns = style.row().apply { isBaselineAligned = false }
+            val left = style.column(); parent = style.column()
+            columns.addView(left, LayoutParams(0, -2, 1f))
+            columns.addView(parent, LayoutParams(0, -2, 2.6f).apply { marginStart = style.dp(PixelStyle.gapDp) })
+            style.add(host, columns)
+            destination(left, value.destinationName, value.proposed.estimated.meters, value.proposed.estimated.source)
+        } else {
+            parent = host
+            destination(parent, value.destinationName, value.proposed.estimated.meters, value.proposed.estimated.source)
+        }
         if (selected != null) {
             localAction(parent, R.string.delivery_close_detail, "delivery:back") { closeDetail() }
             offerCard(parent, selected, value.vehicleNames[selected.vehicleId], detailed = true)
@@ -353,10 +383,11 @@ class DeliveryView(
             note(parent, R.string.delivery_empty_body)
             return
         }
-        listOf(true, false).forEach { income ->
-            val group = value.proposed.offers.filter { (it is DeliveryOffer.Income) == income }
-            if (group.isNotEmpty()) heading(parent, if (income) R.string.delivery_income else R.string.delivery_purchase)
-            group.chunked(if (wide) 2 else 1).forEach { batch ->
+        (if (split) listOf(null) else listOf(true, false)).forEach { income ->
+            val group = value.proposed.offers.filter { income == null || (it is DeliveryOffer.Income) == income }
+            if (group.isNotEmpty()) { if (income == null) heading(parent, R.string.delivery_offers_all) else heading(parent, if (income) R.string.delivery_income else R.string.delivery_purchase) }
+            val perRow = if (split) 4 else if (wide) 2 else 1
+            group.chunked(perRow).forEach { batch ->
                 val row = style.row().apply { isBaselineAligned = false }
                 batch.forEachIndexed { index, offer ->
                     val card = style.panel(padding = 12)
@@ -373,9 +404,9 @@ class DeliveryView(
                     }
                     row.addView(card, LayoutParams(0, if (wide) -1 else -2, 1f).apply { if (index != 0) marginStart = style.dp(PixelStyle.gapDp) })
                 }
-                if (wide && batch.size == 1) row.addView(View(context), LayoutParams(0, 0, 1f).apply {
+                repeat(if (wide) perRow - batch.size else 0) { row.addView(View(context), LayoutParams(0, 0, 1f).apply {
                     marginStart = style.dp(PixelStyle.gapDp)
-                })
+                }) }
                 style.add(parent, row)
             }
         }
@@ -455,7 +486,7 @@ class DeliveryView(
     private fun destination(parent: LinearLayout, name: String?, meters: Long, source: InputSource) = with(style) {
         add(parent, panel(padding = 12).apply {
             addView(text(present(name, R.string.delivery_destination_missing), 18, bold = true))
-            addView(text(context.getString(R.string.delivery_estimated, meters), 16))
+            addView(text(context.getString(R.string.delivery_estimated, PlayerText.km(meters)), 16))
             addView(text(s(if (source == InputSource.SIMULATION) R.string.delivery_simulation else R.string.delivery_vehicle_source),
                 14, color = PixelStyle.focus, bold = true))
         })
@@ -464,19 +495,33 @@ class DeliveryView(
     private fun offerCard(parent: LinearLayout, offer: DeliveryOffer, name: String?, detailed: Boolean = false,
         active: Boolean = false, tile: Boolean = false, footer: (LinearLayout.() -> Unit)? = null,
     ) = with(style) {
+        // HTML 카드처럼: 차 이름 옆에 탁송 종류·희귀도 칩
+        fun chip(label: String, fg: Int, fill: Int, stroke: Int? = null) = text(label, 14, color = fg, bold = true).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(fill); cornerRadius = dp(14).toFloat(); stroke?.let { setStroke(dp(2), it) }
+            }
+            setPadding(dp(10), dp(2), dp(10), dp(2))
+        }
         val content = column().apply {
-            addView(text(s(if (offer is DeliveryOffer.Income) R.string.delivery_income else R.string.delivery_purchase),
-                14, color = PixelStyle.focus, bold = true))
-            addView(text(present(name, R.string.delivery_vehicle_missing), if (detailed) 23 else 19, bold = true))
+            if (tile) addView(text(present(name, R.string.delivery_vehicle_missing), 19, bold = true).apply { maxLines = 1 })
+            addView(row().apply {
+                gravity = Gravity.CENTER_VERTICAL
+                if (!tile) addView(text(present(name, R.string.delivery_vehicle_missing), if (detailed) 23 else 19, bold = true).apply { setPadding(0, 0, dp(8), 0) })
+                if (offer is DeliveryOffer.Purchase) addView(chip(vehicleLabels.rarity(offer.rarity), PixelStyle.rarityColor(offer.rarity), 0, PixelStyle.rarityColor(offer.rarity)),
+                    LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+                addView(if (offer is DeliveryOffer.Income) chip(s(R.string.delivery_income), 0xff7ee2a6.toInt(), 0xff1f3a2c.toInt())
+                    else chip(s(R.string.delivery_purchase), PixelStyle.gold, 0xff3d3216.toInt()))
+            }, LayoutParams(-1, -2).apply { topMargin = dp(6) })
             when (offer) {
                 is DeliveryOffer.Income -> {
-                    addView(text(context.getString(R.string.delivery_money, s(R.string.delivery_completion_reward), offer.reward.units),
+                    if (tile) addView(amountRow(s(R.string.delivery_tile_reward), "+${java.text.NumberFormat.getIntegerInstance(java.util.Locale.KOREA).format(offer.reward.units)}"))
+                    else addView(text(context.getString(R.string.delivery_money, s(R.string.delivery_completion_reward), offer.reward.units),
                         18, color = PixelStyle.gold, bold = true))
                     if (!tile) addView(text(s(R.string.delivery_income_note), 14, color = muted))
                 }
                 is DeliveryOffer.Purchase -> {
-                    addView(text(vehicleLabels.rarity(offer.rarity), 14, color = PixelStyle.rarityColor(offer.rarity), bold = true))
-                    addView(text(context.getString(R.string.delivery_money,
+                    if (tile) addView(amountRow(s(R.string.delivery_tile_price), java.text.NumberFormat.getIntegerInstance(java.util.Locale.KOREA).format(offer.price.units)))
+                    else addView(text(context.getString(R.string.delivery_money,
                         s(if (active) R.string.delivery_selected_purchase_amount else R.string.delivery_purchase_payment), offer.price.units),
                         18, color = PixelStyle.gold, bold = true))
                     if (!tile) addView(text(s(if (active) R.string.delivery_active_purchase_note else R.string.delivery_purchase_note), 14, color = muted))
@@ -518,6 +563,14 @@ class DeliveryView(
         add(parent, panel(padding = 12, fill = PixelStyle.inset).apply {
             addView(text(context.getString(R.string.delivery_money, s(label), amount), 20, color = PixelStyle.gold, bold = true))
         })
+    }
+    /** HTML 의뢰 카드의 "완료 보상 +220" / "가격 1,000" 줄 */
+    private fun amountRow(label: String, amount: String) = with(style) {
+        row().apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(text(label, 15, color = muted), LinearLayout.LayoutParams(0, -2, 1f))
+            addView(text("● $amount", 19, color = PixelStyle.gold, bold = true))
+        }
     }
     private fun heading(parent: LinearLayout, label: Int) { style.add(parent, style.text(s(label), 21, bold = true), 4) }
     private fun note(parent: LinearLayout, label: Int) { info(parent, s(label), muted = true) }

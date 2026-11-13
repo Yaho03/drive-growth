@@ -31,7 +31,7 @@
     <string name="delivery_purchase_payment">구매 결제 예정</string>
     <string name="delivery_money">%1$s · %2$d 게임머니</string>
     <string name="delivery_active">진행 중 탁송</string>
-    <string name="delivery_estimated">예상 경로 거리 · %1$d m</string>
+    <string name="delivery_estimated">예상 거리 · %1$s</string>
     <string name="delivery_observed">실제 관측 거리 · %1$s</string>
     <string name="delivery_information_missing">확인 불가</string>
     <string name="delivery_progress_missing">진행 상태 확인 불가</string>
@@ -68,7 +68,12 @@
     <string name="delivery_scene_held">구매 차량이 임시 보관함에 도착했어요</string>
     <string name="delivery_scene_held_note">차고가 가득 차 임시 보관 중이에요.</string>
     <string name="delivery_scene_highway">탁송 경로 연출</string>
-    <string name="delivery_scene_observed">관측 이동 거리 · %1$d m</string>
+    <string name="delivery_scene_observed">달린 거리 · %1$s</string>
     <string name="delivery_scene_reward">확정 보상</string>
     <string name="delivery_scene_skip">연출 닫기</string>
+    <string name="delivery_offers_all">이 목적지로 받을 수 있는 의뢰</string>
+    <string name="delivery_tile_reward">완료 보상</string>
+    <string name="delivery_tile_price">가격</string>
+    <string name="delivery_from_shop">우리 가게</string>
+    <string name="delivery_wait_first_drive">운전을 시작하면 트럭도 함께 가요. 막대는 주차할 때 확인된 거리만 채워요</string>
 </resources>

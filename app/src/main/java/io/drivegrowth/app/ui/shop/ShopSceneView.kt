@@ -575,6 +575,7 @@ internal class ShopSceneView(
     })
 
     private fun drawSign(canvas: Canvas) {
+        if (content.appearance.sign.startsWith("기본 간판")) return   // 기본 상태는 마을 그림에 그려진 간판을 그대로 보인다
         canvas.save()
         canvas.translate(729f, 284f)
         canvas.skew(0f, .40f)
@@ -591,7 +592,7 @@ internal class ShopSceneView(
         canvas.save()
         canvas.translate(x, y)
         polygon(canvas, closedSlot, 0xff32394a.toInt())
-        if (selectedId == null && model.slots != null) badge(canvas, context.getString(R.string.shop_scene_slot_closed), 0f, 0f, 105f)
+        if (selectedId == null && model.slots != null) badge(canvas, context.getString(R.string.shop_scene_slot_closed), 0f, 0f, 44f)
         canvas.restore()
     }
 
@@ -599,8 +600,8 @@ internal class ShopSceneView(
         val bitmap = bitmaps[vehicle.id]
         val parked = vehicle.activity == VehicleActivity.IDLE || vehicle.activity == VehicleActivity.NEEDS_REPAIR
         if (bitmap != null && parked) {
-            vehicle.rarity?.let { drawRarity(canvas, it, x, y + 13f) }
-            val drawWidth = if (bitmap.width == 56) 88f else 100f
+            // 차 밑 희귀도 고리는 그리지 않는다(2026-11-13 디자인 결정). 차는 원본의 1.8배
+            val drawWidth = bitmap.width * 1.8f
             val drawHeight = drawWidth * bitmap.height / bitmap.width
             area.set(x - drawWidth / 2, y - 7f - drawHeight / 2, x + drawWidth / 2, y - 7f + drawHeight / 2)
             canvas.save()
@@ -612,9 +613,10 @@ internal class ShopSceneView(
             }
             canvas.restore()
         }
-        val label = if (vehicle.activity == VehicleActivity.IDLE && bitmap != null) vehicle.name
-            else "${vehicle.name} · ${vehicle.status}"
-        badge(canvas, label, x - 36f, y + 25f, 155f)
+        // HTML처럼 대기 중인 차에는 이름표를 달지 않고, 상태가 있을 때만 차 위에 짧게 띄운다
+        if (vehicle.activity == VehicleActivity.IDLE && bitmap != null) return
+        if (bitmap == null) badge(canvas, vehicle.name, x - 36f, y + 25f, 155f)
+        else badge(canvas, vehicle.status, x - 30f, y - 70f, 96f)
     }
 
     private fun drawHeadlights(rarity: Rarity?, canvas: Canvas, elapsed: Long) {

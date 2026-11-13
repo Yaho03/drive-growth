@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.garage
 
+import io.drivegrowth.app.ui.pixel.PlayerText
 import android.content.Context
 import android.view.View
 import android.widget.LinearLayout
@@ -58,7 +59,7 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
                 })
             }
             is CollectionScreenState.Content -> {
-                body.addView(text(current.sourceLabel, color = muted))
+                PlayerText.source(current.sourceLabel)?.let { body.addView(text(it, color = muted)) }
                 body.addView(text(s(R.string.garage_collection_note), color = muted))
                 if (current.entries.isEmpty()) {
                     add(body, text(s(R.string.garage_collection_empty), 28, bold = true))

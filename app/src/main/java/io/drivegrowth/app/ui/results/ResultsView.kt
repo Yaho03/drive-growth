@@ -85,7 +85,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
             addView(scroll(message(s(R.string.results_restricted), s(R.string.results_restricted_body)), 0), LayoutParams(-1, -1))
             return@with
         }
-        addView(text(s(R.string.results_title), 32, bold = true))
+        addView(text(s(R.string.results_title), 26, bold = true))
         when (val current = interaction.state) {
             ResultsScreenState.Loading -> addView(scroll(message(if (uiState.scope == ResultsScope.ALL) "정산 이력을 불러오고 있어요" else s(R.string.results_loading)), 0), LayoutParams(-1, 0, 1f))
             is ResultsScreenState.Error -> addView(scroll(problem(s(R.string.results_error), current.message, true), 0), LayoutParams(-1, 0, 1f))
@@ -94,14 +94,17 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
             }, 0), LayoutParams(-1, 0, 1f))
             is ResultsScreenState.Unsupported -> addView(scroll(problem(s(R.string.results_unsupported), current.message, false), 0), LayoutParams(-1, 0, 1f))
             is ResultsScreenState.Content -> {
-                addView(text(s(if (current.origin == ResultsOrigin.FIXTURE) R.string.results_fixture else R.string.results_stored), color = accent))
+                if (current.origin == ResultsOrigin.FIXTURE) addView(text(s(R.string.results_fixture), color = accent))
                 val area = if (wide) row() else column()
                 addView(area, LayoutParams(-1, 0, 1f))
+                // HTML 정산 화면: 고르기 전에는 가운데 카드 하나, 고르면 오른쪽에 상세
+                val single = wide && selectedSettlementId == null
                 if (wide || selectedSettlementId == null) {
                     listScroll = scroll(resultList(current), listY).apply { tag = "results:list" }
-                    area.addView(listScroll, if (wide) LayoutParams(0, -1, 1f) else LayoutParams(-1, -1))
+                    area.addView(listScroll, if (single) LayoutParams(0, -1, 1f).apply { marginStart = dp(160); marginEnd = dp(160) }
+                        else if (wide) LayoutParams(0, -1, 1f) else LayoutParams(-1, -1))
                 }
-                if (wide || selectedSettlementId != null) {
+                if ((wide && !single) || selectedSettlementId != null) {
                     detailScroll = scroll(detail(), detailY).apply { tag = "results:detail" }
                     area.addView(detailScroll, if (wide) LayoutParams(0, -1, 1.2f).apply { marginStart = dp(PixelStyle.gapDp) } else LayoutParams(-1, -1))
                 }
@@ -123,52 +126,66 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
 
     private fun resultList(state: ResultsScreenState.Content) = with(style) {
         column().apply {
-            add(this, card().apply {
-                addView(text(context.getString(R.string.results_summary,
-                    state.results.count { interaction.readState(it.settlement.settlementId) != ResultsReadState.Done }, state.results.size), 28, bold = true))
-                addView(text(if (state.historyAvailable) "열람한 정산도 전체 기록에 보관돼요." else s(R.string.results_history_unsupported), color = muted))
-                if (state.historyAvailable) add(this, row().apply {
-                    ResultsScope.entries.forEachIndexed { index, scope ->
-                        addView(button(if (scope == ResultsScope.ALL) "전체 기록" else "미확인", primary = uiState.scope == scope) {
-                            interaction.scope(scope); drawScreen()
-                        }.apply { tag = "results:scope:${scope.name}" }, LayoutParams(0, -2, 1f).apply {
-                            if (index > 0) marginStart = dp(PixelStyle.gapDp)
-                        })
-                    }
-                })
-            })
+            add(this, row().apply {   // 제목 한 줄 + 오른쪽 작은 [미확인][전체 기록]
+                gravity = Gravity.CENTER_VERTICAL
+                addView(column().apply {
+                    addView(text(s(R.string.results_headline), 24, bold = true))
+                    addView(text(context.getString(R.string.results_summary,
+                        state.results.count { interaction.readState(it.settlement.settlementId) != ResultsReadState.Done }, state.results.size), 16, muted))
+                    if (!state.historyAvailable) addView(text(s(R.string.results_history_unsupported), 14, muted))
+                }, LayoutParams(0, -2, 1f))
+                if (state.historyAvailable) ResultsScope.entries.forEach { scope ->
+                    addView(button(if (scope == ResultsScope.ALL) "전체 기록" else "미확인", primary = uiState.scope == scope) {
+                        interaction.scope(scope); drawScreen()
+                    }.apply { tag = "results:scope:${scope.name}"; textSize = 16f; minHeight = dp(48); minimumHeight = dp(48) },
+                        LayoutParams(-2, -2).apply { marginStart = dp(8) })
+                }
+            }, 4)
             if (interaction.visibleResults.isEmpty()) add(this, message(
                 if (state.historyAvailable && uiState.scope == ResultsScope.ALL) "저장된 정산 기록이 없어요" else s(R.string.results_empty),
                 if (state.historyAvailable) "현재 필터에서 표시할 정산이 없어요." else s(R.string.results_empty_body)))
-            interaction.visibleResults.forEach { value ->
-                val settlement = value.settlement
-                add(this, card(selected = selectedSettlementId == settlement.settlementId).apply {
-                    addView(text(kind(settlement.transaction.kind), 24, bold = true))
-                    addView(text(s(R.string.results_confirmed), color = accent))
-                    addView(text(moneyChange(settlement), 30, amountColor(settlement), bold = true))
-                    settlement.changedVehicle?.let { car ->
-                        add(this, row().apply {
-                            gravity = Gravity.CENTER_VERTICAL
-                            vehicleArt(car.vehicleId)?.let { addView(it, LayoutParams(dp(76), dp(56))) }
-                            addView(text(value.vehicleName ?: s(R.string.results_vehicle_name_missing)), LayoutParams(0, -2, 1f).apply {
-                                if (childCount != 0) marginStart = dp(PixelStyle.gapDp)
-                            })
-                        })
-                    }
-                    addView(text(pair(R.string.results_settlement_id, settlement.settlementId.value), color = muted))
-                    addView(text(pair(R.string.results_time, time(settlement)), color = muted))
-                    if (interaction.readState(settlement.settlementId) == ResultsReadState.Done) addView(text(s(R.string.results_mark_done)))
-                    add(this, button(s(R.string.results_open), primary = selectedSettlementId == settlement.settlementId) {
+            // HTML처럼 한 카드 안에 [종류 칩] 내용 … 금액 줄들, 맨 아래 합계
+            if (interaction.visibleResults.isNotEmpty()) add(this, card().apply {
+                var total = 0L
+                interaction.visibleResults.forEachIndexed { index, value ->
+                    val settlement = value.settlement
+                    settlement.transaction.money?.let { total += if (it.direction == MoneyDirection.CREDIT) it.amount.units else -it.amount.units }
+                    val selected = selectedSettlementId == settlement.settlementId
+                    val open = {
                         if (selectedSettlementId != settlement.settlementId) { detailY = 0; detailScroll = null }
                         openedResult = settlement.settlementId
                         interaction.select(settlement.settlementId)
                         drawScreen()
-                    }.apply {
-                        tag = "results:open:${settlement.settlementId.value}"
-                        contentDescription = context.getString(R.string.results_open_accessibility, kind(settlement.transaction.kind), settlement.settlementId.value)
-                    })
-                })
-            }
+                    }
+                    addView(row().apply {
+                        gravity = Gravity.CENTER_VERTICAL
+                        background = shape(inset, selected)
+                        setPadding(dp(12), dp(8), dp(10), dp(8))
+                        addView(text(kind(settlement.transaction.kind), 15, ink, bold = true).apply {
+                            background = android.graphics.drawable.GradientDrawable().apply { setColor(PixelStyle.panel); cornerRadius = dp(14).toFloat() }
+                            setPadding(dp(12), dp(4), dp(12), dp(4))
+                        })
+                        settlement.changedVehicle?.let { car -> vehicleArt(car.vehicleId)?.let { addView(it, LayoutParams(dp(52), dp(38)).apply { marginStart = dp(10) }) } }
+                        addView(text(value.vehicleName ?: time(settlement), 17).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END },
+                            LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
+                        if (interaction.readState(settlement.settlementId) == ResultsReadState.Done) addView(text(s(R.string.results_mark_done), 14, muted))
+                        addView(text(moneyChange(settlement), 22, amountColor(settlement), bold = true), LayoutParams(-2, -2).apply { marginStart = dp(10) })
+                        addView(button("보기", primary = selected) { open() }.apply {
+                            tag = "results:open:${settlement.settlementId.value}"
+                            contentDescription = context.getString(R.string.results_open_accessibility, kind(settlement.transaction.kind), settlement.settlementId.value)
+                            textSize = 16f; minHeight = dp(48); minimumHeight = dp(48)
+                        }, LayoutParams(-2, -2).apply { marginStart = dp(10) })
+                    }, LayoutParams(-1, -2).apply { if (index > 0) topMargin = dp(8) })
+                }
+                addView(row().apply {   // 합계(금색 테두리)
+                    gravity = Gravity.CENTER_VERTICAL
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        setColor(PixelStyle.inset); cornerRadius = dp(16).toFloat(); setStroke(dp(2), PixelStyle.gold) }
+                    setPadding(dp(16), dp(10), dp(16), dp(10))
+                    addView(text(s(R.string.results_total), 18, bold = true), LayoutParams(0, -2, 1f))
+                    addView(text((if (total >= 0) "+" else "−") + java.text.NumberFormat.getIntegerInstance(Locale.KOREA).format(kotlin.math.abs(total)), 34, PixelStyle.gold, bold = true))
+                }, LayoutParams(-1, -2).apply { topMargin = dp(12) })
+            })
         }
     }
 

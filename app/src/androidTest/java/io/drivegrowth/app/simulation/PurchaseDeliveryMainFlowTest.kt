@@ -306,8 +306,8 @@ class PurchaseDeliveryMainFlowTest :
         val rarityLabels = Rarity.entries.map(style::rarity).toSet()
         val beforeHeading = context.getString(R.string.delivery_before)
         val afterHeading = context.getString(R.string.delivery_after)
-        val beforeDistance = context.getString(R.string.delivery_estimated, purchase.route.active.proposed.estimated.meters)
-        val afterDistance = context.getString(R.string.delivery_estimated, 36_000L)
+        val beforeDistance = context.getString(R.string.delivery_estimated, io.drivegrowth.app.ui.pixel.PlayerText.km(purchase.route.active.proposed.estimated.meters))
+        val afterDistance = context.getString(R.string.delivery_estimated, io.drivegrowth.app.ui.pixel.PlayerText.km(36_000L))
         val observed = context.getString(R.string.delivery_observed, "실제 관측 이동 거리 $OBSERVED_METERS m")
         var review: DeliveryScreen.ChangeReview? = null
         awaitUi("변경 전후 거리·차량·희귀도·차액 확인") {

@@ -503,7 +503,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                         if (settings != null) settings() else openMapPanel(MapPanel.SettingsMenu)
                     }
                 })
-            frame.addView(hud, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply {
+            frame.addView(hud, FrameLayout.LayoutParams(-1, -2, Gravity.TOP or Gravity.START).apply {
                 marginStart = dp(8); marginEnd = dp(8); topMargin = dp(8)
             })
             val toolbar = row().apply {

@@ -419,7 +419,7 @@ class Issue37NativeMainPurchaseTest :
             assertEquals(offers.proposed.destination, state.navigation?.destination)
             assertEquals(Observation.Missing(MissingReason.NO_DATA), state.navigation?.arrival)
             val visible = labels()
-            assertTrue(context.getString(R.string.delivery_estimated, sdkMeters) in visible)
+            assertTrue(context.getString(R.string.delivery_estimated, io.drivegrowth.app.ui.pixel.PlayerText.km(sdkMeters)) in visible)
             for (offer in purchases) {
                 assertTrue(offers.vehicleNames.getValue(offer.vehicleId) in visible)
                 assertTrue(GarageStyle(activity).rarity(offer.rarity) in visible)
