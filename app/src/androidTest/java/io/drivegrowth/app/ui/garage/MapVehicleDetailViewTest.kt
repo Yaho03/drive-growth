@@ -1,0 +1,146 @@
+package io.drivegrowth.app.ui.garage
+
+import android.test.InstrumentationTestCase
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.ScrollView
+import android.widget.TextView
+import io.drivegrowth.core.contract.MAX_VEHICLE_LEVEL
+import io.drivegrowth.core.contract.Revision
+import io.drivegrowth.core.progression.VehicleAction
+
+@Suppress("DEPRECATION")
+class MapVehicleDetailViewTest : InstrumentationTestCase() {
+    private fun onUi(block: () -> Unit) {
+        var failure: Throwable? = null
+        instrumentation.runOnMainSync {
+            try { block() } catch (error: Throwable) { failure = error }
+        }
+        failure?.let { throw it }
+    }
+
+    fun testPanelKeepsMapVisibleAndFitsPortraitAndShortWideWindows() = onUi {
+        val view = MapVehicleDetailView(instrumentation.targetContext) {}
+        val state = GaragePreviewStates.normal
+        val id = state.data.vehicles.last().vehicle.ownedVehicleId
+        view.render(state, id, controlsEnabled = true, actionsBlocked = false)
+        val panel = view.findViewWithTag<View>("map:vehicle-detail")
+
+        layout(view, 840, 1100)
+        assertEquals(dp(view, 12), panel.left)
+        assertEquals(dp(view, 1100) - dp(view, 12), panel.bottom)
+        assertTrue(panel.height <= dp(view, 660))
+        assertTrue(texts(view).any { "긴 차종명" in it })
+        assertTrue(texts(view).contains("활동 상태 확인 불가"))
+
+        layout(view, 1000, 340)
+        assertEquals(dp(view, 1000) - dp(view, 12), panel.right)
+        assertEquals(dp(view, 360), panel.width)
+        assertTrue(panel.height <= dp(view, 340) - 2 * dp(view, 12))
+        view.findViewWithTag<Button>("map:vehicle-manage").performClick()
+        layout(view, 320, 360)
+        val scroll = view.findViewWithTag<ScrollView>("map:vehicle-detail-scroll")
+        assertTrue(scroll.getChildAt(0).height > scroll.height)
+        assertTrue(view.findViewWithTag<Button>("map:vehicle-close").bottom <= panel.height)
+    }
+
+    fun testSelectionChangesAndRestrictionInvalidateOldActions() = onUi {
+        val events = mutableListOf<GarageEvent>()
+        val view = MapVehicleDetailView(instrumentation.targetContext, events::add)
+        val state = GaragePreviewStates.normal
+        val first = state.data.vehicles[0]
+        val second = state.data.vehicles[3]
+        view.render(state, first.vehicle.ownedVehicleId, controlsEnabled = true, actionsBlocked = false)
+        view.findViewWithTag<Button>("map:vehicle-manage").performClick()
+        val previous = view.findViewWithTag<Button>(VehicleAction.SELL)
+        view.render(state, second.vehicle.ownedVehicleId, controlsEnabled = true, actionsBlocked = false)
+        previous.performClick()
+        assertTrue(events.isEmpty())
+        assertTrue(texts(view).contains("수리 필요"))
+        assertTrue(texts(view).contains("레벨 진행량 · 75%"))
+
+        view.findViewWithTag<Button>("map:vehicle-manage").performClick()
+        val repair = view.findViewWithTag<Button>(VehicleAction.REPAIR)
+        assertFalse(view.findViewWithTag<Button>(VehicleAction.SELL).isEnabled)
+        repair.performClick()
+        repair.performClick()
+        assertEquals(listOf(GarageEvent.RequestAction(second.vehicle.ownedVehicleId, second.vehicle.revision, VehicleAction.REPAIR)), events)
+        assertFalse(view.handleBack())
+
+        view.render(state, second.vehicle.ownedVehicleId, controlsEnabled = false, actionsBlocked = true)
+        repair.performClick()
+        assertEquals(View.GONE, view.visibility)
+        assertTrue(texts(view).isEmpty())
+        assertEquals(1, events.size)
+        view.render(state, second.vehicle.ownedVehicleId, controlsEnabled = true, actionsBlocked = false)
+        assertFalse(view.findViewWithTag<Button>("map:vehicle-manage").isEnabled)
+        view.completeRequest()
+        assertTrue(view.findViewWithTag<Button>("map:vehicle-manage").isEnabled)
+    }
+
+    fun testFreshRevisionUsesHostActionAndBackClosesOnlyPresentation() = onUi {
+        val events = mutableListOf<GarageEvent>()
+        val view = MapVehicleDetailView(instrumentation.targetContext, events::add)
+        val state = GaragePreviewStates.normal
+        val sample = state.data.vehicles.first()
+        val id = sample.vehicle.ownedVehicleId
+        view.render(state, id, controlsEnabled = true, actionsBlocked = false)
+        view.findViewWithTag<Button>("map:vehicle-manage").performClick()
+        val previous = view.findViewWithTag<Button>(VehicleAction.SELL)
+        val updated = sample.copy(vehicle = sample.vehicle.copy(revision = Revision(5)))
+        view.render(state.copy(data = state.data.copy(vehicles = listOf(updated))), id,
+            controlsEnabled = true, actionsBlocked = false)
+        previous.performClick()
+        assertTrue(events.isEmpty())
+        view.findViewWithTag<Button>(VehicleAction.SELL).performClick()
+        assertEquals(listOf(GarageEvent.RequestAction(id, Revision(5), VehicleAction.SELL)), events)
+        view.completeRequest()
+        assertTrue(view.handleBack())
+        assertNotNull(view.findViewWithTag<Button>("map:vehicle-manage"))
+        assertTrue(view.handleBack())
+        assertEquals(GarageEvent.CloseDetail, events.last())
+        assertEquals(View.GONE, view.visibility)
+    }
+
+    fun testLoadingReadFailureAndRemovedVehicleDoNotOfferManagement() = onUi {
+        val events = mutableListOf<GarageEvent>()
+        val view = MapVehicleDetailView(instrumentation.targetContext, events::add)
+        val state = GaragePreviewStates.normal
+        val sample = state.data.vehicles.first()
+        val id = sample.vehicle.ownedVehicleId
+        val maxLevel = sample.copy(vehicle = sample.vehicle.copy(level = MAX_VEHICLE_LEVEL))
+        view.render(state.copy(data = state.data.copy(vehicles = listOf(maxLevel))), id,
+            controlsEnabled = true, actionsBlocked = true)
+        assertTrue(texts(view).contains("최대 레벨"))
+        assertFalse(view.findViewWithTag<Button>("map:vehicle-manage").isEnabled)
+
+        view.render(GarageScreenState.Loading, id, controlsEnabled = true, actionsBlocked = false)
+        assertNull(view.findViewWithTag<Button>("map:vehicle-manage"))
+        view.render(GaragePreviewStates.error, id, controlsEnabled = true, actionsBlocked = false)
+        val retry = view.findViewWithTag<Button>("map:vehicle-retry")
+        retry.performClick()
+        retry.performClick()
+        assertEquals(listOf(GarageEvent.Retry), events)
+        assertNull(view.findViewWithTag<Button>("map:vehicle-manage"))
+        view.render(GaragePreviewStates.removed, id, controlsEnabled = true, actionsBlocked = false)
+        assertTrue(texts(view).contains("선택한 차량을 찾을 수 없어요"))
+        assertNull(view.findViewWithTag<Button>("map:vehicle-manage"))
+    }
+
+    private fun dp(view: View, value: Int) = (value * view.resources.displayMetrics.density).toInt()
+
+    private fun layout(view: View, width: Int, height: Int) {
+        val widthPx = dp(view, width)
+        val heightPx = dp(view, height)
+        view.measure(View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.EXACTLY))
+        view.layout(0, 0, widthPx, heightPx)
+    }
+
+    private fun texts(view: View): List<String> = when (view) {
+        is TextView -> listOf(view.text.toString())
+        is ViewGroup -> (0 until view.childCount).flatMap { texts(view.getChildAt(it)) }
+        else -> emptyList()
+    }
+}
