@@ -81,8 +81,8 @@ internal class ShopMapOverlayView(
                         is ShopScreenState.Unsupported -> state.message
                         is ShopScreenState.Content -> error("이미 표시 내용을 읽었습니다")
                     }
-                    addView(text(status, 18))
                     if (state is ShopScreenState.Failure || state is ShopScreenState.Empty) {
+                        addView(text(status, 18))
                         val retryPending = interaction.uiState.retryPending
                         add(this, button(s(if (retryPending) R.string.shop_retry_pending else R.string.shop_retry),
                             !retryPending, primary = true) {
@@ -91,6 +91,8 @@ internal class ShopMapOverlayView(
                                 onChanged()
                             }
                         }.apply { tag = "shop:map-retry" })
+                    } else {
+                        addView(text(status, 18))
                     }
                 }
                 target == ShopMapTarget.Decorations -> {
@@ -169,7 +171,14 @@ internal class ShopMapOverlayView(
         val current = interaction ?: return false
         if (visibility != VISIBLE || !current.controlsEnabled) return false
         // 닫기는 보관 요청을 취소하지 않는다. 미리보기만 기존 상호작용으로 취소한다.
+        val returnToDecorations = target == ShopMapTarget.Decorations &&
+            current.uiState.pending == null && current.selection != null
         if (current.uiState.pending == null) current.cancel()
+        if (returnToDecorations) {
+            generation++
+            onChanged()
+            return true
+        }
         generation++
         target = null
         visibility = GONE

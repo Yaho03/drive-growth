@@ -54,6 +54,7 @@ import io.drivegrowth.app.host.SimulationInputState
 import io.drivegrowth.app.host.ResultsHostMapper
 import io.drivegrowth.app.host.ResultsStateBundle
 import io.drivegrowth.app.ui.results.ResultsEvent
+import io.drivegrowth.app.ui.results.ResultsScope
 import io.drivegrowth.app.ui.results.ResultsView
 import io.drivegrowth.app.ui.onboarding.OnboardingEvent
 import io.drivegrowth.app.ui.onboarding.OnboardingScreenState
@@ -924,6 +925,8 @@ open class MainActivity : Activity() {
             operatingStatus = operatingStatus,
             onResults = {
                 if (homeSettings == null && navigation.page == HostPage.HOME && gameControlsAllowed()) {
+                    results.restoreUiState(results.uiState.copy(selectedId = null, scope = ResultsScope.UNVIEWED))
+                    session.results.remember(results.uiState)
                     select(HostPage.RESULTS)
                 }
             },
@@ -946,6 +949,12 @@ open class MainActivity : Activity() {
         onboarding.render(onboardingState, gameEnabled)
         renderDelivery(gameEnabled && navigation.page == HostPage.DELIVERY)
         chrome.removeAllViews()
+        if (homeEnabled && homeContent == null) {
+            chrome.addView(style.button("설정", onClick = ::openHomeSettings).apply {
+                tag = "host:home-settings-fallback"
+                compact(style)
+            }, LinearLayout.LayoutParams(-1, -2))
+        }
         renderSimulationControls(enabled)
         if (!enabled) {
             val simulation = session.simulation

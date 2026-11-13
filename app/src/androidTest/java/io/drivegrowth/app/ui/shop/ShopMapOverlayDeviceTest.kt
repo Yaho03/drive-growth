@@ -68,7 +68,7 @@ class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
         assertTrue(overlay.handleBack())
         oldConfirm.performClick()
         assertNull(interaction.selection)
-        assertEquals(1, closes)
+        assertEquals(0, closes)
         assertTrue(events.isEmpty())
 
         overlay.render(ShopMapTarget.Decorations, interaction)

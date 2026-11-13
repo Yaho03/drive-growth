@@ -474,8 +474,8 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                 activeSheet = target
                 val dim = View(context).apply {
                     setBackgroundColor(0x880d1423.toInt())
-                    isClickable = true
                     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    isClickable = true
                 }
                 frame.addView(dim, FrameLayout.LayoutParams(-1, -1))
                 val content = when (target) {
@@ -494,10 +494,12 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         } else {
             val hud = ShopMapHud(context, c, money(c.balance), operatingStatus, unviewedCount,
                 openResults?.let { action -> { if (acceptsFocusInput(generation)) action() } },
-                { if (acceptsFocusInput(generation)) {
-                    val settings = openSettings
-                    if (settings != null) settings() else openMapPanel(MapPanel.SettingsMenu)
-                } })
+                {
+                    if (acceptsFocusInput(generation)) {
+                        val settings = openSettings
+                        if (settings != null) settings() else openMapPanel(MapPanel.SettingsMenu)
+                    }
+                })
             frame.addView(hud, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply {
                 marginStart = dp(8); marginEnd = dp(8); topMargin = dp(8)
             })
@@ -521,13 +523,16 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             frame.addView(toolbar, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM or Gravity.START).apply {
                 marginStart = dp(8); marginEnd = dp(8); bottomMargin = dp(8)
             })
-            val notice = uiState.message ?: uiState.acknowledged?.takeIf { it.revision == c.revision }
-                ?.let { s(R.string.shop_wait_refresh) }
-            notice?.let { message ->
-                frame.addView(text(message, 16, accent).apply { background = shape(panel) },
-                    FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
-                        marginStart = dp(8); marginEnd = dp(8); bottomMargin = dp(62)
-                    })
+            val notice = uiState.message ?: uiState.acknowledged
+                ?.takeIf { it.revision == c.revision }?.let { s(R.string.shop_wait_refresh) }
+            if (notice != null) {
+                val layout = FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
+                    marginStart = dp(8)
+                    marginEnd = dp(8)
+                    bottomMargin = dp(62)
+                }
+                val label = text(notice, 16, accent).apply { background = shape(panel) }
+                frame.addView(label, layout)
             }
         }
         frame

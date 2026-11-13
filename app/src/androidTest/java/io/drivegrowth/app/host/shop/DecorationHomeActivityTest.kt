@@ -96,7 +96,9 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
         instrumentation.runOnMainSync { a.onBackPressed() }
         await(a,"Back은 미리보기만 닫음") { shop(a).uiState.selection==null && menu(a)?.isEnabled==true }
         assertEquals(before,read { game -> Triple(ok(game.store.balance()),ok(game.store.decorations.state(game.identity.profileId)),counts(game)) })
-        preview(a,id);click(a,"shop:map-close")
+        click(a,"shop:map-preview:decoration:$id")
+        click(a,"shop:map-close")
+        click(a,"shop:map-close")
         assertEquals(before,read { game -> Triple(ok(game.store.balance()),ok(game.store.decorations.state(game.identity.profileId)),counts(game)) })
     }
     private fun recreateAndCompare(a:MainActivity,expected:Pair<GameIdentity,io.drivegrowth.core.decoration.DecorationState>) {
