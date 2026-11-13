@@ -55,3 +55,7 @@
 .shop.returning>:last-child{animation:fxFadeIn .45s .2s both}
 @keyframes fxFadeIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.shop.returning>:last-child{animation:none}}
+
+/* 주민 누르기: 손 흔들기·들어 올리기 */
+.map .town-emote{position:absolute;transform:translate(-50%,-100%);width:1.4%;image-rendering:pixelated;pointer-events:none}
+#townViewport{-webkit-user-select:none;user-select:none}
