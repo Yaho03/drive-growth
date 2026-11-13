@@ -21,6 +21,7 @@ import io.drivegrowth.app.mainPage
 import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.showSimulationControls
 import io.drivegrowth.app.simulation.UnifiedSimulationActivity
+import io.drivegrowth.app.ui.delivery.DeliveryScreen
 import io.drivegrowth.app.ui.gacha.GachaView
 import io.drivegrowth.app.ui.onboarding.OnboardingView
 import io.drivegrowth.app.ui.results.ResultsView
@@ -252,8 +253,19 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
     private fun verifyDeliveryDeparture(host: UnifiedSimulationActivity, games: GameSessionFactory) {
         openPage(host, HostPage.DELIVERY)
         click(host, "delivery:destination")
-        click(host, "simulation:destination")
-        click(host, "delivery:offer:offer-0")
+        val delivery = (host.onRetainNonConfigurationInstance() as HostSession).delivery
+        await("시연 목적지 준비 완료 뒤 확인") {
+            delivery.state?.screen is DeliveryScreen.Destination &&
+                button(host, "simulation:destination")?.takeIf { it.isEnabled && it.isShown }?.performClick() == true
+        }
+        await("저장된 수익 탁송 후보 열기") {
+            val current = delivery.state ?: return@await false
+            if (current.displayedProposal != null || delivery.isSavingDisplayedOffers) return@await false
+            val proposal = (current.screen as? DeliveryScreen.Offers)?.proposal ?: return@await false
+            val income = proposal.proposed.offers.filterIsInstance<DeliveryOffer.Income>()
+                .firstOrNull { proposal.availability[it.id]?.allowed == true } ?: return@await false
+            button(host, "delivery:offer:${income.id.value}")?.takeIf { it.isEnabled && it.isShown }?.performClick() == true
+        }
         click(host, "delivery:confirm")
         await("확정 수익 탁송 출발") {
             host.window.decorView.findViewWithTag<View>("delivery:scene:DEPARTURE")?.isShown == true
