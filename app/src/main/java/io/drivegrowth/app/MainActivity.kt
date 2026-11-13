@@ -154,6 +154,9 @@ open class MainActivity : Activity() {
     private var active = false
     private val backObservation = BackObservationBoundary()
     private lateinit var panel: LinearLayout
+    private lateinit var driveBar: DriveProgressBarView
+    private lateinit var driveChip: DriveProgressChipView
+    private var driveBarCollapsed = false
     private val watchdog = object : Runnable {
         override fun run() {
             if (!active) return
@@ -326,6 +329,15 @@ open class MainActivity : Activity() {
         panel.addView(chrome)
         stage = FrameLayout(this).apply { addView(body, FrameLayout.LayoutParams(-1, -1)) }
         panel.addView(stage, LinearLayout.LayoutParams(-1, 0, 1f))
+        // 탁송 진행도: 화면과 아래 메뉴 사이의 한 줄 막대. 숨기면 오른쪽 아래의 작은 내 차 아이콘만 남는다.
+        driveBar = DriveProgressBarView(this,
+            onOpen = { if (gameControlsAllowed() && homeSettings == null) select(HostPage.DELIVERY) },
+            onCollapse = { setDriveBarCollapsed(true) }).apply { visibility = View.GONE }
+        panel.addView(driveBar, LinearLayout.LayoutParams(-1, -2))
+        driveChip = DriveProgressChipView(this) { setDriveBarCollapsed(false) }.apply { visibility = View.GONE }
+        stage.addView(driveChip, FrameLayout.LayoutParams(style.dp(56), style.dp(56), Gravity.BOTTOM or Gravity.END).apply {
+            setMargins(0, 0, style.dp(14), style.dp(14))
+        })
         setContentView(panel)
         gacha.onCelebration = ::playCelebration
         results.onCelebration = ::playCelebration
@@ -953,6 +965,7 @@ open class MainActivity : Activity() {
         results.render(if (session.results.hasHistorySource) session.results.historyState else resultsMapper.map(screen), gameEnabled)
         onboarding.render(onboardingState, gameEnabled)
         renderDelivery(gameEnabled && navigation.page == HostPage.DELIVERY)
+        renderDriveProgress(gameEnabled)
         chrome.removeAllViews()
         if (gameEnabled && navigation.page == HostPage.HOME && (shopRestoreFailed || homeContent == null)) {
             chrome.addView(style.button("설정", onClick = ::openHomeSettings).apply {
@@ -1212,6 +1225,26 @@ open class MainActivity : Activity() {
         body.removeAllViews()
         (view.parent as? android.view.ViewGroup)?.removeView(view)
         body.addView(view, FrameLayout.LayoutParams(-1, -1))
+    }
+
+    /** 탁송 화면 밖에서만 보인다(탁송 화면에는 같은 진행 막대가 이미 있다). 주행 제한 중에는 게임 화면과 함께 숨는다. */
+    private fun renderDriveProgress(gameEnabled: Boolean) {
+        val progress = DriveProgress.from(deliveryFrame, session.delivery.state)
+            ?.takeIf { gameEnabled && navigation.page != HostPage.DELIVERY && homeSettings == null }
+        driveBar.render(progress)
+        val barShown = progress != null && !driveBarCollapsed
+        val chipShown = progress != null && driveBarCollapsed
+        if (barShown && driveBar.visibility != View.VISIBLE) { driveBar.visibility = View.VISIBLE; driveBar.slideIn() }
+        else if (!barShown) driveBar.visibility = View.GONE
+        if (chipShown && driveChip.visibility != View.VISIBLE) { driveChip.visibility = View.VISIBLE; driveChip.bringToFront(); driveChip.popIn() }
+        else if (!chipShown) driveChip.visibility = View.GONE
+    }
+
+    private fun setDriveBarCollapsed(value: Boolean) {
+        if (!gameControlsAllowed() || driveBarCollapsed == value) return
+        driveBarCollapsed = value
+        renderDriveProgress(true)
+        (if (value) driveChip else driveBar).requestFocus()
     }
 
     private fun select(page: HostPage) {
