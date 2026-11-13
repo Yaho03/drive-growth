@@ -299,6 +299,7 @@ internal class ShopSceneView(
             }
             polygon(canvas, outline, 0x99151a28.toInt())
         }
+        if (selectedId != null) return
         val ink = when (status) {
             ShopAvailability.LOCKED -> PixelStyle.gold
             ShopAvailability.AVAILABLE -> PixelStyle.focus
@@ -338,7 +339,7 @@ internal class ShopSceneView(
         canvas.save()
         canvas.translate(x, y)
         polygon(canvas, closedSlot, 0xff32394a.toInt())
-        if (model.slots != null) badge(canvas, context.getString(R.string.shop_scene_slot_closed), 0f, 0f, 105f)
+        if (selectedId == null && model.slots != null) badge(canvas, context.getString(R.string.shop_scene_slot_closed), 0f, 0f, 105f)
         canvas.restore()
     }
 

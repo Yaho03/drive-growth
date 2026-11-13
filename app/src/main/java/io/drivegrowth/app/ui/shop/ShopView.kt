@@ -341,11 +341,6 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                 }
             }
             addView(scene)
-            addView(originLabel(c))
-            addView(text(c.name, 30, bold = true))
-            addView(text(s(R.string.shop_level, c.level?.toString() ?: s(R.string.shop_unknown)) + " · " +
-                s(R.string.shop_capacity, c.ownedCount?.toString() ?: s(R.string.shop_unknown), c.capacity?.toString() ?: s(R.string.shop_unknown)), 22))
-            addView(text(s(R.string.shop_balance, money(c.balance)), 24, color = accent))
             val modes = row()
             for (mode in ShopMode.entries) modes.addView(button(
                 s(if (mode == ShopMode.OVERALL) R.string.shop_overall else R.string.shop_vehicles),
@@ -356,6 +351,11 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             },
                 LayoutParams(0, -2, 1f).apply { if (mode == ShopMode.VEHICLES) marginStart = dp(8) })
             add(this, modes)
+            addView(originLabel(c))
+            addView(text(c.name, 30, bold = true))
+            addView(text(s(R.string.shop_level, c.level?.toString() ?: s(R.string.shop_unknown)) + " · " +
+                s(R.string.shop_capacity, c.ownedCount?.toString() ?: s(R.string.shop_unknown), c.capacity?.toString() ?: s(R.string.shop_unknown)), 22))
+            addView(text(s(R.string.shop_balance, money(c.balance)), 24, color = accent))
             addView(text(c.appearance.sign, 24, bold = true))
             addView(text(s(R.string.shop_scene_layout_note), 16, color = muted))
             val model = shopSceneModel(c)

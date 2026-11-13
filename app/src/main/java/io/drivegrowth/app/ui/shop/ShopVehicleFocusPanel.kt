@@ -37,24 +37,30 @@ internal class ShopVehicleFocusPanel(
     private val back = style.button("← 가게", controlsEnabled, action = onBack).apply { tag = "shop:focus-back" }
     private val facts = style.scroll(facts(vehicle, selected, queryError), 0)
     private val actions = management ?: style.scroll(style.card().apply {
+        if (vehicle != null) {
+            val sharedExplanation = managementActions.mapNotNull { (action, _) ->
+                vehicle.actions[action]?.takeIf { it.enabled }?.explanation
+            }.distinct().singleOrNull()
+            if (sharedExplanation != null) addView(style.text(sharedExplanation, 16, style.muted))
+            for ((action, label) in managementActions) {
+                val info = vehicle.actions[action]
+                addView(style.button(context.getString(label), managementEnabled && info?.enabled == true) {
+                    onAction(action)
+                }.apply { tag = action })
+                if (info?.enabled != true || info.explanation != sharedExplanation) {
+                    addView(style.text(info?.explanation ?: context.getString(R.string.garage_action_unknown), 16, style.muted))
+                }
+            }
+        }
+        if (recovery != null) addView(recovery)
+        else addView(style.button(restingLabel ?: "영업 쉬기 확인 불가", managementEnabled && restingLabel != null, action = onRest)
+            .apply { tag = "shop:focus-rest" })
         if (choices.size > 1) addView(style.text("다른 차량 선택", 16, style.muted, bold = true))
         for (choice in choices) {
             if (choice.id == selected.id) continue
             addView(style.button(choice.name, controlsEnabled) { onSelect(choice) }
                 .apply { tag = "shop:focus-choose:${choice.id.value}" })
         }
-        if (vehicle != null) {
-            for ((action, label) in managementActions) {
-                val info = vehicle.actions[action]
-                addView(style.button(context.getString(label), managementEnabled && info?.enabled == true) {
-                    onAction(action)
-                }.apply { tag = action })
-                addView(style.text(info?.explanation ?: context.getString(R.string.garage_action_unknown), 16, style.muted))
-            }
-        }
-        if (recovery != null) addView(recovery)
-        else addView(style.button(restingLabel ?: "영업 쉬기 확인 불가", managementEnabled && restingLabel != null, action = onRest)
-            .apply { tag = "shop:focus-rest" })
     }, actionsY).apply { tag = "shop:focus-actions" }
     val actionScroll: ScrollView? get() = actions as? ScrollView
 

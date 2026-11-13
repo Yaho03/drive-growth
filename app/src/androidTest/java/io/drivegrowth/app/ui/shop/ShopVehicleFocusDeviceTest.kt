@@ -3,6 +3,7 @@ package io.drivegrowth.app.ui.shop
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import io.drivegrowth.app.ui.garage.ActionPresentation
@@ -65,8 +66,15 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
     fun testCompactPanelKeepsLongNamesAndUsesOnlyMatchingRestingFacts() = onUi {
         val context = instrumentation.targetContext
         val rests = mutableListOf<FacilityControlsEvent>()
+        val sharedExplanation = "실제 저장 상태로 비용과 결과를 먼저 확인합니다"
+        val repairReason = "현재 활동에서는 이 관리를 할 수 없습니다"
         val first = GaragePreviewStates.normal.data.vehicles.first().copy(
             name = "긴 차량 이름이 잘리지 않는지 확인하는 캐스퍼 일렉트릭",
+            actions = mapOf(
+                VehicleAction.LEVEL_UP to ActionPresentation(true, sharedExplanation),
+                VehicleAction.USE_MATERIAL to ActionPresentation(true, sharedExplanation),
+                VehicleAction.REPAIR to ActionPresentation(false, repairReason),
+            ),
         )
         val second = first.copy(vehicle = first.vehicle.copy(ownedVehicleId = OwnedVehicleId("focus-other")))
         val state = ShopPreviewStates.normal().copy(vehicles = listOf(first, second).map(::mapVehicle))
@@ -93,7 +101,14 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
         val back = panel.findViewWithTag<Button>("shop:focus-back")
         assertTrue(back.width > 0 && back.height > 0)
         assertTrue(actions.height > 0 && actions.bottom <= panel.height && actions.top >= back.bottom)
-        assertTrue(actions.getChildAt(0).height > actions.height)
+        val actionRows = actions.getChildAt(0) as LinearLayout
+        assertTrue(actionRows.height > actions.height)
+        val rows = (0 until actionRows.childCount).map(actionRows::getChildAt)
+        assertEquals(1, rows.filterIsInstance<TextView>().count { it.text.toString() == sharedExplanation })
+        val repair = panel.findViewWithTag<Button>(VehicleAction.REPAIR)
+        assertFalse(repair.isEnabled)
+        assertEquals(repairReason, (rows[rows.indexOf(repair) + 1] as TextView).text.toString())
+        assertTrue(rows.indexOf(choose) > rows.indexOf(repair))
         assertTrue(choose.text.contains(second.name))
         view.findViewWithTag<Button>("shop:focus-rest").performClick()
         assertEquals(listOf(current), rests)

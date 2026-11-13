@@ -273,7 +273,10 @@ class ShopViewTest : InstrumentationTestCase() {
                 assertEquals(description, view.paddingTop, mapBounds.top)
                 assertTrue(description, mapBounds.bottom <= view.height - view.paddingBottom)
                 assertTrue(description, mapBounds.contains(bounds(vehicle)))
-                assertTrue(description, mapBounds.bottom <= bounds(button(view, "shop:mode:VEHICLES")).top)
+                val sceneColumn = scene.parent as ViewGroup
+                val modeRow = button(view, "shop:mode:VEHICLES").parent as View
+                assertSame(description, sceneColumn.getChildAt(sceneColumn.indexOfChild(scene) + 1), modeRow)
+                assertTrue(description, mapBounds.bottom <= bounds(modeRow).top)
             }
         }
     }
