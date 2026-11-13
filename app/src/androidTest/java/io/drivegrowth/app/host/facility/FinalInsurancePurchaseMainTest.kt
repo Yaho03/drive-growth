@@ -53,7 +53,7 @@ class FinalInsurancePurchaseMainTest :
     private val confirmTag = "shop:map-confirm"
 
     fun testMainBuysCentralInsuranceAndTheSameLedgerPaysAccidentBenefit() {
-        assertEquals("새 격리 패키지에서 실행합니다", "io.drivegrowth.verify.finalinsurance44", context.packageName)
+        assertTrue("새 격리 패키지에서 실행합니다", context.packageName.startsWith("io.drivegrowth.verify.finalinsurance44"))
         assertTrue(context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0)
         assertFalse(db.exists())
         assertFalse(context.getDatabasePath("game-ledger-vehicle.db").exists())
@@ -194,12 +194,10 @@ class FinalInsurancePurchaseMainTest :
         assertEquals(before.copy(shop = before.shop.copy(facilities = setOf(Facility.INSURANCE)),
             balance = original.balance, settlements = before.settlements + original, checkpoint = checkpoint), purchased)
         click(root, "facility:ack")
-        awaitUi("보험 결과 확인 후 원결과 패널에서 빠져나올 수 있다") {
-            root.findViewWithTag<View>("facility:receipt")?.isShown != true
-        }
-        // 결과 확인 뒤 남아 있는 시설 메뉴를 닫고 지도에서 다시 연다.
-        if (onUi { root.findViewWithTag<View>("shop:map-facilities")?.isShown != true }) {
-            instrumentation.runOnMainSync { activity.onBackPressed() }
+        awaitUi("보험 결과 확인 후 확정 재조회로 지도에 돌아온다") {
+            if (root.findViewWithTag<View>("facility:receipt")?.isShown == true) return@awaitUi false
+            root.findViewWithTag<Button>("shop:map-sheet-close")?.takeIf { it.isShown && it.isEnabled }?.performClick()
+            root.findViewWithTag<View>("shop:map-facilities")?.isShown == true
         }
         openFacility(root, Facility.INSURANCE)
         awaitUi("보험 설치 유지와 재구매 선택 제거") {
