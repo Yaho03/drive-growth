@@ -47,6 +47,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     internal var focusedVehicleId: OwnedVehicleId? = null
         private set
     private var focusVehicles: Map<OwnedVehicleId, VehiclePresentation>? = null
+    private var focusGarageError: String? = null
     private var focusActionsScroll: ScrollView? = null
     private var focusActionsY = 0
     private var focusScene: ShopScreenState.Content? = null
@@ -78,13 +79,15 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         focusRestRecovery: Boolean = false,
         managementBusy: Boolean = false,
         vehicleActionsBlocked: Boolean = false,
+        focusError: String? = null,
     ) {
         val stale = state is ShopScreenState.Content &&
             state.revision.value < (interaction.uiState.latestRevision?.value ?: -1)
         interaction.render(state, controlsEnabled)
         if (!stale) {
-            this.focusVehicles = focusVehicles?.filter { it.vehicle.lifecycle == VehicleLifecycle.OWNED }
-                ?.associateBy { it.vehicle.ownedVehicleId }
+            this.focusVehicles = focusVehicles?.takeIf { focusError == null }
+                ?.filter { it.vehicle.lifecycle == VehicleLifecycle.OWNED }?.associateBy { it.vehicle.ownedVehicleId }
+            focusGarageError = focusError
             this.focusRest = focusRest
             this.focusRestRecovery = focusRestRecovery
             this.managementBusy = managementBusy
@@ -96,6 +99,15 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         interaction.restoreUiState(state)
         sceneY = state.sceneScrollY.coerceAtLeast(0); controlsY = state.controlsScrollY.coerceAtLeast(0)
         sceneScroll = null; controlsScroll = null
+        drawScreen()
+    }
+    internal fun restoreFocusedVehicle(id: OwnedVehicleId?) {
+        focusedVehicleId = id
+        focusScene = null
+        focusActionsScroll = null
+        focusActionsY = 0
+        focusFrom = null
+        focusStartedAt = null
         drawScreen()
     }
     private fun rememberExpansion(request: ShopRequest) {
@@ -149,7 +161,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             if (acceptsFocusInput(generation) && focusVehicles?.containsKey(id) != false) selectFocusedVehicle(id)
         })
         val facts = focusVehicles?.get(selected.id)
-        val canManage = interaction.state is ShopScreenState.Content && !vehicleActionsBlocked &&
+        val canManage = facts != null && interaction.state is ShopScreenState.Content && !vehicleActionsBlocked &&
             !managementBusy && uiState.pending == null
         val rest = focusRest[selected.id]?.takeIf {
             onFocusedRest != null && it.vehicle.ownedVehicleId == selected.id &&
@@ -162,6 +174,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         return ShopVehicleFocusPanel(context, camera, facts, vehicles, selected, recovery, management,
             rest?.let { if (it.expected) "영업 쉬기 끄기" else "영업 쉬기 켜기" },
             !managementBusy && uiState.pending == null, canManage, focusActionsY,
+            queryError = focusGarageError,
             onBack = { if (acceptsFocusInput(generation)) selectFocusedVehicle(null) },
             onAction = { action ->
                 if (acceptsFocusInput(generation) && canManage && focusedVehicleId == selected.id &&

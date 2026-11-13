@@ -27,6 +27,7 @@ internal class ShopVehicleFocusPanel(
     controlsEnabled: Boolean,
     managementEnabled: Boolean,
     actionsY: Int,
+    queryError: String?,
     onBack: () -> Unit,
     onAction: (VehicleAction) -> Unit,
     onRest: () -> Unit,
@@ -34,7 +35,7 @@ internal class ShopVehicleFocusPanel(
 ) : FrameLayout(context) {
     private val style = ShopStyle(context)
     private val back = style.button("← 가게", controlsEnabled, action = onBack).apply { tag = "shop:focus-back" }
-    private val facts = style.scroll(facts(vehicle, selected), 0)
+    private val facts = style.scroll(facts(vehicle, selected, queryError), 0)
     private val actions = management ?: style.scroll(style.card().apply {
         if (choices.size > 1) addView(style.text("다른 차량 선택", 16, style.muted, bold = true))
         for (choice in choices) {
@@ -89,11 +90,12 @@ internal class ShopVehicleFocusPanel(
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 
-    private fun facts(value: VehiclePresentation?, selected: ShopVehicle): LinearLayout = with(style) {
+    private fun facts(value: VehiclePresentation?, selected: ShopVehicle, queryError: String?): LinearLayout = with(style) {
         card().apply {
             addView(text(value?.let { vehicleDisplayName(it.name, it.instanceLabel) } ?: selected.name, 22, bold = true))
             if (value == null) {
-                addView(text("차량 관리 정보를 확인하고 있어요", 16, muted))
+                addView(text(queryError ?: "차량 관리 정보를 확인하고 있어요", 16, muted)
+                    .apply { tag = "shop:focus-query-status" })
                 return@apply
             }
             val car = value.vehicle

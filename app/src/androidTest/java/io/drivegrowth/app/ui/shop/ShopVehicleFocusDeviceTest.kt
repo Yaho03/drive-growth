@@ -4,6 +4,7 @@ import android.test.InstrumentationTestCase
 import android.view.View
 import android.widget.Button
 import android.widget.ScrollView
+import android.widget.TextView
 import io.drivegrowth.app.ui.garage.ActionPresentation
 import io.drivegrowth.app.ui.garage.GarageEvent
 import io.drivegrowth.app.ui.garage.GaragePreviewStates
@@ -99,6 +100,59 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
         choose.performClick()
         assertEquals(second.vehicle.ownedVehicleId, view.focusedVehicleId)
         assertFalse(view.findViewWithTag<Button>("shop:focus-rest").isEnabled)
+    }
+
+    fun testGarageFailureKeepsFocusAndDisablesManagementUntilFreshFactsArrive() = onUi {
+        val vehicle = GaragePreviewStates.normal.data.vehicles.first()
+        val home = ShopPreviewStates.normal().copy(vehicles = listOf(mapVehicle(vehicle)))
+        val view = ShopView(instrumentation.targetContext) { fail("조회 상태가 가게 거래를 요청했습니다") }
+        val actions = mutableListOf<GarageEvent.RequestAction>()
+        val rests = mutableListOf<FacilityControlsEvent>()
+        view.onFocusedVehicleAction = actions::add
+        view.onFocusedRest = rests::add
+        val id = vehicle.vehicle.ownedVehicleId
+        val rest = FacilityControlsEvent.SetResting(4, VehicleRef(id, vehicle.vehicle.revision), false, true)
+        view.render(home, true, listOf(vehicle), focusRest = mapOf(id to rest))
+        mapButton(view, vehicle).performClick()
+        val oldAction = view.findViewWithTag<Button>(VehicleAction.LEVEL_UP)
+        val oldRest = view.findViewWithTag<Button>("shop:focus-rest")
+        assertTrue(oldAction.isEnabled)
+        assertTrue(oldRest.isEnabled)
+
+        view.render(home, true, listOf(vehicle), focusRest = mapOf(id to rest), focusError = "차량 정보를 읽지 못했어요")
+        assertEquals(id, view.focusedVehicleId)
+        assertEquals("차량 정보를 읽지 못했어요", view.findViewWithTag<TextView>("shop:focus-query-status").text.toString())
+        assertNull(view.findViewWithTag<Button>(VehicleAction.LEVEL_UP))
+        assertFalse(view.findViewWithTag<Button>("shop:focus-rest").isEnabled)
+        oldAction.performClick()
+        oldRest.performClick()
+        assertTrue(actions.isEmpty())
+        assertTrue(rests.isEmpty())
+
+        view.render(home, true, focusVehicles = null)
+        assertEquals("차량 관리 정보를 확인하고 있어요", view.findViewWithTag<TextView>("shop:focus-query-status").text.toString())
+        view.render(home, true, listOf(vehicle))
+        assertNull(view.findViewWithTag<TextView>("shop:focus-query-status"))
+        assertTrue(view.findViewWithTag<Button>(VehicleAction.LEVEL_UP).isEnabled)
+    }
+
+    fun testRestoredFocusWaitsForParkedContentAndClearsWhenVehicleIsAbsent() = onUi {
+        val vehicle = GaragePreviewStates.normal.data.vehicles.first()
+        val id = vehicle.vehicle.ownedVehicleId
+        val home = ShopPreviewStates.normal().copy(vehicles = listOf(mapVehicle(vehicle)))
+        val view = ShopView(instrumentation.targetContext) { fail("선택 복원이 가게 거래를 요청했습니다") }
+        view.onFocusedVehicleAction = { fail("선택 복원이 차량 관리 명령을 요청했습니다") }
+
+        view.restoreFocusedVehicle(id)
+        assertNull(view.findViewWithTag<View>("shop:focus-panel"))
+        view.render(home, false, listOf(vehicle))
+        assertNull(view.findViewWithTag<View>("shop:focus-panel"))
+        view.render(home, true, listOf(vehicle))
+        assertEquals(id, view.focusedVehicleId)
+        assertNotNull(view.findViewWithTag<View>("shop:focus-panel"))
+        view.render(home.copy(vehicles = emptyList()), true, emptyList())
+        assertNull(view.focusedVehicleId)
+        assertNull(view.findViewWithTag<View>("shop:focus-panel"))
     }
 
     private fun mapVehicle(shown: VehiclePresentation) = ShopVehicle(
