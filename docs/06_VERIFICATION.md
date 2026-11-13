@@ -3229,3 +3229,62 @@ Pleos API34 ARM64 에뮬레이터의 사용자 10에서 소스별 격리 APK를 
 Back의 추가 재시험 두 번은 권한 복원 직후 SDK가 `NO_DATA`에 머물러 D 입력 전에 중단했다. 포트 충돌 한 건은 다른 포트로 해소했지만 SDK 수신은 복구되지 않았다. Back handler 진입의 직접 근거가 없어 OEM 입력 전달과 앱 처리 중 어느 쪽의 문제인지 판정하지 않는다. [D 재생성 화면](evidence/final-pixel-ui/final-regressions/final-acceptance/vehicle/05-drive-recreate.png) · [생명주기](evidence/final-pixel-ui/final-regressions/final-acceptance/vehicle/lifecycle-events.txt) · [재시도 NO_DATA](evidence/final-pixel-ui/final-regressions/final-acceptance/vehicle/retry-no-data.txt).
 
 시험 패키지·포워드·보조 디스플레이를 정리하고 야간 모드를 `no`로 원복한 뒤 전용 AVD만 종료했다. 원래 AVD의 APK·데이터·권한·설정 등 [19/19 보존](evidence/final-pixel-ui/final-regressions/final-acceptance/preservation.json)을 확인했다.
+
+
+## Back 뒤 지연된 관측 재시작 수정 — 2026-11-13
+
+기준 `77dfebd`(제품 `35f93a6`)의 실제 VEHICLE D 이동에서 Back 수신→관측 중단→`moveTaskToBack(true)` 성공 직후, 늦은 top-resumed 획득이 사용자 재진입 전에 관측을 다시 시작했다. D 게임 화면 제한은 유지됐으므로 주행 중 게임 조작 허용 결함으로 확대하지 않는다. 앞선 OEM 포커스 미확보 시도에서는 앱이 키를 받지 않았으며 해당 결과와 구분한다.
+
+수정은 최상위 Back에서 복귀 경계를 잠근 뒤 일반 `onResume`, 또는 Back 이후 top-resumed 이탈과 다음 획득에서 복구한다. `setVisible(false)`와 기존 차량 조작 판정은 유지한다. 창 포커스만으로 잠금을 풀던 첫 후보는 숨긴 창의 포커스 의존 문제로 독립 검토에서 반려했다. 현재 제품에는 그 포커스 분기가 없다.
+
+| 확인 | 실제 결과 |
+|---|---|
+| [원본 동작 단위 회귀](evidence/issue51-back-return/red-unit.xml) / [수정 후](evidence/issue51-back-return/green-unit.xml) | 같은 네 기대조건에서 원본 2개 실패, 수정 4개 통과. 전체 앱 843개 실패·오류·생략 0 |
+| 빌드·Lint | Debug 앱·계측 APK 빌드 성공, Lint 오류 0·경고 50. 코어 변경 없음, 코어 447개는 이전 동일 소스 근거이며 새 실행 아님 |
+| [실제 SDK D 이동 추적](evidence/issue51-back-return/05-d-moving-back-return-trace.txt) | Back 직전 top=false, Back 후 늦은 true 차단→false 수신. 명시 재진입 전 관측 0회, 같은 PID/task 재진입 후 1회·NO_DATA→DRIVE·ux=true. D 정차도 같은 결과, 이후 PARK·ux=false 복귀 |
+| [비교 집계](evidence/issue51-back-return/regression.txt) | D 정차·이동 2개와 P 내부 페이지 Back 통과. P 내부 이동을 최상위 Task 숨김으로 계산하지 않음 |
+| [표준 Debug 최근 Task 복귀](evidence/issue51-back-return/recent-task-retry.txt) | 기존 `NavigationTest#testTopLevelBackHidesTask` 1/1, 2.217초. 같은 Activity·task의 창 숨김→AppTask.moveToFront→가시성·포커스 복구. [수명주기 로그](evidence/issue51-back-return/recent-task-lifecycle.txt)에서 복귀 사이 두 번째 onResume 없음. 이 시험은 SDK 구독 횟수를 직접 계측하지 않음 |
+| [최초 시도](evidence/issue51-back-return/recent-task-instrumentation.txt) | 시험 시작 포커스 조건 실패. 격리 앱 권한·포커스 준비 후 같은 APK 재시험이며 최초 실패 보존 |
+
+[APK 식별](evidence/issue51-back-return/metadata.json)의 표준 Debug와 로깅 전용 VEHICLE APK는 다르다. SDK 이벤트 추적을 표준 APK에서 직접 계측한 것으로 표시하지 않는다. 시험은 Pleos API 34 ARM64 격리 AVD에서 수행했다. Back은 Android `KEYCODE_BACK` 주입이며 실제 차량 버튼이나 CCP의 직접 입력 시험이 아니다. P·속도 0 복원, 격리 패키지·포워드 제거 후 해당 AVD만 종료했고 원래 공유 AVD·제품 데이터는 수정하지 않았다.
+
+대상 환경에서 실제 onResume 없는 최근 Task 복귀를 확인했다. 다만 Back 전 이미 top=false이고 Back 뒤 새로운 false 없이 정당한 true만 오는 다른 OEM 순서는 검증하지 않았다. 현재 경계는 그 경우 일반 onResume을 기다리므로 Android 전체 환경의 복귀 보장을 주장하지 않는다. 공식 회전·분할 창·실차 등 #28·#51의 잔여 조건은 계속 열어 둔다.
+
+## 표준 Debug 앱 로컬 시연과 모의주행 조작 제한 — 2026-11-13
+
+[#275](https://github.com/Yaho03/drive-growth/pull/275)에 반영된 제품 변경을 포함한 표준 Debug `io.drivegrowth.app.simulation`을 Pleos API 34 ARM64 전용 AVD(1080×600px·120dpi)에서 실행했다. 촬영 기기에서 회수한 APK 해시는 [Back 수정의 표준 Debug](evidence/issue51-back-return/metadata.json)와 일치했다. [실행 식별·영상 해시·상태 발췌](evidence/final-pixel-ui/final-regressions/local-demo/result.json)
+
+새 설치에서 화면으로 캐스퍼를 첫 지급받고, 같은 프로필에서 가게·차고·상세·도감 → 시연 목적지와 수익 탁송 선택 → 모의주행 → 탁송 보상·결과 → 퀘스트·업적 목표와 내 기록을 확인했다. 별도 시험 데이터로 잔액·차량·DB를 준비하지 않았다. 첫 시도에서는 선택 결과를 열람하기 전에 모의주행을 눌러 `STATE_CONFLICT`로 거절됐고, 결과를 읽은 뒤 같은 의뢰로 이어갔다.
+
+[#28](https://github.com/Yaho03/drive-growth/issues/28)의 모의주행 중 화면 제한을 같은 실행에서 확인했다. 보유 차량·탁송 탭과 명령 버튼이 있던 좌표를 눌렀을 때 전후 모두 게임 본문·탐색·명령이 숨겨져 있었다. 앱의 읽기 전용 시연 상태에서 모의 D 구간의 44/65단계와 같은 프로필·요청·경로의 종료 65/65단계, 모의 P 관측을 대조했다. 종료 뒤 탁송 보상이 확정되고 게임 탐색이 복귀했다. 터치별 원장 행 비교는 미수행이며 실제 차량 SDK·실차 검증은 별도다.
+
+실제 앱의 `시연 · 모의 입력` 표시를 유지한 원본 녹화 두 편과 대기·조작 구간을 줄인 70.648초 편집본을 로컬에 보존했다. 영상은 화면 속 자산 권리와 익명성 확인 전 내부 검토용이다.
+
+
+## 시스템 회전·분할의 플랫폼 비교 — 2026-11-13
+
+`9ffb434`에서 #28·#51·#52의 남은 시스템 창 조건을 확인했다. 제품 소스는 #275의 `ba38def`와 같으며 이번에는 제품 코드·DB를 변경하거나 제품 시험을 반복하지 않았다. Pleos API34 ARM64 전용 AVD에서 차량용 설정 앱을 대조군으로 실행했다.
+
+90° 회전 뒤 표시 영역은 1080×600px에서 600×1080px로 바뀌었지만 설정 앱의 태스크는 `[360,57]–[1062,495]`를 유지했다. 오른쪽 콘텐츠가 화면 밖으로 잘렸고 회전 원복 후 다시 표시됐다. 기존 제품 앱 회전 기록과 같은 태스크 좌표다. [설정 앱 태스크 발췌](evidence/final-pixel-ui/final-regressions/window-boundary/task-excerpt.txt)
+
+[지원 조회](evidence/final-pixel-ui/final-regressions/window-boundary/support.txt)는 multiwindow=true, split-screen=false, freeform=false, 보조 디스플레이=true였다. 따라서 공식 세로·가로 보조 창의 기존 4/4 및 task 크기 변경·복원 근거는 유지하되, 이 AVD의 시스템 회전·분할을 제품 화면 검증 통과로 바꾸지 않는다. 설정 앱에서도 같은 잘림이 발생한 근거이며 제품의 모든 방향 전환 동작이 정상이라는 증거는 아니다.
+
+회전을 free·0·자동1, 1080×600px·120dpi로 [원복](evidence/final-pixel-ui/final-regressions/window-boundary/settings-restored.txt)하고 전용 AVD만 종료했다. 공유 AVD·원본 제품 데이터는 수정하지 않았다. 실제 회전·분할 복합 조건은 지원 환경을 확보한 뒤 확인한다.
+
+## 모의 시연 Debug APK 배포 — 2026-11-13
+
+사용자 요청으로 [사전 릴리스](https://github.com/Yaho03/drive-growth/releases/tag/demo-20261113-ba38def)에 표준 Debug APK와 SHA256SUMS를 제공한다. APK는 `ba38def` 제품 소스의 기존 기기 검증본이며 SHA-256은 `bc7df29fc66d96f8fdc9a9536a14131b7ba33f16f15684af743b1ca97a8a3466`이다. 태그 기준 `b11e6ff`와 app/core/빌드 설정 차이가 없음을 확인했다. 이번 작업에서 재빌드·기기 시험을 반복하지 않았으며 기존 실행 범위를 확대하지 않는다. APK ZIP 무결성과 게시 전 해시를 확인했고, 업로드 후 다시 내려받은 APK 및 GitHub asset digest가 같은 SHA-256임을 확인했다.
+
+설치·실행·모의 입력 범위는 릴리스 안내와 기존 개발환경 문서로 연결한다. APK를 Git 소스에 커밋하거나 서명키를 게시하지 않는다. 비공개 저장소 접근 조건은 유지하며 최종 제출용 Release·영상·자산 권리·익명성 확인 및 #29 전체 완료와 구분한다.
+
+## 기능 이슈 완료와 후속 조건 이관 — 2026-11-13
+
+사용자의 이슈 정리 요청에 따라 최신 본문·댓글·완료 조건을 기존 구현과 실제 검증 근거에 대조했다. 독립 읽기 검토 후 아래 기능 이슈를 종료하고 미완료 조건은 기존 후속 이슈에 보존했다. 새로운 실행 시험을 수행하거나 기존 미검증을 통과로 바꾸지 않았다.
+
+| 종료 기능 | 완료 근거 | 미완료 후속 |
+|---|---|---|
+| [#46 개체·도감](https://github.com/Yaho03/drive-growth/issues/46) | #104·#149·#202·#207·#215·#227·#236·#238·#242의 조회·활동·발견/획득 이력·지원 이전·원본 보존·원정산 재생 | [#24](https://github.com/Yaho03/drive-growth/issues/24): 원본에 없는 취득액·희귀도·진행량의 복구/재설치 정책. 근거 없는 기본값 생성 금지 |
+| [#51 공통 호스트](https://github.com/Yaho03/drive-growth/issues/51), [#52 차고 화면](https://github.com/Yaho03/drive-growth/issues/52) | #254·#269의 기능 연결, 공식 두 창의 차고·도감 4/4, #275의 Back 경계 수정과 실제 SDK D/P·표준 Debug 복귀 | [#28](https://github.com/Yaho03/drive-growth/issues/28): 지원 환경의 실제 시스템 회전·분할·Activity 재생성 복합과 다른 OEM 순서. #277 플랫폼 제한은 성공 증거가 아님 |
+| [#55 가게 화면](https://github.com/Yaho03/drive-growth/issues/55) | #203·#211·#258·#269의 실제 거래·새 프로세스 복원·실패 재시도·공식 HOME 두 창 | [#29](https://github.com/Yaho03/drive-growth/issues/29): 채택 자산 권리 또는 중립 대체 적용·APK/화면 재검증 |
+
+#38·#53은 실제 SDK 목적지 변경 입력·새 견적 귀속과 제품 연결이 미지원이므로 유지한다. #24·#25·#28·#29·#81·#82·#171·#172의 남은 정책·통합·제출·플랫폼·자산 요구도 유지한다. 기존 assignee·증거·댓글은 보존하며 이 정리는 전체 앱/제출 완료 판정이 아니다.

@@ -1,0 +1,18 @@
+=== control-before-task.txt ===
+  * Task{9875dfe #1000944 type=standard A=1001000:com.android.car.settings U=10 visible=true visibleRequested=true mode=multi-window translucent=true sz=1}
+    mBounds=Rect(360, 57 - 1062, 495)
+    topResumedActivity=ActivityRecord{1a86fac u10 com.android.car.settings/.common.CarSettingActivities$HomepageActivity t1000944}
+      CurrentConfiguration={1.0 310mcc260mnc [ko_KR] ldltr sw800dp w936dp h584dp 120dpi lrg land car finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(360, 57 - 1062, 495) mAppBounds=Rect(360, 57 - 1062, 495) mMaxBounds=Rect(0, 0 - 1080, 600) mDisplayRotation=ROTATION_0 mWindowingMode=multi-window mDisplayWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_0} s.3 fontWeightAdjustment=0}
+    init=1080x600 120dpi mMinSizeOfResizeableTaskDp=50 cur=1080x600 app=1080x495 rng=600x438-1080x918
+=== control-rotated-task.txt ===
+  * Task{9875dfe #1000944 type=standard A=1001000:com.android.car.settings U=10 visible=true visibleRequested=true mode=multi-window translucent=true sz=1}
+    mBounds=Rect(360, 57 - 1062, 495)
+    topResumedActivity=ActivityRecord{1a86fac u10 com.android.car.settings/.common.CarSettingActivities$HomepageActivity t1000944}
+      CurrentConfiguration={1.0 310mcc260mnc [ko_KR] ldltr sw800dp w936dp h584dp 120dpi lrg land car finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(360, 57 - 1062, 495) mAppBounds=Rect(360, 57 - 1062, 495) mMaxBounds=Rect(0, 0 - 600, 1080) mDisplayRotation=ROTATION_90 mWindowingMode=multi-window mDisplayWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_90} s.4 fontWeightAdjustment=0}
+    init=1080x600 120dpi mMinSizeOfResizeableTaskDp=50 cur=600x1080 app=600x975 rng=600x438-1080x918
+=== control-restored-task.txt ===
+  * Task{9875dfe #1000944 type=standard A=1001000:com.android.car.settings U=10 visible=true visibleRequested=true mode=multi-window translucent=true sz=1}
+    mBounds=Rect(360, 57 - 1062, 495)
+    topResumedActivity=ActivityRecord{1a86fac u10 com.android.car.settings/.common.CarSettingActivities$HomepageActivity t1000944}
+      CurrentConfiguration={1.0 310mcc260mnc [ko_KR] ldltr sw800dp w936dp h584dp 120dpi lrg land car finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(360, 57 - 1062, 495) mAppBounds=Rect(360, 57 - 1062, 495) mMaxBounds=Rect(0, 0 - 1080, 600) mDisplayRotation=ROTATION_0 mWindowingMode=multi-window mDisplayWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_0} s.5 fontWeightAdjustment=0}
+    init=1080x600 120dpi mMinSizeOfResizeableTaskDp=50 cur=1080x600 app=1080x495 rng=600x438-1080x918

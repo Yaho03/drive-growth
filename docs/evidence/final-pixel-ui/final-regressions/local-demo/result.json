@@ -1,0 +1,54 @@
+{
+  "integrated_main": "f148e4a5f423951a4657955e092f106fb361ad50",
+  "build_base": "77dfebdce98031db80e96f69cdf8711a32c8430d",
+  "package": "io.drivegrowth.app.simulation",
+  "installed_apk_sha256": "bc7df29fc66d96f8fdc9a9536a14131b7ba33f16f15684af743b1ca97a8a3466",
+  "environment": {
+    "api": 34,
+    "abi": "arm64-v8a",
+    "screen_px": [
+      1080,
+      600
+    ],
+    "density_dpi": 120
+  },
+  "simulation_state": {
+    "moving_stage": 44,
+    "terminal_stage": 65,
+    "same_profile": true,
+    "same_request": true,
+    "same_route": true,
+    "terminal_observation": {
+      "source": "SIMULATION",
+      "gear": {
+        "type": "available",
+        "value": "PARK"
+      },
+      "speed": {
+        "type": "available",
+        "value": "0"
+      },
+      "ux": {
+        "type": "available",
+        "value": false
+      }
+    }
+  },
+  "local_media": [
+    {
+      "name": "drive-growth-local-review.mp4",
+      "duration_seconds": 70.648,
+      "sha256": "8d29e8079885aa8c0257df1c70a462d8ab7e9c6d51a6607fadb86198fc7b5083"
+    },
+    {
+      "name": "drive-growth-demo.mp4",
+      "duration_seconds": 100.039,
+      "sha256": "971a6fa4eec5045d7dcaf51d09b162bf5b3124befb4d467d09c0711891b3ecb0"
+    },
+    {
+      "name": "drive-growth-results.mp4",
+      "duration_seconds": 23.649,
+      "sha256": "a3575eabcb01fa7aab25e5c8a204f3b0153da232f971833619cfa03574843a45"
+    }
+  ]
+}

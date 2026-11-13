@@ -1,0 +1,58 @@
+--------- beginning of main
+11-12 15:37:32.387 18321 18321 I BackBoundaryProbe: start active=false task=1000762 focus=false
+11-12 15:37:32.399 18321 18321 I DriveGrowthVehicle: observation_start firstInProcess=true displayId=0
+11-12 15:37:32.417 18321 18321 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-12 15:37:32.739 18321 18321 I BackBoundaryProbe: topResumed=true start=true task=1000762
+11-12 15:37:32.740 18321 18321 I BackBoundaryProbe: start active=true task=1000762 focus=false
+11-12 15:37:32.787 18321 18321 I BackBoundaryProbe: topResumed=false start=false task=1000762
+11-12 15:37:33.136 18321 18321 I BackBoundaryProbe: topResumed=true start=true task=1000762
+11-12 15:37:33.139 18321 18321 I BackBoundaryProbe: start active=true task=1000762 focus=false
+11-12 15:37:33.458 18321 18321 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false
+11-12 15:37:34.299 18321 18321 I BackBoundaryProbe: topResumed=false start=false task=1000762
+11-12 15:37:36.987 18321 18321 I BackBoundaryProbe: topResumed=true start=true task=1000762
+11-12 15:37:37.008 18321 18321 I BackBoundaryProbe: start active=true task=1000762 focus=false
+11-12 15:37:37.037 18321 18321 I BackBoundaryProbe: topResumed=false start=false task=1000762
+11-12 15:37:39.337 18321 18321 I BackBoundaryProbe: topResumed=true start=true task=1000762
+11-12 15:37:39.337 18321 18321 I BackBoundaryProbe: start active=true task=1000762 focus=false
+11-12 15:37:39.460 18321 18321 I BackBoundaryProbe: key action=0 device=-1 source=0
+11-12 15:37:39.473 18321 18321 I BackBoundaryProbe: key action=1 device=-1 source=0
+11-12 15:37:39.474 18321 18321 I BackBoundaryProbe: onBackPressed allowed=true active=true task=1000762 focus=true
+11-12 15:37:39.689 18321 18321 I BackBoundaryProbe: topResumed=false start=false task=1000762
+11-12 15:37:42.023 18321 18321 I BackBoundaryProbe: topResumed=true start=true task=1000762
+11-12 15:37:42.025 18321 18321 I BackBoundaryProbe: start active=true task=1000762 focus=false
+11-12 15:37:42.069 18321 18321 I BackBoundaryProbe: topResumed=false start=false task=1000762
+11-12 15:37:46.389 18321 18321 I BackBoundaryProbe: topResumed=true start=true task=1000762
+11-12 15:37:46.389 18321 18321 I BackBoundaryProbe: start active=true task=1000762 focus=false
+11-12 15:37:46.688 18321 18321 I BackBoundaryProbe: topResumed=false start=false task=1000762
+11-12 15:37:49.460 18321 18321 I DriveGrowthVehicle: signal_state speed=OK gear=DRIVE ux=true
+11-12 15:37:52.247 18321 18321 I BackBoundaryProbe: topResumed=true start=true task=1000762
+11-12 15:37:52.250 18321 18321 I BackBoundaryProbe: start active=true task=1000762 focus=false
+11-12 15:37:52.302 18321 18321 I BackBoundaryProbe: topResumed=false start=false task=1000762
+11-12 15:37:54.832 18321 18321 I BackBoundaryProbe: key action=0 device=-1 source=0
+11-12 15:37:54.833 18321 18321 I BackBoundaryProbe: key action=1 device=-1 source=0
+11-12 15:37:54.833 18321 18321 I BackBoundaryProbe: onBackPressed allowed=false active=true task=1000762 focus=true
+11-12 15:37:54.834 18321 18321 I BackBoundaryProbe: stop active=true task=1000762 focus=true
+11-12 15:37:54.837 18321 18321 I BackBoundaryProbe: moveTaskToBack result=true task=1000762
+11-12 15:37:57.221 18321 18321 I BackBoundaryProbe: stop active=false task=1000762 focus=false
+11-12 15:38:01.535 18321 18321 I BackBoundaryProbe: start active=false task=1000762 focus=false
+11-12 15:38:01.558 18321 18321 I DriveGrowthVehicle: observation_start firstInProcess=false displayId=0
+11-12 15:38:01.574 18321 18321 I DriveGrowthVehicle: observation_gap kind=APP_HIDDEN durationMs=6741
+11-12 15:38:01.574 18321 18321 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-12 15:38:01.583 18321 18321 I BackBoundaryProbe: topResumed=true start=true task=1000762
+11-12 15:38:01.589 18321 18321 I BackBoundaryProbe: start active=true task=1000762 focus=false
+11-12 15:38:02.579 18321 18321 I DriveGrowthVehicle: signal_state speed=OK gear=DRIVE ux=true
+11-12 15:38:02.670 18321 18321 I BackBoundaryProbe: topResumed=false start=false task=1000762
+11-12 15:38:07.423 18321 18321 I BackBoundaryProbe: topResumed=true start=true task=1000762
+11-12 15:38:07.424 18321 18321 I BackBoundaryProbe: start active=true task=1000762 focus=false
+11-12 15:38:07.425 18321 18321 I BackBoundaryProbe: topResumed=false start=false task=1000762
+11-12 15:38:12.475 18321 18321 I BackBoundaryProbe: topResumed=true start=true task=1000762
+11-12 15:38:12.475 18321 18321 I BackBoundaryProbe: start active=true task=1000762 focus=false
+11-12 15:38:12.543 18321 18321 I BackBoundaryProbe: topResumed=false start=false task=1000762
+11-12 15:38:13.340 18321 18321 I BackBoundaryProbe: key action=0 device=-1 source=0
+11-12 15:38:13.342 18321 18321 I BackBoundaryProbe: key action=1 device=-1 source=0
+11-12 15:38:13.343 18321 18321 I BackBoundaryProbe: onBackPressed allowed=false active=true task=1000762 focus=true
+11-12 15:38:13.350 18321 18321 I BackBoundaryProbe: stop active=true task=1000762 focus=true
+11-12 15:38:13.356 18321 18321 I BackBoundaryProbe: moveTaskToBack result=true task=1000762
+11-12 15:38:13.357 18321 18321 I BackBoundaryProbe: topResumed=true start=false task=1000762
+11-12 15:38:13.373 18321 18321 I BackBoundaryProbe: topResumed=false start=false task=1000762
+11-12 15:38:15.220 18321 18321 I BackBoundaryProbe: stop active=false task=1000762 focus=false

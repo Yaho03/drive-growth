@@ -1,0 +1,21 @@
+{
+  "base": "77dfebdce98031db80e96f69cdf8711a32c8430d",
+  "integration_base": "7b703d002db89cea1673c431b78bf9fd1a56d2d9",
+  "product_apk_sha256": "bc7df29fc66d96f8fdc9a9536a14131b7ba33f16f15684af743b1ca97a8a3466",
+  "probe_apk_sha256": "28326ab99ff98f809520c239da68b904faadc91aa7a4d2e764232aa7bd6f7db0",
+  "instrumentation_apk_sha256": "722cc9886190a994db3b57eccbd334a12b1aa1e6bf2f8bf29c1479b1bf5825b0",
+  "scope": "표준 Debug 최근 task 시험과 로깅 전용 VEHICLE SDK 시험을 구분",
+  "files": {
+    "recent-task-retry.txt": "560b8524b2aeb1b83fc26a25a473dcede56b814a85d7c1a50b6118c0257af42d",
+    "original-regression.txt": "81e41ed68a796648e7c530bb933263d83040c3448d77e0e24eef528dce294c5d",
+    "recent-task-instrumentation.txt": "d8568df3aac478e36c34723c4d2b3254beafd71edf849c236509deebff783e1b",
+    "05-d-moving-back-held-trace.txt": "4928c19109933a782120067461cead6e51638559fa48a1e94d3acb60b32e59ca",
+    "05-d-moving-back-return-trace.txt": "6b86b9be1c20fa1b61b2f7355f35b90bf2ab2a5300334d32c4e412b87a6b382e",
+    "recent-task-lifecycle.txt": "2970c196b36848aba6dc3ff63a1b7733a4d9ca76e3e1498288e0565c9198aafc",
+    "regression.txt": "9efb9e2c6f9a2b5aa3b4ac681b4e03e3c209145aac359b05de4481825c6c083a",
+    "04-d-stop-back-return-trace.txt": "efd52954e38fe48850d84095a751f07382e7df8925c50f4ac8b2a4df12efd487",
+    "green-unit.xml": "fea0c6784b691b3590aaa6fd91db66d8389e8b78c448f438882a6a2106cb36d2",
+    "red-unit.xml": "dda70fa4a9aec6b5c4f831e1d1deaa1639acdabec84610ff22d4fd7df4a4201a"
+  },
+  "redaction": "공개 XML의 hostname만 redacted로 치환했다. 원본은 격리 시험 폴더에 보존한다."
+}
