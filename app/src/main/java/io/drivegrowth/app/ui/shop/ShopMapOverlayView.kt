@@ -3,6 +3,7 @@ package io.drivegrowth.app.ui.shop
 import android.annotation.SuppressLint
 import android.content.Context
 import android.view.Gravity
+import android.view.ViewTreeObserver
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -142,9 +143,17 @@ internal class ShopMapOverlayView(
         val panel = column().apply {
             background = shape(style.panel)
             val restore = scrollY
-            val contentScroll = scroll(body, restore).apply {
-                tag = "shop:map-scroll"
-                if (restore > 0) post { if (current()) scrollTo(0, restore) }
+            val contentScroll = scroll(body, restore).apply { tag = "shop:map-scroll" }
+            if (restore > 0) {
+                // The window assigns initial keyboard focus during layout, which can scroll to
+                // the first control. Restore after that layout and before the panel is drawn.
+                contentScroll.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
+                    override fun onPreDraw(): Boolean {
+                        contentScroll.viewTreeObserver.removeOnPreDrawListener(this)
+                        if (current()) contentScroll.scrollTo(0, restore)
+                        return true
+                    }
+                })
             }
             this@ShopMapOverlayView.scroll = contentScroll
             addView(contentScroll, LinearLayout.LayoutParams(-1, 0, 1f))
