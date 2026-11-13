@@ -1,12 +1,15 @@
 package io.drivegrowth.app.ui.onboarding
 
+import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ImageView
+import android.widget.ScrollView
 import android.widget.TextView
+import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.core.contract.VehicleId
 
@@ -22,6 +25,38 @@ class OnboardingViewTest : InstrumentationTestCase() {
         if (view is ViewGroup) (0 until view.childCount).flatMap { all(view.getChildAt(it)) } else emptyList()
     private fun button(view: View, text: String) = all(view).filterIsInstance<Button>().first { it.text.toString() == text }
     private fun texts(view: View) = all(view).filterIsInstance<TextView>().map { it.text.toString() }
+
+    fun testPrimaryActionsRemainVisibleInShortAndNarrowWindows() = onUi {
+        val context = instrumentation.targetContext
+        val density = context.resources.displayMetrics.density
+        val states = listOf(
+            OnboardingPreviewStates.intro to R.string.onboarding_start,
+            OnboardingPreviewStates.choosing to R.string.onboarding_review,
+            OnboardingPreviewStates.confirming to R.string.onboarding_confirm,
+            OnboardingPreviewStates.completed to R.string.onboarding_to_shop,
+        )
+        for (widthDp in listOf(320, 936)) {
+            val width = (widthDp * density).toInt()
+            val height = (320 * density).toInt()
+            for ((state, resource) in states) {
+                val view = OnboardingView(context) {}
+                assertTrue(view.render(state, true))
+                view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+                view.layout(0, 0, width, height)
+                val action = checkNotNull(view.findViewWithTag<Button>(resource))
+                val scroll = all(view).filterIsInstance<ScrollView>().single()
+                val buttonBounds = Rect().also {
+                    action.getDrawingRect(it)
+                    view.offsetDescendantRectToMyCoords(action, it)
+                }
+                assertTrue("width=$widthDp state=${state.javaClass.simpleName} action=$buttonBounds",
+                    buttonBounds.top >= scroll.bottom && buttonBounds.bottom <= height)
+                assertTrue("본문 스크롤이 남아야 한다", scroll.height > 0 && scroll.canScrollVertically(1))
+                assertTrue("터치 영역은 48dp 이상이어야 한다", action.height >= (48 * density).toInt())
+            }
+        }
+    }
 
     fun testSelectionConfirmationWaitsForTheExactConfirmedResult() = onUi {
         val events = mutableListOf<OnboardingEvent>()
