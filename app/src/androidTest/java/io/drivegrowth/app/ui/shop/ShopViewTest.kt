@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.shop
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
@@ -8,12 +9,14 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import io.drivegrowth.app.data.ShopState
 import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.app.host.facility.FacilityFacts
 import io.drivegrowth.app.host.facility.FacilityHostMapper
+import io.drivegrowth.app.ui.garage.CollectionScrollTestActivity
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.rental.Facility
 import io.drivegrowth.core.rental.FacilityOffer
@@ -326,6 +329,86 @@ class ShopViewTest : InstrumentationTestCase() {
         assertNull(view.findViewWithTag<Button>("facility:ack"))
         view.render(ShopPreviewStates.normal(), true, null, focusRestRecovery = true)
         assertSame(panel, view.findViewWithTag<Button>("facility:ack"))
+    }
+
+    fun testFacilityRecoveryDismissesUntilNextRecovery() = onUi {
+        val context = instrumentation.targetContext
+        val state = ShopPreviewStates.normal()
+        val view = ShopView(context) { fail("패널 닫기에서 거래 요청 발생") }
+        val receipt = Button(context).apply { tag = "facility:ack" }
+        view.facilityPanel = receipt
+
+        view.render(state, true, null, focusRestRecovery = true)
+        assertSame(receipt, view.findViewWithTag<Button>("facility:ack"))
+        assertTrue(button(view, "shop:map-sheet-close").performClick())
+        assertNull(view.findViewWithTag<Button>("facility:ack"))
+        view.render(state, true, null, focusRestRecovery = true)
+        assertNull(view.findViewWithTag<Button>("facility:ack"))
+        assertFalse(view.handleBack())
+
+        assertTrue(button(view, "shop:map-facilities").performClick())
+        assertSame(receipt, view.findViewWithTag<Button>("facility:ack"))
+        assertTrue(view.handleBack())
+        assertNull(view.findViewWithTag<Button>("facility:ack"))
+
+        view.render(state, true, null, focusRestRecovery = false)
+        view.render(state, true, null, focusRestRecovery = true)
+        assertSame(receipt, view.findViewWithTag<Button>("facility:ack"))
+        assertTrue(view.handleBack())
+        view.render(state, true, null, focusRestRecovery = true)
+        assertNull(view.findViewWithTag<Button>("facility:ack"))
+        assertFalse(view.handleBack())
+    }
+
+    fun testAttachedFacilityDetailsKeepScrollOnSameContentRender() {
+        val host = instrumentation.startActivitySync(Intent(instrumentation.targetContext,
+            CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        val events = mutableListOf<ShopEvent>()
+        val fixture = ShopPreviewStates.normal()
+        val state = fixture.copy(facilities = fixture.facilities.map {
+            if (it.facility == Facility.FUEL_STATION) it.copy(option = it.option.copy(
+                condition = "긴 시설 조건과 현재 달성 상태를 확인합니다. ".repeat(24),
+                availability = ShopAvailability.AVAILABLE,
+            )) else it
+        })
+        try {
+            lateinit var view: ShopView
+            onUi {
+                val density = host.resources.displayMetrics.density
+                view = ShopView(host, events::add)
+                host.setContentView(FrameLayout(host).apply {
+                    addView(view, FrameLayout.LayoutParams((300 * density).toInt(), (240 * density).toInt()))
+                })
+                view.render(state, true)
+                view.showMapPanel(ShopMapTarget.FacilityLot(Facility.FUEL_STATION))
+            }
+            instrumentation.waitForIdleSync()
+            val expectedScroll = onUi {
+                assertTrue(view.isAttachedToWindow)
+                val scroll = view.findViewWithTag<ScrollView>("shop:map-scroll")
+                assertTrue(scroll.isLaidOut)
+                assertTrue(scroll.canScrollVertically(1))
+                scroll.scrollTo(0, scroll.getChildAt(0).height)
+                val position = scroll.scrollY
+                assertTrue(position > 0)
+
+                val staleConfirm = button(view, "shop:map-confirm")
+                assertTrue(staleConfirm.isEnabled)
+                view.render(state, true)
+                staleConfirm.performClick()
+                assertTrue(events.isEmpty())
+                position
+            }
+            instrumentation.waitForIdleSync()
+            onUi {
+                val scroll = view.findViewWithTag<ScrollView>("shop:map-scroll")
+                assertTrue(scroll.isAttachedToWindow)
+                assertTrue(scroll.isLaidOut)
+                assertEquals(expectedScroll, scroll.scrollY)
+            }
+        } finally {
+            onUi { host.finish() }
+        }
     }
 
     fun testPixelMapVehicleTapUsesCurrentOwnedIdAndRevision() = onUi {

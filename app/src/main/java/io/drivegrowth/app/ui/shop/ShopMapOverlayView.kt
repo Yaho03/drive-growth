@@ -40,13 +40,17 @@ internal class ShopMapOverlayView(
         tag = "shop:map-overlay"
     }
 
+    fun scrollPosition(): Pair<ShopMapTarget, Int>? =
+        target?.let { it to (scroll?.takeIf { it.isLaidOut }?.scrollY ?: scrollY) }
+
     fun render(
         target: ShopMapTarget,
         interaction: ShopInteraction,
         projectedBalance: Map<String, GameMoney> = emptyMap(),
+        initialScrollY: Int = 0,
     ) = with(style) {
         val sameTarget = this@ShopMapOverlayView.target == target && this@ShopMapOverlayView.interaction === interaction
-        scrollY = if (sameTarget) scroll?.takeIf { it.isLaidOut }?.scrollY ?: scrollY else 0
+        scrollY = if (sameTarget) scroll?.takeIf { it.isLaidOut }?.scrollY ?: scrollY else initialScrollY
         this@ShopMapOverlayView.target = target
         this@ShopMapOverlayView.interaction = interaction
         val token = ++generation

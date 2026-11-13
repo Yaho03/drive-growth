@@ -76,12 +76,14 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     private var focusScene: ShopScreenState.Content? = null
     private var focusRest: Map<OwnedVehicleId, FacilityControlsEvent.SetResting> = emptyMap()
     private var focusRestRecovery = false
+    private var recoveryDismissed = false
     private var managementBusy = false
     private var vehicleActionsBlocked = false
     private var focusFrom: OwnedVehicleId? = null
     private var focusStartedAt: Long? = null
     internal var focusManagementPanel: View? = null
     private var panelTarget: MapPanel? = null
+    private var activeSheet: MapPanel? = null
     private var mapOverlay: ShopMapOverlayView? = null
     private var dismissedPending: ShopRequest? = null
     private var mapPan = ShopMapOffset()
@@ -164,6 +166,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             focusGarageError = focusError
             this.focusRest = focusRest
             this.focusRestRecovery = focusRestRecovery
+            if (controlsEnabled && !focusRestRecovery) recoveryDismissed = false
             this.managementBusy = managementBusy
             this.vehicleActionsBlocked = vehicleActionsBlocked
         }
@@ -223,11 +226,8 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             drawScreen()
             return true
         }
-        if (panelTarget != null) {
-            if (uiState.pending == null) {
-                panelTarget = null
-                drawScreen()
-            }
+        if (activeSheet != null || panelTarget != null) {
+            closeMapPanel()
             return true
         }
         if (focusedVehicleId == null) return false
@@ -301,8 +301,10 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         val focus = findFocus()?.tag
         val generation = ++sceneGeneration
         // 교체된 overlay의 버튼도 현재 ShopInteraction으로 명령을 보내지 못하게 한다.
+        val previousOverlayScroll = mapOverlay?.scrollPosition()
         mapOverlay?.visibility = View.GONE
         mapOverlay = null
+        activeSheet = null
         controlsScroll = null; removeAllViews()
         setPadding(0, 0, 0, 0)
         if (!interaction.controlsEnabled) {
@@ -347,7 +349,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             is ShopScreenState.Empty -> problem(s(R.string.shop_empty), state.message, true)
             is ShopScreenState.Failure -> problem(s(R.string.shop_failure), state.message, true)
             is ShopScreenState.Unsupported -> problem(s(R.string.shop_unsupported), state.message, false)
-            is ShopScreenState.Content -> addView(mapScreen(state, generation), LayoutParams(-1, 0, 1f))
+            is ShopScreenState.Content -> addView(mapScreen(state, generation, previousOverlayScroll), LayoutParams(-1, 0, 1f))
         }
         if (focus != null) findViewWithTag<View>(focus)?.takeIf { it.isEnabled }?.requestFocus()
     }
@@ -381,7 +383,11 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         return scene
     }
 
-    private fun mapScreen(c: ShopScreenState.Content, generation: Long) = with(style) {
+    private fun mapScreen(
+        c: ShopScreenState.Content,
+        generation: Long,
+        previousOverlayScroll: Pair<ShopMapTarget, Int>?,
+    ) = with(style) {
         val frame = FrameLayout(context).apply { tag = "shop:map-screen" }
         if (viewedMode != uiState.mode) {
             viewedMode = uiState.mode
@@ -431,7 +437,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             pending != null -> pending.takeUnless { it == dismissedPending }
                 ?.let { MapPanel.Details(it.selection.option.mapTarget()) }
             review != null -> MapPanel.Details(review.option.mapTarget())
-            focusRestRecovery && panelTarget == null -> MapPanel.FacilityMenu
+            focusRestRecovery && !recoveryDismissed && panelTarget == null -> MapPanel.FacilityMenu
             else -> panelTarget
         }
         if (target != null) {
@@ -448,9 +454,11 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                     onChanged = { if (sceneGeneration == generation) drawScreen() },
                 )
                 mapOverlay = overlay
-                overlay.render(target.target, interaction, projectedBalance)
+                overlay.render(target.target, interaction, projectedBalance,
+                    initialScrollY = previousOverlayScroll?.takeIf { it.first == target.target }?.second ?: 0)
                 frame.addView(overlay, FrameLayout.LayoutParams(-1, -1))
             } else {
+                activeSheet = target
                 val dim = View(context).apply {
                     setBackgroundColor(0x880d1423.toInt())
                     isClickable = true
@@ -514,6 +522,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
 
     private fun closeMapPanel() {
         if (!interaction.controlsEnabled || uiState.pending != null) return
+        if (activeSheet == MapPanel.FacilityMenu && focusRestRecovery) recoveryDismissed = true
         interaction.cancel()
         panelTarget = null
         drawScreen()
