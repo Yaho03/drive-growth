@@ -257,14 +257,15 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
 
     private fun verifyDeliveryDeparture(host: UnifiedSimulationActivity, games: GameSessionFactory) {
         openPage(host, HostPage.DELIVERY)
-        click(host, "delivery:destination")
         val delivery = (host.onRetainNonConfigurationInstance() as HostSession).delivery
-        await("시연 목적지 준비 완료 뒤 확인") {
+        await("첫 시연 목적지 확인") {
             delivery.state?.screen is DeliveryScreen.Destination &&
                 button(host, "simulation:destination")?.takeIf { it.isEnabled && it.isShown }?.performClick() == true
         }
-        await("저장된 수익 탁송 후보 열기") {
+        var lastOfferState = ""
+        await("저장된 수익 탁송 후보 열기", diagnostic = { lastOfferState }) {
             val current = delivery.state ?: return@await false
+            lastOfferState = current.screen.javaClass.simpleName + " discoveryPending=" + (current.displayedProposal != null)
             if (current.displayedProposal != null || delivery.isSavingDisplayedOffers) return@await false
             val proposal = (current.screen as? DeliveryScreen.Offers)?.proposal ?: return@await false
             val income = proposal.proposed.offers.filterIsInstance<DeliveryOffer.Income>()
@@ -389,7 +390,9 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             bitmap.recycle()
         }
     }
-    private fun await(label: String = "기대 상태", timeoutMillis: Long = 15_000, condition: () -> Boolean) {
+    private fun await(label: String = "기대 상태", timeoutMillis: Long = 15_000,
+        diagnostic: () -> String = { "" }, condition: () -> Boolean,
+    ) {
         val end = SystemClock.uptimeMillis() + timeoutMillis
         while (SystemClock.uptimeMillis() < end) {
             var matched = false
@@ -397,7 +400,7 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             if (matched) return
             SystemClock.sleep(100)
         }
-        fail("실제 Main 화면에서 $label 확인 실패")
+        fail("실제 Main 화면에서 $label 확인 실패 ${diagnostic()}".trimEnd())
     }
     private fun onUi(action: () -> Unit) {
         var failure: Throwable? = null
