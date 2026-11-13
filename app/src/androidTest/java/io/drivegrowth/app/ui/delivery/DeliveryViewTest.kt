@@ -195,7 +195,10 @@ class DeliveryViewTest : InstrumentationTestCase() {
         val road = checkNotNull(view.findViewWithTag<View>("delivery:motion-art"))
         val host = checkNotNull(view.findViewWithTag<View>(destinationControls))
         assertTrue(visibleWithoutScrolling(status))
-        assertTrue(visibleWithoutScrolling(road))
+        val visibleRoad = Rect()
+        road.getGlobalVisibleRect(visibleRoad)
+        assertTrue("고속도로 bounds=${bounds(road)} visible=$visibleRoad status=${bounds(status)} viewport=${bounds(view)}",
+            visibleWithoutScrolling(road))
         assertTrue(bounds(status).bottom <= bounds(road).top)
         assertTrue(bounds(road).bottom <= bounds(host).top)
         assertEquals(40, nodes(status).filterIsInstance<ProgressBar>().single().progress)

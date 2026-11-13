@@ -153,8 +153,8 @@ class DeliveryView(
             addView(text(s(R.string.delivery_restricted_body), color = muted))
             return@with
         }
-        if (scene != null) addView(sceneHeader(scene))
-        else addView(text(s(R.string.delivery_title), 26, bold = true))
+        val header = scene?.let(::sceneHeader) ?: text(s(R.string.delivery_title), 26, bold = true)
+        addView(header)
         val body = column()
         scroll = style.scroll(body, savedY)
         addView(scroll, LayoutParams(-1, 0, 1f))
@@ -168,9 +168,9 @@ class DeliveryView(
         })
         val state = session.frame?.screen
         val highway = (state as? DeliveryScreen.Active)?.let { active ->
-            presentation.highway?.let { highwayPanel(it, active.delivery) }
+            presentation.highway?.let { highwayPanel(it, active.delivery, header) }
         }
-        if (highway != null) body.addView(highway, LayoutParams(motionWidth(), -2).apply {
+        if (highway != null) body.addView(highway, LayoutParams(-1, -2).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             topMargin = dp(6)
         })
@@ -264,10 +264,10 @@ class DeliveryView(
         }
     }
 
-    private fun highwayPanel(road: DeliveryHighway, delivery: DeliveryActiveUi): View = with(style) {
+    private fun highwayPanel(road: DeliveryHighway, delivery: DeliveryActiveUi, header: View): View = with(style) {
         column().apply {
             tag = "delivery:highway"
-            addView(panel(padding = 8).apply {
+            val status = panel(padding = 8).apply {
                 tag = "delivery:highway-status"
                 addView(text(present(road.details.destinationName, R.string.delivery_destination_missing), 18, bold = true).apply {
                     maxLines = 1
@@ -286,9 +286,18 @@ class DeliveryView(
                     addView(vehicleLabels.progressTrack(progressPercent, color = PixelStyle.focus),
                         LayoutParams(-1, dp(8)).apply { topMargin = dp(4) })
                 }
-            })
+            }
+            addView(status, LayoutParams(motionWidth(), -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
+            val availableWidth = width - paddingStart - paddingEnd
+            val remainingHeight = if (availableWidth > 0 && height > 0) {
+                val viewWidth = View.MeasureSpec.makeMeasureSpec(availableWidth, View.MeasureSpec.EXACTLY)
+                val flexibleHeight = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                header.measure(viewWidth, flexibleHeight)
+                status.measure(View.MeasureSpec.makeMeasureSpec(motionWidth(), View.MeasureSpec.EXACTLY), flexibleHeight)
+                height - paddingTop - paddingBottom - header.measuredHeight - status.measuredHeight - dp(12)
+            } else motionHeightLimit()
             motion.showHighway(road)
-            addMotion(this)
+            addMotion(this, minOf(motionHeightLimit(), remainingHeight.coerceAtLeast(dp(48))))
         }
     }
 
@@ -298,16 +307,16 @@ class DeliveryView(
     private fun estimatedDistance(details: DeliverySceneDetails) = details.estimatedMeters
         ?.let { context.getString(R.string.delivery_estimated, it) } ?: s(R.string.delivery_distance_missing)
 
-    private fun motionWidth(): Int {
+    private fun motionWidth(heightLimit: Int = motionHeightLimit()): Int {
         val availableWidth = width - paddingStart - paddingEnd
-        return if (availableWidth > 0) minOf(availableWidth, motionHeightLimit() * 16 / 9) else -1
+        return if (availableWidth > 0) minOf(availableWidth, heightLimit * 16 / 9) else -1
     }
 
     private fun motionHeightLimit() = if (height > 0) (height / 2).coerceIn(style.dp(100), style.dp(380)) else style.dp(152)
 
-    private fun addMotion(parent: LinearLayout) = with(style) {
-        val artWidth = motionWidth()
-        val artHeight = if (artWidth > 0) artWidth * 9 / 16 else motionHeightLimit()
+    private fun addMotion(parent: LinearLayout, heightLimit: Int = motionHeightLimit()) = with(style) {
+        val artWidth = motionWidth(heightLimit)
+        val artHeight = if (artWidth > 0) artWidth * 9 / 16 else heightLimit
         parent.addView(motion, LayoutParams(artWidth, artHeight).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             topMargin = dp(6)
