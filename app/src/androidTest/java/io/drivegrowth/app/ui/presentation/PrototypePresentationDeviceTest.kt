@@ -1,6 +1,7 @@
 package io.drivegrowth.app.ui.presentation
 
 import android.content.Intent
+import android.graphics.Rect
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.widget.Button
@@ -64,10 +65,13 @@ class PrototypePresentationDeviceTest : InstrumentationTestCase() {
                 for ((index, expected) in listOf("드라이브", "키우기").withIndex()) {
                     val line = words.getChildAt(index) as TextView
                     assertEquals(expected, line.text.toString())
-                    assertNotNull(line.layout)
-                    val fm = line.paint.fontMetrics
-                    assertTrue("제목 줄 ${index + 1} 글꼴 영역이 잘립니다 ($widthDp × $heightDp dp)",
-                        line.height >= fm.descent - fm.ascent)
+                    val layout = checkNotNull(line.layout)
+                    val glyphs = Rect().also { line.paint.getTextBounds(expected, 0, expected.length, it) }
+                    val top = line.top + line.baseline + glyphs.top
+                    val bottom = line.top + line.baseline + glyphs.bottom
+                    assertTrue("제목 줄 ${index + 1} 글자 영역이 잘립니다 ($widthDp × $heightDp dp)",
+                        !glyphs.isEmpty && top >= line.top && bottom <= line.bottom &&
+                            layout.getEllipsisCount(0) == 0)
                 }
             }
         }
