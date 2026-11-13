@@ -3,6 +3,7 @@ package io.drivegrowth.app.ui.shop
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
+import android.database.ContentObserver
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -14,11 +15,17 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
+import android.provider.Settings
 import android.text.TextPaint
 import android.text.TextUtils
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.view.animation.PathInterpolator
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.pixel.PixelStyle
@@ -44,9 +51,21 @@ internal class ShopSceneView(
         else RectF(100f, 546f, 1450f, 986f)
     private val placed = model.vehicles.zip(townSlots).sortedBy { it.second.second }
     private val bitmaps = placed.associate { (vehicle, _) -> vehicle.id to vehicle.vehicleId?.let(sprites::bitmap) }
-    private val actors = TownActors(context)
     private val fuelInstalled = model.facilityStates[Facility.FUEL_STATION] == ShopAvailability.INSTALLED
     private val washInstalled = model.facilityStates[Facility.CAR_WASH] == ShopAvailability.INSTALLED
+    private val actorsDelegate = lazy(LazyThreadSafetyMode.NONE) {
+        val parked = placed.filter { (vehicle, _) ->
+            vehicle.activity == VehicleActivity.IDLE || vehicle.activity == VehicleActivity.NEEDS_REPAIR
+        }
+        val population = TownPopulation(
+            parked.map { (_, slot) -> TownPoint(slot.first.toFloat(), slot.second.toFloat()) },
+            parked.filter { (vehicle, _) -> vehicle.activity == VehicleActivity.NEEDS_REPAIR }
+                .map { (_, slot) -> TownPoint(slot.first.toFloat(), slot.second.toFloat()) },
+            fuelInstalled, washInstalled,
+        )
+        TownActors(context, population)
+    }
+    private val actors by actorsDelegate
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = false }
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.create("sans-serif", Typeface.BOLD)
@@ -71,17 +90,37 @@ internal class ShopSceneView(
     private var frameScheduled = false
     private val nextFrame = Runnable {
         frameScheduled = false
-        if (canAnimateActors() || movingCamera) {
+        if (canAnimateActors()) {
             if (movingCamera) {
                 updateCamera()
                 placeVehicleTargets()
             }
             invalidate()
+        } else stopMotion()
+    }
+
+    internal val residentTouch = TownResidentTouch()
+    private val liftResident = Runnable {
+        if (canTouchActors()) {
+            residentTouch.hold()
+            if (residentTouch.isHeld) parent?.requestDisallowInterceptTouchEvent(true)
+            invalidate()
+        } else cancelResidentTouch()
+    }
+    private val scrollChanged = ViewTreeObserver.OnScrollChangedListener {
+        if (canAnimateActors()) invalidate() else stopMotion()
+    }
+    private val motionSetting = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            // 설정 통지와 플랫폼의 애니메이터 상태 갱신 순서가 달라도 다음 그리기에서 다시 확인한다.
+            invalidate()
         }
     }
 
     private fun canAnimateActors() = isAttachedToWindow && isShown && windowVisibility == VISIBLE &&
-        hasWindowFocus() && ValueAnimator.areAnimatorsEnabled()
+        hasWindowFocus() && acceptsVehicleTap() && ValueAnimator.areAnimatorsEnabled() && getLocalVisibleRect(visibleBounds)
+
+    private fun canTouchActors() = scale > 0f && !movingCamera && selectedId == null && canAnimateActors()
 
     internal fun focus(
         selected: OwnedVehicleId?,
@@ -94,6 +133,9 @@ internal class ShopSceneView(
         cameraStart = startedAt?.takeIf { SystemClock.uptimeMillis() - it < 720L && ValueAnimator.areAnimatorsEnabled() }
         movingCamera = cameraStart != null
         acceptsVehicleTap = acceptsTap
+        if (!acceptsTap()) stopMotion()
+        else if (selected != null) cancelResidentTouch()
+        invalidate()
     }
 
     internal fun highlightExpansion(slots: IntRange, consume: () -> Boolean) {
@@ -114,7 +156,22 @@ internal class ShopSceneView(
         }
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        viewTreeObserver.addOnScrollChangedListener(scrollChanged)
+        context.contentResolver.registerContentObserver(
+            Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), false, motionSetting,
+        )
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility == VISIBLE) invalidate() else stopMotion()
+    }
+
     override fun onDetachedFromWindow() {
+        viewTreeObserver.removeOnScrollChangedListener(scrollChanged)
+        context.contentResolver.unregisterContentObserver(motionSetting)
         stopMotion()
         super.onDetachedFromWindow()
     }
@@ -123,6 +180,8 @@ internal class ShopSceneView(
         removeCallbacks(nextFrame)
         frameScheduled = false
         expansionStartedAt = null
+        cancelResidentTouch()
+        if (actorsDelegate.isInitialized()) actors.stop()
         cameraStart = null
         if (movingCamera) {
             movingCamera = false
@@ -130,6 +189,57 @@ internal class ShopSceneView(
             placeVehicleTargets()
             invalidate()
         }
+    }
+
+    private fun cancelResidentTouch() {
+        removeCallbacks(liftResident)
+        if (residentTouch.isHeld) parent?.requestDisallowInterceptTouchEvent(false)
+        residentTouch.cancel()
+    }
+
+    // ViewGroup가 차량 선택 자식을 먼저 처리한다. 주민은 자식이 받지 않은 지도 터치만 사용한다.
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (!canTouchActors()) {
+            cancelResidentTouch()
+            return super.onTouchEvent(event)
+        }
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                cancelResidentTouch()
+                val x = (event.x - offsetX) / scale
+                val y = (event.y - offsetY) / scale
+                if (!scene.contains(x, y)) return super.onTouchEvent(event)
+                val targetSize = 40f * resources.displayMetrics.density / scale
+                val resident = actors.hit(x, y, targetSize) ?: return super.onTouchEvent(event)
+                residentTouch.begin(event.getPointerId(0), resident, x, y)
+                postDelayed(liftResident, ViewConfiguration.getLongPressTimeout().toLong())
+                invalidate()
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val pointer = event.findPointerIndex(residentTouch.pointer)
+                if (pointer >= 0) {
+                    val x = (event.getX(pointer) - offsetX) / scale
+                    val y = (event.getY(pointer) - offsetY) / scale
+                    if (residentTouch.isHeld) residentTouch.drag(x, y, actors::moveHeld)
+                    else if (residentTouch.moved(x, y, ViewConfiguration.get(context).scaledTouchSlop / scale)) {
+                        cancelResidentTouch()
+                    }
+                    invalidate()
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                removeCallbacks(liftResident)
+                if (residentTouch.isHeld) parent?.requestDisallowInterceptTouchEvent(false)
+                residentTouch.release(event.getPointerId(event.actionIndex))
+                invalidate()
+            }
+            MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP -> {
+                cancelResidentTouch()
+                invalidate()
+            }
+        }
+        return true
     }
 
     init {
@@ -225,6 +335,9 @@ internal class ShopSceneView(
         canvas.drawColor(PixelStyle.background)
         val now = SystemClock.uptimeMillis()
         val animate = canAnimateActors()
+        if (!animate) stopMotion()
+        else if (!canTouchActors() && residentTouch.pointer >= 0) cancelResidentTouch()
+        actors.update(now, animate)
         canvas.save()
         canvas.translate(offsetX, offsetY)
         canvas.scale(scale, scale)
@@ -239,9 +352,8 @@ internal class ShopSceneView(
             badge(canvas, context.getString(R.string.shop_scene_spaces_unknown), 770f, 652f, 360f)
         }
         drawExpansion(canvas, now, animate)
-        val elapsed = if (animate) (now - animationOrigin) / 1000f else 0f
-        actors.draw(canvas, elapsed, fuelInstalled, washInstalled)
         placed.forEach { (vehicle, slot) -> drawVehicle(canvas, vehicle, slot.first.toFloat(), slot.second.toFloat()) }
+        actors.draw(canvas, animate)
         if (selectedId == null && mode == ShopMode.OVERALL) {
             val unknown = context.getString(R.string.shop_unknown)
             val summary = context.getString(R.string.shop_scene_summary, content.level?.toString() ?: unknown,
@@ -440,7 +552,6 @@ internal class ShopSceneView(
 
     companion object {
         private val cameraEasing = PathInterpolator(.4f, 0f, .2f, 1f)
-        private val animationOrigin = SystemClock.uptimeMillis()
         private val fuelCover = floatArrayOf(
             72f, 0f, 536f, 0f, 562f, 102f, 487f, 151f, 487f, 238f, 395f, 292f, 322f, 296f, 80f, 237f,
         )

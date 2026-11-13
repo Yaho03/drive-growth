@@ -71,6 +71,7 @@ import io.drivegrowth.core.contract.ContractError
 import io.drivegrowth.core.contract.InputSource
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.VehicleId
+import io.drivegrowth.core.contract.MissingReason
 import io.drivegrowth.core.contract.Observation
 import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.contract.Revision
@@ -592,6 +593,17 @@ open class MainActivity : Activity() {
 
     private fun gameControlsAllowed() = allowed() && !titlePending
 
+    private fun vehicleRestrictionMessage(): String {
+        val missing = interaction.state(SystemClock.elapsedRealtime()) as? Observation.Missing
+        val message = when (missing?.reason) {
+            MissingReason.PERMISSION_DENIED -> R.string.vehicle_restriction_permission
+            MissingReason.UNSUPPORTED -> R.string.vehicle_restriction_unsupported
+            else -> R.string.vehicle_restriction_park
+        }
+        return getString(message)
+    }
+
+
     private fun showPresentationTitle(show: Boolean) {
         if (titlePending == show) return
         if (show) simulationStartBoundary.cancel()
@@ -691,6 +703,12 @@ open class MainActivity : Activity() {
 
     private fun updateAccess() {
         val enabled = allowed()
+        if (!enabled && session.simulation == null) {
+            body.findViewWithTag<TextView>("vehicle:blocked")?.let {
+                val message = vehicleRestrictionMessage()
+                if (it.text != message) it.text = message
+            }
+        }
         if (!enabled) simulationStartBoundary.cancel()
         val gameEnabled = enabled && !titlePending
         updateNavigationBar(gameEnabled)
@@ -798,13 +816,13 @@ open class MainActivity : Activity() {
         if (!enabled) {
             val simulation = session.simulation
             val message = when (simulation?.inputState) {
-                null -> "주차 후 조작이 허용되면 이용할 수 있습니다."
+                null -> vehicleRestrictionMessage()
                 SimulationInputState.PROCESSING -> "모의 입력을 처리하고 있어요. 잠시 기다려 주세요."
                 SimulationInputState.RETRYABLE_FAILURE -> "모의 입력이 중단됐어요. 같은 입력을 다시 시도해 주세요."
                 SimulationInputState.UNAVAILABLE -> "모의 입력을 확인할 수 없어요. 기존 저장 기록은 그대로예요."
                 SimulationInputState.READY -> "지금은 시연을 조작할 수 없어요. 시연 상태를 확인해 주세요."
             }
-            showBody(style.text(message).apply { if (simulation != null) tag = "simulation:blocked" })
+            showBody(style.text(message).apply { tag = if (simulation == null) "vehicle:blocked" else "simulation:blocked" })
             return
         }
         if (titlePending) {

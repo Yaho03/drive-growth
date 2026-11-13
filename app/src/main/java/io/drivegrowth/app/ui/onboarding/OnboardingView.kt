@@ -101,6 +101,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             is OnboardingScreenState.Intro -> {
                 source(body, state.sourceLabel)
                 intro(body, state)
+                action(this@OnboardingView, R.string.onboarding_start, primary = true) { interaction.start() }
             }
             is OnboardingScreenState.Choosing -> {
                 source(body, state.sourceLabel)
@@ -118,21 +119,23 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
                     }
                     if (interaction.selectedCandidate == null) body.addView(label(s(if (interaction.selectedId == null)
                         R.string.onboarding_select_required else R.string.onboarding_selection_missing), color = PixelStyle.muted))
-                    action(body, R.string.onboarding_review, interaction.selectedCandidate?.selectable == true, true) { interaction.review() }
                 }
                 benefits(body, state.plannedBenefits)
                 action(body, R.string.onboarding_previous) { interaction.handleBack() }
+                if (state.candidates.isNotEmpty())
+                    action(this@OnboardingView, R.string.onboarding_review,
+                        interaction.selectedCandidate?.selectable == true, true) { interaction.review() }
             }
             is OnboardingScreenState.Confirming -> {
                 source(body, state.sourceLabel)
                 heading(body, R.string.onboarding_confirm_title, R.string.onboarding_confirm_body)
                 add(body, candidate(state.candidate, false))
                 benefits(body, state.plannedBenefits)
-                action(body, R.string.onboarding_confirm, state.candidate.selectable, true) {
-                    interaction.confirm(state.candidate.vehicle.vehicleId)
-                }
                 action(body, R.string.onboarding_previous, state.backAllowed) { interaction.handleBack() }
                 if (interaction.pendingSelection != null) body.addView(label(s(R.string.onboarding_submitting), 24))
+                action(this@OnboardingView, R.string.onboarding_confirm, state.candidate.selectable, true) {
+                    interaction.confirm(state.candidate.vehicle.vehicleId)
+                }
             }
             is OnboardingScreenState.Submitting -> {
                 source(body, state.sourceLabel)
@@ -159,7 +162,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
                     R.string.onboarding_completed_note)
                 completedRewards(body, state)
                 add(body, label(s(R.string.onboarding_next), color = PixelStyle.muted))
-                action(body, R.string.onboarding_to_shop, primary = true) { interaction.goToShop() }
+                action(this@OnboardingView, R.string.onboarding_to_shop, primary = true) { interaction.goToShop() }
             }
         }
         if (focused != null) findViewWithTag<View>(focused)?.takeIf { it.isEnabled }?.requestFocus()
@@ -214,7 +217,6 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
                 heading(this, R.string.onboarding_intro_title, R.string.onboarding_intro_body)
             })
             benefits(this, state.plannedBenefits)
-            action(this, R.string.onboarding_start, primary = true) { interaction.start() }
         }
         val town = townBitmap?.let { bitmap ->
             artwork(BitmapDrawable(resources, bitmap).apply { setFilterBitmap(false) }).apply {
