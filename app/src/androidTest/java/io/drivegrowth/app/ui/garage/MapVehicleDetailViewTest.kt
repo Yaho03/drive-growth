@@ -1,9 +1,12 @@
 package io.drivegrowth.app.ui.garage
 
+import android.content.Intent
+import android.graphics.Rect
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import io.drivegrowth.core.contract.MAX_VEHICLE_LEVEL
@@ -43,6 +46,39 @@ class MapVehicleDetailViewTest : InstrumentationTestCase() {
         val scroll = view.findViewWithTag<ScrollView>("map:vehicle-detail-scroll")
         assertTrue(scroll.getChildAt(0).height > scroll.height)
         assertTrue(view.findViewWithTag<Button>("map:vehicle-close").bottom <= panel.height)
+    }
+
+    fun testCloseAndManageAreEntirelyVisibleInAttachedCompactPanel() {
+        val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext,
+            CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        try {
+            val state = GaragePreviewStates.normal
+            val view = MapVehicleDetailView(activity) {}
+            onUi {
+                val root = FrameLayout(activity)
+                root.addView(view, FrameLayout.LayoutParams(dp(view, 320), dp(view, 340)))
+                activity.setContentView(root)
+                view.render(state, state.data.vehicles.first().vehicle.ownedVehicleId, true, false)
+            }
+            instrumentation.waitForIdleSync()
+            onUi {
+                assertEntirelyVisible(view.findViewWithTag("map:vehicle-close"))
+                val manage = view.findViewWithTag<Button>("map:vehicle-manage")
+                assertEntirelyVisible(manage)
+                assertTrue(manage.performClick())
+            }
+            instrumentation.waitForIdleSync()
+            onUi { assertEntirelyVisible(view.findViewWithTag("map:vehicle-close")) }
+        } finally {
+            onUi { activity.finish() }
+        }
+    }
+
+    private fun assertEntirelyVisible(view: View) {
+        val bounds = Rect()
+        assertTrue(view.getGlobalVisibleRect(bounds))
+        assertEquals(view.width, bounds.width())
+        assertEquals(view.height, bounds.height())
     }
 
     fun testSelectionChangesAndRestrictionInvalidateOldActions() = onUi {
