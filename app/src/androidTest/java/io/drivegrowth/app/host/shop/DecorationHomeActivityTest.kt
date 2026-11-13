@@ -77,7 +77,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
     private fun currentShopShown(a: MainActivity, id: String): Boolean {
         val children=tree(shop(a))
         val sign=when(id) { "neutral-sign"->"기본 간판 · 시연"; "blue-sign"->"간판 색상 · 시연"; else->error("시험 기대 외 품목") }
-        return children.any { it is ShopSceneView && it.isShown && sign in it.contentDescription.orEmpty() }
+        return children.any { it is ShopSceneView && it.isShown && sign in it.contentDescription?.toString().orEmpty() }
     }
     private fun awaitState(a: MainActivity,id:String) {
         val end=SystemClock.uptimeMillis()+30_000;var found=false
