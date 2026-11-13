@@ -137,7 +137,7 @@ JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌�
 
 재실행 로그를 대조할 때는 `DriveGrowthSimulation`의 `simulation_input`과 `simulation_terminal_restored`를 같은 논리 시각으로 비교한다. 각 시험의 범위는 [시연 검증 기록](06_VERIFICATION.md#통합-모의주행-debug-검증--2026-11-11)을 따른다.
 
-이 플레이 절차는 기존 Android 앱에서 확인한 경로다. [새 가게 UI](09_UI_UX_SPEC.md#새-가게-지도와-기능-연결--2026-11-13)의 메뉴·선택 위치와 실행 절차는 결합 APK의 검증 뒤 갱신한다. 실제 Pleos SDK를 사용한 에뮬레이터 관측과 실차 시험은 각각 [06](06_VERIFICATION.md)과 [#82](https://github.com/Yaho03/drive-growth/issues/82)에서 확인한다.
+이 플레이 절차는 기존 Android 앱에서 확인한 경로다. 새 가게 UI 결합 소스에서는 하단 ‘차고’의 ‘보유 차량’·‘도감’, ‘기록’의 ‘정산·내 기록’·‘퀘스트·업적·휴식’·‘시연 랭킹’에서 기존 기능으로 들어간다. 가게 상단의 미확인 정산 버튼은 미확인 목록을 연다. 지도·패널과 해당 APK의 시연 경로는 장치 시험 결과가 나온 뒤 이 절에 반영한다. [새 가게 UI 연결표](09_UI_UX_SPEC.md#새-가게-지도와-기능-연결--2026-11-13) 실제 Pleos SDK를 사용한 에뮬레이터 관측과 실차 시험은 각각 [06](06_VERIFICATION.md)과 [#82](https://github.com/Yaho03/drive-growth/issues/82)에서 확인한다.
 
 ## 기존 설치 상태
 
