@@ -162,19 +162,29 @@ class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
                 container.addView(overlay, FrameLayout.LayoutParams(width, height))
             }
             instrumentation.waitForIdleSync()
+            val before = android.graphics.Rect()
             onUi {
                 assertTrue(overlay.isAttachedToWindow)
                 val close = overlay.findViewWithTag<Button>("shop:map-close")
                 val scroll = overlay.findViewWithTag<ScrollView>("shop:map-scroll")
-                val before = android.graphics.Rect()
                 assertTrue(close.getGlobalVisibleRect(before))
                 assertEquals(close.height, before.height())
                 assertTrue(scroll.canScrollVertically(1))
                 scroll.scrollTo(0, scroll.getChildAt(0).height)
+            }
+            instrumentation.waitForIdleSync()
+            onUi {
+                val scroll = overlay.findViewWithTag<ScrollView>("shop:map-scroll")
                 assertTrue(scroll.scrollY > 0)
+                val close = overlay.findViewWithTag<Button>("shop:map-close")
                 val after = android.graphics.Rect()
                 assertTrue(close.getGlobalVisibleRect(after))
                 assertEquals(before, after)
+                val confirm = overlay.findViewWithTag<Button>("shop:map-confirm")
+                val visibleConfirm = android.graphics.Rect()
+                assertTrue(confirm.getGlobalVisibleRect(visibleConfirm))
+                assertEquals(confirm.width, visibleConfirm.width())
+                assertEquals(confirm.height, visibleConfirm.height())
             }
         } finally {
             onUi { host.finish() }
