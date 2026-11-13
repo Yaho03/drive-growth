@@ -114,13 +114,14 @@ class RewardCelebrationDeviceTest : InstrumentationTestCase() {
         val effect = RewardCelebrationView(host)
         var starts = 0
         var finishes = 0
+        onUi { host.setContentView(parent) }
+        awaitWindowFocus(parent)
         onUi {
-            host.setContentView(parent)
             effect.onStarted = { starts++ }
-            effect.holdGacha("saved-result", Color.MAGENTA, null) { finishes++ }
+            assertTrue(effect.holdGacha("saved-result", Color.MAGENTA, null) { finishes++ })
             parent.addView(effect.over(View(host), fillHeight = true), FrameLayout.LayoutParams(-1, -1))
         }
-        awaitWindowFocus(parent)
+        instrumentation.waitForIdleSync()
         onUi {
             val bitmap = Bitmap.createBitmap(effect.width, effect.height, Bitmap.Config.ARGB_8888)
             try {
