@@ -56,7 +56,8 @@ class ShopViewTest : InstrumentationTestCase() {
                 measureAndLayout(view, w, h)
                 val shown = text(view)
                 assertTrue(shown.contains("세차장")); assertTrue(shown.contains("가게 레벨 3 필요 · 현재 레벨 2"))
-                assertTrue(shown.contains("조정 가능한 시험값"))
+                assertEquals(state.facilities.single { it.facility == Facility.CAR_WASH }.option.trial,
+                    "조정 가능한 시험값" in shown)
                 assertFalse(shown.contains("규칙 ·"))
                 assertFalse(shown.contains(checkNotNull(state.expansion?.ruleVersion).value))
                 val label = views(view).filterIsInstance<TextView>().single { it.text.contains("가게 레벨 3 필요") }
@@ -239,6 +240,8 @@ class ShopViewTest : InstrumentationTestCase() {
             button(view, "shop:mode:VEHICLES").performClick(); assertEquals(ShopMode.VEHICLES, view.uiState.mode)
             view.showMapPanel(ShopMapTarget.Decorations)
             button(view, "shop:map-preview:blue-sign").performClick(); assertTrue(view.handleBack()); assertNull(view.uiState.selection)
+            assertNotNull(view.findViewWithTag<View>("shop:map-overlay"))
+            assertTrue(view.handleBack())
             assertFalse(view.handleBack()); assertTrue(events.isEmpty())
         }
     }
@@ -376,9 +379,9 @@ class ShopViewTest : InstrumentationTestCase() {
             onUi {
                 val density = host.resources.displayMetrics.density
                 view = ShopView(host, events::add)
-                host.setContentView(FrameLayout(host).apply {
-                    addView(view, FrameLayout.LayoutParams((300 * density).toInt(), (240 * density).toInt()))
-                })
+                val root = FrameLayout(host)
+                host.setContentView(root)
+                root.addView(view, FrameLayout.LayoutParams((300 * density).toInt(), (240 * density).toInt()))
                 view.render(state, true)
                 view.showMapPanel(ShopMapTarget.FacilityLot(Facility.FUEL_STATION))
             }

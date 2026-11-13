@@ -1,5 +1,6 @@
 package io.drivegrowth.app
 
+import android.content.Intent
 import android.os.SystemClock
 import android.test.ActivityInstrumentationTestCase2
 import android.widget.Button
@@ -22,6 +23,7 @@ import java.util.concurrent.FutureTask
 class MainNavigationAccessTest : ActivityInstrumentationTestCase2<MainActivity>(MainActivity::class.java) {
     fun testOldNavigationCannotActOnAnotherPageOrAfterParkingReturns() {
         assertTrue(instrumentation.targetContext.packageName.startsWith("io.drivegrowth.verify."))
+        setActivityIntent(Intent(instrumentation.targetContext, MainActivity::class.java))
         val main = activity
         val task = FutureTask {
             val root = main.window.decorView
