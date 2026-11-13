@@ -61,7 +61,7 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
             private val path = Path()
 
             override fun draw(canvas: Canvas) {
-                val edge = bounds.height() * .27f
+                val edge = bounds.height() * .34f
                 val left = bounds.left.toFloat()
                 val right = bounds.right.toFloat()
                 val top = bounds.top.toFloat()
@@ -75,8 +75,13 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
                 path.lineTo(left, bottom)
                 path.lineTo(left + edge, middle)
                 path.close()
+                paint.color = 0xff2050a8.toInt()
+                canvas.drawPath(path, paint)
+                canvas.save()
+                canvas.clipRect(left, top, right, bottom - bounds.height() * .13f)
                 paint.color = 0xff2f6fe8.toInt()
                 canvas.drawPath(path, paint)
+                canvas.restore()
             }
 
             override fun setAlpha(alpha: Int) { paint.alpha = alpha }
@@ -150,12 +155,13 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
         measureAt(landscape, width, height)
         fitLabel(badge, 15 * scale)
         measureAt(badge, (171 * scale).roundToInt(), (32 * scale).roundToInt())
-        for (word in listOf(gold, sky)) {
-            fitLabel(word, 136 * scale)
-            measureAt(word, logoWidth, (140 * scale).roundToInt())
-        }
+        val goldWidth = gold.paint.measureText(gold.text.toString()) / gold.textSize.coerceAtLeast(1f)
+        fitLabel(gold, minOf(136f, 316 / goldWidth.coerceAtLeast(1f)) * scale)
+        measureAt(gold, logoWidth, (140 * scale).roundToInt())
+        fitLabel(sky, 136 * scale)
+        measureAt(sky, logoWidth, (140 * scale).roundToInt())
         fitLabel(ribbon, 24 * scale)
-        measureAt(ribbon, (486 * scale).roundToInt(), (49 * scale).roundToInt())
+        measureAt(ribbon, (437 * scale).roundToInt(), (49 * scale).roundToInt())
         fitLabel(trial, 15 * scale)
         fitLabel(prototype, 15 * scale)
         measureAt(trial, (228 * scale).roundToInt(), (22 * scale).roundToInt())
@@ -178,13 +184,13 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
         val stageY = (height - 720 * scale) / 2
         val inset = minOf(dp(16), width / 12)
         val logoX = maxOf(inset, (stageX + 172 * scale).roundToInt())
-        val logoY = (stageY + 58 * scale).roundToInt()
+        val logoY = (stageY + 52 * scale).roundToInt()
         place(landscape, 0, 0)
         place(badge, logoX + (10 * scale).roundToInt(), logoY)
         val firstY = badge.bottom + (6 * scale).roundToInt()
         place(gold, logoX, firstY)
         place(sky, logoX + (64 * scale).roundToInt(), firstY + (126 * scale).roundToInt())
-        place(ribbon, logoX + (40 * scale).roundToInt(), sky.bottom + (18 * scale).roundToInt())
+        place(ribbon, logoX + (40 * scale).roundToInt(), sky.bottom + (14 * scale).roundToInt())
         val bottomGap = (stageY + 74 * scale).roundToInt()
         val roomBelowRibbon = (height - ribbon.bottom).coerceAtLeast(0)
         val startTop = height - minOf(roomBelowRibbon, bottomGap + start.measuredHeight)
