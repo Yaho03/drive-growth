@@ -28,9 +28,11 @@ import io.drivegrowth.app.host.garage.GarageCommandHost
 import io.drivegrowth.app.host.garage.GarageCommandState
 import io.drivegrowth.app.host.garage.GarageCommandView
 import io.drivegrowth.app.host.garage.GarageActionAvailability
+import io.drivegrowth.app.host.facility.FacilityHostMapper
 import io.drivegrowth.app.ui.shop.ShopScreenState
 import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.app.ui.shop.ShopEvent
+import io.drivegrowth.app.ui.shop.FacilityControlsEvent
 import io.drivegrowth.app.ui.shop.ShopMode
 import io.drivegrowth.app.ui.shop.ShopUiState
 import io.drivegrowth.app.ui.pixel.PixelStyle
@@ -89,6 +91,7 @@ open class MainActivity : Activity() {
     private var managementState: GarageCommandState = GarageCommandState.Idle
     private var recoveredManagement = false
     private var managementVisible = false
+    private var homeVehicleManagement = false
     private lateinit var facilityControls: io.drivegrowth.app.ui.shop.FacilityControlsView
     private var pendingPage: HostPage? = null
     private var pendingRouteGeneration = 0L
@@ -169,7 +172,11 @@ open class MainActivity : Activity() {
         garage = GarageView(this, ::onGarageEvent).also { it.restoreSelection(navigation.selectedVehicleId) }
         collection = CollectionView(this, ::refresh)
         results = ResultsView(this, ::onResultsEvent)
-        shop = ShopView(this, ::onShopEvent).also { it.onOpenVehicle = ::openVehicleFromShop }
+        shop = ShopView(this, ::onShopEvent).apply {
+            onOpenVehicle = ::openVehicleFromShop
+            onFocusedVehicleAction = ::openFocusedVehicleAction
+            onFocusedRest = ::onFacilityEvent
+        }
         facilityControls = io.drivegrowth.app.ui.shop.FacilityControlsView(this, ::onFacilityEvent)
         shop.facilityPanel = facilityControls
         val shopMode = ShopMode.entries.firstOrNull { it.name == savedInstanceState?.getString("shopMode") } ?: ShopMode.OVERALL
@@ -245,10 +252,16 @@ open class MainActivity : Activity() {
         management = GarageCommandHost(applicationContext, { handler.post(it) }, session.games) { state ->
             val prior = managementState
             managementState = state
-            if (state == GarageCommandState.Idle) managementVisible = false
+            if (state == GarageCommandState.Idle) {
+                managementVisible = false
+                homeVehicleManagement = false
+            }
             if (state is GarageCommandState.Review || state is GarageCommandState.Running || state is GarageCommandState.Confirmed)
                 managementVisible = true
-            if ((state is GarageCommandState.Confirmed || state is GarageCommandState.Rejected) && allowed()) queries.refresh()
+            if ((state is GarageCommandState.Confirmed || state is GarageCommandState.Rejected) && allowed()) {
+                queries.refresh()
+                if (homeVehicleManagement && navigation.page == HostPage.HOME) session.home.refresh()
+            }
             if (state == GarageCommandState.Idle && prior is GarageCommandState.Confirmed) {
                 navigation.pendingGarageRequest = null
                 managementVisible = false
@@ -739,12 +752,25 @@ open class MainActivity : Activity() {
         ranking.render(rankingState, gameEnabled && navigation.page == HostPage.RANKING)
         managementView.render(managementState, gameEnabled)
         val homeEnabled = gameEnabled && navigation.page == HostPage.HOME && !shopRestoreFailed
-        shop.render(if (shopRestoreFailed) ShopScreenState.Failure("가게 화면 상태를 복원하지 못해 요청을 보존하고 조작을 제한합니다.")
-            else session.home.state.screen, homeEnabled)
         val facility = session.facility.state
+        val facilityEnabled = homeEnabled && session.home.facilityControlsEnabled
+        val showHomeManagement = navigation.page == HostPage.HOME && homeVehicleManagement && managementVisible
+        shop.focusManagementPanel = managementView.takeIf { showHomeManagement }
+        val restRecovery = facility.receipt != null || facility.pending != null || facility.error != null
+        val restActions = if (facilityEnabled && !facility.busy && !facility.foreign && !facility.unsupported && !restRecovery) {
+            facility.facts?.let(FacilityHostMapper::restingRows).orEmpty().filter { it.activity != null }.associate { row ->
+                row.vehicle.ownedVehicleId to FacilityControlsEvent.SetResting(facility.version, row.vehicle, row.resting, !row.resting)
+            }
+        } else emptyMap()
+        shop.render(if (shopRestoreFailed) ShopScreenState.Failure("가게 화면 상태를 복원하지 못해 요청을 보존하고 조작을 제한합니다.")
+            else session.home.state.screen, homeEnabled, (garageState as? GarageScreenState.Content)?.data?.vehicles,
+            focusRest = restActions, focusRestRecovery = facilityEnabled && restRecovery,
+            managementBusy = showHomeManagement,
+            vehicleActionsBlocked = managementVisible || navigation.pendingGarageRequest != null ||
+                pendingPage != null || pendingRouteFailed || facility.busy || restRecovery)
         val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
             ?.associate { it.vehicleId to it.displayName }.orEmpty()
-        facilityControls.render(facility, homeEnabled && session.home.facilityControlsEnabled, names)
+        facilityControls.render(facility, facilityEnabled, names)
         garage.render(garageState, gameEnabled)
         collection.render(collectionState, gameEnabled)
         results.render(if (session.results.hasHistorySource) session.results.historyState else resultsMapper.map(screen), gameEnabled)
@@ -802,7 +828,7 @@ open class MainActivity : Activity() {
         }
         if (pendingRouteFailed)
             chrome.addView(style.button("처리 중인 요청 다시 확인") { if (gameControlsAllowed()) refreshPendingRoute() })
-        pendingPage?.takeIf { it != navigation.page }?.let { target ->
+        pendingPage?.takeIf { it != navigation.page && !(it == HostPage.GARAGE && showHomeManagement) }?.let { target ->
             chrome.addView(style.button(when (target) {
                 HostPage.GACHA -> "보관한 가챠 요청 확인"
                 HostPage.GARAGE -> "보관한 차량 관리 요청 확인"
@@ -832,7 +858,7 @@ open class MainActivity : Activity() {
             HostPage.COLLECTION -> showBody(collection)
             HostPage.RESULTS -> showBody(results)
             HostPage.ONBOARDING -> showBody(onboarding)
-            HostPage.HOME -> showBody(shop)
+            HostPage.HOME -> showBody(if (showHomeManagement && shop.focusedVehicleId == null) managementView else shop)
             HostPage.GACHA -> showBody(gacha)
             HostPage.DELIVERY -> {
                 showBody(delivery)
@@ -978,6 +1004,7 @@ open class MainActivity : Activity() {
     private fun showBody(view: View) {
         if (body.childCount == 1 && body.getChildAt(0) === view) return
         body.removeAllViews()
+        (view.parent as? android.view.ViewGroup)?.removeView(view)
         body.addView(view, FrameLayout.LayoutParams(-1, -1))
     }
 
@@ -1013,6 +1040,21 @@ open class MainActivity : Activity() {
         garage.restoreSelection(id)
         select(HostPage.GARAGE)
         queries.refresh()
+    }
+
+    private fun openFocusedVehicleAction(event: GarageEvent.RequestAction) {
+        val facility = session.facility.state
+        if (!gameControlsAllowed() || navigation.page != HostPage.HOME || shopRestoreFailed ||
+            shop.focusedVehicleId != event.id || shop.uiState.pending != null || managementVisible ||
+            pendingPage != null || pendingRouteFailed || navigation.pendingGarageRequest != null ||
+            facility.busy || facility.pending != null || facility.receipt != null || facility.error != null
+        ) return
+        val current = (screen as? HostQueryState.Content)?.snapshot?.ownedVehicles?.firstOrNull {
+            it.ownedVehicleId == event.id && it.revision == event.revision
+        } ?: return
+        if (current.lifecycle != io.drivegrowth.core.contract.VehicleLifecycle.OWNED) return
+        homeVehicleManagement = true
+        onGarageEvent(event)
     }
 
     private fun onShopEvent(event: ShopEvent) {
@@ -1129,6 +1171,7 @@ open class MainActivity : Activity() {
         if (managementState != GarageCommandState.Idle && !management.controller.cancel()) return
         navigation.pendingGarageRequest = null
         managementVisible = false
+        homeVehicleManagement = false
         garage.completeRequest()
         render()
     }
@@ -1151,7 +1194,9 @@ open class MainActivity : Activity() {
         if (titlePending && allowed()) { showPresentationTitle(false); return }
         automaticIntroAllowed = false
         if (allowed()) {
-            if (navigation.page == HostPage.GARAGE && managementVisible && managementState != GarageCommandState.Idle) {
+            if ((navigation.page == HostPage.GARAGE || navigation.page == HostPage.HOME && homeVehicleManagement) &&
+                managementVisible && managementState != GarageCommandState.Idle
+            ) {
                 if (managementState is GarageCommandState.Confirmed) management.controller.acknowledge()
                 else cancelPreparation()
                 return
