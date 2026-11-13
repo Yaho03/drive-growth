@@ -1,5 +1,6 @@
 // Display-only map controls and actors; never mutate economy state.
 let mapZoom=1, mapPan={x:0,y:0}, townRAF=0, actorClock=0, townActorState=null;
+let townFocus=null, townFocusAnim=false, townBusy=false;   // 지도에서 고른 차(상세 보기)
 let townMotion=!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TOWN_ACTORS=[
  {name:'손님 · 산책',kind:'guest',a:[595,580],b:[825,695],duration:22,offset:0},
@@ -72,7 +73,7 @@ function npcFrames(kind, rear=false){
 }
 function applyTownCamera(){
  const world=document.getElementById('townWorld');if(!world)return;
- world.style.transform=`translate(${Math.round(mapPan.x)}px,${Math.round(mapPan.y)}px) scale(${mapZoom})`;
+ world.style.transform=(townFocus&&focusTransform(townFocus))||`translate(${Math.round(mapPan.x)}px,${Math.round(mapPan.y)}px) scale(${mapZoom})`;
  const readout=document.getElementById('zoomValue');if(readout)readout.textContent=Math.round(mapZoom*100)+'%';
  document.querySelector('[data-act="zoomOut"]').disabled=mapZoom<=.5;
  document.querySelector('[data-act="zoomIn"]').disabled=mapZoom>=1.5;
@@ -86,7 +87,7 @@ function mountTown(){
  applyTownCamera();
  let dragging=null;
  vp.onpointerdown=e=>{
-  if(mapZoom<=1||e.target.closest('button'))return;
+  if(townFocus||mapZoom<=1||e.target.closest('button'))return;
   dragging={x:e.clientX,y:e.clientY,px:mapPan.x,py:mapPan.y};vp.setPointerCapture(e.pointerId);vp.classList.add('is-dragging');
  };
  vp.onpointermove=e=>{
@@ -182,3 +183,125 @@ function mountTown(){
  }
  tick(prev);
 }
+
+// ── 차를 누르면: 헤드라이트 번쩍 → 그 차로 확대 → 상세 UI ──
+const FOCUS_ZOOM=2.6, FOCUS_AT=[-.22,.2];       // 확대 배율, 차를 둘 화면 위치(가운데 기준, 지도 틀 폭·높이 비율): 왼쪽 위 카드 아래, 오른쪽 목록 왼쪽
+const reduceMotion=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function focusTransform(id){
+ const vp=document.getElementById('townViewport');
+ const i=S.cars.slice(0,cap()).findIndex(c=>c.id===id);
+ if(!vp||i<0)return null;
+ const sl=SLOTS[i],Wv=vp.clientWidth,Hv=vp.clientHeight,Ww=Wv,Hw=Wv*2/3,s=FOCUS_ZOOM;
+ const px=(sl.x/1536-.5)*Ww,py=((sl.y+6)/1024-.5)*Hw;
+ let tx=FOCUS_AT[0]*Wv-px*s,ty=FOCUS_AT[1]*Hv-py*s;
+ const lx=Math.max(0,(s*Ww-Wv)/2),ly=Math.max(0,(s*Hw-Hv)/2);   // 지도 밖(빈 곳)이 보이지 않게
+ tx=Math.max(-lx,Math.min(lx,tx));ty=Math.max(-ly,Math.min(ly,ty));
+ return `translate(${Math.round(tx)}px,${Math.round(ty)}px) scale(${s})`;
+}
+// 등급 색(일반 흰 · 고급 파랑 · 희귀 코랄 · 전설 진한 주황)
+const FLASH_COL={common:['#d6dce6','#f6f6f2','#f6f6f2'],advanced:['#346cd6','#68a0f0','#aad6f6'],
+ rare:['#f68068','#f08caa','#e8d6b4'],legend:['#c86e28','#f6aa3c','#fcdc64']};
+function flashCar(id){
+ const car=document.querySelector(`.town-car[data-carid="${id}"]`);if(!car)return;
+ if(!car.complete||!car.naturalWidth){car.addEventListener('load',()=>flashCar(id),{once:true});return;}
+ const rar=car.dataset.rar||'common',[main,light,pale]=FLASH_COL[rar]||FLASH_COL.common;
+ const w=car.naturalWidth,h=car.naturalHeight,P=14;
+ const cv=document.createElement('canvas');cv.width=w+2*P;cv.height=h+2*P;cv.className='flash-cv';
+ const wPct=parseFloat(car.style.width);
+ Object.assign(cv.style,{left:car.style.left,top:car.style.top,width:(wPct*(w+2*P)/w)+'%',
+  transform:'translate(-50%,-50%) scaleX(-1)',zIndex:(+car.style.zIndex||100)+1});
+ car.parentNode.appendChild(cv);
+ const g=cv.getContext('2d');
+ // 앞(↘) 헤드라이트 두 개: 차 그림 폭·높이 비율(여러 차종에서 잰 평균)
+ const lights=[[Math.round(w*.66)+P,Math.round(h*.70)+P],[Math.round(w*.95)+P,Math.round(h*.58)+P]];
+ const put=(x,y,c,a=1)=>{g.globalAlpha=a;g.fillStyle=c;g.fillRect(x,y,1,1);};
+ const base={common:1,advanced:2,rare:3,legend:5}[rar]||1, powers=[1,2,3,3,2,1];
+ let k=0;
+ const step=()=>{
+  g.clearRect(0,0,cv.width,cv.height);
+  if(k>=powers.length){cv.remove();return;}
+  const power=powers[k],size=base+power-1;
+  for(const [x,y] of lights){
+   for(let dy=-size;dy<=size;dy++)for(let dx=-size;dx<=size;dx++){
+    const d=dx*dx+dy*dy;if(d>0&&d<=(size*.7)**2&&((x+dx+y+dy)&1)===0)put(x+dx,y+dy,light,.8);}
+   for(let r=1;r<=size+1;r++){const c=r<=Math.floor(size/2)+1?'#ffffff':main;
+    put(x+r,y,c);put(x-r,y,c);put(x,y+r,c);put(x,y-r,c);}
+   if(rar==='legend')for(let r=1;r<=Math.floor(size/2)+1;r++){put(x+r,y+r,pale);put(x-r,y-r,pale);put(x+r,y-r,pale);put(x-r,y+r,pale);}
+   put(x,y,'#ffffff');
+   if(rar==='rare'||rar==='legend'){                // 앞으로 뻗는 빛줄기
+    const L=Math.floor({rare:8,legend:12}[rar]*power/3);
+    for(let s=2;s<L;s++)for(const v of[-1,0,1]){const xx=x+s+1,yy=y+Math.floor(s/2)+v;
+     if(v===0||((xx+yy)&1)===0)put(xx,yy,s<L*.6?light:main,.85);}
+   }
+  }
+  k++;setTimeout(step,100);
+ };
+ step();
+}
+// 화면을 새 배치로 바로 다시 그리되, 지도가 누르기 전 자리·크기 그대로 보이도록 맞춘 뒤
+// 지도 틀 넓어짐과 차로 확대를 같은 시간·같은 곡선으로 한 번에 움직인다(FLIP).
+const CAM_MS=720, CAM_EASE='cubic-bezier(.4,0,.2,1)';   // 천천히 시작해 가운데서 빠르고 끝에서 부드럽게 멈춤
+function worldRectAt1(map){const r=map.getBoundingClientRect(),h=r.width*2/3;return {x:r.left,y:r.top+(r.height-h)/2,w:r.width,h};}
+function matchTransform(from,base){
+ const k=from.width/base.w;
+ const tx=(from.left+from.width/2)-(base.x+base.w/2),ty=(from.top+from.height/2)-(base.y+base.h/2);
+ return `translate(${tx}px,${ty}px) scale(${k})`;
+}
+function flipTo(oldWorld,oldMap,targetTransform){
+ const map=document.getElementById('townViewport'),w=document.getElementById('townWorld');
+ if(!map||!w||!oldWorld)return;
+ const nm=map.getBoundingClientRect();
+ w.classList.remove('cam-move');
+ w.style.transform=matchTransform(oldWorld,worldRectAt1(map));
+ // 새 틀이 더 크면 누르기 전 틀 크기로 잘라 두었다가 함께 넓힌다
+ const ins=[oldMap.top-nm.top,nm.right-oldMap.right,nm.bottom-oldMap.bottom,oldMap.left-nm.left].map(v=>Math.max(0,Math.round(v)));
+ map.style.transition='';map.style.clipPath=`inset(${ins.join('px ')}px round 22px)`;
+ void w.offsetWidth;
+ map.style.transition=`clip-path ${CAM_MS}ms ${CAM_EASE}`;
+ w.style.transition=`transform ${CAM_MS}ms ${CAM_EASE}`;
+ w.style.transform=targetTransform;map.style.clipPath='inset(0px 0px 0px 0px round 22px)';
+ setTimeout(()=>{map.style.clipPath='';map.style.transition='';w.style.transition='';},CAM_MS+40);
+}
+function townFocusCar(id){
+ if(townBusy||!S.cars.some(c=>c.id===id))return;
+ const world=document.getElementById('townWorld'),map=document.getElementById('townViewport');if(!world||!map)return;
+ townBusy=true;
+ const fast=reduceMotion(),oldWorld=world.getBoundingClientRect(),oldMap=map.getBoundingClientRect();
+ townFocus=id;townFocusAnim=true;render();townFocusAnim=false;
+ if(!fast){flipTo(oldWorld,oldMap,focusTransform(id));flashCar(id);}
+ setTimeout(()=>{townBusy=false;},fast?0:CAM_MS);
+}
+let townFocusH=0;
+// 확대 때 지도 틀 높이: 지도 칸 위쪽부터 하단 메뉴 바로 위까지
+function focusMapHeight(){
+ const nav=document.getElementById('nav'),shell=document.querySelector('.map-shell');
+ // 창 높이 − 지도 칸 위치(스크롤 포함) − 하단 메뉴 높이 − 아래 여백·간격
+ if(nav&&shell&&!nav.hidden){const top=shell.getBoundingClientRect().top+window.scrollY;
+  const h=Math.round(window.innerHeight-top-nav.offsetHeight-16-12-4);if(h>200)townFocusH=h;}
+ return townFocusH||Math.max(240,Math.round(window.innerHeight-160));
+}
+function townUnfocus(){
+ if(!townFocus||townBusy)return;
+ townBusy=true;
+ const fast=reduceMotion();
+ document.querySelectorAll('.focus-actions,.focus-info').forEach(e=>e.classList.add('leaving'));
+ setTimeout(()=>{
+  const world=document.getElementById('townWorld'),map=document.getElementById('townViewport');
+  const oldWorld=world&&world.getBoundingClientRect(),oldMap=map&&map.getBoundingClientRect();
+  townFocus=null;render();
+  const shop=document.querySelector('.shop');
+  if(!fast&&oldWorld){
+   flipTo(oldWorld,oldMap,`translate(${Math.round(mapPan.x)}px,${Math.round(mapPan.y)}px) scale(${mapZoom})`);
+   if(shop){shop.classList.add('returning');setTimeout(()=>shop.classList.remove('returning'),CAM_MS+200);}
+  }
+  townBusy=false;
+ },fast?0:160);
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&townFocus&&!document.querySelector('#layer .overlay'))townUnfocus();});
+// 창 크기가 바뀌면 확대 화면의 지도 틀 높이와 카메라를 다시 맞춘다
+window.addEventListener('resize',()=>{
+ if(!townFocus||townBusy)return;
+ const map=document.getElementById('townViewport');if(!map)return;
+ townFocusH=0;map.style.height=focusMapHeight()+'px';
+ const w=document.getElementById('townWorld');if(w){w.classList.remove('cam-move');w.style.transform=focusTransform(townFocus);}
+});

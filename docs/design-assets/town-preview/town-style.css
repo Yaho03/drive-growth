@@ -19,3 +19,39 @@
 .map .town-car{transform:translate(-50%,-50%) scaleX(-1);image-rendering:auto;filter:saturate(1.14) contrast(1.06)}
 .parked-hit{width:4.6%;height:7%;transform:translate(-50%,-50%)}
 .parked-ring{width:5.4%;height:2.4%;transform:translate(-50%,-50%) rotate(-29deg)}
+
+/* 차를 고르면 그 차로 확대하고 상세 UI를 옆에 띄운다 */
+.shop.focused .map-tools,.shop.focused .map-help{display:none}
+.shop.focusing .map-tools,.shop.focusing .map-help{display:none}
+.shop.focused #townViewport>.hud,.shop.focusing #townViewport>.hud{display:none}
+.shop{transition:grid-template-columns .5s cubic-bezier(.22,.8,.25,1),gap .5s}
+.shop.focusing,.shop.focused{grid-template-columns:minmax(0,1fr) minmax(0,0fr);gap:0}
+.shop.focusing>:last-child,.shop.focused>:last-child{opacity:0;overflow:hidden;pointer-events:none;transition:opacity .2s}
+/* 지도(3:2)는 틀 가운데. 틀 높이가 바뀌어도 늘어나지 않는다 */
+.map .town-world{inset:auto;left:0;width:100%;height:calc(100cqw * 2 / 3);top:calc(50% - 100cqw / 3)}
+.town-world.cam-move{transition:transform .65s cubic-bezier(.22,.8,.25,1)}
+.flash-cv{position:absolute;image-rendering:pixelated;pointer-events:none}
+.focus-info{position:absolute;left:2%;top:3%;z-index:7;width:min(46%,430px);background:rgba(18,22,34,.93);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:12px 14px;display:grid;gap:8px}
+.focus-info .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.focus-info .stats .item{display:block;padding:6px 10px;border-radius:10px}
+.focus-actions{position:absolute;right:1.6%;top:3%;bottom:3%;width:min(44%,440px);z-index:7;overflow:auto;background:rgba(18,22,34,.93);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:10px;gap:8px}
+.focus-actions .item{padding:8px 10px;border-radius:12px;gap:8px}
+.focus-actions .item b{font-size:14px}
+.focus-actions .item .mut{font-size:12px!important;line-height:1.35}
+.focus-actions .btn{min-height:36px;padding:0 12px;font-size:14px}
+.anim-in-right{animation:fxSlideR .42s .22s cubic-bezier(.2,.8,.2,1) both}
+.anim-in-right>.item{animation:fxSlideR .42s cubic-bezier(.2,.8,.2,1) both}
+.anim-in-right>.item:nth-of-type(1){animation-delay:.26s}.anim-in-right>.item:nth-of-type(2){animation-delay:.3s}
+.anim-in-right>.item:nth-of-type(3){animation-delay:.34s}.anim-in-right>.item:nth-of-type(4){animation-delay:.38s}
+.anim-in-right>.item:nth-of-type(5){animation-delay:.42s}.anim-in-right>.item:nth-of-type(6){animation-delay:.46s}
+.anim-in-up{animation:fxSlideU .42s .3s cubic-bezier(.2,.8,.2,1) both}
+.leaving{animation:fxOut .22s ease both}
+@keyframes fxSlideR{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+@keyframes fxSlideU{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
+@keyframes fxOut{to{opacity:0;transform:translateY(8px)}}
+@media (prefers-reduced-motion:reduce){.town-world.cam-move{transition:none}.anim-in-right,.anim-in-right>.item,.anim-in-up,.leaving{animation:none}}
+
+/* 확대에서 돌아올 때 오른쪽 가게 칸이 서서히 나타난다 */
+.shop.returning>:last-child{animation:fxFadeIn .45s .2s both}
+@keyframes fxFadeIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.shop.returning>:last-child{animation:none}}

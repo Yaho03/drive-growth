@@ -184,7 +184,7 @@ function toast(t){ const el=document.createElement("div"); el.className="toast";
 function modal(html){ $("#layer").innerHTML=`<div class="overlay" id="ov"><div class="card modal pop" role="dialog" aria-modal="true">${html}</div></div>`;
   $("#ov").addEventListener("click",e=>{ if(e.target.id==="ov") closeModal(); }); }
 function closeModal(){ $("#layer").innerHTML=""; }
-function go(v){ view=v; detailId=null; render(); window.scrollTo(0,0); }
+function go(v){ view=v; detailId=null; townFocus=null; render(); window.scrollTo(0,0); }
 
 function render(){
   cancelAnimationFrame(townRAF);
@@ -235,6 +235,8 @@ function renderOnboarding(){
 
 // ── 가게(지도) ──
 function renderShop(){
+  const fc = townFocus && S.cars.slice(0,cap()).find(x=>x.id===townFocus);
+  if(townFocus && !fc) townFocus=null;
   const b = S.level===1?BUILD.main_lv1:BUILD.main_lv2;
   const pct=(v,base)=>v/base*100;
   const cars = S.cars.slice(0,cap()).map((c,i)=>{ const sl=SLOTS[i], m=M[c.model], [w,h]=SPR[m.type];
@@ -243,27 +245,28 @@ function renderShop(){
   const sw = Math.hypot(sign[1][0]-sign[0][0], sign[1][1]-sign[0][1]), sh = sign[0][1]-sign[3][1];
   const next = EXPAND[S.level+1];
   const canExp = next && S.customers>=next.cust && S.money>=next.cost;
-  $("#screen").innerHTML = `<div class="shop">
+  $("#screen").innerHTML = `<div class="shop${fc?" focused":""}">
    <div class="map-shell">
     <div class="map-tools" aria-label="지도 보기 조절">
       <span>마을 둘러보기</span><button data-act="zoomOut" aria-label="지도 축소">−</button><output id="zoomValue" aria-live="polite">${Math.round(mapZoom*100)}%</output><button data-act="zoomIn" aria-label="지도 확대">＋</button><button data-act="zoomFit">전체 보기</button><button data-act="toggleTownMotion" aria-pressed="${!townMotion}">${townMotion?'움직임 멈춤':'움직임 재생'}</button>
     </div>
-    <div class="map" id="townViewport" aria-label="가게 지도. 주차 ${S.cars.length}/${cap()}칸">
+    <div class="map" id="townViewport" aria-label="가게 지도. 주차 ${S.cars.length}/${cap()}칸" ${fc?`style="aspect-ratio:auto;height:${focusMapHeight()}px"`:""}>
      <div class="town-world" id="townWorld">
       <img class="full town-background" src="${IMG.isoTown}" alt="사선 시점의 파란 렌트카 본관, 빨간 HR주유소, 민트 보험회사와 주황 세차장">
       ${SLOTS.map((sl,i)=>i>=cap()?`<span class="lot-lock" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-35,1024)}%;z-index:2500">확장 예정</span>`:'').join('')}
       ${cars.map(({c,sl,m})=>`<span class="ring parked-ring ${c.rar}" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y+13,1024)}%;z-index:2"></span>
-       <img class="town-car" src="${IMG[m.id]||IMG[m.type]}" alt="${esc(m.name)}" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-7,1024)}%;width:${pct(m.type==='light'?88:100,1536)}%;z-index:${100+Math.round(sl.y+13)}">
+       <img class="town-car" data-carid="${c.id}" data-rar="${c.rar}" src="${IMG[m.id]||IMG[m.type]}" alt="${esc(m.name)}" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-7,1024)}%;width:${pct(m.type==='light'?88:100,1536)}%;z-index:${100+Math.round(sl.y+13)}">
        <span class="car-label" style="left:${pct(sl.x-36,1536)}%;top:${pct(sl.y+25,1024)}%;z-index:2500">${esc(m.name)}${c.st==='repair'?' · 수리':c.rest?' · 쉼':''}</span>
-       <button class="slotbtn parked-hit" data-act="openCar" data-arg="${c.id}" aria-label="${esc(m.name)} 자세히" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-7,1024)}%;z-index:3000"></button>`).join("")}
+       <button class="slotbtn parked-hit" data-act="focusCar" data-arg="${c.id}" aria-label="${esc(m.name)} 자세히" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-7,1024)}%;z-index:3000"></button>`).join("")}
       ${TOWN_ACTORS.map((p,i)=>`<img class="px town-actor" id="townActor${i}" alt="${p.name}" style="width:${pct(p.ruru?64:40,1536)}%;left:${pct(p.a[0],1536)}%;top:${pct(p.a[1],1024)}%" src="${p.ruru?RURU_FRAMES.idle[0]:npcFrames(p.kind)[0]}">`).join('')}
      </div>
      <div class="hud" style="left:2%;top:3%">● 정상 영업 중</div>
      <div class="hud" style="right:2%;top:3%">P ${S.cars.length} / ${cap()}</div>
-     <div class="hud" style="left:2%;bottom:3%">가게 Lv${S.level} · 완료 손님 ${S.customers}명</div>
+     ${fc?focusInfoHTML(fc, townFocusAnim)+focusActionsHTML(fc, townFocusAnim):`<div class="hud" style="left:2%;bottom:3%">가게 Lv${S.level} · 완료 손님 ${S.customers}명</div>`}
     </div>
     <p class="map-help">− 버튼으로 50%까지 축소 · 확대 후 빈 곳을 드래그해 이동 · 전체 보기로 복귀</p>
    </div>
+   ${fc?`<div></div>`:`
    <div style="display:grid;gap:14px;align-content:start">
     <div class="card" style="display:grid;gap:10px">
       <div class="h2">가게 확장</div>
@@ -290,7 +293,8 @@ function renderShop(){
       <button class="btn danger" data-act="resetAsk">처음부터 다시</button>
       <div class="mut" style="font-size:13px">${S.day}일째 · 오늘 반영 거리 ${S.kmToday} / ${KM_CAP}km</div>
     </div>
-   </div></div>`;
+   </div>`}
+  </div>`;
 }
 
 // ── ① 차고 ──
@@ -314,6 +318,37 @@ function renderGarage(){
 }
 
 // ── ② 차량 상세 ──
+function detailRows(c){
+  const m=M[c.model], busyRepair=c.st==="repair", scrapOnly=c.acc>=3, max=c.lv>=20;
+  const mats = S.cars.filter(x=>x.id!==c.id && x.model===c.model && x.st!=="repair");
+  const row=(t,sub,price,btn)=>`<div class="item"><div><b>${t}</b><div class="mut" style="font-size:14px">${sub}</div></div><div class="row">${price!=null?`<span class="row" style="gap:6px;font-weight:900"><span class="coin s"></span>${won(price)}</span>`:""}${btn}</div></div>`;
+  return `     ${busyRepair?`<div class="notice bad">사고가 나서 수리가 필요해요 · 수리, 판매, 폐차만 할 수 있어요</div>`:""}
+     ${row(max?"레벨업 · 최대 Lv20":`레벨업 · Lv${c.lv} → Lv${c.lv+1}`, `${won(m.price)} × 2% × Lv${c.lv} × ${R[c.rar].n} ${R[c.rar].cost/100}`, max?null:lvCost(c),
+        `<button class="btn p" data-act="levelup" data-arg="${c.id}" ${busyRepair||max||S.money<lvCost(c)?"disabled":""}>레벨업</button>`)}
+     ${row("재료 강화", busyRepair?"수리 후 가능":max?"이미 Lv20이라 재료를 쓸 수 없어요":mats.length?`같은 ${m.name} ${mats.length}대를 재료로 쓸 수 있어요 · 일반 100% · 고급 150% · 희귀 250% · 전설 400%`:"같은 차종 차가 있어야 재료로 쓸 수 있어요", null,
+        `<button class="btn" data-act="matPick" data-arg="${c.id}" ${busyRepair||max||!mats.length?"disabled":""}>재료 고르기</button>`)}
+     ${row("수리", busyRepair?`${won(m.price)} × 5% × ${R[c.rar].cost/100}`:"지금은 수리할 곳이 없어요", repairCost(c),
+        `<button class="btn ${busyRepair?"p":""}" data-act="repair" data-arg="${c.id}" ${!busyRepair||S.money<repairCost(c)?"disabled":""}>수리</button>`)}
+     ${row("판매 · 받는 금액", scrapOnly?"사고 3회 이상은 폐차만 가능해요":`${won(c.cost)} × (60% − 사고 ${c.acc}회 ${5*c.acc}%p + Lv${c.lv} ${c.lv-1}%p) = ${salePct(c)}%`, scrapOnly?null:salePrice(c),
+        `<button class="btn" data-act="sellAsk" data-arg="${c.id}" ${scrapOnly||S.cars.length<=1?"disabled":""}>판매</button>`)}
+     ${row("폐차 · 받는 금액", `구매가 ${won(c.cost)} × 20%`, scrapPrice(c),
+        `<button class="btn danger" data-act="scrapAsk" data-arg="${c.id}" ${S.cars.length<=1?"disabled":""}>폐차</button>`)}
+     ${row("영업 쉬기", busyRepair?"수리 중엔 영업을 안 해요":"켜면 손님에게 빌려주지 않아요", null,
+        `<button class="btn" data-act="rest" data-arg="${c.id}" aria-pressed="${c.rest}">${c.rest?"켜짐":"꺼짐"}</button>`)}
+     ${S.cars.length<=1?`<div class="mut" style="font-size:14px">마지막 한 대는 판매·폐차할 수 없어요(시제품 규칙).</div>`:""}`;
+}
+// 가게 지도에서 차를 골랐을 때: 지도 위 왼쪽 위 정보 카드
+function focusInfoHTML(c, anim){ const m=M[c.model];
+  return `<div class="focus-info ${anim?"anim-in-up":""}">
+    <div class="row" style="gap:8px"><span class="big" style="font-size:22px">${m.name}</span>${rarChip(c.rar)}${stChip(c)}</div>
+    <div class="row" style="flex-wrap:nowrap"><b>Lv ${c.lv}</b><div class="bar"><div style="width:${c.prog}%"></div></div><span class="mut">${c.prog}%</span></div>
+    <div class="stats"><div class="item"><div class="mut">사고</div><b>${c.acc}회</b></div><div class="item"><div class="mut">구매가</div><b>${won(c.cost)}</b></div><div class="item"><div class="mut">차종 가격</div><b>${won(m.price)}</b></div></div>
+  </div>`; }
+// 가게 지도에서 차를 골랐을 때: 오른쪽 기능 목록
+function focusActionsHTML(c, anim){
+  return `<div class="list focus-actions ${anim?"anim-in-right":""}">
+    <div class="row" style="justify-content:space-between"><button class="btn" data-act="unfocus">← 가게</button><span class="mut" style="font-size:14px">${M[c.model].name} 관리</span></div>
+    ${detailRows(c)}</div>`; }
 function renderDetail(){
   const c = S.cars.find(x=>x.id===detailId); if(!c){ view="garage"; return render(); }
   const m=M[c.model], busyRepair=c.st==="repair", scrapOnly=c.acc>=3, max=c.lv>=20;
@@ -331,20 +366,7 @@ function renderDetail(){
        <div class="item" style="display:block"><div class="mut">차종 가격</div><b>${won(m.price)}</b></div></div>
    </div>
    <div class="card list">
-     ${busyRepair?`<div class="notice bad">사고가 나서 수리가 필요해요 · 수리, 판매, 폐차만 할 수 있어요</div>`:""}
-     ${row(max?"레벨업 · 최대 Lv20":`레벨업 · Lv${c.lv} → Lv${c.lv+1}`, `${won(m.price)} × 2% × Lv${c.lv} × ${R[c.rar].n} ${R[c.rar].cost/100}`, max?null:lvCost(c),
-        `<button class="btn p" data-act="levelup" data-arg="${c.id}" ${busyRepair||max||S.money<lvCost(c)?"disabled":""}>레벨업</button>`)}
-     ${row("재료 강화", busyRepair?"수리 후 가능":max?"이미 Lv20이라 재료를 쓸 수 없어요":mats.length?`같은 ${m.name} ${mats.length}대를 재료로 쓸 수 있어요 · 일반 100% · 고급 150% · 희귀 250% · 전설 400%`:"같은 차종 차가 있어야 재료로 쓸 수 있어요", null,
-        `<button class="btn" data-act="matPick" data-arg="${c.id}" ${busyRepair||max||!mats.length?"disabled":""}>재료 고르기</button>`)}
-     ${row("수리", busyRepair?`${won(m.price)} × 5% × ${R[c.rar].cost/100}`:"지금은 수리할 곳이 없어요", repairCost(c),
-        `<button class="btn ${busyRepair?"p":""}" data-act="repair" data-arg="${c.id}" ${!busyRepair||S.money<repairCost(c)?"disabled":""}>수리</button>`)}
-     ${row("판매 · 받는 금액", scrapOnly?"사고 3회 이상은 폐차만 가능해요":`${won(c.cost)} × (60% − 사고 ${c.acc}회 ${5*c.acc}%p + Lv${c.lv} ${c.lv-1}%p) = ${salePct(c)}%`, scrapOnly?null:salePrice(c),
-        `<button class="btn" data-act="sellAsk" data-arg="${c.id}" ${scrapOnly||S.cars.length<=1?"disabled":""}>판매</button>`)}
-     ${row("폐차 · 받는 금액", `구매가 ${won(c.cost)} × 20%`, scrapPrice(c),
-        `<button class="btn danger" data-act="scrapAsk" data-arg="${c.id}" ${S.cars.length<=1?"disabled":""}>폐차</button>`)}
-     ${row("영업 쉬기", busyRepair?"수리 중엔 영업을 안 해요":"켜면 손님에게 빌려주지 않아요", null,
-        `<button class="btn" data-act="rest" data-arg="${c.id}" aria-pressed="${c.rest}">${c.rest?"켜짐":"꺼짐"}</button>`)}
-     ${S.cars.length<=1?`<div class="mut" style="font-size:14px">마지막 한 대는 판매·폐차할 수 없어요(시제품 규칙).</div>`:""}
+${detailRows(c)}
    </div></div>`;
 }
 
@@ -497,6 +519,8 @@ const ACT = {
     if(canMotion()) window.playMotion("grant",{money:1000, name:M[ob.pick].name, car:carData(ob.pick), onClose:()=>{ window.closeMotion(); ACT.obDone(); }}); },
   obDone(){ S.started=true; ob.step=0; view="shop"; render(); },
   openCar(id){ detailId=id; view="detail"; render(); window.scrollTo(0,0); },
+  focusCar(id){ townFocusCar(id); },
+  unfocus(){ townUnfocus(); },
   expand(){ const n=EXPAND[S.level+1], from=cap(); S.money-=n.cost; S.level++; render();
     if(canMotion()) window.playMotion("expand",{lv:S.level, from, to:cap(), onClose:()=>window.closeMotion()}); else toast(`가게 Lv${S.level}이 되었어요 · 주차 ${cap()}칸`); },
   hour(){ let n=0;
@@ -545,7 +569,7 @@ const ACT = {
   sellAsk(id){ const c=S.cars.find(x=>x.id===id); confirmDispose(c,"sell",salePrice(c)); },
   scrapAsk(id){ const c=S.cars.find(x=>x.id===id); confirmDispose(c,"scrap",scrapPrice(c)); },
   dispose(arg){ const [id,kind]=arg.split("|"), c=S.cars.find(x=>x.id===id); const amt=kind==="sell"?salePrice(c):scrapPrice(c);
-    S.cars=S.cars.filter(x=>x.id!==id); if(amt){ S.money+=amt; S.earned+=amt; } closeModal(); view="garage"; toast(`${M[c.model].name}을 ${kind==="sell"?"판매":"폐차"}했어요 · +${won(amt)}`); render(); },
+    S.cars=S.cars.filter(x=>x.id!==id); if(amt){ S.money+=amt; S.earned+=amt; } closeModal(); if(view!=="shop") view="garage"; townFocus=null; toast(`${M[c.model].name}을 ${kind==="sell"?"판매":"폐차"}했어요 · +${won(amt)}`); render(); },
   rest(id){ const c=S.cars.find(x=>x.id===id); c.rest=!c.rest; render(); },
   pull(kind){ if(S.cars.length>=cap()) return; if(kind==="free"){ if(!S.free) return; S.free--; } else { if(S.money<TICKET) return; S.money-=TICKET; }
     if(canMotion()){ const before=S.pity, guaranteed=before>=PITY-1; const r=rollRar(); const pool=unlocked(); const m=pool[Math.floor(Math.random()*pool.length)];
