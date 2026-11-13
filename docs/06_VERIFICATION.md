@@ -2628,6 +2628,10 @@ JDK 17·기존 Android SDK 35에서 `:core:test` 447개와 `:app:testDebugUnitTe
 
 원격 main `4f0f64267e2a279e2d99d5ae5738d1a06653d980`의 독립 worktree에서 JDK 17·기존 Android SDK 35로 지정 검사를 다시 실행했다. `./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`의 오프라인 실행은 4분 9초에 성공했다. core 447개(개체 계약 11개·Garage 18개 포함), 앱 단위 843개(Garage 저장 명령 소비 5개 포함)가 통과했으며 실패·오류·생략은 모두 0건이다. Debug APK 조립 성공, Lint 오류 0건·경고 50건이며 `python3 scripts/check_repository.py`와 `git diff --check`도 통과했다. 최초 Gradle 시작은 샌드박스의 로컬 소켓 제한으로 중단돼 로컬 소켓을 허용한 뒤 재실행했다. 이번에는 SQLite·앱 재실행·에뮬레이터·adb를 사용하지 않았다. [같은 main 커밋의 원격 CI](https://github.com/Yaho03/drive-growth/actions/runs/43368554156)에서 저장소·Android 검사도 통과했다.
 
+2026-11-14 원격 main `1bee127042909a2a21d911b13321cc492130a07a`를 별도 worktree에서 다시 확인했다. `./gradlew --offline --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`가 성공했다. core 447개(개체 계약 11개·Garage 18개 포함), 앱 단위 863개(저장 조회 11개·Garage 저장 명령 5개 포함)가 통과했고 실패·오류·생략은 모두 0건이다. Debug APK 조립 성공, Lint 오류 0건·경고 81건이다. `python3 scripts/check_repository.py`와 `git diff --check`도 통과했다. JDK 17과 기존 SDK 35를 사용했다. 첫 오프라인 실행은 사용한 캐시에 Pleos 라이브러리 두 개가 빠져 앱 의존성 해석에서 중단됐다. 필요한 의존성이 있는 기존 캐시를 별도 폴더로 복사해 같은 검사에 사용했다.
+
+[같은 main 커밋의 원격 CI](https://github.com/Yaho03/drive-growth/actions/runs/43435568841)는 계정 결제 또는 사용 한도로 `repository-checks`가 실행 전에 실패했고 `android-checks`는 건너뛰었다. 이번 실행은 JVM 단위 시험과 정적 검사·빌드 범위다. SQLite 계측·앱 재실행·에뮬레이터·adb는 사용하지 않았다. 기존 저장과 이전 근거는 [02의 저장 연결점](02_SYSTEM_ARCHITECTURE.md#34-저장-확장의-연결점과-기존-데이터-조건)에 연결했다.
+
 ## 대여 정산의 저장된 시간 근거와 화면 검증 — 2026-11-11
 
 정상·감액·상한 제외 시간을 실제 수락 구간과 각 구간에 적용된 당시 정책으로 저장하고 기존 Main 정산 조회→ResultsHostMapper→ResultsView에 연결했다. 금액은 최초 Settlement를 표시하며 시간에서 다시 지급하거나 현재 잔액으로 바꾸지 않는다. 기록이 없는 이전 결과는 확인 불가다. 계약은 [시간 근거 schema18](02_SYSTEM_ARCHITECTURE.md#대여-결과-시간-근거-schema18), 표현은 [시간 상세](09_UI_UX_SPEC.md#영업-정산의-시간-상세)를 따른다.

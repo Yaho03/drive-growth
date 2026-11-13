@@ -380,7 +380,7 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 
 PR #104가 개체 필드·단일 변경·원래 정산 재생을 공급했고, PR #116의 처분 포함 이력·발견 저장, PR #140의 `Garage.collection(history)`, PR #149의 저장 조회 소비도 main에 반영됐다. [#46 완료 기록](06_VERIFICATION.md#기능-이슈-완료와-후속-조건-이관--2026-11-13)에 실제 발견·도감 복원과 지원 구버전 이전 근거를 연결했다. 희귀도·취득액·진행량이 원본에 없는 개체·명령·정산의 복구 방침은 [#24](https://github.com/Yaho03/drive-growth/issues/24)에서 결정한다.
 
-PR #104 당시 SQLite 변경은 새 필드를 손실시키지 않는 `LedgerJson.vehicle` 양방향, Update 명령 JSON·copy, 처분 성장값 보존 조건에 한정했고 테이블·DB 이름·스키마 버전1·원자성·revision 책임을 유지했다. 현재 `LedgerJson`도 별도 파일이 아니라 `app/src/main/java/io/drivegrowth/app/data/SqliteGameChangeStore.kt` 안에 있다. 이 문서 확인은 SQLite 구현 변경이나 새 장치 시험이 아니다. 과거 실제 SQLite 검증은 [PR #104 검증 기록](06_VERIFICATION.md#pr-104-차량-숫자-decoder-수정--2026-11-07), 이번 최신 조합의 자동 검사는 [최신 재확인](06_VERIFICATION.md#46-공통-차량-계약의-최신-main-재확인--2026-11-11)을 따른다.
+PR #104는 당시 schema1을 유지하면서 개체·명령·정산 JSON의 필수 필드를 확장했다. 현재 schema20에서도 [`SqliteGameChangeStore.kt`의 `LedgerJson`](../app/src/main/java/io/drivegrowth/app/data/SqliteGameChangeStore.kt)이 이 JSON을 읽고 쓴다. `LedgerHelper.onUpgrade`는 schema1~19의 테이블·열을 이전하면서 기존 개체·명령·정산 JSON을 보존한다. 격리 DDL fixture의 schema2·10·12와 보존 APK가 직접 작성한 schema10·12 DB에서 이전·재개방을 확인했다. 각 실행의 범위는 [PR #104의 필드·숫자 검사](06_VERIFICATION.md#pr-104-차량-숫자-decoder-수정--2026-11-07), [schema20 DDL 시험](06_VERIFICATION.md#122-구매-결제-재생과-schema20-이전--2026-11-13), [구버전 APK 이전 시험](06_VERIFICATION.md#122-quest-원자성update-정산-재생과-구버전-apk-이전--2026-11-13)을 따른다.
 
 | 코드 위치·공급 | 입력·출력과 검증 조건 |
 |---|---|
@@ -392,7 +392,7 @@ PR #104 당시 SQLite 변경은 새 필드를 손실시키지 않는 `LedgerJson
 | 기존 schema1 JSON | 새 필드 누락 시 기본값/자동 삭제 없이 실패. 처분 개체 한 건의 누락도 현재 조회가 모든 payload를 먼저 읽으므로 전체 보유 조회를 실패시킬 수 있음. 미확인 정산의 차량 snapshot 누락도 전체 정산 조회 실패 |
 | 과거 명령 재시도 | 새 필드 없는 옛 Add/Update 명령과 새 명령의 JSON은 달라 result 읽기 전 STATE_CONFLICT일 수 있음. 차량 없는 과거 금액 명령은 동일 표현·원래 정산 연결을 검증해 재생. PR #104의 격리 DB 검증은 기존 근거이며 이번에는 장치에서 재실행하지 않음 |
 
-이미 운영한 schema1 데이터가 새 필드를 가진 것으로 간주하지 않는다. 같은 DB 버전 안에서 payload 의미가 확장되므로 저장 담당이 실제 구버전 자료와 호환 전략을 검증해야 한다. 근거 있는 취득 기록 없이 COMMON·0·현재 차종가로 복구하거나, 새 DB/기존 데이터 삭제로 통과시키지 않는다. 확정 결과의 과거 값도 현재 개체로 재구성하지 않는다. 자동 이전은 이번에 제공하지 않는다.
+필수 JSON 필드가 빠진 레코드는 테이블 이전 뒤에도 읽기 실패로 처리하고 원본을 보존한다. 출처가 확인된 무료·최초 지급의 0은 정상 취득액이다. 누락 필드의 복구는 [#24](https://github.com/Yaho03/drive-growth/issues/24)에서 정책을 결정한 뒤 진행한다. 저장 담당은 원본 개체·명령·정산 각각에 당시 희귀도·진행량·취득액을 확인할 근거를 대조한다. 당시 결과와 현재 차량이 다른 경우도 재시도·재개방 검증에 포함한다.
 
 #48의 추가 거래는 아래 `MaterialChangeStore`·재료 강화 SQLite 절의 기존 공급을 소비한다. 대상ID/revision·재료ID/revision·활동·버전에서 계산한 새 레벨/진행량을 한 정산의 대상 성장 snapshot과 재료 CONSUMED snapshot에 연결하고 각각의 취득 정보를 보존한다. 같은 개체 중복·활동 제한·revision 충돌·금액 부족이면 전부 미반영이어야 하며, 단일 `GameChange` 두 번으로 나누지 않는다. PR #104 당시 후속이었던 다중 개체 거래를 다시 설계하지 않고 기존 명령·결과·저장·fixture를 재사용한다. 가챠·초기 지급·사고/활동·도감의 현재 공급과 남은 제품 연결은 각 기능 절과 #46/#122/#28을 따른다.
 
