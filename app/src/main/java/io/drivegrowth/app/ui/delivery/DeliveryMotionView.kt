@@ -11,6 +11,7 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.SystemClock
 import android.view.View
 import io.drivegrowth.app.ui.pixel.PixelStyle
@@ -54,7 +55,15 @@ internal class DeliveryMotionView(
     private var lastFrame: Long? = null
     private var started = false
 
-    init { importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO }
+    init {
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+        tag = "delivery:motion-art"
+        background = GradientDrawable().apply {
+            setColor(PixelStyle.inset)
+            cornerRadius = 12 * resources.displayMetrics.density
+        }
+        clipToOutline = true
+    }
 
     fun showScene(value: DeliveryScene) {
         if (scene?.key != value.key) resetClock()

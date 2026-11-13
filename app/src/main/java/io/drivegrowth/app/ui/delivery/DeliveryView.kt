@@ -1,6 +1,7 @@
 package io.drivegrowth.app.ui.delivery
 
 import android.content.Context
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
@@ -44,14 +45,15 @@ class DeliveryView(
     private var scroll: ScrollView? = null
     private var savedY = 0
     private var drawnVersion: Long? = null
+    private var drawnScene: DeliverySceneKey? = null
     private var wide = false
 
     init { orientation = VERTICAL; setBackgroundColor(style.base) }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        val next = w >= style.dp(760)
-        if (next != wide) { wide = next; post { drawScreen() } }
+        wide = w >= style.dp(760)
+        post { drawScreen() }
     }
 
     fun render(frame: DeliveryFrame, controlsEnabled: Boolean): Boolean =
@@ -132,11 +134,13 @@ class DeliveryView(
 
     private fun drawScreen(): Unit = with(style) {
         val version = session.frame?.version
-        val sameFrame = version == drawnVersion
+        val scene = presentation.scene
+        val sameFrame = version == drawnVersion && scene?.key == drawnScene
         if (sameFrame) scroll?.takeIf { it.isLaidOut }?.let { savedY = it.scrollY }
         else savedY = 0
         val focused = if (sameFrame) findFocus()?.tag else null
         drawnVersion = version
+        drawnScene = scene?.key
         drawGeneration++
         (motion.parent as? LinearLayout)?.removeView(motion)
         removeAllViews()
@@ -149,18 +153,27 @@ class DeliveryView(
             addView(text(s(R.string.delivery_restricted_body), color = muted))
             return@with
         }
-        addView(text(s(R.string.delivery_title), 26, bold = true))
+        if (scene != null) addView(sceneHeader(scene))
+        else addView(text(s(R.string.delivery_title), 26, bold = true))
         val body = column()
         scroll = style.scroll(body, savedY)
         addView(scroll, LayoutParams(-1, 0, 1f))
-        presentation.scene?.let {
-            add(body, scenePanel(it))
+        if (scene != null) {
+            add(body, scenePanel(scene), gap = 6)
+            if (focused != null) findViewWithTag<View>(focused)?.takeIf { it.isEnabled }?.requestFocus()
             return@with
         }
         if (session.pending != null) add(body, panel(fill = PixelStyle.inset).apply {
             note(this, R.string.delivery_pending)
         })
         val state = session.frame?.screen
+        val highway = (state as? DeliveryScreen.Active)?.let { active ->
+            presentation.highway?.let { highwayPanel(it, active.delivery) }
+        }
+        if (highway != null) body.addView(highway, LayoutParams(motionWidth(), -2).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            topMargin = dp(6)
+        })
         hostStatus()?.let { status -> add(body, panel(border = PixelStyle.focus).apply { addView(status) }) }
         if (state !is DeliveryScreen.Offers) addNavigationControls(body)
         when (state) {
@@ -183,10 +196,7 @@ class DeliveryView(
                 if (!state.chooseAllowed) info(this, present(state.reason, R.string.delivery_action_unavailable), muted = true)
             })
             is DeliveryScreen.Offers -> offers(body, state.proposal)
-            is DeliveryScreen.Active -> {
-                presentation.highway?.let { add(body, highwayPanel(it)) }
-                active(body, state.delivery, actions = true)
-            }
+            is DeliveryScreen.Active -> active(body, state.delivery, actions = true)
             is DeliveryScreen.ChangeReview -> changeReview(body, state)
             is DeliveryScreen.AbandonReview -> abandonReview(body, state)
             is DeliveryScreen.AwaitingResult -> {
@@ -203,59 +213,102 @@ class DeliveryView(
         if (focused != null) findViewWithTag<View>(focused)?.takeIf { it.isEnabled }?.requestFocus()
     }
 
-    private fun scenePanel(scene: DeliveryScene): View = with(style) {
-        panel(padding = 12).apply {
-            tag = "delivery:scene:${scene.kind.name}"
-            heading(this, when (scene.kind) {
-                DeliverySceneKind.DEPARTURE -> R.string.delivery_scene_departure
-                DeliverySceneKind.INCOME_ARRIVAL -> R.string.delivery_scene_income_arrival
-                DeliverySceneKind.VEHICLE_ARRIVAL -> R.string.delivery_scene_vehicle_arrival
-                DeliverySceneKind.HELD -> R.string.delivery_scene_held
+    private fun sceneHeader(scene: DeliveryScene): View = with(style) {
+        panel(padding = 8).apply {
+            addView(row().apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(column().apply {
+                    val title = when (scene.kind) {
+                        DeliverySceneKind.DEPARTURE -> R.string.delivery_scene_departure
+                        DeliverySceneKind.INCOME_ARRIVAL -> R.string.delivery_scene_income_arrival
+                        DeliverySceneKind.VEHICLE_ARRIVAL -> R.string.delivery_scene_vehicle_arrival
+                        DeliverySceneKind.HELD -> R.string.delivery_scene_held
+                    }
+                    addView(text(s(title), 18, bold = true))
+                    scene.details.confirmedReward?.let { reward ->
+                        addView(text(context.getString(R.string.delivery_money, s(R.string.delivery_scene_reward), reward.units),
+                            18, color = PixelStyle.gold, bold = true).apply { tag = "delivery:confirmed-reward" })
+                    }
+                    val destination = present(scene.details.destinationName, R.string.delivery_destination_missing)
+                    addView(text("${sourceLabel(scene.details)} · $destination", 14, color = muted).apply {
+                        maxLines = 1
+                        ellipsize = TextUtils.TruncateAt.END
+                    })
+                }, LayoutParams(0, -2, 1f))
+                val generation = drawGeneration
+                addView(button(s(R.string.delivery_scene_skip), session.pending == null, primary = true) {
+                    if (generation == drawGeneration && session.controlsEnabled && session.pending == null &&
+                        presentation.scene?.key == scene.key) dismissScene()
+                }.apply { tag = "delivery:skip-motion" }, LayoutParams(-2, -2).apply { marginStart = dp(8) })
             })
+        }
+    }
+
+    private fun scenePanel(scene: DeliveryScene): View = with(style) {
+        column().apply {
+            tag = "delivery:scene:${scene.kind.name}"
             motion.showScene(scene)
             addMotion(this)
-            motionDetails(this, scene.details)
-            if (scene.kind == DeliverySceneKind.HELD) note(this, R.string.delivery_scene_held_note)
-            val key = scene.key
-            localAction(this, R.string.delivery_scene_skip, "delivery:skip-motion") {
-                if (presentation.scene?.key == key) dismissScene()
-            }
+            add(this, panel(padding = 8).apply {
+                addView(text(present(scene.details.destinationName, R.string.delivery_destination_missing), 16, bold = true))
+                info(this, present(scene.details.vehicleName, R.string.delivery_vehicle_missing))
+                scene.details.rarity?.let {
+                    add(this, text(vehicleLabels.rarity(it), 14, color = PixelStyle.rarityColor(it), bold = true), gap = 2)
+                }
+                info(this, estimatedDistance(scene.details), muted = true)
+                if (scene.kind == DeliverySceneKind.HELD) note(this, R.string.delivery_scene_held_note)
+                scene.details.expectedReward?.takeIf { scene.details.confirmedReward == null }?.let { reward ->
+                    info(this, context.getString(R.string.delivery_money, s(R.string.delivery_completion_reward), reward.units))
+                }
+            }, gap = 6)
         }
     }
 
-    private fun highwayPanel(road: DeliveryHighway): View = with(style) {
-        panel(padding = 12).apply {
+    private fun highwayPanel(road: DeliveryHighway, delivery: DeliveryActiveUi): View = with(style) {
+        column().apply {
             tag = "delivery:highway"
-            heading(this, R.string.delivery_scene_highway)
+            addView(panel(padding = 8).apply {
+                tag = "delivery:highway-status"
+                addView(text(present(road.details.destinationName, R.string.delivery_destination_missing), 18, bold = true))
+                val progress = present(delivery.progressLabel, R.string.delivery_progress_missing)
+                val kind = s(if (road.details.purchase) R.string.delivery_purchase else R.string.delivery_income)
+                addView(text("$progress · $kind · ${sourceLabel(road.details)}", 14, color = muted))
+                val observed = road.observedMeters
+                val estimated = road.details.estimatedMeters
+                val distance = observed?.let { context.getString(R.string.delivery_scene_observed, it) }
+                    ?: context.getString(R.string.delivery_observed, present(delivery.observedDistanceLabel, R.string.delivery_information_missing))
+                addView(text("$distance · ${estimatedDistance(road.details)}", 14))
+                if (observed != null && estimated != null && estimated > 0L) {
+                    val progressPercent = ((observed.coerceIn(0L, estimated).toDouble() / estimated) * 100).toInt()
+                    addView(vehicleLabels.progressTrack(progressPercent, color = PixelStyle.focus),
+                        LayoutParams(-1, dp(8)).apply { topMargin = dp(4) })
+                }
+            })
             motion.showHighway(road)
             addMotion(this)
-            motionDetails(this, road.details)
-            road.observedMeters?.let { info(this, context.getString(R.string.delivery_scene_observed, it)) }
         }
     }
 
-    private fun addMotion(parent: LinearLayout) {
-        // 진행 화면의 일러스트는 넓은 창에서도 본문 너비 안에 둔다.
-        parent.addView(motion, LayoutParams(-1, style.dp(if (wide) 198 else 152)).apply {
+    private fun sourceLabel(details: DeliverySceneDetails) =
+        s(if (details.source == InputSource.SIMULATION) R.string.delivery_simulation else R.string.delivery_vehicle_source)
+
+    private fun estimatedDistance(details: DeliverySceneDetails) = details.estimatedMeters
+        ?.let { context.getString(R.string.delivery_estimated, it) } ?: s(R.string.delivery_distance_missing)
+
+    private fun motionWidth(): Int {
+        val availableWidth = width - paddingStart - paddingEnd
+        return if (availableWidth > 0) minOf(availableWidth, motionHeightLimit() * 16 / 9) else -1
+    }
+
+    private fun motionHeightLimit() = if (height > 0) (height / 2).coerceIn(style.dp(100), style.dp(380)) else style.dp(152)
+
+    private fun addMotion(parent: LinearLayout) = with(style) {
+        val artWidth = motionWidth()
+        val artHeight = if (artWidth > 0) artWidth * 9 / 16 else motionHeightLimit()
+        parent.addView(motion, LayoutParams(artWidth, artHeight).apply {
             gravity = Gravity.CENTER_HORIZONTAL
-            topMargin = style.dp(6)
+            topMargin = dp(6)
         })
-    }
-
-    private fun motionDetails(parent: LinearLayout, details: DeliverySceneDetails) = with(style) {
-        val name = present(details.vehicleName, R.string.delivery_vehicle_missing)
-        add(parent, text(name, 18, bold = true), gap = 8)
-        details.rarity?.let { add(parent, text(vehicleLabels.rarity(it), 14, color = PixelStyle.rarityColor(it), bold = true), gap = 2) }
-        info(parent, s(if (details.purchase) R.string.delivery_purchase else R.string.delivery_income), muted = true)
-        info(parent, present(details.destinationName, R.string.delivery_destination_missing))
-        info(parent, details.estimatedMeters?.let { context.getString(R.string.delivery_estimated, it) } ?: s(R.string.delivery_distance_missing))
-        info(parent, s(if (details.source == InputSource.SIMULATION) R.string.delivery_simulation else R.string.delivery_vehicle_source), muted = true)
-        val reward = details.confirmedReward ?: details.expectedReward
-        if (reward != null) {
-            val label = if (details.confirmedReward != null) R.string.delivery_scene_reward else R.string.delivery_completion_reward
-            add(parent, text(context.getString(R.string.delivery_money, s(label), reward.units),
-                18, color = PixelStyle.gold, bold = true), gap = 2)
-        }
     }
 
     private fun dismissScene() {

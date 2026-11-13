@@ -1,19 +1,28 @@
 package io.drivegrowth.app.ui.delivery
 
+import android.graphics.Rect
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
+import io.drivegrowth.app.R
+import io.drivegrowth.app.data.ArrivalCommit
 import io.drivegrowth.app.data.DeliveryCommit
 import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.app.host.delivery.DeliveryHostOperation
 import io.drivegrowth.app.host.delivery.DeliveryHostRead
 import io.drivegrowth.app.host.delivery.DeliveryHostReceipt
+import io.drivegrowth.app.host.delivery.DeliveryNavigationSnapshot
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.delivery.DeliveryInProgress
 import io.drivegrowth.core.delivery.DeliveryOffer
+import io.drivegrowth.core.delivery.DeliveryOutcome
 import io.drivegrowth.core.delivery.DeliverySelected
+import io.drivegrowth.core.delivery.DeliverySettlement
+import io.drivegrowth.core.delivery.DeliverySettlementRules
 
 @Suppress("DEPRECATION")
 class DeliveryViewTest : InstrumentationTestCase() {
@@ -160,6 +169,95 @@ class DeliveryViewTest : InstrumentationTestCase() {
         view.render(frame.copy(version = frame.version + 2), true, read)
         assertNull(view.findViewWithTag<View>("delivery:scene:DEPARTURE"))
         assertNotNull(view.findViewWithTag<View>("delivery:highway"))
+    }
+
+    fun testActiveHighwayAndStatusPrecedeHostDestinationControls() = onUi {
+        val context = instrumentation.targetContext
+        val destinationControls = "test:host-destination"
+        val view = DeliveryView(context, onRequest = {}, navigationControls = {
+            Button(context).apply { tag = destinationControls; text = "시연 목적지 확인" }
+        })
+        layoutAt(view, 700, 320)
+        val frame = incomeFrame()
+        val missing = Observation.Missing(MissingReason.NO_DATA)
+        val observed = Observation.Available(ObservedDistance(5000, InputSource.SIMULATION))
+        val nav = DeliveryNavigationSnapshot(null, null, missing, observed, missing, null)
+        val read = DeliveryHostRead(GameIdentity(ProfileId("fixture"), InputSource.SIMULATION), frame.screen, navigation = nav)
+        view.render(frame, true, read)
+        layoutAt(view, 700, 320)
+        val status = checkNotNull(view.findViewWithTag<View>("delivery:highway-status"))
+        val road = checkNotNull(view.findViewWithTag<View>("delivery:motion-art"))
+        val host = checkNotNull(view.findViewWithTag<View>(destinationControls))
+        assertTrue(visibleWithoutScrolling(status))
+        assertTrue(visibleWithoutScrolling(road))
+        assertTrue(bounds(status).bottom <= bounds(road).top)
+        assertTrue(bounds(road).bottom <= bounds(host).top)
+        assertEquals(40, nodes(status).filterIsInstance<ProgressBar>().single().progress)
+        val foreign = Observation.Available(ObservedDistance(5000, InputSource.VEHICLE))
+        val foreignRead = read.copy(navigation = nav.copy(observed = foreign))
+        view.render(frame.copy(version = frame.version + 1), true, foreignRead)
+        val nextStatus = checkNotNull(view.findViewWithTag<View>("delivery:highway-status"))
+        assertTrue(nodes(nextStatus).none { it is ProgressBar })
+    }
+
+    fun testConfirmedIncomeAndCloseAreVisibleWithArrivalArtworkOnFirstLayout() = onUi {
+        val context = instrumentation.targetContext
+        val order = (incomeFrame().screen as DeliveryScreen.Active).delivery.active
+        val route = RouteId("fixture-route")
+        val time = EpochMillis(1)
+        val rules = DeliverySettlementRules(order.proposed.list.ruleVersion, 100, 100, 5)
+        val evidence = Observation.Available(DeliveryArrivalEvidence(route, InputSource.SIMULATION, time))
+        val outcome = (DeliverySettlement(rules).resolve(DeliveryInProgress(order, route, time), evidence, time, 1)
+            as ContractResult.Success).value as DeliveryOutcome.IncomeCompleted
+        val change = outcome.change
+        val receipt = Settlement(SettlementId("fixture-settlement"),
+            Transaction(TransactionId("fixture-transaction"), change.requestId, change.kind, change.source,
+                change.ruleVersion, change.money), GameMoney(200), null, time)
+        val frame = DeliveryPreviewStates.missing.copy(version = 3)
+        val read = DeliveryHostRead(GameIdentity(ProfileId("fixture"), InputSource.SIMULATION), frame.screen,
+            pending = DeliveryHostOperation.Arrival(rules, order.requestId, evidence, time, order.proposed.list, order.proposed.list),
+            receipt = DeliveryHostReceipt.Arrived(ArrivalCommit(outcome, receipt)))
+        for ((width, height) in listOf(320 to 440, 700 to 280)) {
+            val requests = mutableListOf<DeliveryRequest>()
+            val view = DeliveryView(context, requests::add)
+            layoutAt(view, width, height)
+            assertTrue(view.render(frame, true, read))
+            layoutAt(view, width, height)
+            val reward = checkNotNull(view.findViewWithTag<TextView>("delivery:confirmed-reward"))
+            val art = checkNotNull(view.findViewWithTag<View>("delivery:motion-art"))
+            val close = checkNotNull(view.findViewWithTag<Button>("delivery:skip-motion"))
+            val rewardLabel = context.getString(R.string.delivery_scene_reward)
+            assertEquals(context.getString(R.string.delivery_money, rewardLabel,
+                (order.offer as DeliveryOffer.Income).reward.units), reward.text.toString())
+            assertTrue(visibleWithoutScrolling(reward))
+            assertTrue(visibleWithoutScrolling(art))
+            assertTrue(visibleWithoutScrolling(close))
+            assertTrue(close.performClick())
+            assertTrue(requests.isEmpty())
+            assertNull(view.findViewWithTag<View>("delivery:confirmed-reward"))
+        }
+    }
+
+    private fun layoutAt(view: DeliveryView, widthDp: Int, heightDp: Int) {
+        val density = view.resources.displayMetrics.density
+        val width = (widthDp * density).toInt()
+        val height = (heightDp * density).toInt()
+        view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+        view.layout(0, 0, width, height)
+    }
+
+    private fun bounds(view: View): Rect {
+        val result = Rect(0, 0, view.width, view.height)
+        val root = view.rootView as ViewGroup
+        root.offsetDescendantRectToMyCoords(view, result)
+        return result
+    }
+
+    private fun visibleWithoutScrolling(view: View): Boolean {
+        val visible = Rect()
+        return view.width > 0 && view.height > 0 && view.getGlobalVisibleRect(visible) &&
+            visible.width() == view.width && visible.height() == view.height
     }
 
     private fun incomeFrame(): DeliveryFrame {
