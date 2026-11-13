@@ -234,7 +234,7 @@ class DeliveryViewTest : InstrumentationTestCase() {
         val read = DeliveryHostRead(GameIdentity(ProfileId("fixture"), InputSource.SIMULATION), frame.screen,
             pending = DeliveryHostOperation.Arrival(rules, order.requestId, evidence, time, order.proposed.list, order.proposed.list),
             receipt = DeliveryHostReceipt.Arrived(ArrivalCommit(outcome, receipt)))
-        for ((width, height) in listOf(320 to 440, 700 to 280)) {
+        for ((width, height) in listOf(320 to 440, 700 to 280, 1360 to 948)) {
             val requests = mutableListOf<DeliveryRequest>()
             val view = DeliveryView(context, requests::add)
             layoutAt(view, width, height)
@@ -248,6 +248,8 @@ class DeliveryViewTest : InstrumentationTestCase() {
                 (order.offer as DeliveryOffer.Income).reward.units), reward.text.toString())
             assertTrue(visibleWithoutScrolling(reward))
             assertTrue(visibleWithoutScrolling(art))
+            if (width == 1360) assertTrue("공식 가로 도착 그림 너비: ${art.width}/${view.width}",
+                art.width >= view.width * .85f)
             assertTrue(visibleWithoutScrolling(close))
             assertTrue(close.performClick())
             assertTrue(requests.isEmpty())

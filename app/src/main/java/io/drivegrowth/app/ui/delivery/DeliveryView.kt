@@ -159,7 +159,7 @@ class DeliveryView(
         scroll = style.scroll(body, savedY)
         addView(scroll, LayoutParams(-1, 0, 1f))
         if (scene != null) {
-            add(body, scenePanel(scene), gap = 6)
+            add(body, scenePanel(scene, header), gap = 6)
             if (focused != null) findViewWithTag<View>(focused)?.takeIf { it.isEnabled }?.requestFocus()
             return@with
         }
@@ -244,11 +244,11 @@ class DeliveryView(
         }
     }
 
-    private fun scenePanel(scene: DeliveryScene): View = with(style) {
+    private fun scenePanel(scene: DeliveryScene, header: View): View = with(style) {
         column().apply {
             tag = "delivery:scene:${scene.kind.name}"
             motion.showScene(scene)
-            addMotion(this)
+            addMotion(this, availableMotionHeight(header))
             add(this, panel(padding = 8).apply {
                 addView(text(present(scene.details.destinationName, R.string.delivery_destination_missing), 16, bold = true))
                 info(this, present(scene.details.vehicleName, R.string.delivery_vehicle_missing))
@@ -288,17 +288,8 @@ class DeliveryView(
                 }
             }
             addView(status, LayoutParams(motionWidth(), -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
-            val availableWidth = this@DeliveryView.width - this@DeliveryView.paddingStart - this@DeliveryView.paddingEnd
-            val remainingHeight = if (availableWidth > 0 && this@DeliveryView.height > 0) {
-                val viewWidth = View.MeasureSpec.makeMeasureSpec(availableWidth, View.MeasureSpec.EXACTLY)
-                val flexibleHeight = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-                header.measure(viewWidth, flexibleHeight)
-                status.measure(View.MeasureSpec.makeMeasureSpec(motionWidth(), View.MeasureSpec.EXACTLY), flexibleHeight)
-                val rootPadding = this@DeliveryView.paddingTop + this@DeliveryView.paddingBottom
-                this@DeliveryView.height - rootPadding - header.measuredHeight - status.measuredHeight - dp(6) * 2
-            } else motionHeightLimit()
             motion.showHighway(road)
-            addMotion(this, minOf(motionHeightLimit(), remainingHeight.coerceAtLeast(dp(48))))
+            addMotion(this, minOf(motionHeightLimit(), availableMotionHeight(header, status)))
         }
     }
 
@@ -307,6 +298,16 @@ class DeliveryView(
 
     private fun estimatedDistance(details: DeliverySceneDetails) = details.estimatedMeters
         ?.let { context.getString(R.string.delivery_estimated, it) } ?: s(R.string.delivery_distance_missing)
+
+    private fun availableMotionHeight(header: View, status: View? = null): Int {
+        val availableWidth = width - paddingStart - paddingEnd
+        if (availableWidth <= 0 || height <= 0) return motionHeightLimit()
+        val flexibleHeight = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        header.measure(View.MeasureSpec.makeMeasureSpec(availableWidth, View.MeasureSpec.EXACTLY), flexibleHeight)
+        status?.measure(View.MeasureSpec.makeMeasureSpec(motionWidth(), View.MeasureSpec.EXACTLY), flexibleHeight)
+        val contentHeight = height - paddingTop - paddingBottom - header.measuredHeight - (status?.measuredHeight ?: 0)
+        return (contentHeight - style.dp(6) * 2).coerceAtLeast(style.dp(48))
+    }
 
     private fun motionWidth(heightLimit: Int = motionHeightLimit()): Int {
         val availableWidth = width - paddingStart - paddingEnd

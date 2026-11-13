@@ -46,6 +46,11 @@ internal class DeliveryMotionView(
         textSize = 18f
         textAlign = Paint.Align.CENTER
     }
+    private val destinationSign = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xfffff8e8.toInt()
+        typeface = Typeface.DEFAULT_BOLD
+        textSize = 12.5f
+    }
     private val polygon = Path()
     private val visibleBounds = Rect()
     private val imageBounds = RectF()
@@ -152,6 +157,15 @@ internal class DeliveryMotionView(
             val height = background.height * 480f / background.width
             imageBounds.set(0f, (h - height) * 0.65f, 480f, (h - height) * 0.65f + height)
             c.drawBitmap(background, null, imageBounds, paint)
+            if (income) {
+                c.save()
+                c.translate(imageBounds.left + imageBounds.width() * (742f / 1536f),
+                    imageBounds.top + imageBounds.height() * (322f / 1024f))
+                c.skew(0f, .5f)
+                c.drawText(context.getString(io.drivegrowth.app.R.string.delivery_scene_destination_sign),
+                    0f, 0f, destinationSign)
+                c.restore()
+            }
         }
         val ground = h * 0.83f
         rect(c, 0f, ground - 27, 480f, h, 0xca20283b.toInt())
