@@ -776,7 +776,7 @@ open class MainActivity : Activity() {
         fun isCurrent() = navigationBar === bar && navigation.page == page &&
             homeSettings == null && gameControlsAllowed()
         val choose: (HostPage) -> Unit = { target -> if (isCurrent() && target != page) select(target) }
-        bar = MainHomeNavigation(this, page, choose)
+        bar = MainNavigationBar(this, page, choose)
         navigationBar = bar
         navigationBarPage = page
         panel.addView(bar, LinearLayout.LayoutParams(-1, -2))
