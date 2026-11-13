@@ -56,7 +56,8 @@ internal class ShopMapOverlayView(
         if (!interaction.controlsEnabled) return@with
         fun current() = generation == token && visibility == VISIBLE && interaction.controlsEnabled
 
-        val content = interaction.state as? ShopScreenState.Content
+        val state = interaction.state
+        val content = state as? ShopScreenState.Content
         val title = when (target) {
             is ShopMapTarget.FacilityLot -> label(target.facility)
             ShopMapTarget.Expansion -> s(R.string.shop_expand)
@@ -68,13 +69,26 @@ internal class ShopMapOverlayView(
             if (pending) addView(text(s(R.string.shop_pending), 18, color = accent))
             interaction.uiState.message?.let { addView(text(it, 18)) }
             when {
-                content == null -> addView(text(when (val state = interaction.state) {
-                    ShopScreenState.Loading -> s(R.string.shop_loading)
-                    is ShopScreenState.Empty -> state.message
-                    is ShopScreenState.Failure -> state.message
-                    is ShopScreenState.Unsupported -> state.message
-                    is ShopScreenState.Content -> error("이미 표시 내용을 읽었습니다")
-                }, 18))
+                content == null -> {
+                    val status = when (state) {
+                        ShopScreenState.Loading -> s(R.string.shop_loading)
+                        is ShopScreenState.Empty -> state.message
+                        is ShopScreenState.Failure -> state.message
+                        is ShopScreenState.Unsupported -> state.message
+                        is ShopScreenState.Content -> error("이미 표시 내용을 읽었습니다")
+                    }
+                    addView(text(status, 18))
+                    if (state is ShopScreenState.Failure || state is ShopScreenState.Empty) {
+                        val retryPending = interaction.uiState.retryPending
+                        add(this, button(s(if (retryPending) R.string.shop_retry_pending else R.string.shop_retry),
+                            !retryPending, primary = true) {
+                            if (current() && interaction.state == state && !interaction.uiState.retryPending) {
+                                interaction.retry()
+                                onChanged()
+                            }
+                        }.apply { tag = "shop:map-retry" })
+                    }
+                }
                 target == ShopMapTarget.Decorations -> {
                     val selected = interaction.selection?.takeIf { it.option in content.decorations }
                     if (selected != null) {
@@ -121,8 +135,9 @@ internal class ShopMapOverlayView(
         }
         val panel = column().apply {
             background = shape(style.panel)
-            addView(scroll(body, scrollY).also { this@ShopMapOverlayView.scroll = it }, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(button(if (interaction.selection != null) s(R.string.shop_cancel) else "닫기") {
+            addView(scroll(body, scrollY).apply { tag = "shop:map-scroll" }
+                .also { this@ShopMapOverlayView.scroll = it }, LinearLayout.LayoutParams(-1, 0, 1f))
+            addView(button(if (!pending && interaction.uiState.selection != null) s(R.string.shop_cancel) else "닫기") {
                 if (current()) handleBack()
             }.apply { tag = "shop:map-close" }, LinearLayout.LayoutParams(-1, -2))
         }
@@ -146,7 +161,8 @@ internal class ShopMapOverlayView(
     fun handleBack(): Boolean {
         val current = interaction ?: return false
         if (visibility != VISIBLE || !current.controlsEnabled) return false
-        current.cancel()
+        // 닫기는 보관 요청을 취소하지 않는다. 미리보기만 기존 상호작용으로 취소한다.
+        if (current.uiState.pending == null) current.cancel()
         generation++
         target = null
         visibility = GONE

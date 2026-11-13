@@ -1,10 +1,14 @@
 package io.drivegrowth.app.ui.shop
 
+import android.content.Intent
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.ScrollView
 import android.widget.TextView
+import io.drivegrowth.app.ui.garage.CollectionScrollTestActivity
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.Revision
@@ -83,6 +87,98 @@ class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
         val request = (events.single() as ShopEvent.Submit).request
         assertEquals("blue-sign", request.selection.option.id)
         assertEquals(state.appearance, (interaction.state as ShopScreenState.Content).appearance)
+    }
+
+    fun testFailedAndEmptyQueriesCanRetryOnceWithoutDroppingPendingRequest() = onUi {
+        val events = mutableListOf<ShopEvent>()
+        val interaction = ShopInteraction({ events += it })
+        val overlay = ShopMapOverlayView(instrumentation.targetContext, {}, {})
+        val state = ShopPreviewStates.normal()
+        interaction.render(state, true)
+        overlay.render(ShopMapTarget.Expansion, interaction)
+        overlay.findViewWithTag<Button>("shop:map-confirm").performClick()
+        val request = (events.single() as ShopEvent.Submit).request
+
+        for (problem in listOf(ShopScreenState.Failure("조회 실패"), ShopScreenState.Empty("조회 결과 없음"))) {
+            interaction.render(problem, true)
+            overlay.render(ShopMapTarget.Expansion, interaction)
+            val retry = overlay.findViewWithTag<Button>("shop:map-retry")
+            val previousRetries = events.count { it == ShopEvent.Retry }
+            assertTrue(retry.isEnabled)
+            retry.performClick()
+            retry.performClick()
+            assertEquals(previousRetries + 1, events.count { it == ShopEvent.Retry })
+            assertEquals(problem, interaction.state)
+            assertEquals(request, interaction.uiState.pending)
+            overlay.render(ShopMapTarget.Expansion, interaction)
+            assertFalse(overlay.findViewWithTag<Button>("shop:map-retry").isEnabled)
+            interaction.completeRetry()
+        }
+    }
+
+    fun testPendingCloseAndBackKeepTheOriginalRequest() = onUi {
+        val events = mutableListOf<ShopEvent>()
+        val interaction = ShopInteraction({ events += it })
+        var closes = 0
+        val overlay = ShopMapOverlayView(instrumentation.targetContext, { closes++ }, {})
+        interaction.render(ShopPreviewStates.normal(), true)
+        overlay.render(ShopMapTarget.Expansion, interaction)
+        overlay.findViewWithTag<Button>("shop:map-confirm").performClick()
+        val request = (events.single() as ShopEvent.Submit).request
+        assertNotNull(interaction.selection)
+        overlay.render(ShopMapTarget.Expansion, interaction)
+        val close = overlay.findViewWithTag<Button>("shop:map-close")
+        assertEquals("닫기", close.text.toString())
+        close.performClick()
+        assertEquals(1, closes)
+        assertEquals(request, interaction.uiState.pending)
+
+        overlay.render(ShopMapTarget.Expansion, interaction)
+        assertTrue(overlay.handleBack())
+        assertEquals(2, closes)
+        assertEquals(request, interaction.uiState.pending)
+        assertEquals(1, events.size)
+    }
+
+    fun testNarrowAttachedOverlayScrollsWhileCloseRemainsVisible() {
+        val host = instrumentation.startActivitySync(Intent(instrumentation.targetContext,
+            CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        try {
+            lateinit var container: FrameLayout
+            lateinit var overlay: ShopMapOverlayView
+            val width = (300 * host.resources.displayMetrics.density).toInt()
+            val height = (240 * host.resources.displayMetrics.density).toInt()
+            onUi {
+                container = FrameLayout(host)
+                host.setContentView(container)
+                overlay = ShopMapOverlayView(host, {}, {})
+                val state = ShopPreviewStates.normal()
+                val expansion = state.expansion!!
+                val interaction = ShopInteraction({})
+                interaction.render(state.copy(expansion = expansion.copy(
+                    condition = "긴 시설 조건과 현재 달성 상태를 확인합니다. ".repeat(14),
+                )), true)
+                overlay.render(ShopMapTarget.Expansion, interaction)
+                container.addView(overlay, FrameLayout.LayoutParams(width, height))
+            }
+            instrumentation.waitForIdleSync()
+            onUi {
+                assertTrue(overlay.isAttachedToWindow)
+                val close = overlay.findViewWithTag<Button>("shop:map-close")
+                val scroll = overlay.findViewWithTag<ScrollView>("shop:map-scroll")
+                val before = android.graphics.Rect()
+                assertTrue(close.getGlobalVisibleRect(before))
+                assertEquals(close.height, before.height())
+                assertTrue(scroll.canScrollVertically(1))
+                scroll.scrollTo(0, scroll.getChildAt(0).height)
+                assertTrue(scroll.scrollY > 0)
+                val after = android.graphics.Rect()
+                assertTrue(close.getGlobalVisibleRect(after))
+                assertEquals(before, after)
+            }
+        } finally {
+            onUi { host.finish() }
+        }
     }
 
     private fun text(view: View): String = when (view) {
