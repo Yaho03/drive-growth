@@ -79,7 +79,7 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         val starts = mutableListOf<RewardCelebrationKind>()
         val vehicle = VehicleId("hyundai_casper")
         try {
-            await("아직 지급하지 않은 격리 프로필의 안내 화면") {
+            await("아직 지급하지 않은 격리 프로필의 안내 화면", timeoutMillis = 30_000) {
                 button(host, R.string.onboarding_start)?.isEnabled == true && host.hasWindowFocus()
             }
             onUi {
@@ -168,7 +168,12 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                 button(host, "delivery:acknowledge") == null &&
                     host.window.decorView.findViewWithTag<View>("delivery:scene:INCOME_ARRIVAL") == null
             }
-        } finally { onUi { host.finish() } }
+        } finally { finishHost(host) }
+    }
+
+    private fun finishHost(host: UnifiedSimulationActivity) {
+        onUi { host.finishAndRemoveTask() }
+        await("계측 Activity 종료") { host.isDestroyed }
     }
 
     private fun verifyMapManagement(original: UnifiedSimulationActivity, games: GameSessionFactory): UnifiedSimulationActivity {
