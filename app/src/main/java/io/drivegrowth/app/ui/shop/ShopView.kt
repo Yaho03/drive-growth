@@ -49,14 +49,25 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     internal var onOpenVehicle: ((OwnedVehicleId, Revision) -> Unit)? = null
     internal var onFocusedVehicleAction: ((GarageEvent.RequestAction) -> Unit)? = null
     internal var onFocusedVehicleRetry: (() -> Unit)? = null
+    private var preparingVehicleAction = false
     private val vehicleDetail = MapVehicleDetailView(context) { event ->
         when (event) {
             GarageEvent.CloseDetail -> selectFocusedVehicle(null)
             GarageEvent.Retry -> onFocusedVehicleRetry?.invoke()
-            is GarageEvent.RequestAction -> onFocusedVehicleAction?.invoke(event)
+            is GarageEvent.RequestAction -> {
+                preparingVehicleAction = true
+                try {
+                    onFocusedVehicleAction?.invoke(event)
+                } finally {
+                    preparingVehicleAction = false
+                    if (!managementBusy) vehicleDetailRequestFinished()
+                }
+            }
             is GarageEvent.SelectVehicle -> Unit
         }
     }
+    private fun vehicleDetailRequestFinished() = vehicleDetail.completeRequest()
+
     internal var onFocusedRest: ((FacilityControlsEvent) -> Unit)? = null
     internal var focusedVehicleId: OwnedVehicleId? = null
         private set
@@ -266,7 +277,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                 addView(sheet, FrameLayout.LayoutParams(-1, -1))
             }
         }
-        if (!managementBusy) vehicleDetail.completeRequest()
+        if (!managementBusy && !preparingVehicleAction) vehicleDetailRequestFinished()
         val detailState = focusGarageError?.let { GarageScreenState.Error(it) }
             ?: focusVehicles?.values?.toList()?.let { GarageScreenState.Content(GarageContent(it, null, "")) }
             ?: GarageScreenState.Loading
