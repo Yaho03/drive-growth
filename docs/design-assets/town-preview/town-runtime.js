@@ -245,7 +245,7 @@ const ROLE={
  visitor2:{zones:{lot:2,right:1,plaza:1},speed:33,rest:[1.5,4],shop:.25},
 };
 const roleOf=p=>ROLE[p.ruru?'ruru':p.kind];
-const SHOP_DOOR=[806,556];                         // 렌트카 본관 문 앞(발 위치)
+const SHOP_APPROACH=[806,568];                     // 본관 문 앞 보도에 있는 출입 시작점
 const SHOP_STAY=[10,25];                          // 가게 안에 머무는 시간(초)
 const npcRnd=(a,b)=>a+Math.random()*(b-a);
 function polyArea(t){return Math.abs((t[1][0]-t[0][0])*(t[2][1]-t[0][1])-(t[2][0]-t[0][0])*(t[1][1]-t[0][1]))/2;}
@@ -276,18 +276,20 @@ function walkGrid(){
  for(let gy=0;gy<PGH;gy++)for(let gx=0;gx<PGW;gx++){const x=gx*PATH_GRID+8,y=gy*PATH_GRID+8;g[gy*PGW+gx]=inWalkMask(x,y)&&!onCar(x,y,E)?1:0;}
  pathGridKey=key;return pathGrid={g,E};
 }
-function freeAt(x,y){const {g,E}=walkGrid(),gx=Math.floor(x/PATH_GRID),gy=Math.floor(y/PATH_GRID);
- return gx>=0&&gy>=0&&gx<PGW&&gy<PGH&&g[gy*PGW+gx]===1&&!onCar(x,y,E);}
-function nearestFreeCell(x,y){                      // 가장 가까운 걸을 수 있는 칸(넓혀 가며 찾기)
- const {g}=walkGrid(),cx=Math.floor(x/PATH_GRID),cy=Math.floor(y/PATH_GRID);
+function freeAt(x,y,{g,E}=walkGrid()){const gx=Math.floor(x/PATH_GRID),gy=Math.floor(y/PATH_GRID);
+ return gx>=0&&gy>=0&&gx<PGW&&gy<PGH&&g[gy*PGW+gx]===1&&inWalkMask(x,y)&&!onCar(x,y,E);}
+function nearestFreeCell(x,y,{g}=walkGrid()){                      // 가장 가까운 걸을 수 있는 칸(넓혀 가며 찾기)
+ const cx=Math.floor(x/PATH_GRID),cy=Math.floor(y/PATH_GRID);
  for(let r=0;r<14;r++)for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
   if(Math.max(Math.abs(dx),Math.abs(dy))!==r)continue;const gx=cx+dx,gy=cy+dy;
   if(gx>=0&&gy>=0&&gx<PGW&&gy<PGH&&g[gy*PGW+gx])return [gx,gy];}
  return null;
 }
-function clearLine(x0,y0,x1,y1){const d=Math.hypot(x1-x0,y1-y0),n=Math.ceil(d/6);for(let k=1;k<=n;k++){const s=k/n;if(!freeAt(x0+(x1-x0)*s,y0+(y1-y0)*s))return false;}return true;}
-function findPath(x0,y0,x1,y1){                     // A*(8방향). 결과는 꺾이는 점만 남긴 길
- const {g}=walkGrid(),s=nearestFreeCell(x0,y0),e=nearestFreeCell(x1,y1);if(!s||!e)return null;
+function clearLine(x0,y0,x1,y1,grid=walkGrid()){const d=Math.hypot(x1-x0,y1-y0),n=Math.ceil(d/6);for(let k=1;k<=n;k++){const s=k/n;if(!freeAt(x0+(x1-x0)*s,y0+(y1-y0)*s,grid))return false;}return true;}
+function findPath(x0,y0,x1,y1,grid=walkGrid()){      // A*(8방향). 결과는 꺾이는 점만 남긴 길
+ if(!freeAt(x0,y0,grid)||!freeAt(x1,y1,grid))return null;
+ if(clearLine(x0,y0,x1,y1,grid))return [[x1,y1]];
+ const {g}=grid,s=nearestFreeCell(x0,y0,grid),e=nearestFreeCell(x1,y1,grid);
  const id=(x,y)=>y*PGW+x,start=id(...s),goal=id(...e);
  const gs=new Float32Array(PGW*PGH).fill(Infinity),from=new Int32Array(PGW*PGH).fill(-1),closed=new Uint8Array(PGW*PGH);
  const open=[start];gs[start]=0;const h=i=>Math.hypot(i%PGW-e[0],Math.floor(i/PGW)-e[1]);
@@ -299,6 +301,7 @@ function findPath(x0,y0,x1,y1){                     // A*(8방향). 결과는 �
   for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){
    const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=PGW||ny>=PGH)continue;const ni=id(nx,ny);
    if(!g[ni]||closed[ni])continue;if(dx&&dy&&(!g[id(cx+dx,cy)]||!g[id(cx,cy+dy)]))continue;   // 모서리 끼기 금지
+   if(!clearLine(cx*PATH_GRID+8,cy*PATH_GRID+8,nx*PATH_GRID+8,ny*PATH_GRID+8,grid))continue;
    const ng=gs[cur]+(dx&&dy?1.414:1);if(ng<gs[ni]){gs[ni]=ng;from[ni]=cur;fs.set(ni,ng+h(ni));if(!open.includes(ni))open.push(ni);}
   }
  }
@@ -306,7 +309,9 @@ function findPath(x0,y0,x1,y1){                     // A*(8방향). 결과는 �
  const cells=[];for(let c=goal;c>=0;c=from[c]){cells.push([c%PGW*PATH_GRID+8,Math.floor(c/PGW)*PATH_GRID+8]);if(c===start)break;}
  cells.reverse();cells.push([x1,y1]);
  const out=[];let cx=x0,cy=y0,k=0;                  // 보이는 곳까지 한 번에 가도록 점 줄이기
- while(k<cells.length){let far=k;for(let m=cells.length-1;m>k;m--)if(clearLine(cx,cy,cells[m][0],cells[m][1])){far=m;break;}
+ while(k<cells.length){let far=cells.length-1;
+  while(far>=k&&!clearLine(cx,cy,...cells[far],grid))far--;
+  if(far<k)return null;
   out.push(cells[far]);[cx,cy]=cells[far];k=far+1;}
  return out;
 }
@@ -404,8 +409,9 @@ function emoteSprite(kind,f){
  return emoteCache[key]=cv.toDataURL('image/png');
 }
 
-let townAgents=null, townHeld=null;
+let townAgents=null, cancelTownPress=null;
 function mountActors(vp,world){
+ cancelTownPress?.();
  const elements=TOWN_ACTORS.map((_,i)=>document.getElementById('townActor'+i));
  Object.values(RURU_FRAMES).flat().forEach(src=>{const im=new Image();im.src=src;});
  const size=TOWN_ACTORS.map(p=>p.ruru?[64,59]:[40,67]);
@@ -413,41 +419,60 @@ function mountActors(vp,world){
  // 화면을 다시 그려도 걷던 자리·상태가 이어지도록 상태는 한 번만 만든다
  if(!townAgents)townAgents=TOWN_ACTORS.map((p,i)=>{
   const [x,y]=walkable(p.a[0],p.a[1])?p.a:randomInPoly(WALK_ZONES[pickZone(roleOf(p))]);
-  return {x,y,tx:x,ty:y,path:null,pi:0,state:'idle',t:npcRnd(.2,2)+i*.3,dist:0,wait:0,nx:0,ny:0,flip:false,rear:false,act:null,lift:0,bounce:0,clock:Math.random()*10};
+  return {x,y,path:null,pi:0,state:'idle',t:npcRnd(.2,2)+i*.3,dist:0,wait:0,nx:0,ny:0,flip:false,rear:false,act:null,lift:0,bounce:0,clock:Math.random()*10};
  });
  const A=townAgents;
- A.forEach(a=>{if(!freeAt(a.x,a.y)&&a.state!=='inside'){const c=nearestFreeCell(a.x,a.y);if(c){a.x=c[0]*PATH_GRID+8;a.y=c[1]*PATH_GRID+8;a.path=null;}}});
+ A.forEach(a=>{if(!freeAt(a.x,a.y)&&!['inside','entering','exiting'].includes(a.state)){const c=nearestFreeCell(a.x,a.y);if(c){a.x=c[0]*PATH_GRID+8;a.y=c[1]*PATH_GRID+8;a.path=null;}}});
  // 머리 위 표시 그림
+ // NPC 위에서 시작한 터치만 직접 이동용으로 예약한다. 나머지 지도에서는 세로 스크롤을 유지한다.
+ const touchTargets=elements.map((el,i)=>{
+  if(!el)return null;
+  const target=document.createElement('span');
+  target.className='town-actor-touch';
+  target.setAttribute('aria-hidden','true');
+  target.style.width=(size[i][0]*.7/1536*100)+'%';
+  target.style.height=(size[i][1]/1024*100)+'%';
+  world.appendChild(target);return target;
+ });
  const emotes=TOWN_ACTORS.map(()=>{const e=document.createElement('img');e.className='town-emote';e.alt='';e.style.display='none';world.appendChild(e);return e;});
  const sparks=TOWN_ACTORS.map(()=>{const e=document.createElement('img');e.className='town-emote';e.alt='';e.style.display='none';world.appendChild(e);return e;});
  const parked=()=>S.cars.slice(0,cap()).map((c,k)=>({c,sl:SLOTS[k]}));
- function pickTarget(i){pickTarget0(i);const a=A[i];
-  if(!freeAt(a.tx,a.ty)&&a.act!=='enter'){const c=nearestFreeCell(a.tx,a.ty);if(c){a.tx=c[0]*PATH_GRID+8;a.ty=c[1]*PATH_GRID+8;}}
-  a.path=findPath(a.x,a.y,a.tx,a.ty)||[[a.tx,a.ty]];a.pi=0;
- }
- function pickTarget0(i){
-  const p=TOWN_ACTORS[i],role=roleOf(p),a=A[i];a.act=null;
-  if(role.repairs){                                 // 수리 필요한 차가 있으면 그 차 옆으로 가서 렌치질
-   const r=parked().find(o=>o.c.st==='repair');
-   if(r){                                           // 차 앞쪽(아래)에 선다. 막혀서 다시 고를 때는 차 주변의 다른 자리
-    const tries=a.workTries=(a.workId===r.c.id?(a.workTries||0)+1:0);
-    const spots=[[16,42],[48,30],[0,48],[-30,26]],[ox,oy]=spots[tries%spots.length];
-    a.tx=r.sl.x+ox;a.ty=r.sl.y+oy;a.act='work';a.workId=r.c.id;return;}
+ function pickTarget(i,grid){
+  const role=roleOf(TOWN_ACTORS[i]),a=A[i];
+  const target=(x,y,act=null)=>{
+   const path=findPath(a.x,a.y,x,y,grid);if(!path)return false;
+   a.path=path;a.pi=0;a.act=act;return true;
+  };
+  a.act=null;a.path=null;
+  if(role.repairs){
+   for(const repair of parked().filter(o=>o.c.st==='repair')){
+    // 아래쪽에 길이 없으면 위쪽 보도에서도 정비한다.
+    for(const [ox,oy] of [[16,42],[48,30],[0,48],[-30,26],[0,-32],[16,-32],[32,-24],[-16,-32]]){
+     if(target(repair.sl.x+ox,repair.sl.y+oy,'work')){a.workId=repair.c.id;return true;}
+    }
+   }
   }
-  if(role.shop&&Math.random()<role.shop){a.tx=SHOP_DOOR[0]+npcRnd(-6,6);a.ty=SHOP_DOOR[1];a.act='enter';return;}
-  if(role.visitsCars&&Math.random()<.35){const ps=parked();if(ps.length){const o=ps[Math.floor(Math.random()*ps.length)];a.tx=o.sl.x+60;a.ty=o.sl.y+14;a.act='car';return;}}
-  for(let k=0;k<12;k++){const [x,y]=randomInPoly(WALK_ZONES[pickZone(role)]);a.tx=x;a.ty=y;if(freeAt(x,y))break;}
+  if(role.shop&&Math.random()<role.shop&&target(SHOP_APPROACH[0]+npcRnd(-6,6),SHOP_APPROACH[1],'enter'))return true;
+  if(role.visitsCars&&Math.random()<.35){
+   const ps=parked();
+   if(ps.length){const o=ps[Math.floor(Math.random()*ps.length)];if(target(o.sl.x+60,o.sl.y+14,'car'))return true;}
+  }
+  for(let k=0;k<12;k++){
+   const [x,y]=randomInPoly(WALK_ZONES[pickZone(role)]);
+   if(target(x,y))return true;
+  }
+  return false;
  }
  function update(dt){
-  const parkedBoxes=parked().map(o=>[o.sl.x,o.sl.y+8]);
+  let grid;
   A.forEach((a,i)=>{
    const p=TOWN_ACTORS[i],role=roleOf(p);
+   if(a.bounce>0)a.bounce=Math.max(0,a.bounce-dt);
    if(!townMotion&&['walk','idle','work','entering','inside','exiting'].includes(a.state))return;   // 움직임 멈춤: 걷기만 멈추고 누르기 반응은 그대로
    a.clock+=dt;
    if(a.state==='held'){a.lift+=(1-a.lift)*Math.min(1,dt*14);return;}
    if(a.lift>0&&a.state!=='drop')a.lift=Math.max(0,a.lift-dt*6);
    if(a.state==='drop'){a.t-=dt;a.lift=Math.max(0,a.t/.18);if(a.t<=0){a.state='idle';a.t=.5;a.bounce=.35;}return;}
-   if(a.bounce>0)a.bounce=Math.max(0,a.bounce-dt);
    if(a.state==='wave'){a.t-=dt;if(a.t<=0){a.state='idle';a.t=npcRnd(.4,1);}return;}
    if(a.state==='work'){
     const still=S.cars.some(c=>c.id===a.workId&&c.st==='repair');
@@ -455,26 +480,36 @@ function mountActors(vp,world){
     return;
    }
    if(a.state==='entering'){a.t-=dt;a.y-=dt*10;if(a.t<=0){a.state='inside';a.t=npcRnd(...SHOP_STAY);}return;}
-   if(a.state==='inside'){a.t-=dt;if(a.t<=0){a.state='exiting';a.t=.45;a.x=SHOP_DOOR[0]+npcRnd(-6,6);a.y=SHOP_DOOR[1]-4;a.rear=false;a.flip=Math.random()<.5;}return;}
+   if(a.state==='inside'){a.t-=dt;if(a.t<=0){a.state='exiting';a.t=.45;a.x=SHOP_APPROACH[0]+npcRnd(-6,6);a.y=SHOP_APPROACH[1]-4;a.rear=false;a.flip=Math.random()<.5;}return;}
    if(a.state==='exiting'){a.t-=dt;a.y+=dt*10;if(a.t<=0){a.state='idle';a.t=npcRnd(.6,1.4);}return;}
-   if(a.state==='idle'){a.t-=dt;if(a.t<=0){pickTarget(i);a.state='walk';a.wait=0;}return;}
-   // 걷기: 찾아 둔 길의 다음 점을 향해 간다
-   if(!a.path)a.path=[[a.tx,a.ty]],a.pi=0;
-   let wp=a.path[Math.min(a.pi,a.path.length-1)];
-   if(a.pi<a.path.length-1&&Math.hypot(wp[0]-a.x,wp[1]-a.y)<4){a.pi++;wp=a.path[a.pi];}
-   const dx=wp[0]-a.x,dy=wp[1]-a.y,d=Math.hypot(dx,dy);
-   if(a.pi>=a.path.length-1&&d<2){
-    if(a.act==='enter'){a.state='entering';a.t=.45;a.rear=true;return;}   // 문 앞에 오면 등을 보이며 들어간다
-    a.state=a.act==='work'?'work':'idle';
-    a.t=a.act==='work'?1:npcRnd(...role.rest);
-    if(a.act==='car'){a.flip=true;a.rear=true;}                    // 차 쪽(왼쪽 위)을 바라본다
-    if(a.act==='work'){a.flip=true;a.rear=false;}                  // 앞모습으로 차 쪽을 보며 렌치질
-    else if(Math.random()<.4)a.flip=!a.flip;                       // 가끔 다른 쪽을 둘러본다
+   grid??=walkGrid();
+   if(a.state==='idle'){
+    a.t-=dt;
+    if(a.t<=0){
+     if(pickTarget(i,grid)){a.state='walk';a.wait=0;}
+     else a.t=npcRnd(...role.rest);
+    }
     return;
    }
-   // 앞이 막히면 서지 않고 비스듬히 돌아간다(곧장 → 좌우 35° → 좌우 70°). 다 막히면 잠깐 기다린다
-   const step=Math.min(d,role.speed*dt),inZone=freeAt(a.x,a.y),E=walkGrid().E;
-   // 주차된 차도 장애물(차 바닥 상자). 이미 상자 안이면 빠져나가는 쪽은 허용
+   // 지도 갱신으로 길이 무효화되면 다음 유효 목적지를 다시 고른다.
+   if(!a.path){a.state='idle';a.t=.4;return;}
+   let wp=a.path[a.pi];
+   if(a.pi<a.path.length-1&&Math.hypot(wp[0]-a.x,wp[1]-a.y)<4&&clearLine(a.x,a.y,...a.path[a.pi+1],grid)){
+    wp=a.path[++a.pi];
+   }
+   const dx=wp[0]-a.x,dy=wp[1]-a.y,d=Math.hypot(dx,dy);
+   if(d<.001&&a.pi<a.path.length-1){a.state='idle';a.t=.4;return;}
+   if(a.pi>=a.path.length-1&&d<2&&freeAt(...wp,grid)){
+    if(a.act==='enter'){a.state='entering';a.t=.45;a.rear=true;return;}
+    a.state=a.act==='work'?'work':'idle';
+    a.t=a.act==='work'?1:npcRnd(...role.rest);
+    if(a.act==='car'){a.flip=true;a.rear=true;}
+    if(a.act==='work'){a.flip=true;a.rear=false;}
+    else if(Math.random()<.4)a.flip=!a.flip;
+    return;
+   }
+   const step=Math.min(d,role.speed*dt);
+   if(!freeAt(...wp,grid)){a.state='idle';a.t=.4;return;}
    // 부딪힘은 발밑(쿼터뷰라 세로 2배)만 본다. 둘 다 걷는 중이면 번호가 작은 쪽이 먼저(뒤쪽이 양보),
    // 서 있는 사람은 모두가 피해 간다. 잠깐 스쳐 지나가는 중(ghost)에는 사람과 부딪힘을 무시한다
    const feet=(q,b)=>Math.hypot(q.x-b.x,(q.y-b.y)*2);
@@ -484,14 +519,12 @@ function mountActors(vp,world){
    for(const ang of [0,.6,-.6,1.2,-1.2,1.75,-1.75,2.4,-2.4]){
     const cs=Math.cos(ang),sn=Math.sin(ang),ux=(dx/d)*cs-(dy/d)*sn,uy=(dx/d)*sn+(dy/d)*cs;
     const n={x:a.x+ux*step,y:a.y+uy*step};
-    if(onCar(n.x,n.y,E)&&!onCar(a.x,a.y,E))continue;    // 차 위로는 절대 가지 않는다
-    if(ang!==0&&inZone&&!freeAt(n.x,n.y))continue;      // 돌아갈 때 걸을 수 없는 곳으로 나가지 않게
-    if(!blockedAt(n)){moved=[n,ux,uy];break;}
+    if(!clearLine(a.x,a.y,n.x,n.y,grid))continue;
+    if(!blockedAt(n)){moved=n;break;}
    }
    if(a.ghost>0)a.ghost-=dt;
    if(!moved){a.wait+=dt;if(a.wait>1.2){a.ghost=.9;a.wait=0;}return;}   // 오래 막히면 잠깐 스쳐 지나가 엉킨 걸 푼다
-   const [n,ux,uy]=moved;
-   a.wait=0;a.x=n.x;a.y=n.y;a.dist+=step;
+   a.wait=0;a.x=moved.x;a.y=moved.y;a.dist+=step;
    const fx=dx/d,fy=dy/d;if(fx<-.3)a.flip=true;else if(fx>.3)a.flip=false;if(fy<-.25)a.rear=true;else if(fy>.25)a.rear=false;
   });
   // 가까이 붙으면 서로 살짝 비켜 선다(그림만)
@@ -520,6 +553,9 @@ function mountActors(vp,world){
     src=npcSprite(p.kind,mode,fr,rear);key=mode+fr+rear;
    }
    if(el.dataset.frame!==key){el.src=src;el.dataset.frame=key;}
+   const target=touchTargets[i];
+   target.hidden=Boolean(townFocus)||['inside','entering','exiting'].includes(a.state);
+   target.style.left=el.style.left;target.style.top=el.style.top;target.style.zIndex=3100+(held?2048:y);
    el.style.visibility=a.state==='inside'?'hidden':'';
    el.style.opacity=a.state==='entering'?Math.max(0,a.t/.45).toFixed(2):a.state==='exiting'?(1-Math.max(0,a.t/.45)).toFixed(2):'';
    // 머리 위 표시
@@ -547,42 +583,70 @@ function mountActors(vp,world){
    if(e.clientX>=r.left+r.width*.15&&e.clientX<=r.right-r.width*.15&&e.clientY>=r.top&&e.clientY<=r.bottom){const z=+el.style.zIndex||0;if(z>bz){bz=z;best=i;}}});
   return best;
  }
- let press=null,swallowUntil=0;
+ let press=null, clickPointer=null;
+ const observer=new MutationObserver(()=>{if(!vp.isConnected)cancelPress();});
+ function finishPress(completed){
+  if(!press)return;
+  const {i,id,timer,held}=press,a=A[i];
+  press=null;
+  clearTimeout(timer);
+  observer.disconnect();
+  if(cancelTownPress===cancelPress)cancelTownPress=null;
+  if(vp.hasPointerCapture(id))vp.releasePointerCapture(id);
+  if(held){
+   if(!completed||!freeAt(a.x,a.y)){[a.x,a.y]=a.home;}
+   a.state=completed?'drop':'idle';a.t=completed ? .18 : .5;
+   if(!completed)a.lift=0;
+   a.path=null;
+  }else if(completed){a.state='wave';a.t=1.6;a.flip=false;}
+  clickPointer=completed?id:null;
+ }
+ function cancelPress(){finishPress(false);}
  vp.addEventListener('pointerdown',e=>{
-  if(townFocus||townBusy)return;
+  clickPointer=null;
+  if(press){e.stopPropagation();return;}
+  if(e.button!==0||townFocus||townBusy)return;
   const i=hitActor(e);if(i<0)return;
   e.stopPropagation();e.preventDefault();
   try{vp.setPointerCapture(e.pointerId);}catch(_){}
   const a=A[i];
-  if(!looping){looping=true;townRAF=requestAnimationFrame(tick);}
-  press={i,id:e.pointerId,timer:setTimeout(()=>{          // 꾹 누르면 들어 올린다
-   press.held=true;townHeld=i;a.home=[a.x,a.y];a.state='held';a.lift=0;
+  if(!looping){prev=performance.now();looping=true;townRAF=requestAnimationFrame(tick);}
+  const current={i,id:e.pointerId,x:e.clientX,y:e.clientY,held:false,timer:setTimeout(()=>{
+   if(press!==current||!vp.isConnected)return;
+   current.held=true;a.home=[a.x,a.y];a.state='held';a.lift=0;
    const [mx,my]=toMap(e);a.grab=[a.x-mx,a.y-my];
   },350)};
+  press=current;
+  cancelTownPress=cancelPress;
+  observer.observe(document.getElementById('screen'),{childList:true});
  },true);
  vp.addEventListener('pointermove',e=>{
-  if(!press||!press.held||e.pointerId!==press.id)return;
-  e.stopPropagation();const a=A[press.i],[mx,my]=toMap(e);
+  if(!press)return;
+  e.stopPropagation();
+  if(e.pointerId!==press.id)return;
+  if(!press.held){
+   if(Math.hypot(e.clientX-press.x,e.clientY-press.y)>8)cancelPress();
+   return;
+  }
+  const a=A[press.i],[mx,my]=toMap(e);
   a.x=Math.max(20,Math.min(1516,mx+a.grab[0]));a.y=Math.max(80,Math.min(1010,my+a.grab[1]));
  },true);
- const release=e=>{
+ function release(e){
   if(!press||e.pointerId!==press.id)return;
-  e.stopPropagation();clearTimeout(press.timer);
-  const a=A[press.i];
-  if(press.held){                                       // 놓으면 떨어진다. 걸을 수 없는 곳(건물·풀밭)이면 원래 자리로
-   if(!freeAt(a.x,a.y)){a.x=a.home[0];a.y=a.home[1];}
-   a.state='drop';a.t=.18;a.tx=a.x;a.ty=a.y;a.path=null;townHeld=null;
-  }else{a.state='wave';a.t=1.6;a.tx=a.x;a.ty=a.y;a.flip=false;}
-  press=null;swallowUntil=performance.now()+350;   // 놓은 직후 생기는 클릭만 막는다(다음 클릭은 그대로)
-  if(!looping){looping=true;townRAF=requestAnimationFrame(tick);}
- };
+  e.stopPropagation();
+  finishPress(e.type==='pointerup');
+ }
  vp.addEventListener('pointerup',release,true);
  vp.addEventListener('pointercancel',release,true);
- vp.addEventListener('click',e=>{if(performance.now()<swallowUntil){e.stopPropagation();e.preventDefault();swallowUntil=0;}},true);
+ vp.addEventListener('lostpointercapture',release,true);
+ vp.addEventListener('click',e=>{
+  if(clickPointer===null||e.detail===0||e.pointerId!==clickPointer)return;
+  e.stopPropagation();e.preventDefault();clickPointer=null;
+ },true);
  let prev=performance.now(),looping=true;
  const reacting=()=>A.some(a=>a.state==='wave'||a.state==='held'||a.state==='drop'||a.bounce>0);
  function tick(now){
-  if(!vp.isConnected){looping=false;return;}
+  if(!vp.isConnected){cancelPress();looping=false;return;}
   const dt=document.hidden?0:Math.min((now-prev)/1000,.1);prev=now;
   if(dt>0)update(dt);
   draw();
