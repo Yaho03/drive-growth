@@ -932,13 +932,11 @@ open class MainActivity : Activity() {
             },
             onSettings = ::openHomeSettings,
         )
-        shop.decorationActivation = if (homeEnabled && session.home.state.activationRequired) {
-            style.button("꾸미기 기능 사용 시작") {
-                if (gameControlsAllowed() && navigation.page == HostPage.HOME && !shopRestoreFailed &&
-                    session.home.state.activationRequired
-                ) session.home.activateDecoration()
-            }.apply { tag = "decoration:activate" }
-        } else null
+        shop.onActivateDecoration = {
+            if (gameControlsAllowed() && navigation.page == HostPage.HOME && !shopRestoreFailed &&
+                session.home.state.activationRequired
+            ) session.home.activateDecoration()
+        }.takeIf { homeEnabled && session.home.state.activationRequired }
         shop.render(if (shopRestoreFailed) ShopScreenState.Failure("가게 화면 상태를 복원하지 못해 요청을 보존하고 조작을 제한합니다.")
             else session.home.state.screen, homeEnabled, (garageState as? GarageScreenState.Content)?.data?.vehicles,
             focusRest = restActions, focusRestRecovery = facilityEnabled && restRecovery,

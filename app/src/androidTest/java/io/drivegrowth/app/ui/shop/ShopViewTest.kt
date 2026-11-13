@@ -363,6 +363,25 @@ class ShopViewTest : InstrumentationTestCase() {
         assertFalse(view.handleBack())
     }
 
+    fun testClosedOrReplacedFacilityMenuCannotActivateDecoration() = onUi {
+        var activations = 0
+        val state = ShopPreviewStates.normal()
+        val view = ShopView(instrumentation.targetContext) {}
+        view.onActivateDecoration = { activations++ }
+        view.render(state, true)
+        button(view, "shop:map-facilities").performClick()
+        val closed = button(view, "decoration:activate")
+        assertTrue(view.handleBack())
+        closed.performClick()
+        button(view, "shop:map-facilities").performClick()
+        val replaced = button(view, "decoration:activate")
+        view.render(state, true)
+        replaced.performClick()
+        assertEquals(0, activations)
+        button(view, "decoration:activate").performClick()
+        assertEquals(1, activations)
+    }
+
     fun testAttachedFacilityDetailsKeepScrollOnSameContentRender() {
         val host = instrumentation.startActivitySync(Intent(instrumentation.targetContext,
             CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
