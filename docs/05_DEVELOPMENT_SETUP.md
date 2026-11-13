@@ -1,6 +1,6 @@
 # 개발 기반·버전 기준과 로컬 환경 기록
 
-현재 설정 확인일: 2026-11-04 KST. 아래 과거 설치·조사 기록은 각 수행 시점을 따른다.
+현재 저장소 설정 대조: 2026-11-13 KST. 빌드 기준의 최초 반영은 2026-11-04다. 아래 설치·조사 기록은 각 수행 시점을 따른다.
 
 ## 개발 기반과 버전 기준
 
@@ -101,18 +101,28 @@ Gradle의 `--version`에 표시되는 내장 Kotlin 2.0.20은 Gradle 자체 스�
 
 ### 별도 모의 시연 Debug APK
 
+| APK | 소스·위치 | 입력과 사용 |
+|---|---|---|
+| 배포된 모의 시연 Debug | [릴리스 ba38def와 SHA256SUMS](https://github.com/Yaho03/drive-growth/releases/tag/demo-20261113-ba38def)의 `drive-growth-ba38def-debug.apk`. 비공개 저장소 접근 권한 필요 | `io.drivegrowth.app.simulation`의 모의 입력. 아래 절차는 이 배포본과 해당 조작이 유지되는 로컬 기준 앱에 적용 |
+| 현재 소스의 로컬 Debug | `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` | 모의 입력과 제품과 분리된 시연 원장. 현재 빌드 커밋과 해시는 별도 기록 |
+| #287 로컬 시험 APK | 제품·시험 소스 `5fac471`의 모의 Debug 및 기존 개발용 서명을 사용한 차량용 Release 구성. [빌드·설치 해시](06_VERIFICATION.md#차량용-첫-실행과-마을-주민-검증--2026-11-13) | 모의 APK는 SIMULATION. 차량용 `io.drivegrowth.app`은 Pleos SDK 입력·권한·PARK/UX 허용 사용. 배포 Debug 다운로드는 이 소스의 APK를 제공하지 않음 |
+| 제출용 Release 후보 | #29에서 실제 서명·설치 APK와 동일 소스·해시를 고정 | 실제 실행과 제출 범위를 확인한 뒤에만 제공. App Market 검증·승인은 별도 |
+
+[공식 개발 요구사항](https://appdevchallenge.auto-hmg.io/guide/development)의 API 28 이상·Gradle 8.0 이상은 최소 조건이다. 프로젝트의 정확한 도구 버전은 위 [현재 적용값](#개발-기반과-버전-기준)을 사용한다. 에뮬레이터의 API 34는 앱의 minSdk나 compileSdk와 별개다.
+
 JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌드한다. 기본 Debug 산출물은 `app/build/outputs/apk/debug/app-debug.apk`, 패키지는 `io.drivegrowth.app.simulation`이다. 시연 원장 `unified-simulation.db`와 진행 기록은 이 패키지에 저장된다. Release는 `io.drivegrowth.app` 패키지와 차량 입력을 사용한다.
 
 시연 화면의 **시연 · 모의 입력**과 **SIMULATION** 표시는 게임에 공급하는 모의 차량·내비 입력을 뜻한다. 시연 중 발생한 게임 기록은 시연 원장에만 남으며 차량을 조작하지 않는다. 이 절차는 고정 시연 목적지의 도착을 재현한다. 실제 SDK로 주행 후 목적지를 변경하는 경로는 현재 시연에서 지원하지 않는다.
 
-1. 기기 담당과 실행 시간을 조율하고 `SERIAL`에 시험 장치 시리얼을 지정한다. 시연 APK를 설치한 뒤 런처의 **드라이브 키우기 · 모의 시연**을 연다. 두 번째 명령으로도 같은 화면을 열 수 있다.
+1. Pleos 시험 장치 사용 시간을 조율하고 `SERIAL`에 시험 장치 시리얼을 지정한다. 아래 `APK_PATH`는 로컬 빌드 예시다. 배포본은 내려받은 파일의 실제 경로를 넣고 릴리스의 해시와 대조한다. 기존 설치본과 서명이 다르면 같은 데이터에 덮어쓰지 말고 승인된 별도 시험 환경을 사용한다. 설치한 뒤 런처의 **드라이브 키우기 · 모의 시연**을 연다.
 
    ```sh
-   adb -s "$SERIAL" install -r app/build/outputs/apk/debug/app-debug.apk
+   APK_PATH=app/build/outputs/apk/debug/app-debug.apk
+   adb -s "$SERIAL" install -r "$APK_PATH"
    adb -s "$SERIAL" shell am start -n io.drivegrowth.app.simulation/io.drivegrowth.app.simulation.UnifiedSimulationActivity
    ```
 
-2. 첫 실행이면 **첫 차량 고르기**에서 차량을 선택한다. **선택 내용 확인** → **이 차량으로 시작**으로 첫 지급을 확정하고 **가게로**를 누른다.
+2. 처음 시작 화면이 보이면 **시작**을 누른다. 새 프로필이면 **첫 차량 고르기**에서 차량을 선택한다. **선택 내용 확인** → **이 차량으로 시작**으로 첫 지급을 확정하고 **가게로**를 누른다.
 3. **탁송**에서 **시연 목적지 확인**을 누른다. **수익 탁송** 의뢰를 골라 **수익 탁송 선택 확정**을 누르고 선택 결과를 확인한다.
 4. **시연 · 모의 입력 ▸**을 펼쳐 **모의주행 시작**을 누른다. 모의 주행 1시간이 논리 시각으로 자동 진행된다. 주행 중에는 게임 조작이 제한되므로 모의 주차가 끝날 때까지 기다린다. **같은 모의 입력 다시 시도**가 표시되면 그 버튼을 누른다.
 5. 주차 후 **탁송**에서 완료 결과를, **미확인 정산**에서 수익 내역을 확인한다. **보유 차량**에서 첫 차량을, **가게**의 **시설**에서 각 시설의 상태와 해금 조건을 확인한다.
@@ -123,6 +133,8 @@ JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌�
    ```
 
 재실행 로그를 대조할 때는 `DriveGrowthSimulation`의 `simulation_input`과 `simulation_terminal_restored`를 같은 논리 시각으로 비교한다. 각 시험의 범위는 [시연 검증 기록](06_VERIFICATION.md#통합-모의주행-debug-검증--2026-11-11)을 따른다.
+
+이 플레이 절차는 기존 Android 앱에서 확인한 경로다. [새 가게 UI](09_UI_UX_SPEC.md#새-가게-지도와-기능-연결--2026-11-13)의 메뉴·선택 위치와 실행 절차는 결합 APK의 검증 뒤 갱신한다. 실제 Pleos SDK를 사용한 에뮬레이터 관측과 실차 시험은 각각 [06](06_VERIFICATION.md)과 [#82](https://github.com/Yaho03/drive-growth/issues/82)에서 확인한다.
 
 ## 기존 설치 상태
 

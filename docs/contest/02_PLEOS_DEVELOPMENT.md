@@ -57,7 +57,7 @@ Pleos Connect SDK는 Android Automotive OS(AAOS) 기반 차량용 인포테인�
 | 신청 없이 사용 가능 | Vehicle State, NaviHelper |
 | 준비 중 / 신청 불가 | FusedLocation, TextToSpeech, SpeechToText, Vehicle Control |
 
-이 신청 안내는 2026-11-03 재확인 시에도 같은 상태다. 반면 TTS·STT·FusedLocation 상세 문서에는 의존성·권한·API·에뮬레이터 사용법이 있고, OT는 위 개발 조건을 안내했다. **자료 간 설명 차이가 남아 있으며 공모전 특례인지 일반 포털 갱신 지연인지 확인되지 않았다.** [공모전 FAQ](https://appdevchallenge.auto-hmg.io/faq)와 [개발 안내](https://appdevchallenge.auto-hmg.io/guide/development)도 다섯 SDK를 열거하면서 현재 상태는 SDK 문서를 확인하도록 안내한다.
+이 신청 안내는 2026-11-13 공개 원문 재확인에서도 같은 상태다. [SDK 릴리스 노트](https://document.pleos.ai/docs/pleos-only/release-note/sdk-release-note)의 공개 버전 표를 함께 확인했다. 계정별 신청 상태는 조회하지 않았다. 반면 TTS·STT·FusedLocation 상세 문서에는 의존성·권한·API·에뮬레이터 사용법이 있고, OT는 위 개발 조건을 안내했다. **자료 간 설명 차이가 남아 있으며 공모전 특례인지 일반 포털 갱신 지연인지 확인되지 않았다.** [공모전 FAQ](https://appdevchallenge.auto-hmg.io/faq)와 [개발 안내](https://appdevchallenge.auto-hmg.io/guide/development)도 다섯 SDK를 열거하면서 현재 상태는 SDK 문서를 확인하도록 안내한다.
 
 따라서 현재 확인 가능한 결론은 다음과 같다.
 
@@ -99,7 +99,7 @@ SDK 상태에는 준비 중, 사용 가능, 신청 필요, 검토 중, 반려됨
 
 앱의 최소 지원 API 28과 에뮬레이터 이미지 API 34는 서로 다른 설정이다.
 
-출처: [Pleos Connect Emulator 설치 및 실행](https://document.pleos.ai/docs/connect/guide/getting-started/application-development/setup-connect-sdk-emulator)
+2026-11-13 공개 원문 재확인: [공모전 개발 안내](https://appdevchallenge.auto-hmg.io/guide/development)와 [Pleos Connect Emulator 설치 및 실행](https://document.pleos.ai/docs/connect/guide/getting-started/application-development/setup-connect-sdk-emulator). 프로젝트의 고정 도구 버전과 실행 방법은 [05](../05_DEVELOPMENT_SETUP.md)를 따른다.
 
 ### 4.2 공식 자료·패키지 경로
 
