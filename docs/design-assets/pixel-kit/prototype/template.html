@@ -448,7 +448,7 @@ function renderDelivery(){
        <div class="row"><span class="chip st-rent">진행 중</span><span class="chip" style="background:var(--warn-bg);color:var(--warn)">${o.kind==="buy"?"구매 탁송":"수익 탁송"}</span></div>
        <div class="carpic"><span class="ring ${o.rar}"></span>${carImg(o.model)}</div>
        <div class="row"><span class="h2">${M[o.model].name}</span>${rarChip(o.rar)}</div>
-       <div class="item"><span class="mut">목적지</span><b>${o.dest} · ${o.km}km</b></div>
+       <div class="item"><span class="mut">목적지</span><b>${esc(o.dest)} · ${o.km}km</b></div>
        <div class="item"><span class="mut">도착 기한</span><b>${d.day+1}일째까지(24시간)</b></div>
        <div class="item"><span class="mut">${o.kind==="buy"?"결제":"완료 보상"}</span><b>${o.kind==="buy"?`${won(d.paid)} · 확정할 때 냈어요`:`+${won(o.reward)}`}</b></div>
        <div class="notice info">운전하는 동안에는 이 화면을 쓰지 않아요. 도착해서 주차하면 정산에서 결과를 볼 수 있어요.</div>
