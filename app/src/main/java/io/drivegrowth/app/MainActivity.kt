@@ -769,7 +769,8 @@ open class MainActivity : Activity() {
         if (!enabled) return
 
         lateinit var bar: View
-        fun isCurrent() = navigationBar === bar && navigation.page == page && gameControlsAllowed()
+        fun isCurrent() = navigationBar === bar && navigation.page == page &&
+            homeSettings == null && gameControlsAllowed()
         val choose: (HostPage) -> Unit = { target -> if (isCurrent() && target != page) select(target) }
         bar = if (page == HostPage.HOME) MainHomeNavigation(this, choose)
         else MainNavigationBar(this, destinations, choose,
@@ -883,7 +884,11 @@ open class MainActivity : Activity() {
             operatingStatus = (session.home.state.screen as? ShopScreenState.Content)?.vehicles
                 ?.count { it.activity == io.drivegrowth.core.progression.VehicleActivity.RENTED }
                 ?.takeIf { it > 0 }?.let { "대여 중 $it대" },
-            onResults = { if (navigation.page == HostPage.HOME && gameControlsAllowed()) select(HostPage.RESULTS) },
+            onResults = {
+                if (homeSettings == null && navigation.page == HostPage.HOME && gameControlsAllowed()) {
+                    select(HostPage.RESULTS)
+                }
+            },
             onSettings = ::openHomeSettings,
         )
         shop.render(if (shopRestoreFailed) ShopScreenState.Failure("가게 화면 상태를 복원하지 못해 요청을 보존하고 조작을 제한합니다.")
