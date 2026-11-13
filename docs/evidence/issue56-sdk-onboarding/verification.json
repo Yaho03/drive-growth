@@ -1,0 +1,115 @@
+{
+  "executedAppCommit": "dce75aea611904d2f94d754e4cbeb080c38e9848",
+  "installedApkSha256": "f0d804bc755c1781bfc22eb04741c4513a3133eb0f19255c83b19a43df6b6603",
+  "activity": "io.drivegrowth.app.onboarding56gate/io.drivegrowth.app.MainActivity",
+  "environment": {
+    "platform": "Pleos Connect Emulator 2.1.0",
+    "api": 34,
+    "abi": "arm64-v8a",
+    "startKst": "2026-11-11T22:42:23.496104+09:00",
+    "endKst": "2026-11-11T22:43:49.970541+09:00"
+  },
+  "ledgerSource": "VEHICLE",
+  "sameProcessAndProfile": true,
+  "sdk": {
+    "initialPark": {
+      "gear": "PARK",
+      "uxRestricted": false,
+      "speedStatus": "OK"
+    },
+    "stationaryDrive": {
+      "gear": "DRIVE",
+      "uxRestricted": true,
+      "speedStatus": "OK"
+    },
+    "returnedPark": {
+      "gear": "PARK",
+      "uxRestricted": false,
+      "speedStatus": "OK"
+    }
+  },
+  "virtualConsole": {
+    "beforeSession": {
+      "bridgeReady": false,
+      "emulatorActive": false
+    },
+    "afterSession": {
+      "bridgeReady": true,
+      "emulatorActive": true
+    },
+    "driveSpeedKph": 0,
+    "restoredGear": "Park",
+    "controlsRestored": true,
+    "remainingBrowserClients": 0
+  },
+  "ui": {
+    "driveConfirmAndNavigationUnavailable": true,
+    "parkReturnedToSameCasperConfirmation": true,
+    "confirmTouchesSent": 3,
+    "firstGrantSummaryShown": {
+      "balance": 1000,
+      "garageCapacity": 3
+    }
+  },
+  "ledger": {
+    "beforeDrive": {
+      "initialGrantRequests": 0,
+      "settlements": 0,
+      "ownedVehicles": 0,
+      "balance": 0
+    },
+    "stationaryDrive": {
+      "initialGrantRequests": 0,
+      "settlements": 0,
+      "ownedVehicles": 0,
+      "balance": 0
+    },
+    "afterPark": {
+      "initialGrantRequests": 0,
+      "settlements": 0,
+      "ownedVehicles": 0,
+      "balance": 0
+    },
+    "afterConfirm": {
+      "initialGrantRequests": 1,
+      "settlements": 1,
+      "ownedVehicles": 1,
+      "balance": 1000,
+      "requestId": "initial-grant",
+      "vehicle": "hyundai_casper",
+      "garageCapacity": 3,
+      "settlementMatchesInitialRequest": true
+    }
+  },
+  "restoration": {
+    "matchingChecks": 19,
+    "productDataFilesMatched": 6,
+    "testSpeedPermissionRestored": true,
+    "temporaryForwardRemoved": true,
+    "isolatedPackagesRemoved": true,
+    "noIsolatedProcesses": true,
+    "noActiveInstrumentation": true,
+    "released": true
+  },
+  "sourceArtifactSha256": {
+    "installed.json": "cfab55510c92a1a37359c2b1fd810c4d85b66b3ec592677a63eabc0ed3cb1b80",
+    "01-sdk-p-sdk.txt": "c79a8495b5413b7cb878ec238cf194749c77a7ef8db178917bd58e823624f27e",
+    "console-before-session.json": "d40b833b4ed3f20b89e3825fa71fc483e7e5421c76159ef5e7dc35fb0e145aa5",
+    "console-ready.json": "60f3c1ca7f58503f9666d0e6728c80dea61497fb22ab2a85799a9b74a4f272e8",
+    "console-drive.json": "ae274cdbabd35c5b5ba4f271c0b6417564f747444bf15045b3a1246d6ec9376b",
+    "drive-sdk.txt": "85ce6f91f50858559e00218eec102a241d2ded7bfd9e057da92277bf8b5273cc",
+    "console-park-restored.json": "4d840d92564adec1a5595995b88a5d25f1e02aae29bc8a1d30019639d86ae326",
+    "returned-park-sdk.txt": "03a62de9406c3f41e4fb88f041aa0284a23593164b0ec224bc1d2e1418137044",
+    "08-confirm-inputs.json": "588e667bad83c6f19839939df71e823bb9b1b86778080919d3b30e897cef2d6d",
+    "permission-restoration.json": "b5eac7da09962f7bf3d974251cbe2423562a89c71c4bb0c464ff96c6bd496676",
+    "console-session-close.json": "ab17afb609494fb09eee89107309fee0b5e14944bac9ba0ed1e4bebfc1d5ba6f",
+    "preservation.json": "293d3ca2834e577b65c511d5740dfcfb353f6922af8002a824582da47a0a7aca",
+    "lease-end.json": "be8a4dcd2a2d887b0ce8e0b2cb8d2d1b041d80a4939494e59f2715a95146cca0",
+    "05-before-confirm-ledger.json": "3aa1995df67253ee2c17a584ed87522a99b5aa7e7d9c60dee6cd53583cb486b5",
+    "06-drive-zero-grant-ledger.json": "3aa1995df67253ee2c17a584ed87522a99b5aa7e7d9c60dee6cd53583cb486b5",
+    "07-park-before-confirm-ledger.json": "3aa1995df67253ee2c17a584ed87522a99b5aa7e7d9c60dee6cd53583cb486b5",
+    "09-original-grant-ledger.json": "532917b13ec8ea372aa2a3b70717613ed174e6f32ba68d41cd3763d3f832c4e4",
+    "06-drive-restricted.png": "ecaaaee8359faafacf7c9bda75dfe3ffc504fbfa42b7f3609c7ad42abe9f9e82",
+    "09-grant-summary.png": "9d6cfd2cd2b78624f20b4ad53b1e9bc8625914c9a0cd03b391e8b131873617c4"
+  }
+}

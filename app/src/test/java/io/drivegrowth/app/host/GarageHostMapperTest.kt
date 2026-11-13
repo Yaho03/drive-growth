@@ -20,12 +20,16 @@ class GarageHostMapperTest {
     private val mapper = GarageHostMapper()
 
     @Test fun mapsSameModelAsDistinctTypedOwnedVehiclesWithoutInventingDetails() {
-        val first = vehicle("owned-a")
+        val first = vehicle("initial-grant")
         val second = vehicle("owned-b", Rarity.LEGEND)
         val state = mapper.garage(data(first, second)) as GarageScreenState.Content
         assertEquals(listOf(first, second), state.data.vehicles.map { it.vehicle })
         assertEquals(listOf(Revision(7), Revision(7)), state.data.vehicles.map { it.vehicle.revision })
-        assertNotEquals(state.data.vehicles[0].instanceLabel, state.data.vehicles[1].instanceLabel)
+        assertEquals(listOf("1번", "2번"), state.data.vehicles.map { it.instanceLabel })
+        val reversed = mapper.garage(data(second, first)) as GarageScreenState.Content
+        assertEquals(listOf("2번", "1번"), reversed.data.vehicles.map { it.instanceLabel })
+        val single = mapper.garage(data(first)) as GarageScreenState.Content
+        assertEquals("", single.data.vehicles.single().instanceLabel)
         assertNull(state.data.capacityLabel)
         assertTrue(state.data.sourceLabel.contains("모의 원장"))
         assertTrue(state.data.sourceLabel.contains("fixture-v1"))

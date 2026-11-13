@@ -66,7 +66,7 @@ internal fun restoreGaragePending(command:HostCheckpointCommand):ContractResult<
     val content:ContentVersion
     val original:GarageCommand
     when(command) {
-        is HostCheckpointCommand.FacilityPurchase, is HostCheckpointCommand.VehicleResting, is HostCheckpointCommand.Gacha, is HostCheckpointCommand.Expand, is HostCheckpointCommand.Delivery, is HostCheckpointCommand.Quest -> return ContractResult.Failure(ContractError.STATE_CONFLICT)
+        is HostCheckpointCommand.Decoration, is HostCheckpointCommand.FacilityPurchase, is HostCheckpointCommand.VehicleResting, is HostCheckpointCommand.Gacha, is HostCheckpointCommand.Expand, is HostCheckpointCommand.Delivery, is HostCheckpointCommand.Quest, is HostCheckpointCommand.Achievement -> return ContractResult.Failure(ContractError.STATE_CONFLICT)
         is HostCheckpointCommand.Garage -> {
             val write=command.value.vehicle as? VehicleWrite.Update ?: return ContractResult.Failure(ContractError.STORAGE_FAILURE)
             val action=when(write.lifecycle) {
@@ -89,7 +89,7 @@ private fun ContractResult<HostCheckpointResult>.receipt():ContractResult<Garage
         is HostCheckpointResult.Garage -> ContractResult.Success(GarageReceipt.Single(r.value))
         is HostCheckpointResult.Material -> ContractResult.Success(GarageReceipt.Material(r.value))
         is HostCheckpointResult.Repair -> ContractResult.Success(GarageReceipt.Repair(r.value))
-        is HostCheckpointResult.FacilityPurchase, is HostCheckpointResult.VehicleResting, is HostCheckpointResult.Gacha, is HostCheckpointResult.Expand, is HostCheckpointResult.Delivery, is HostCheckpointResult.Quest -> ContractResult.Failure(ContractError.STATE_CONFLICT)
+        is HostCheckpointResult.Decoration, is HostCheckpointResult.FacilityPurchase, is HostCheckpointResult.VehicleResting, is HostCheckpointResult.Gacha, is HostCheckpointResult.Expand, is HostCheckpointResult.Delivery, is HostCheckpointResult.Quest, is HostCheckpointResult.Achievement -> ContractResult.Failure(ContractError.STATE_CONFLICT)
     }
 }
 private fun <T,R> ContractResult<T>.convert(f:(T)->R):ContractResult<R> = when(this) {is ContractResult.Failure -> this;is ContractResult.Success -> ContractResult.Success(f(value))}

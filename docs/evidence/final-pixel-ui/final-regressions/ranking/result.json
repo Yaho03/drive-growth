@@ -1,0 +1,13 @@
+{
+  "head": "303973174cd2c71053df6802aa6fd2e610fe3486",
+  "tree": "3d86500fbc5dcd5074af8ee3a3c23c41cb8decd1",
+  "package": "io.drivegrowth.verify.ranking28restore",
+  "mode": "ranking",
+  "sha256": {
+    "io.drivegrowth.verify.ranking28restore": "77256e2d596c7fc920d14887fe532d070a63753df51d91bd4054e9a0b103df53",
+    "io.drivegrowth.verify.ranking28restore.test": "827b6c28ecb7e5cf41756cdd77930030fc1a5266f360e2208cc00c1491324ba1"
+  },
+  "cleanupErrors": [],
+  "signerSHA256": "3398b6f1e8a85d4950d221b75ec046770046d8bc2c614ef7af3ebc1bbef856da",
+  "passed": true
+}

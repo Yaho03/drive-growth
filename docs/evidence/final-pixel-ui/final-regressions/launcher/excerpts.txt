@@ -1,0 +1,33 @@
+기록에서 필요한 항목만 발췌. AppGrid 아이콘 이름·bounds는 XML node에서 추출했다.
+397dd96af53779983b95dcaced553fc73c4a9c38 / 57af062e8775571025721a76c5feb5952283f1d9
+설치용 격리 Release 빌드와 회수 APK의 바이트 일치
+9a886d51854ef17ac50e2bc774adc42188389332a544f8dc9c241e96c83256db  installed-release.apk
+Signer #1 certificate DN: C=US, O=Android, CN=Android Debug
+02-grid-0.xml: com.android.car.carlauncher · 드라이브 키우기 · [280,521][411,548]
+07-reentry-grid-0.xml: com.android.car.carlauncher · 드라이브 키우기 · [280,521][411,548]
+
+05-before-top-back-tasks.txt:
+  * Task{9369735 #1000024 type=standard A=1010174:io.drivegrowth.verify.vehiclelauncher28 U=10 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+    topResumedActivity=ActivityRecord{bbffd3b u10 io.drivegrowth.verify.vehiclelauncher28/io.drivegrowth.app.MainActivity t1000024}
+      app=ProcessRecord{f62d8b3 4146:io.drivegrowth.verify.vehiclelauncher28/u10a174}
+      * Task{9369735 #1000024 type=standard A=1010174:io.drivegrowth.verify.vehiclelauncher28 U=10 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+
+06-hidden-windows.txt:
+      * Task{9369735 #1000024 type=standard A=1010174:io.drivegrowth.verify.vehiclelauncher28 U=10 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+
+07-reentry-tasks.txt:
+  * Task{9369735 #1000024 type=standard A=1010174:io.drivegrowth.verify.vehiclelauncher28 U=10 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+    topResumedActivity=ActivityRecord{bbffd3b u10 io.drivegrowth.verify.vehiclelauncher28/io.drivegrowth.app.MainActivity t1000024}
+      app=ProcessRecord{f62d8b3 4146:io.drivegrowth.verify.vehiclelauncher28/u10a174}
+      * Task{9369735 #1000024 type=standard A=1010174:io.drivegrowth.verify.vehiclelauncher28 U=10 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+
+04-garage.txt:
+io.drivegrowth.verify.vehiclelauncher28 차고  true [18,37][1062,73]
+
+05-back-from-garage-state.txt:
+io.drivegrowth.verify.vehiclelauncher28  가게 전경 · 기본 간판. 주차 공간 3칸. 주유소: 잠김. 보험 시설: 잠김. 세차장: 잠김 true [18,85][679,526]
+
+08-vehicle-signals.txt:
+11-12 13:30:50.711  4146  4146 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false
+11-12 13:31:00.674  4146  4146 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false
+11-12 13:33:04.378  4146  4146 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false

@@ -83,18 +83,25 @@ class RentalFlowTest {
     }
 
     @Test fun facilitiesOnlyAffectRentalsAfterPurchase() {
-        val before = ShopProgress(4,99,2)
-        val at = ShopProgress(5,100,3)
-        val after = ShopProgress(6,101,4)
-        Facility.entries.forEach {
-            val offer = FacilityOffer(it, RuleVersion("test"), true, GameMoney(10))
-            assertFalse(it.unlocked(before))
-            assertTrue(it.unlocked(at) && it.unlocked(after))
-            assertEquals(ContractResult.Success(offer), offer.planPurchase(at, emptySet(), GameMoney(10)))
-            assertEquals(ContractResult.Failure(ContractError.INSUFFICIENT_FUNDS),
-                offer.planPurchase(at, emptySet(), GameMoney(9)))
+        val above = ShopProgress(6, 101, 4)
+        val cases = listOf(
+            Triple(Facility.FUEL_STATION, above.copy(ownedVehicles = 4), above.copy(ownedVehicles = 5)),
+            Triple(Facility.INSURANCE, above.copy(servedCustomers = 99), above.copy(servedCustomers = 100)),
+            Triple(Facility.CAR_WASH, above.copy(shopLevel = 2), above.copy(shopLevel = 3)),
+        )
+        for ((facility, before, exact) in cases) {
+            val offer = FacilityOffer(facility, RuleVersion("test"), true, GameMoney(10))
+            assertFalse(facility.unlocked(before))
+            assertTrue(facility.unlocked(exact))
+            assertTrue(facility.unlocked(above))
             assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
-                offer.planPurchase(at, setOf(it), GameMoney(10)))
+                offer.planPurchase(before, emptySet(), GameMoney(10)))
+            assertEquals(ContractResult.Success(offer), offer.planPurchase(exact, emptySet(), GameMoney(10)))
+            assertEquals(ContractResult.Success(offer), offer.planPurchase(above, emptySet(), GameMoney(10)))
+            assertEquals(ContractResult.Failure(ContractError.INSUFFICIENT_FUNDS),
+                offer.planPurchase(exact, emptySet(), GameMoney(9)))
+            assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
+                offer.planPurchase(exact, setOf(facility), GameMoney(10)))
         }
     }
 }

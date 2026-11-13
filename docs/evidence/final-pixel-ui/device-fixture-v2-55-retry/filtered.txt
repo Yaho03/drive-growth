@@ -1,0 +1,32 @@
+--------- beginning of main
+11-12 12:10:02.950 29622 29622 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+11-12 12:10:02.953 29622 29622 I AndroidRuntime: Using default boot image
+11-12 12:10:02.953 29622 29622 I AndroidRuntime: Leaving lock profiling enabled
+11-12 12:10:03.043 29622 29622 D AndroidRuntime: Calling main entry com.android.commands.am.Am
+11-12 12:10:03.303 29669 29737 I TestRunner: started: testPaidDecorationWriteFailureRetriesSameRequestInActualMain(io.drivegrowth.app.host.shop.DecorationHomeActivityTest)
+11-12 12:10:03.870 29669 29669 I DriveGrowthVehicle: observation_start firstInProcess=true displayId=0
+11-12 12:10:03.878 29669 29669 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-12 12:10:04.910 29669 29669 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false
+11-12 12:10:43.786 29669 29737 I TestRunner: failed: testPaidDecorationWriteFailureRetriesSameRequestInActualMain(io.drivegrowth.app.host.shop.DecorationHomeActivityTest)
+11-12 12:10:43.786 29669 29737 I TestRunner: ----- begin exception -----
+11-12 12:10:43.791 29669 29737 I TestRunner: junit.framework.AssertionFailedError: ASSERTION_STATE: 저장 실패와 다시 조회
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at junit.framework.Assert.fail(Assert.java:50)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at junit.framework.Assert.assertTrue(Assert.java:20)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at io.drivegrowth.app.host.shop.DecorationHomeActivityTest.await(DecorationHomeActivityTest.kt:50)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at io.drivegrowth.app.host.shop.DecorationHomeActivityTest.testPaidDecorationWriteFailureRetriesSameRequestInActualMain(DecorationHomeActivityTest.kt:204)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at java.lang.reflect.Method.invoke(Native Method)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at android.test.ActivityInstrumentationTestCase2.runTest(ActivityInstrumentationTestCase2.java:192)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at junit.framework.TestCase.runBare(TestCase.java:134)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at junit.framework.TestResult$1.protect(TestResult.java:115)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at junit.framework.TestResult.runProtected(TestResult.java:133)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at junit.framework.TestResult.run(TestResult.java:118)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at junit.framework.TestCase.run(TestCase.java:124)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+11-12 12:10:43.791 29669 29737 I TestRunner: 	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+11-12 12:10:43.791 29669 29737 I TestRunner: ----- end exception -----
+11-12 12:10:43.813 29669 29737 I TestRunner: finished: testPaidDecorationWriteFailureRetriesSameRequestInActualMain(io.drivegrowth.app.host.shop.DecorationHomeActivityTest)
+11-12 12:10:43.825 29622 29622 I AndroidRuntime: VM exiting with result code 0.

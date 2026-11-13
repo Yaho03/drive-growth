@@ -1,0 +1,60 @@
+{
+  "productSource": "3bd7d925c1133fd5a45ecf3cc5ee8d72faabbdfb",
+  "isolatedAvd": "DriveGrowth_FormFactor_E",
+  "serial": "emulator-5578",
+  "bridgeZipSHA256": "7a7e660ee5ab27ebad416c8394b9e8b406548e8027ab3cfa083f7512de9350b9",
+  "standardApkSHA256": "6a41e671741781d706025138bf07f964f141210138f162249c39c18f834eb745",
+  "portrait": {
+    "ok": true,
+    "available": true,
+    "created": true,
+    "display_slot": 2,
+    "display_name": "DISPLAY2",
+    "width": 840,
+    "height": 1184,
+    "dpi": 160,
+    "flags": 1737,
+    "orientation": "portrait"
+  },
+  "landscape": {
+    "ok": true,
+    "available": true,
+    "created": true,
+    "display_slot": 2,
+    "display_name": "DISPLAY2",
+    "width": 1700,
+    "height": 1185,
+    "dpi": 200,
+    "flags": 1737,
+    "orientation": "landscape"
+  },
+  "rotationOriginal": {
+    "screenPx": [
+      1080,
+      600
+    ],
+    "appBounds": [
+      360,
+      57,
+      1062,
+      495
+    ]
+  },
+  "rotationLock90": {
+    "screenPx": [
+      600,
+      1080
+    ],
+    "appBounds": [
+      360,
+      57,
+      1062,
+      495
+    ],
+    "contentClipped": true
+  },
+  "androidSplitScreenSupported": false,
+  "standardLandscapeActivityActualAppGrid": true,
+  "standardPortraitInitialGrantAndScreenNavigation": true,
+  "sameOwnedSelectionAfterActivityRelaunch": true
+}

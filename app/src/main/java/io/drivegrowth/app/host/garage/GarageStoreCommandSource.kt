@@ -6,6 +6,8 @@ import io.drivegrowth.app.data.AssetGameContent
 import io.drivegrowth.app.data.MaterialVersions
 import io.drivegrowth.app.data.SqliteGameChangeStore
 import io.drivegrowth.app.ui.garage.GarageEvent
+import io.drivegrowth.app.ui.vehicleDisplayName
+import io.drivegrowth.app.ui.vehicleInstanceLabels
 import io.drivegrowth.core.content.ContentLoad
 import io.drivegrowth.core.content.GameContentSnapshot
 import io.drivegrowth.core.contract.*
@@ -45,13 +47,32 @@ class GarageStoreCommandSource(private val content: GameContentSnapshot, private
                         val current = when (val read = ledger.activity(car.ownedVehicleId)) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
                         if (current == VehicleActivity.IDLE) candidates.add(car)
                     }
-                    return ContractResult.Success(GaragePreparation.Materials(request, Collections.unmodifiableList(candidates)))
+                    val names = materialDisplayNames(owned)
+                    return ContractResult.Success(GaragePreparation.Materials(request, Collections.unmodifiableList(candidates),
+                        Collections.unmodifiableMap(candidates.associate { it.ownedVehicleId to names.getValue(it.ownedVehicleId) })))
                 }
                 upgrade.prepareMaterial(ledger, id, ledger.source, ref, material).map { GarageCommand.Material(it) }
             }
         }
-        return planned.map { command -> GaragePreparation.Ready(GaragePending(request, content.catalog.contentVersion, command,
-            balance, target, content.catalog.vehicles.single { it.vehicleId == target.vehicleId }.displayName)) }
+        val command = when (planned) {
+            is ContractResult.Failure -> return planned
+            is ContractResult.Success -> planned.value
+        }
+        val names = if (command is GarageCommand.Material) materialDisplayNames(owned) else emptyMap()
+        val materialName = if (command is GarageCommand.Material) {
+            names[command.value.material.ownedVehicleId] ?: return ContractResult.Failure(ContractError.STATE_CONFLICT)
+        } else null
+        val targetName = names[target.ownedVehicleId] ?: content.catalog.vehicles.single { it.vehicleId == target.vehicleId }.displayName
+        return ContractResult.Success(GaragePreparation.Ready(GaragePending(request, content.catalog.contentVersion, command,
+            balance, target, targetName, materialName)))
+    }
+
+    private fun materialDisplayNames(owned: List<OwnedVehicle>): Map<OwnedVehicleId, String> {
+        val catalogNames = content.catalog.vehicles.associate { it.vehicleId to it.displayName }
+        val vehicles = owned.filter { it.lifecycle == VehicleLifecycle.OWNED }
+            .map { it.ownedVehicleId to catalogNames.getValue(it.vehicleId) }
+        val labels = vehicleInstanceLabels(vehicles)
+        return vehicles.associate { (id, name) -> id to vehicleDisplayName(name, labels[id]) }
     }
 
     override fun commit(command: GarageCommand): ContractResult<GarageReceipt> = when(command) {

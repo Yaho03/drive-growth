@@ -1,7 +1,6 @@
 package io.drivegrowth.app.ui.shop
 
 import android.content.Context
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.View
@@ -9,27 +8,28 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import io.drivegrowth.app.ui.pixel.PixelStyle
 
-/** 기존 Garage와 ui-v3의 카드·색·여백을 따른다. 중립 전경 자산은 ShopSceneView가 직접 그린다. */
+/** #229의 공통 색과 기존 차량 화면의 Native 조작 크기를 사용한다. */
 internal class ShopStyle(private val context: Context) {
-    val base = Color.rgb(14, 16, 20)
-    val panel = Color.rgb(26, 29, 35)
-    val inset = Color.rgb(40, 44, 52)
-    val ink = Color.rgb(242, 243, 245)
-    val muted = Color.rgb(166, 172, 183)
-    val blue = Color.rgb(48, 102, 255)
-    val accent = Color.rgb(245, 207, 119)
+    val base = PixelStyle.background
+    val panel = PixelStyle.panel
+    val inset = PixelStyle.inset
+    val ink = PixelStyle.text
+    val muted = PixelStyle.muted
+    val blue = PixelStyle.primary
+    val accent = PixelStyle.gold
     fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
     fun column() = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     fun row() = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-    fun shape(fill: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = dp(24).toFloat() }
+    fun shape(fill: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = dp(PixelStyle.panelRadiusDp).toFloat() }
     fun text(value: CharSequence, size: Int = 20, color: Int = ink, bold: Boolean = false) = TextView(context).apply {
         text = value; textSize = size.toFloat(); setTextColor(color)
         if (bold) setTypeface(typeface, Typeface.BOLD)
         setPadding(0, dp(4), 0, dp(4))
     }
     fun card() = column().apply {
-        background = shape(panel); setPadding(dp(20), dp(16), dp(20), dp(16))
+        background = shape(panel); setPadding(dp(PixelStyle.panelPaddingDp), dp(16), dp(PixelStyle.panelPaddingDp), dp(16))
     }
     fun button(label: String, enabled: Boolean = true, primary: Boolean = false, action: () -> Unit) = Button(context).apply {
         text = label; textSize = 24f; isAllCaps = false; isEnabled = enabled
@@ -39,7 +39,7 @@ internal class ShopStyle(private val context: Context) {
         setPadding(dp(16), dp(12), dp(16), dp(12))
         setOnClickListener { if (isEnabled) action() }
     }
-    fun add(parent: LinearLayout, child: View, gap: Int = 12) {
+    fun add(parent: LinearLayout, child: View, gap: Int = PixelStyle.gapDp) {
         parent.addView(child, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(gap) })
     }
     fun scroll(body: View, restoreY: Int) = object : ScrollView(context) {

@@ -1,0 +1,13 @@
+--------- beginning of main
+11-12 15:10:45.093  7400  7400 I DriveGrowthVehicle: observation_start firstInProcess=true displayId=0
+11-12 15:10:45.116  7400  7400 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-12 15:10:46.135  7400  7400 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false
+11-12 15:10:53.150  7400  7400 I DriveGrowthVehicle: signal_state speed=OK gear=DRIVE ux=true
+11-12 15:11:02.987  7400  7400 I DriveGrowthVehicle: observation_start firstInProcess=false displayId=0
+11-12 15:11:03.152  7400  7400 I DriveGrowthVehicle: observation_gap kind=APP_HIDDEN durationMs=960
+11-12 15:11:03.156  7400  7400 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-12 15:11:04.675  7400  7400 I DriveGrowthVehicle: signal_state speed=OK gear=DRIVE ux=true
+11-12 15:11:05.299  7400  7400 I DriveGrowthVehicle: observation_start firstInProcess=false displayId=0
+11-12 15:11:05.332  7400  7400 I DriveGrowthVehicle: observation_gap kind=APP_HIDDEN durationMs=209
+11-12 15:11:05.342  7400  7400 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-12 15:11:06.339  7400  7400 I DriveGrowthVehicle: signal_state speed=OK gear=DRIVE ux=true

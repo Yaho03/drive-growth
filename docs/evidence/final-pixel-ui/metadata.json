@@ -1,0 +1,30 @@
+{
+  "head": "b3c09a575e16b023e64dcbe93e263bed0788b7ec",
+  "tree": "666784894027662b9dceb0d8710cf7bda1ab0a5c",
+  "package": "io.drivegrowth.verify.combined28e",
+  "selectors": [
+    "io.drivegrowth.app.ui.shop.ShopViewTest#testPixelMapVehicleTapUsesCurrentOwnedIdAndRevision",
+    "io.drivegrowth.app.ui.shop.ShopViewTest#testGateAndStaleDetachedButtonsCannotSubmit",
+    "io.drivegrowth.app.ui.garage.GarageViewTest#testInstanceSelectionAndDuplicateRequest",
+    "io.drivegrowth.app.ui.garage.CollectionScrollDeviceTest#testRestrictedScreenHidesContentAndPreservesPositionOnReturn",
+    "io.drivegrowth.app.ui.gacha.GachaViewTest#testStaleButtonsRestrictionAndConstructorPendingRestoration",
+    "io.drivegrowth.app.ui.delivery.DeliveryViewTest#testPendingAndLateResponseDoNotOpenRestrictedContent",
+    "io.drivegrowth.app.ui.delivery.DeliveryViewTest#testReviewBackNeverSubmitsAbandonAndMissingAmountsDisableConfirmation",
+    "io.drivegrowth.app.ui.onboarding.OnboardingViewTest#testTownAndCandidateArtFollowTheCurrentStageAndVehicleId",
+    "io.drivegrowth.app.ui.onboarding.OnboardingViewTest#testRestrictedStateHidesAllGameContentAndActions",
+    "io.drivegrowth.app.ui.results.ResultsViewTest#testVehicleArtUsesTheSettledVehicleIdAndHidesWhenRestricted",
+    "io.drivegrowth.app.ui.progress.ProgressViewTest#testOverviewHighlightsOnlyCurrentlyClaimableOffers",
+    "io.drivegrowth.app.ui.progress.ProgressScrollDeviceTest#testSameDetailOffsetAcrossRestrictionDetachLoadingAndFreshContent",
+    "io.drivegrowth.app.ui.ranking.RankingViewTest#testRealRecordNeverHasRankOrSyntheticPlayersAndRestrictionHidesBoth"
+  ],
+  "hostSelector": "io.drivegrowth.app.simulation.UnifiedSimulationActivityTest#testOneStartRunsExistingUiDrivingRentalDeliveryAndReopenedOriginalResults",
+  "sha256": {
+    "io.drivegrowth.verify.combined28e": "2766ca4af2221b619a26a76e71e393d89854f8fd5a32a5e05f12d1dcf0d0278c",
+    "io.drivegrowth.verify.combined28e.test": "f57c08900bfec08d06f340d68359b880c2ceb838bf2919c0e0439027ea168283"
+  },
+  "cleanupErrors": [],
+  "signerSHA256": "4241ac4162c67a0e0101009cec5a8810ae78bdf1346d4decdf55b191fc64d60b",
+  "viewPassed": true,
+  "hostPassed": true,
+  "passed": true
+}

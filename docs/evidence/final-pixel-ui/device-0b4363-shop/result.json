@@ -1,0 +1,18 @@
+{
+  "head": "0b43637880e4a46cde827da96b1c419a58853629",
+  "tree": "efce403e178c18749317c581368c48aa67844939",
+  "package": "io.drivegrowth.verify.combined28e",
+  "selector": [
+    "io.drivegrowth.app.ui.shop.ShopViewTest#testCarWashConditionAndCoreFactsInBothLayouts",
+    "io.drivegrowth.app.ui.shop.ShopViewTest#testLockedCarWashWithActualMapperIsReadableAfterScrollInBothNarrowWindows",
+    "io.drivegrowth.app.ui.shop.ShopViewTest#testHomeMapAndVehicleAreVisibleBeforeSummaryWithoutScrolling",
+    "io.drivegrowth.app.ui.shop.ShopViewTest#testPixelMapVehicleTapUsesCurrentOwnedIdAndRevision"
+  ],
+  "sha256": {
+    "io.drivegrowth.verify.combined28e": "ef338238e45ece44a54a07decd3331092f9f88dab5f38bfeacc1d664f6bd4b03",
+    "io.drivegrowth.verify.combined28e.test": "b0bcb2e0f1b8c879d5444cc963d5d216995d27fe8dd4c85f92257f92b9fbae91"
+  },
+  "cleanupErrors": [],
+  "signerSHA256": "4241ac4162c67a0e0101009cec5a8810ae78bdf1346d4decdf55b191fc64d60b",
+  "passed": true
+}

@@ -1,0 +1,9 @@
+{
+  "appGridIcon": true,
+  "garageBackToHome": true,
+  "topBackHidden": true,
+  "iconReentry": true,
+  "samePid": "4146",
+  "sameTask": "1000024",
+  "sdkParkAllowed": true
+}

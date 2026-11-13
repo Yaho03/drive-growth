@@ -97,7 +97,32 @@ Gradle의 `--version`에 표시되는 내장 Kotlin 2.0.20은 Gradle 자체 스�
 
 첫 명령은 핵심 테스트·APK 컴파일·Android Lint이며 두 번째 명령은 연결된 Android 시험 기기가 필요하다. 저장 테스트 실행을 새 렌터카 기능·주행 정책 적합성 검증으로 취급하지 않는다. 공식 SDK·차량 콜백·주행 제한 시험은 #13, 새 기능 통합은 #28의 별도 범위다.
 
-현재 컴퓨터의 결과는 06 문서에 기록하고 다른 팀원의 설치·실행 결과와 구분한다. 팀원별 OS·CPU·SDK/AVD 지원·성공 또는 실패 단계·후속 담당은 실제 확인 후 #12에서 채운다. 이 문서의 절차 제공만으로 4명 전원의 환경 준비 완료를 표시하지 않는다.
+팀원 네 명의 공통 명령줄 빌드 재현 근거를 [#12](https://github.com/Yaho03/drive-growth/issues/12)에 연결해 환경 확인을 완료했다. 팀원별 OS·CPU와 검사 범위는 #12의 근거를 따른다. IDE 설치·실행, Pleos AVD·차량 SDK·실차 시험은 실제 수행자와 환경별로 [검증 문서](06_VERIFICATION.md)와 해당 기능 이슈에 기록한다.
+
+### 별도 모의 시연 Debug APK
+
+JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌드한다. 기본 Debug 산출물은 `app/build/outputs/apk/debug/app-debug.apk`, 패키지는 `io.drivegrowth.app.simulation`이다. 시연 원장 `unified-simulation.db`와 진행 기록은 이 패키지에 저장된다. Release는 `io.drivegrowth.app` 패키지와 차량 입력을 사용한다.
+
+시연 화면의 **시연 · 모의 입력**과 **SIMULATION** 표시는 게임에 공급하는 모의 차량·내비 입력을 뜻한다. 시연 중 발생한 게임 기록은 시연 원장에만 남으며 차량을 조작하지 않는다. 이 절차는 고정 시연 목적지의 도착을 재현한다. 실제 SDK로 주행 후 목적지를 변경하는 경로는 현재 시연에서 지원하지 않는다.
+
+1. 기기 담당과 실행 시간을 조율하고 `SERIAL`에 시험 장치 시리얼을 지정한다. 시연 APK를 설치한 뒤 런처의 **드라이브 키우기 · 모의 시연**을 연다. 두 번째 명령으로도 같은 화면을 열 수 있다.
+
+   ```sh
+   adb -s "$SERIAL" install -r app/build/outputs/apk/debug/app-debug.apk
+   adb -s "$SERIAL" shell am start -n io.drivegrowth.app.simulation/io.drivegrowth.app.simulation.UnifiedSimulationActivity
+   ```
+
+2. 첫 실행이면 **첫 차량 고르기**에서 차량을 선택한다. **선택 내용 확인** → **이 차량으로 시작**으로 첫 지급을 확정하고 **가게로**를 누른다.
+3. **탁송**에서 **시연 목적지 확인**을 누른다. **수익 탁송** 의뢰를 골라 **수익 탁송 선택 확정**을 누르고 선택 결과를 확인한다.
+4. **시연 · 모의 입력 ▸**을 펼쳐 **모의주행 시작**을 누른다. 모의 주행 1시간이 논리 시각으로 자동 진행된다. 주행 중에는 게임 조작이 제한되므로 모의 주차가 끝날 때까지 기다린다. **같은 모의 입력 다시 시도**가 표시되면 그 버튼을 누른다.
+5. 주차 후 **탁송**에서 완료 결과를, **미확인 정산**에서 수익 내역을 확인한다. **보유 차량**에서 첫 차량을, **가게**의 **시설**에서 각 시설의 상태와 해금 조건을 확인한다.
+6. 새 프로세스에서 저장 결과를 확인하려면 시연 패키지만 종료하고 1단계의 실행 명령으로 다시 연다. 앱 데이터를 유지한 채 탁송 결과의 확인 대기 여부와 정산 기록을 확인한다. 이미 열람한 정산은 **전체 기록**에서 확인할 수 있다.
+
+   ```sh
+   adb -s "$SERIAL" shell am force-stop io.drivegrowth.app.simulation
+   ```
+
+재실행 로그를 대조할 때는 `DriveGrowthSimulation`의 `simulation_input`과 `simulation_terminal_restored`를 같은 논리 시각으로 비교한다. 각 시험의 범위는 [시연 검증 기록](06_VERIFICATION.md#통합-모의주행-debug-검증--2026-11-11)을 따른다.
 
 ## 기존 설치 상태
 
@@ -241,6 +266,8 @@ adb -s emulator-5556 shell getprop sys.boot_completed
 2026-11-03 조사 보완: 위 `start-pleos.sh`의 화면 없는 실행은 부팅·서비스 확인용 기록이다. **시각 UI 검증이나 FormFactorConsole 시험 완료가 아니다.** 공식 폼 팩터 시험은 별도 창으로 실행한 Emulator와 Host Display Bridge를 사용하며 Headless·Android Studio 내장 Running Devices 창은 해당 시험에 사용할 수 없다. 실제 실행 옵션·AVD 이름은 시험 착수 시 확인한다. 이번 문서 보완에서 스크립트나 AVD 설정을 바꾸지는 않았다.
 
 차량 상태 웹 콘솔(8088), SDK 샘플 앱, 화면 크기 시험 도구는 목적이 다르다. 설치·포트·종료 조건은 [공식 자료 목록](contest/04_OFFICIAL_RESOURCES.md) 6절과 [Virtual Console 안내](contest/02_PLEOS_DEVELOPMENT.md) 5절을 기준으로 사용한다. 이미 기록된 headless 부팅 성공을 이 시험들의 성공으로 재분류하지 않는다.
+
+2026-11-13에는 별도 창의 AVD와 공식 Host Display Bridge·FormFactorConsole로 Portrait·Landscape를 실행했다. 현재 설치용 Debug APK의 직접 설치와 관측 범위는 [공식 창 실행 결과](06_VERIFICATION.md#공식-세로가로-창과-표준-debug-apk-직접-설치--2026-11-13)를 따른다. 기본 화면의 강제 회전·task 크기 변경을 공식 프리셋 시험으로 대신하지 않는다.
 
 ## 남은 검증
 

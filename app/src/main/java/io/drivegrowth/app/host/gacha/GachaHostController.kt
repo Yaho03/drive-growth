@@ -53,7 +53,10 @@ class GachaHostController(
             reply {
                 if (!released && sequence == serial) {
                     busy = false
-                    when (result) { is ContractResult.Success -> show(GachaScreen.Offers(result.value)); is ContractResult.Failure -> showFailure(result.error) }
+                    when (result) {
+                        is ContractResult.Success -> show(GachaScreen.Offers(result.value))
+                        is ContractResult.Failure -> showFailure(result.error, result.detail)
+                    }
                     completeReload(token)
                 }
             }
@@ -117,7 +120,7 @@ class GachaHostController(
             val result = if (!allowed || released) ContractResult.Failure(ContractError.UX_RESTRICTED) else safely { source.prepare(request.input) }
             reply {
                 if (!released && sequence == serial) when (result) {
-                    is ContractResult.Failure -> fail(request, result.error, reload)
+                    is ContractResult.Failure -> fail(request, result.error, reload, result.detail)
                     is ContractResult.Success -> {
                         saved = saved.copy(pending = GachaHostPending(request, result.value))
                         if (checkpoint(saved) is ContractResult.Failure) fail(request, ContractError.STORAGE_FAILURE, reload)
@@ -138,7 +141,7 @@ class GachaHostController(
             reply {
                 if (!released && sequence == serial) {
                     when (result) {
-                        is ContractResult.Failure -> fail(request, result.error, reload)
+                        is ContractResult.Failure -> fail(request, result.error, reload, result.detail)
                         is ContractResult.Success -> when (val mapped = resultFrame(request.input, command, result.value)) {
                             is ContractResult.Failure -> fail(request, mapped.error, reload)
                             is ContractResult.Success -> {
@@ -154,12 +157,16 @@ class GachaHostController(
         }
     }
 
-    private fun fail(request: GachaRequest, error: ContractError, reload: String?) {
-        busy = false; complete(request, ContractResult.Failure(error)); showFailure(error); reload?.let(completeReload)
+    private fun fail(request: GachaRequest, error: ContractError, reload: String?, detail: ContractFailureDetail? = null) {
+        busy = false
+        complete(request, ContractResult.Failure(error, detail))
+        showFailure(error, detail)
+        reload?.let(completeReload)
     }
-    private fun showFailure(error: ContractError) {
+    private fun showFailure(error: ContractError, detail: ContractFailureDetail? = null) {
         val message = when (error) {
-            ContractError.DATA_UNAVAILABLE -> "가챠 권위 상태나 진행 정보를 확인할 수 없습니다."
+            ContractError.DATA_UNAVAILABLE -> if (detail == ContractFailureDetail.GACHA_NO_UNLOCKED_CANDIDATES)
+                "현재 해금 후보가 없습니다." else "가챠 권위 상태나 진행 정보를 확인할 수 없습니다."
             ContractError.CAPACITY_EXCEEDED -> "차고 공간이 부족합니다."
             ContractError.INSUFFICIENT_FUNDS -> if (saved.pending?.request?.input?.option?.kind == GachaOptionKind.FREE) "무료권이 부족합니다." else "게임머니가 부족합니다."
             ContractError.STATE_CONFLICT -> "확인한 조건이 달라졌습니다. 보관한 요청의 결과를 확인해 주세요."

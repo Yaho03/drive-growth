@@ -8,7 +8,8 @@ import java.time.LocalDate
 
 data class DeliveryHostData(val identity: GameIdentity, val content: GameContentSnapshot,
     val balance: GameMoney, val shopLevel: Int, val freeSlots: Int, val terms: DeliveryTerms?,
-    val progress: DeliveryInProgress?, val held: List<HeldVehicle>)
+    val progress: DeliveryInProgress?, val held: List<HeldVehicle>,
+    val vehicleObserved: Observation<ObservedDistance> = Observation.Missing(MissingReason.NO_DATA))
 /** 같은 실제 원장의 조회·목록·발견 경계. 원자 일괄 조회를 약정하지 않는다. */
 interface DeliveryHostQueries {
     fun identity(): ContractResult<GameIdentity>

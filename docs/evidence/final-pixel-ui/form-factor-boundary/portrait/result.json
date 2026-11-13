@@ -1,0 +1,19 @@
+{
+  "head": "3bd7d925c1133fd5a45ecf3cc5ee8d72faabbdfb",
+  "tree": "cc9a75d325b1112b236fd4d5351725719d4e8121",
+  "package": "io.drivegrowth.verify.formfactorboundary",
+  "selector": [
+    "io.drivegrowth.app.simulation.FormFactorBoundaryTest#testLongGoalClaimLabelsAndScrollInOfficialWindow"
+  ],
+  "sha256": {
+    "io.drivegrowth.verify.formfactorboundary": "2a24028b8d5dc8d52e2bfdc5f53b0ffa79f8942493bcefdd1360dccab6ffb4db",
+    "io.drivegrowth.verify.formfactorboundary.test": "81e37f5f7d7a1bdc4af2c808bd5a590b500e5ed4333322adf2e68b7da8ce828b"
+  },
+  "testSourceSHA256": "90bc436528fff72ecd19acf5ee422eeff12ef9372ca536cc0c4cb31382de5257",
+  "cleanupErrors": [],
+  "signerSHA256": "4241ac4162c67a0e0101009cec5a8810ae78bdf1346d4decdf55b191fc64d60b",
+  "passed": true,
+  "runs": [
+    true
+  ]
+}

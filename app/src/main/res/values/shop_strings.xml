@@ -31,7 +31,6 @@
     <string name="shop_condition">조건 · %1$s</string>
     <string name="shop_effect">효과 · %1$s</string>
     <string name="shop_price">요청 비용 · %1$s</string>
-    <string name="shop_rule">규칙 · %1$s</string>
     <string name="shop_trial">조정 가능한 시험값</string>
     <string name="shop_preview">변경안 확인</string>
     <string name="shop_preview_label">미리보기 · 확정 상태와 잔액은 유지됩니다</string>

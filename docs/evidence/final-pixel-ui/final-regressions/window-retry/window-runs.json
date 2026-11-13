@@ -1,0 +1,169 @@
+{
+  "selector": "io.drivegrowth.app.simulation.FinalOfficialWindowStateTest#testHomeModesAndPreparedGarageCommandInOfficialWindow",
+  "builds": [
+    {
+      "head": "a8017961028f892e602b67b9e4a0124fc2588513",
+      "tree": "fdbbb3207fcd4fc343e22d6d01f2c6af86e8a7b8",
+      "sha256": {
+        "io.drivegrowth.verify.finalwindow28": "8844cdd29b3dbe0abb85bef475842d98477edd546a6aa3a0b10cf71a093f7e5c",
+        "io.drivegrowth.verify.finalwindow28.test": "9e50d79c7a2f147b6d21dd9ceb7cf4029160feea1631182306dc7a4a2b83cacc"
+      },
+      "signerSHA256": "3398b6f1e8a85d4950d221b75ec046770046d8bc2c614ef7af3ebc1bbef856da"
+    },
+    {
+      "head": "e824452467bf1b3179f3ec1825cef0db1ded3dfc",
+      "tree": "b5d3646b3db2a11327497597a1c2fa4ff9e75045",
+      "sha256": {
+        "io.drivegrowth.verify.finalwindow28": "1c499c470096b78ee26da0d4da457c1af945c53f4f38c71f3bc4cf5255195112",
+        "io.drivegrowth.verify.finalwindow28.test": "9e50d79c7a2f147b6d21dd9ceb7cf4029160feea1631182306dc7a4a2b83cacc"
+      },
+      "signerSHA256": "3398b6f1e8a85d4950d221b75ec046770046d8bc2c614ef7af3ebc1bbef856da"
+    }
+  ],
+  "runs": [
+    {
+      "run": "a801796-window-portrait",
+      "passed": false,
+      "seconds": "19.676",
+      "preset": {
+        "ok": true,
+        "available": true,
+        "created": true,
+        "display_slot": 2,
+        "display_name": "DISPLAY2",
+        "width": 840,
+        "height": 1184,
+        "dpi": 160,
+        "flags": 1737,
+        "orientation": "portrait",
+        "message": "DISPLAY2 created"
+      }
+    },
+    {
+      "run": "a801796-window-portrait-trace",
+      "passed": true,
+      "seconds": "5.673",
+      "preset": {
+        "ok": true,
+        "available": true,
+        "created": true,
+        "display_slot": 2,
+        "display_name": "DISPLAY2",
+        "width": 840,
+        "height": 1184,
+        "dpi": 160,
+        "flags": 1737,
+        "orientation": "portrait",
+        "message": "DISPLAY2 created"
+      }
+    },
+    {
+      "run": "a801796-window-portrait-trace2",
+      "passed": false,
+      "seconds": "19.561",
+      "preset": {
+        "ok": true,
+        "available": true,
+        "created": true,
+        "display_slot": 2,
+        "display_name": "DISPLAY2",
+        "width": 840,
+        "height": 1184,
+        "dpi": 160,
+        "flags": 1737,
+        "orientation": "portrait",
+        "message": "DISPLAY2 created"
+      }
+    },
+    {
+      "run": "a801796-window-landscape",
+      "passed": true,
+      "seconds": "5.772",
+      "preset": {
+        "ok": true,
+        "available": true,
+        "created": true,
+        "display_slot": 2,
+        "display_name": "DISPLAY2",
+        "width": 1700,
+        "height": 1185,
+        "dpi": 200,
+        "flags": 1737,
+        "orientation": "landscape",
+        "message": "DISPLAY2 created"
+      }
+    },
+    {
+      "run": "e824452-window-portrait-1",
+      "passed": true,
+      "seconds": "6.0",
+      "preset": {
+        "ok": true,
+        "available": true,
+        "created": true,
+        "display_slot": 2,
+        "display_name": "DISPLAY2",
+        "width": 840,
+        "height": 1184,
+        "dpi": 160,
+        "flags": 1737,
+        "orientation": "portrait",
+        "message": "DISPLAY2 created"
+      }
+    },
+    {
+      "run": "e824452-window-portrait-2",
+      "passed": true,
+      "seconds": "5.535",
+      "preset": {
+        "ok": true,
+        "available": true,
+        "created": true,
+        "display_slot": 2,
+        "display_name": "DISPLAY2",
+        "width": 840,
+        "height": 1184,
+        "dpi": 160,
+        "flags": 1737,
+        "orientation": "portrait",
+        "message": "DISPLAY2 created"
+      }
+    },
+    {
+      "run": "e824452-window-portrait-3",
+      "passed": true,
+      "seconds": "6.219",
+      "preset": {
+        "ok": true,
+        "available": true,
+        "created": true,
+        "display_slot": 2,
+        "display_name": "DISPLAY2",
+        "width": 840,
+        "height": 1184,
+        "dpi": 160,
+        "flags": 1737,
+        "orientation": "portrait",
+        "message": "DISPLAY2 created"
+      }
+    },
+    {
+      "run": "e824452-window-landscape-1",
+      "passed": true,
+      "seconds": "6.566",
+      "preset": {
+        "ok": true,
+        "available": true,
+        "created": true,
+        "display_slot": 2,
+        "display_name": "DISPLAY2",
+        "width": 1700,
+        "height": 1185,
+        "dpi": 200,
+        "flags": 1737,
+        "orientation": "landscape",
+        "message": "DISPLAY2 created"
+      }
+    }
+  ]
+}

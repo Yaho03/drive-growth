@@ -45,7 +45,7 @@ class QuestStoreIntegrationTest: InstrumentationTestCase() {
     }
     fun testActualFreshHelperIssuesTrackingAndCentralSixDefinitionsWithoutReentry() {
         val before=rows();assertEquals(6,states().size);assertTrue(states().all{it.count==0&&it.status==QuestStatus.IN_PROGRESS&&it.definition.zone==zone})
-        raw{db->assertEquals(15,db.version)
+        raw{db->assertEquals(20, db.version)
             for(table in listOf("quest_tracking","quest_events","quest_claims","host_command_checkpoint","observed_driving_marker","observed_driving_state","observed_driving_receipts"))db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name=?",arrayOf(table)).use{assertTrue(table,it.moveToFirst())}
             for(table in listOf("delivery_requests","delivery_changes","delivery_outcomes","delivery_hold_outcomes"))db.rawQuery("PRAGMA table_info($table)",null).use{r->var found=false;while(r.moveToNext())if(r.getString(1)=="host_command")found=true;assertTrue(table,found)}
             db.rawQuery("SELECT profile,source,complete_since FROM quest_tracking",null).use{assertTrue(it.moveToFirst());assertEquals(profile.value,it.getString(0));assertEquals(source.name,it.getString(1));assertEquals(0L,it.getLong(2));assertFalse(it.moveToNext())}}
@@ -61,6 +61,12 @@ class QuestStoreIntegrationTest: InstrumentationTestCase() {
         ok(store.markViewed(receipt().settlementId));val c=command();val paid=ok(store.quests.claim(c));assertEquals(GameMoney(1100),paid.settlement.balance)
         ok(store.commitGameChange(GameChange(RequestId("later-spend"),TransactionKind.GARAGE,source,definition.rules,MoneyChange(MoneyDirection.DEBIT,GameMoney(200)))))
         now+=8*86400000L;definitionsAvailable=false;val before=rows();store.close();store=open()
+        val collision = ContractResult.Failure(ContractError.STATE_CONFLICT)
+        val foreign = GameChange(c.requestId, TransactionKind.GARAGE, source, definition.rules,
+            MoneyChange(MoneyDirection.CREDIT, GameMoney(100)))
+        val offer = ShopExpansion(definition.rules, true, 1, 3, 5, 0, GameMoney(1))
+        assertEquals(collision, store.commitGameChange(foreign))
+        assertEquals(collision, store.rental.expand(c.requestId, offer))
         assertEquals(paid,ok(store.quests.claim(c)));assertEquals(GameMoney(900),ok(store.balance()));assertEquals(setOf(c.requestId),ok(store.quests.claimedRequestIds(profile)));assertEquals(before,rows())
     }
     fun testIgnoredViewedFlagCannotRecordEventAndRetriesOnce() {
@@ -106,7 +112,7 @@ class QuestStoreIntegrationTest: InstrumentationTestCase() {
     }
     fun testV10MigrationFailurePreservesVersionAndWholeFile() {
         store.close();raw{it.version=10};val file=context.getDatabasePath(name);val before=file.readBytes();store=open()
-        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.balance());store.close();assertTrue(before.contentEquals(file.readBytes()));raw{assertEquals(10,it.version);it.version=15};store=open()
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.balance());store.close();assertTrue(before.contentEquals(file.readBytes()));raw{assertEquals(10,it.version);it.version=18};store=open()
     }
     fun testQuestNamespaceReservedFromNewGenericAndCheckpointCommands() {
         val change=GameChange(RequestId("quest/claim/wrong-owner"),TransactionKind.GARAGE,source,definition.rules,MoneyChange(MoneyDirection.CREDIT,GameMoney(1)))

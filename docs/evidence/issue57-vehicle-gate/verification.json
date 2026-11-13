@@ -1,0 +1,62 @@
+{
+  "base": "03ee44b4916955d2b9f5dd246a303ee532f7e93e",
+  "tree": "4ea573e9991f8a062cd59c434088a58df62cc982",
+  "patchSHA256": "27433badc83166728f617035b37b431567dbd6ff8420f82bfd317f9024e2863f",
+  "artifacts": {
+    "app": {
+      "package": "io.drivegrowth.verify.questgatee",
+      "sha256": "d983fe4d8b2273d1953afa5eef50a786616a888bdf5e4c93ae1cb4771bfb83cd",
+      "signer": "0d7dfb10c8c7e57b96ebc5ecac5a4222f86745c0bec37a5bed95f976eac9f4e1",
+      "installedSHA256": "d983fe4d8b2273d1953afa5eef50a786616a888bdf5e4c93ae1cb4771bfb83cd"
+    },
+    "test": {
+      "package": "io.drivegrowth.verify.questgatee.test",
+      "sha256": "7dc87cfd47037918ce214ca6c50678610940557d7e27c027323e89d276946c90",
+      "signer": "0d7dfb10c8c7e57b96ebc5ecac5a4222f86745c0bec37a5bed95f976eac9f4e1",
+      "installedSHA256": "7dc87cfd47037918ce214ca6c50678610940557d7e27c027323e89d276946c90"
+    }
+  },
+  "publicationBase": "d2759b60f97eeae3011e8f07bbb6d27e42a3f310",
+  "selector": "io.drivegrowth.app.host.progression.ProgressionFirstPlayActivityTest#testQuestDetailRemainsUnclaimedAcrossActualStationaryDriveAndPark",
+  "result": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 16.082
+  },
+  "device": {
+    "api": 34,
+    "abi": "arm64-v8a",
+    "displayPx": [
+      1080,
+      600
+    ],
+    "dpi": 120,
+    "androidUser": 10
+  },
+  "ledger": {
+    "balance": 1000,
+    "resultViewed": 1,
+    "questClaims": 0,
+    "questSettlements": 0,
+    "checkpoint": 0,
+    "quickCheck": "ok"
+  },
+  "offlineEvidenceSha256": {
+    "instrumentation.txt": "005d3d279aeb18695984115d3319ce2953752892b375b00aaa2cc9ee99f00602",
+    "target-trace.txt": "d2f7a12d783a1d08a599f61591bf48f8200d717055b061200727517d230fa783",
+    "game-ledger-vehicle.db": "5422bf2105bf3da1c0c2e0da18d41c5db10ef4fc4f1053f25e9bb340080ba814",
+    "game-ledger-vehicle.db-journal": "c1dce1903d51d623faaa6ca4209080d573d481208886b361f56a70a68894ffb5"
+  },
+  "release": {
+    "at": "2026-11-13T01:20:11.488371+09:00",
+    "released": true,
+    "noFurtherAdb": true,
+    "noFurtherGradle": true,
+    "preservation": "19/19",
+    "activeInstrumentation": false,
+    "source": "03ee44b4916955d2b9f5dd246a303ee532f7e93e",
+    "tree": "4ea573e9991f8a062cd59c434088a58df62cc982"
+  },
+  "publicationDeviceRerun": false
+}

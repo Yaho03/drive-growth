@@ -1,0 +1,25 @@
+{
+  "source": "3bd7d925c1133fd5a45ecf3cc5ee8d72faabbdfb",
+  "tree": "cc9a75d325b1112b236fd4d5351725719d4e8121",
+  "standardApk": {
+    "applicationId": "io.drivegrowth.app.simulation",
+    "versionName": "0.1.0",
+    "versionCode": 1,
+    "sha256": "6a41e671741781d706025138bf07f964f141210138f162249c39c18f834eb745"
+  },
+  "deviceApk": {
+    "applicationId": "io.drivegrowth.verify.combined28e",
+    "sha256": "ef338238e45ece44a54a07decd3331092f9f88dab5f38bfeacc1d664f6bd4b03"
+  },
+  "payloadEntries": {
+    "standard": 100,
+    "isolated": 100,
+    "differences": [
+      "AndroidManifest.xml",
+      "resources.arsc"
+    ]
+  },
+  "dexSame": true,
+  "assetsSame": true,
+  "installedStandardApk": false
+}

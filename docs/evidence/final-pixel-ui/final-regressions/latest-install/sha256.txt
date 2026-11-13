@@ -1,0 +1,2 @@
+47b3420535fb9fa9c7e95d1d7314af3ce27904772eeaa91fcebc68895d255c5d  /private/tmp/drive-e-28-combined.Xrc4NI/apks-35f93a6-standard/app-debug.apk
+47b3420535fb9fa9c7e95d1d7314af3ce27904772eeaa91fcebc68895d255c5d  /private/tmp/drive-e-28-combined.Xrc4NI/device-35f93a6-standard/installed.apk

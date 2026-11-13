@@ -32,7 +32,7 @@ data class RecordingState(val identity:GameIdentity,val revision:Long,val receiv
 }
 /** 수신 원본에 짝지은 zone만 사용한다. 옛 LocalDate를 현재 zone으로 재해석하지 않는다. */
 data class DrivingFrame(val observation:VehicleObservation,val zone:Observation<ZoneId>)
-class ObservedDrivingReducer(private val policy:RecordingPolicy,private val nextId:()->String) {
+class ObservedDrivingReducer(internal val policy:RecordingPolicy,private val nextId:()->String) {
  fun observe(state:RecordingState,receiver:String,frame:DrivingFrame,now:RecordingClock,rules:ContractResult<DrivingIncomeRules>):ContractResult<RecordingState> {
   val input=frame.observation
   if(receiver.isBlank()||input.source!=state.identity.source||now.utc.value<0||input.receivedAt.value<0)

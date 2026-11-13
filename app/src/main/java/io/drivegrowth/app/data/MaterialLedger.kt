@@ -67,6 +67,8 @@ internal class MaterialLedger(private val store: SqliteGameChangeStore) {
         val result = MaterialSettlement(command, SettlementId(UUID.randomUUID().toString()),
             Transaction(TransactionId(UUID.randomUUID().toString()), command.requestId, TransactionKind.GARAGE,
                 command.source, command.ruleVersion, prepared.money), prepared.balance, prepared.target, prepared.material, store.now())
+        val observed = store.achievements.observe(db, setOf(io.drivegrowth.core.achievement.AchievementMetric.OWNED))
+        if (observed is ContractResult.Failure) return@atomic observed
         db.execSQL("UPDATE account SET balance=? WHERE id=1", arrayOf(result.balance.units))
         store.writeVehicle(db, result.target)
         store.writeVehicle(db, result.material)

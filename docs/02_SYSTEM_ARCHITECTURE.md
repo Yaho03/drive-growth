@@ -192,11 +192,11 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 
 - `availableForRental`은 현재 `OWNED`·`IDLE` 후보를 거르는 조회이며 영업 쉬기는 보지 않는다. 영업 쉬기는 #41의 `planRental(…, resting, …)`이 이 결과에서 `RentalLedger.restingVehicles()` 개체를 빼서 적용하고, 켜기/끄기는 `RentalLedger.setResting`이 저장한다(대여 중에 켜면 반납 후 배정에서 빠짐). 최종 자동 배정 가능 여부·점유·최신 revision과 동시 상태 변경 검사는 #41의 공통 거래 연결에서 별도로 확인한다.
 - `owned`는 사용 중·수리 필요 개체도 포함하므로 강화 가능 목록으로 그대로 사용하지 않는다. 대여 후보 목록도 수리·판매·폐차 가능 목록으로 재사용하지 않는다. 수리 필요 차량의 수리·판매·폐차는 PRD에서 허용하므로 각 명령의 활동 제한을 별도로 검사한다.
-- `collection`의 `OWNED`는 한 번이라도 소유한 기록이다. 호출자는 처분 뒤에도 유지되는 `(vehicleId, rarity)` 획득 이력을 `everOwned`로, 탁송 목록·가챠 결과에서 본 기록을 `discovered`로 제공해야 한다. 도감 키를 직접 주입한 계산 시험은 실제 저장·재실행 시험과 다르다.
+- `collection`의 `OWNED`는 한 번이라도 소유한 기록이다. 호출자는 확정 가챠 지급을 포함해 처분 뒤에도 유지되는 `(vehicleId, rarity)` 획득 이력을 `everOwned`로, 실제 표시한 탁송 구매 후보의 발견 기록을 `discovered`로 제공한다. 도감 키를 직접 주입한 계산 시험은 실제 저장·재실행 시험과 다르다.
 
-현재 `GameChangeStore.listOwnedVehicles()`의 개체 타입은 아래 v1 필드를 포함한다. 메모리 조회·변경 예제와 SQLite의 필드 보존용 최소 codec 대응은 반영했다. 시험용 DB의 SQLite 실행 범위는 [검증 문서](06_VERIFICATION.md)의 PR #104 숫자 decoder 재검증 기록을 따르며 실제 제품 DB 이전·앱 재실행 검증과 구분한다. 처분 포함 이력·발견 기록, 실제 활동·영업 쉬기의 영속 공급은 별도다. 필드·명령은 아래 공통 계약을 사용하고 실제 조회 확장·SQLite 호환·재개방 검증은 #34 담당과 아래 연결점으로 조율한다. #46은 이 조회·계산 부분의 인계이며 저장·재실행을 포함한 전체 완료가 아니다. 기능별 본인 검증과 #28 통합 검증은 유지한다.
+현재 `GameChangeStore.listOwnedVehicles()`는 [v1 개체 필드](#46-개체-정보-v1과-공통-소비-예제)를 포함한 보유 개체를 반환한다. SQLite의 활동·영업 쉬기는 #107의 원장에서, 처분 포함 이력·발견 기록은 #116의 [저장 API](#34-저장-확장의-연결점과-기존-데이터-조건)에서 읽는다. #242는 DB 재개방 뒤 원래 정산의 재생과 Update 명령에 대조 가능한 결과 필드의 불일치 거절을 확인했다. [실행 범위와 구버전 APK 이전 근거](06_VERIFICATION.md#122-quest-원자성update-정산-재생과-구버전-apk-이전--2026-11-13)를 참조한다. 필수 정보가 없는 구형 원본의 근거 기반 복구와 재설치 방침은 [#24](https://github.com/Yaho03/drive-growth/issues/24)에서 결정한다.
 
-`Garage.collection(history: VehicleHistoryStore)`는 #116의 `listVehicleHistory()`(처분 포함 전체 개체)에서 `(vehicleId, rarity)` 보유 키를, `discoveredVehicles()`에서 발견 키를 읽어 위 `collection(everOwned, discovered)`를 계산한다. 이력·발견 조회 실패는 빈 도감으로 바꾸지 않고 그대로 전달하며, 이력의 콘텐츠 밖 차종·중복 개체 ID는 `INVALID_INPUT`이다. 공급 목록은 불변을 약정하지 않으므로 `Garage`의 모든 조회는 받은 목록을 먼저 한 번 복사하고 그 사본으로 검사·선택·키 변환을 한다(복사 자체가 외부 동시 변경에 원자적이라는 뜻은 아님). 가챠 결과·탁송 목록에서 본 키는 호출자(화면·호스트)가 `recordDiscoveries(catalog, keys)`로 먼저 기록한다.
+`Garage.collection(history: VehicleHistoryStore)`는 #116의 `listVehicleHistory()`(처분 포함 전체 개체)에서 `(vehicleId, rarity)` 보유 키를, `discoveredVehicles()`에서 발견 키를 읽어 위 `collection(everOwned, discovered)`를 계산한다. 이력·발견 조회 실패는 빈 도감으로 바꾸지 않고 그대로 전달하며, 이력의 콘텐츠 밖 차종·중복 개체 ID는 `INVALID_INPUT`이다. 공급 목록은 불변을 약정하지 않으므로 `Garage`의 모든 조회는 받은 목록을 먼저 한 번 복사하고 그 사본으로 검사·선택·키 변환을 한다(복사 자체가 외부 동시 변경에 원자적이라는 뜻은 아님). 호출자(화면·호스트)는 실제 표시한 탁송 구매 후보의 키를 `recordDiscoveries(catalog, keys)`로 기록한다. 확정 가챠 결과의 차량은 영구 획득 이력으로 보유 칸에 반영한다.
 
 #### #50 첫 실행 지급
 
@@ -271,6 +271,8 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 | 차량·화면 입력 | `DeliveryDistanceInput`에서 `ObservedDistance`와 `EstimatedRouteDistance`를 별도 타입과 출처로 받는다. `Observation.Missing`에는 누락 사유가 필수다. |
 | 공통 실패 | `ContractResult.Failure`에 `ContractError`를 제공한다. 권한 거부와 데이터 없음, 정책 미정, 충돌, 저장 실패를 구분한다. |
 
+`ContractResult.Failure.detail`은 선택 필드(`ContractFailureDetail?`)이며 기본값은 `null`이다. 가챠에서는 가게 레벨·공간이 유효하고 카탈로그에서 확인한 후보가 모두 현재 레벨에서 잠겨 있을 때 `DATA_UNAVAILABLE`에 `GACHA_NO_UNLOCKED_CANDIDATES`를 붙여 후보 없음 안내에 사용한다. 일반 실패의 오류 코드와 안내, 거래 거절 조건, 같은 요청의 확정 정산 재생은 기존 계약을 따른다.
+
 거리 m와 게임머니 최소 단위는 0 이상 `Long`, UTC Unix ms는 `Long`, revision은 0 이상 `Int`다. 재화 방향은 별도 필드로 전달한다. 공통 계약은 정수 결과를 받고, 소수 거리 환산과 경제 산식의 반올림은 값을 계산하는 호출 측 정책에서 정한다. 저장 구현은 범위 초과를 저장 전에 실패 처리한다.
 
 `core/src/testFixtures`의 `RentalContractFixtures`에서 시험 차량 v1/v2, 관측 30,000m·예상 20,000m, 고정 시각·규칙 버전·seed 33, 성공·실패 카탈로그와 메모리 저장소를 얻는다. `:core:test --tests '*RentalContractConsumerTest'`로 소비 예제를 실행한다. 다른 모듈의 테스트에서는 필요할 때 `testFixtures(project(":core"))`를 테스트 의존성으로 사용한다.
@@ -303,6 +305,11 @@ A가 도착을 확인해 차량 지급을 요청하더라도 소유 개체 생�
 2026-11-07 #51의 최상위 Back은 전경 관측·조작 판정을 초기화한 뒤 Task를 뒤로 보내고 게임 창도 숨긴다. Pleos 다중 창에서는 `moveTaskToBack(true)` 후에도 Activity가 `RESUMED`·표시 상태에 남는 것을 재현해 공개 `Activity.setVisible(false)`를 함께 사용했다. 일반 `onResume` 또는 API 29 이상 top-resumed 복귀에서 창과 관측을 다시 시작하며 중복 시작은 막는다. 이전 허용값을 복원하지 않고 기존 연속 주차 조건을 다시 적용한다. 이 창 표시 보완은 Pleos 공식 예제 자체와 구분하며, 적용 환경·복귀 검증·남은 범위는 [#51 실행 근거](06_VERIFICATION.md#51-back창입력-후속-본인-검증--2026-11-07)를 따른다. 기록 서비스·백그라운드 수집을 새로 활성화하는 변경이 아니다.
 
 경로 재선택·재탐색마다 새 `RouteId`를 발급한다. 같은 활성 경로와 예상 출처에 연결할 수 있는 도착 콜백만 정산에 전달한다. 정차·P·거리 0·조회 성공만으로 도착을 만들지 않는다. SDK 거리 단위나 경로 연결 근거가 없으면 예상 거리를 `Missing`으로 유지하고, 도착을 확인할 수 없는 의뢰는 보상을 확정하지 않는다. 최종 정산의 중복 방지는 기존 거래 요청 ID와 단일 원장 경계를 따른다. [#13 실행 근거](https://github.com/Yaho03/drive-growth/issues/13)
+
+제품 내비의 예상 거리 확인에는 같은 SDK 목적지 응답의 거리, 현재 연결의 비어 있지 않은 경로 ID, 신선한 안내 출처가 필요하다. 빈 ID·이전과 다른 ID·종료·취소·목적지 변경 또는 SDK에 보내는 경로 교체/취소가 관측되면 해당 어댑터의 견적을 폐기한다. 재조회·재연결과 후속 ID만으로는 이전과 새 경로의 목적지 콜백을 구분할 수 없어 견적을 복구하지 않는다. `NOT_SENT` 중 `NAVI_ROUTE_SEARCH` 쓰기 권한만 거부된 경우에는 읽기 근거가 유효한 기존 견적을 유지한다. `NAVI_ROUTE` 읽기 권한 거부는 즉시 기존 표본을 지우고 견적을 `Missing(PERMISSION_DENIED)`으로 표시한다. 이전 경로가 무효화되지 않았다면 읽기 권한 복원 후 새 조회 응답으로 같은 경로의 견적을 다시 확인할 수 있다. SDK 거리는 예상 거리로만 사용한다. 도착은 활성 경로와 연결할 독립 근거를 확보할 때까지 확인 대기와 `Missing`으로 유지한다. [#80 JVM 검증 범위](06_VERIFICATION.md#80-제품-내비-경로-무효화-jvm-회귀--2026-11-12)를 참조한다.
+
+
+2026-11-13 코드 대조에서 실제 SDK **목적지 변경 성공 경로도 아직 확보되지 않음**을 확인했다. Main의 `onPause()`는 `SessionObservedDrivingSource.pause()`로 현재 거리 수신 세션을 해제하고 원관측 앵커를 비운다. SQLite에 이미 봉인된 주행 기록이 남아 있어도 재진입한 새 receiver에 그 거리 근거를 다시 연결하는 포트는 없다. Main을 유지하더라도 위 견적 무효화 경계가 적용되며, 사용자에게 새 목적지를 받아 SDK `requestRoute()`를 호출하는 제품 화면은 아직 없다. 내비 앱으로 이동한 뒤 현재 P 신호 하나만 보고 화면 밖 이동이 없었다고 추정하거나, 새 경로 ID·콜백 순서만으로 이전 목적지와 새 목적지의 응답을 구분하지 않는다. 실제 변경 성공에는 같은 중단 지점의 이동 근거와 새 견적의 귀속 근거가 모두 필요하다. #38·#53의 명시적 SIMULATION 변경·원결과 복원 근거와 실제 SDK의 부족 근거 거절을 구분하며, 현 제품 경로에서는 실제 SDK 변경 성공을 지원하지 못하며 #38·#53·#28에 미충족으로 남긴다.
 
 #34·#35의 기존 거래·콘텐츠 타입, 저장 형식과 식별값은 유지한다. 실제 어댑터와 화면 연결은 #36·#51에서 검증하고, #62의 완료된 기록은 기존 거래·콘텐츠 소비 경계의 과거 검증 근거다. 새 변경은 본인 검증·PR 검토와 #28 통합 검증에서 추적한다. 플랫폼 지원과 정책 확인은 #13·#24에서 추적한다.
 
@@ -363,23 +370,25 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 
 #### #34 저장 확장의 연결점과 기존 데이터 조건
 
-**PR #104 당시 범위**다. 현재 main은 아래 B 영업 원장의 schema2까지 제공한다. PR #116의 schema3·이력 조회는 검토 대기이며, 새 필드가 없는 옛 JSON의 복구 정책과는 다르다.
+**도입 범위와 현재 연결(2026-11-11 확인):** PR #104가 개체 필드·단일 변경·원래 정산 재생을 공급했고, PR #116의 처분 포함 이력·발견 저장, PR #140의 `Garage.collection(history)`, PR #149의 저장 조회 소비도 main에 반영됐다. 아래 표는 현재 코드의 연결점을 가리킨다. 새 필드가 없는 legacy JSON의 근거 기반 복구와 제품 앱 재실행·실제 표시 이벤트 검증은 이 공급과 구분한다. 이후 스키마 확장은 각 저장 공급 절을 따르며, 테이블 이전만으로 누락된 취득 정보를 복원했다고 간주하지 않는다.
 
-이번 SQLite 대응은 새 필드를 손실시키지 않기 위한 `LedgerJson.vehicle` 양방향, Update 명령 JSON·copy, 처분 성장값 보존 조건에 한정했다. 테이블·DB 이름·스키마 버전1·원자성·revision 책임은 바꾸지 않았다. 코드 반영·컴파일과 실제 저장/재실행 검증을 구분한다.
+PR #104 당시 SQLite 변경은 새 필드를 손실시키지 않는 `LedgerJson.vehicle` 양방향, Update 명령 JSON·copy, 처분 성장값 보존 조건에 한정했고 테이블·DB 이름·스키마 버전1·원자성·revision 책임을 유지했다. 현재 `LedgerJson`도 별도 파일이 아니라 `app/src/main/java/io/drivegrowth/app/data/SqliteGameChangeStore.kt` 안에 있다. 이 문서 확인은 SQLite 구현 변경이나 새 장치 시험이 아니다. 과거 실제 SQLite 검증은 [PR #104 검증 기록](06_VERIFICATION.md#pr-104-차량-숫자-decoder-수정--2026-11-07), 이번 최신 조합의 자동 검사는 [최신 재확인](06_VERIFICATION.md#46-공통-차량-계약의-최신-main-재확인--2026-11-11)을 따른다.
 
-| 기존 코드 위치 | 필요한 입력·출력과 후속 검증 |
+| 코드 위치·공급 | 입력·출력과 검증 조건 |
 |---|---|
 | `LedgerJson.vehicle` / `vehicles.payload` | rarity, levelProgressPercent, acquisitionCost, acquisitionSource 필수. 비기본 값 Add→재개방→보유 조회가 같아야 함 |
 | `LedgerJson.command` / `settlements.command` | Add의 전체 개체·Update 진행량 포함. 각 필드 하나만 다른 같은 requestId는 STATE_CONFLICT, 원장 추가 변경 없음 |
 | `LedgerJson.settlement` / `settlements.result` | 당시 차량 snapshot 보존. 성장·처분 후 DB 재개방 및 과거 Add/Update 재시도도 당시 snapshot과 정산ID·잔액 반환 |
-| `listOwnedVehicles` / `findVehicle` | 현재 보유와 처분 포함 이력은 다른 조회. #34는 모든 lifecycle의 개체 또는 영구 `(vehicleId, rarity)` 획득 키를 반환하는 조회를 연결해야 함. 처분 후에도 도감의 과거 보유 칸 유지 검증 |
-| 발견 기록: main 미제공, PR #116 작성·수정 대기 | 입력 `(vehicleId, rarity)`를 중복 없이 저장하고 재개방 뒤 같은 발견 키 집합 반환. 콘텐츠 참조 검증·출처별 원장 경계와 실패를 보존하며 `Garage.collection`의 discovered로 공급. 새 테이블/서명은 저장 담당과 후속 확정 |
+| `SqliteGameChangeStore.listOwnedVehicles` / `listVehicleHistory` → `Garage.collection(history)` | 현재 보유는 OWNED만, 이력은 SOLD·SCRAPPED·CONSUMED까지 마지막 개체 상태·취득 정보를 반환. `VehicleHistoryStore`를 통해 이력의 `(vehicleId, rarity)`와 발견 키를 소비한다. 현재 목록으로 과거 보유를 역산하지 않는다. PR #116/#140/#149의 공급·시험과 실제 제품 재실행 검증을 구분 |
+| `VehicleHistoryStore.recordDiscoveries(catalog, keys)` / `discoveredVehicles()` → SQLite `discoveries` | 명시 카탈로그의 `(vehicleId, rarity)` 집합을 검증·중복 없이 저장하고 같은 출처 DB에서 집합으로 조회. 실제 표시 이벤트의 키·목록/콘텐츠·규칙 버전·출처 확인은 호출 측 연결 조건이며, 이 API가 그 표시 근거를 저장하거나 목록 생성만으로 자동 발견 처리하는 것은 아님. 탁송 호스트는 후보·변경 후보의 표시 확인 뒤 희귀도가 있는 구매 후보의 키를 기록한다. 발견 저장 성공 뒤 같은 세션의 공통 조회를 갱신한다. 일시 저장 실패는 같은 프로필·후보·목록·출처·버전으로 재시도한다. 원 표시가 무효면 실패를 표시하고 다음 조회에서 새 후보를 읽는다. 확정 결과 확인과 미실행 요청 취소는 발견 저장과 독립이다. [격리 SQLite 검증](06_VERIFICATION.md#탁송-발견-저장과-도감-갱신--2026-11-11)과 제품 재실행 검증(#46/#53/#28)을 구분한다. 확정 가챠 결과의 차량은 영구 획득 이력으로 보유 칸에 반영한다 |
 | 기존 schema1 JSON | 새 필드 누락 시 기본값/자동 삭제 없이 실패. 처분 개체 한 건의 누락도 현재 조회가 모든 payload를 먼저 읽으므로 전체 보유 조회를 실패시킬 수 있음. 미확인 정산의 차량 snapshot 누락도 전체 정산 조회 실패 |
-| 과거 명령 재시도 | 옛 차량 Add/Update 명령은 새 명령과 JSON이 달라 result 읽기 전 STATE_CONFLICT. 차량 없는 과거 금액 명령은 동일 표현의 재생 경로 유지. 이 차이를 기기에서 검증해야 함 |
+| 과거 명령 재시도 | 새 필드 없는 옛 Add/Update 명령과 새 명령의 JSON은 달라 result 읽기 전 STATE_CONFLICT일 수 있음. 차량 없는 과거 금액 명령은 동일 표현·원래 정산 연결을 검증해 재생. PR #104의 격리 DB 검증은 기존 근거이며 이번에는 장치에서 재실행하지 않음 |
 
 이미 운영한 schema1 데이터가 새 필드를 가진 것으로 간주하지 않는다. 같은 DB 버전 안에서 payload 의미가 확장되므로 저장 담당이 실제 구버전 자료와 호환 전략을 검증해야 한다. 근거 있는 취득 기록 없이 COMMON·0·현재 차종가로 복구하거나, 새 DB/기존 데이터 삭제로 통과시키지 않는다. 확정 결과의 과거 값도 현재 개체로 재구성하지 않는다. 자동 이전은 이번에 제공하지 않는다.
 
-#48 후속 거래는 대상ID/revision·재료ID/revision·활동·차종/희귀도·규칙 버전에서 계산한 새 레벨/진행량과 필요한 재화 변경을 입력으로 받아야 한다. 한 정산에서 대상 성장 snapshot과 재료 CONSUMED snapshot을 함께 확정하고 취득 정보는 각각 보존해야 한다. 같은 개체 중복·활동 제한·revision 충돌·금액 부족이면 전부 미반영이어야 한다. 현재 단일 `GameChange` 두 번 호출로 이를 흉내 내지 않는다. 다중 개체 명령·결과 구조 자체는 #48·#34의 후속 연결이며 이번에는 구현하지 않는다. 가챠 티켓/보장 이력·초기 지급 이력·사고/활동·도감 영속 입력도 각 기존 담당의 범위다. 기존 `VehicleCare.levelAfterMaterial`의 +3레벨 시험 로직은 아래 #48 절에서 희귀도별 진행량 계산으로 교체했다.
+#48의 추가 거래는 아래 `MaterialChangeStore`·재료 강화 SQLite 절의 기존 공급을 소비한다. 대상ID/revision·재료ID/revision·활동·버전에서 계산한 새 레벨/진행량을 한 정산의 대상 성장 snapshot과 재료 CONSUMED snapshot에 연결하고 각각의 취득 정보를 보존한다. 같은 개체 중복·활동 제한·revision 충돌·금액 부족이면 전부 미반영이어야 하며, 단일 `GameChange` 두 번으로 나누지 않는다. PR #104 당시 후속이었던 다중 개체 거래를 다시 설계하지 않고 기존 명령·결과·저장·fixture를 재사용한다. 가챠·초기 지급·사고/활동·도감의 현재 공급과 남은 제품 연결은 각 기능 절과 #46/#122/#28을 따른다.
+
+**단일 개체 Update 정산 재생.** 공용 `readRecordedSettlement(db, change)`는 원래 명령과 정산을 대조하고, Add의 당시 차량 스냅샷 전체를 검사한다. Update의 당시 스냅샷에는 같은 개체 ID·레벨·진행량·lifecycle과 `expectedRevision + 1`이 필요하다. revision은 Long으로 넓혀 비교한다. 불일치는 `STORAGE_FAILURE / INVALID_RECORD`로 반환하며, Garage 명령의 `finish`는 STARTED 슬롯을 유지한다. 같은 명령의 정상 결과는 이후 성장·처분과 관계없이 당시 정산을 반환한다. 희귀도·취득 정보는 Update 명령의 입력에 없으므로 현재 개체로 복구하지 않는다. [SQLite 계측](06_VERIFICATION.md#122-quest-원자성update-정산-재생과-구버전-apk-이전--2026-11-13)
 
 #### #48 레벨업과 재료 강화
 
@@ -470,8 +479,8 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 
 | 구간 | 현재 제공 | 남은 공급과 책임 |
 |---|---|---|
-| 공통 타입·단일 거래 | `core.contract`의 Rarity·OwnedVehicle 필수 필드, GameChange/Settlement·공통 오류, 메모리 fixture와 SQLite 단일 개체 명령 | [계약 후속 121](https://github.com/Yaho03/drive-growth/issues/121): 환석이 기능 입력/결과·다중 개체·프로필·진행 상태의 공통 타입과 소비 fixture를 확장. 기존 생성자 누락을 기본값으로 숨기지 않음 |
-| 공용 저장 | schema10의 공용 store·기존 Rental/Gacha/Delivery/Driving/Material/Repair 원장, Initialization/FirstGift·typed checkpoint. #169 초기화/선물·#173 같은 factory 소비와 #175 완료 고객 집계 공급 | [저장 후속 122](https://github.com/Yaho03/drive-growth/issues/122): 경민이 합의된 명령과 기능 Ledger를 같은 DB에 연결하고 최종 조건 검사·요청 이력·이전·조회 어댑터를 담당. A/C의 계산 구현과 중복하지 않음 |
+| 공통 타입·단일 거래 | `core.contract`의 필수 개체 필드·전체 명령/결과·오류와 메모리 참조/소비 fixture, Quest·Delivery·Driving/Rest 입출력, #192 꾸미기 순수 계약까지 main 공급 | [계약 후속 #121](https://github.com/Yaho03/drive-growth/issues/121)의 명령·조회·단위/범위·재생/충돌·미지원·fixture 공급 범위는 완료 조건과 근거를 대조해 종료했다. 실제 저장·제품/장치 전체 완료와 구분한다. 미정 업적·온라인·legacy 복구 정책을 새 계약 완료 게이트로 추가하지 않음 |
+| 공용 저장 | 같은 DB의 초기화/선물·typed checkpoint(#169), Quest·Delivery schema12(#178), 관측 Driving13(#179), Rental·시설15(#183), Rest16(#191), 꾸미기17(#194)과 기존 Gacha/Material/Repair·이력 조회를 공급. #173 같은 factory 소비도 제공 | [저장 후속 #122](https://github.com/Yaho03/drive-growth/issues/122)는 최신 schema20 조합에서 요청 ID/원결과·원자 실패·지원 이전/재개방 중 미증명 조건을 확인한다. [schema20 격리 이전 근거](06_VERIFICATION.md#122-구매-결제-재생과-schema20-이전--2026-11-13)를 참조한다. #194 원 SQL27과 새 결합 앱635의 검증 수준을 구분한다. #203 Main HOME은 기존 꾸미기 저장과 #200의 원결과 조회를 사용한다. C 관측 생산자의 원입력 재시도, 실제 장소/SDK·제품 수명·통합/장치 조건은 각 기능·#28·#80~#82에서 별도 확인 |
 | PR #111 | main `094ee59` 반영. #126의 전체 GachaCommand를 보존·재제출하고 저장소의 최초 전체 결과를 소비. 동일 ID·다른 입력과 마지막 칸 경쟁의 이전 두 P1 해결 | 실제 SQLite #136·공용 금액 #139와 콘텐츠→SQLite 시험 #145는 main 제공. #169 무료권/최초 선물 저장과 #173 제품 가챠 소비/확정 뒤 재실행까지 공급해 #47 core·저장은 완료. 남은 화면 조건은 #52 |
 | PR #116 | main `0799eb5` 반영. VehicleHistoryStore와 CompletedRentalSource의 이력/발견·완료 영업/사고 조회 제공. 입력 snapshot·정산 연결·원시 값의 세 지적 해결 | 이력 부재만으로 신규 프로필을 판정하지 않음. 실제 표시 발견 이벤트는 #37/#46/#53 후속. 무료권·다중 강화·초기화 core/저장은 #156/#169/#173으로 공급 |
 | PR #128·#134·#137 | 목록/선택·도착/보관·기본 주행·변경/포기 Ledger main 제공. 최신 head는 #136의 엄격 공용 금액 decoder 포함 | #139 공용 연결/이전의 active 결제 검증·지원 v4 재생 두 P2는 해결되어 main 공급. 실제 SDK/제품 호스트·화면/프로세스는 후속. 세부 실행·head는 [06 최신 재검토](06_VERIFICATION.md#pr-수정본-재검토와-부분-인계--2026-11-08) 참조 |
@@ -497,12 +506,12 @@ v1은 최초 스키마로 실제 이전 대상 버전이 없다. 버전 0의 알
 | #39 도착·정산·임시 보관 | 활성 의뢰/revision·현재 경로와 연결 가능한 도착 증거·출처/시각·확인된 주행 구간·기한·보관 상태 → 수익/차량 지급 또는 확인 대기. 완료 슬롯 교체도 같은 거래 | 증거 부족은 대기·미지급. P·거리0·앱 보관 routeId만으로 도착 추정 금지(#80). 구매 만차의 24시간 보관/수령과 기한 뒤5% 공제, 미도착24시간 전액 환급은 서로 다른 상태·중복 방지 필요 |
 | #41~#44 영업·시설 | 방문/대여 ID·개체/revision·유형/요금·고객/사고 고정값·검증 구간/원래 주차시각·시설/확장 규칙 → 배정·정산·반납·영업 쉬기·가게/공간 snapshot | RentalLedger의 assign/account/pending/settle/finishReturn/activity/setResting/shop/buy/expand 유지. 신규 원장 대신 콘텐츠/차량 입력 어댑터 보완. 방문 건수와 완료 고객 기준을 동일시하지 않음. pending은 #167에서 원래 parkedSince의 엄격 조회를 공급하며 실제 검증clock/coverage 복원 입력은 연결부에서 보완. setResting은 현재 ID/불리언만 받으므로 UI 요청 동일성/최신 상태 대조를 연결부에서 구체화. [기존 동의된 시험값](01_PRD.md#기존-동의된-대여확장-시험값)은 버전 있는 정의로 공급한다. 일반Lv1 대여 기준을 모든 차종 요금으로 채우지 않고 확장은 확정 완료 고객 근거를 조회한다. 20종별 시간당료·고객 분포·미제공 시설 비용/효과·단골은 별도 정의/공급 대기 |
 | #49 수리·처분 | 개체/revision·확정 사고 누계/활동·차종가/취득액·최신 규칙 → 수리비/회복 또는 판매/폐차금·lifecycle·당시 정산. 사고 이력 보존·영업 점유와 같은 DB에서 검사 | 기존 단일 Update를 재사용. salePrice의 레벨 가산·실제 취득액 기준과 repairCost의 희귀도 비용 배율은 위 「#49 수리·판매·폐차 금액 계산」에 반영. 수리비 차감+NEEDS_REPAIR 종료는 원자 명령 확장. #116 반영된 사고 조회를 소비하며 처분 계획과 실제 저장/수리 연결을 구분 |
-| #46 도감·활동 | 처분 포함 획득/검증된 발견 키·출처/버전·활동/영업 쉬기 → Garage.collection/availableForRental의 입력 | Garage·현재 보유 조회·RentalLedger 활동은 유지. #116 API는 main 제공이며 #140의 core 소비는 snapshot 수정·재검토 후 main 공급. 제품 mapper의 DATA_UNAVAILABLE 경계는 후속 연결. 획득은 실제 지급에, 발견은 실제 표시한 탁송 후보/가챠 결과에 연결. 미선택 구매 후보도 발견으로 보존하며 발견 저장 실패를 기록 성공으로 표시하지 않음 |
-| #45 퀘스트·업적·채택 이벤트 | 버전 있는 정의(ID·기간/시간대·목표·보상·조건) + 중복 제거 가능한 원인 이벤트 ID/출처/확정 ID → 진행/완료/수령/만료 snapshot. 보상·수령 마커를 한 거래로 확정 | 기본 주행/탁송/영업/강화/수집 이벤트를 재생해도 진행/지급 한 번. 정의는 #24·#35, 계산은 경민, 공통 수령 저장은 후속. 제외된 거리 목표·주말/시즌을 생성하지 않음 |
+| #46 도감·활동 | 처분 포함 획득/검증된 발견 키·출처/버전·활동/영업 쉬기 → Garage.collection/availableForRental의 입력 | Garage·현재 보유 조회·RentalLedger 활동은 유지. #116 API·#140의 snapshot 수정된 core 소비·#149의 저장 조회→mapper는 main 제공. 탁송 후보·변경 후보의 표시 확인→발견 저장도 main 제공. 같은 세션 도감 갱신과 발견 실패·재시도는 위 저장 연결점을 따른다. 제품 재실행·기능 통합은 #46/#53/#28에서 검증한다. 확정 가챠 지급은 영구 획득 이력으로 보유 칸에 반영한다. 실제 표시한 탁송 구매 후보는 선택·획득 전에도 발견으로 보존하며 발견 저장 실패를 기록 성공으로 표시하지 않음 |
+| #45 퀘스트·업적·채택 이벤트 | 버전 있는 정의(ID·기간/시간대·목표·보상·조건) + 중복 제거 가능한 원인 이벤트 ID/출처/확정 ID → 진행/완료/수령/만료 snapshot. 보상·수령 마커를 한 거래로 확정 | 기본 주행/탁송/영업/강화/수집 이벤트를 재생해도 진행/지급 한 번. 기존 Quest 6개와 [업적의 원장 연결](#45-업적의-원장-연결)을 사용한다. 정의는 #24·#35, 계산은 경민. 제외된 거리 목표·주말/시즌을 생성하지 않음 |
 | #36·#39·#40 주행·휴식 | 같은 부팅의 관측 순서/단조 시각·UTC·출처·누락·확인된 구간/일자 + 휴식 장소/출발 증거 → 원인 구간·보상 반영 거리/상한·버프 상태/시작 이벤트/소모 커서 | 기존 차량 gate/DriveEngine 기록과 RestBonus 계산 유지. 경험치 SnapshotStore를 게임머니 원장으로 간주하지 않음. 구간 중복 제거·주행 수익/하루500km·버프 소모를 원자 저장·복원. 주행 서비스·음성 활성화는 #81 조건 충족 후 |
-| #55 꾸미기 | 채택 아이템/해금/가격/배치 영역·현재 배치 revision·선택/미리보기 → 확정 배치/구매 결과 | 미리보기는 무저장, 확정 시 소유/해금·가격·배치를 공통 거래로 검사. 아이템 정의/비용/배치 규칙은 #24 결정 대기. 시설 buy를 꾸미기 지급으로 임의 대체하지 않음 |
+| #55 꾸미기 | 채택 아이템/해금/가격/배치 영역·현재 배치 revision·선택/미리보기 → 확정 배치/구매 결과 | 미리보기는 무저장, 확정 시 소유/해금·가격·배치를 공통 거래로 검사. 버전 있는 시연용 품목·비용·외형 선택 정의를 공급했다. 화면 표현 기준은 [09](09_UI_UX_SPEC.md)이며 밸런스와 자유 배치는 후속이다. 시설 buy를 꾸미기 지급으로 임의 대체하지 않음 |
 | #58 랭킹 | 가게 레벨·도감 수집 수·보유 차량 수·누적 게임머니·주행거리·최고가의 확정 집계 원인·범위/기간·출처·콘텐츠·집계 시각 → 값/지원 상태. 1차 실제 내 기록과 시연용 예시 provider를 분리 | 최고가=현재 보유 차종가×희귀도 수익 배율, 주행거리 하루500km/주간 초기화는 기존 기준. [1차 범위](01_PRD.md#1차-랭킹-범위)는 확정이며 실제 내 기록의 집계/기간/출처·누락을 엄격히 공급한다. 세 집계 기준은 [PRD](01_PRD.md#1차-랭킹-범위)로 확정됐다. 같은 DB의 전체 확정 원장/보유 이력·보상 반영 거리에서 읽고 미열람 목록·현재 잔액으로 대체하지 않는다. 확정 수익은 원래 정산/명령의 원인으로 분류해 포함·제외/중복을 검증한다. 기간/출처·이력의 완전성이 없으면 명시 Missing이며 정상0을 만들지 않는다. 온라인 식별/API/인증/개인정보는 향후 연결 계약으로 분리한다. [댓글6705552358](https://github.com/Yaho03/drive-growth/issues/24#issuecomment-6705552358)은 제안. 로컬 fixture를 실제 순위로 표시하지 않음 |
-| #51~#58 공통 UI | 프로필/출처·현재 gate·콘텐츠/규칙 버전·대상 ID/revision·준비/확정 requestId·시도 세대 → Loading/내용(빈값)/Pending/실패/미지원/확정 snapshot | HostSession·QueryController·ResultsHostController·각 View 재사용. 현재 StoredHostSource의 기본 원장은 SIMULATION이며 차량 gate 허용을 실제 보상 출처로 혼동하지 않음. HostSnapshot은 개별 순차 조회이며 DB 일괄 원자 snapshot이 아님. 서로 의존하는 필드의 일관 조회/기준 revision은 저장 후속의 해당 조회에서 보완. 제한/페이지 이동/재생성 뒤 늦은 응답을 새 요청 결과로 쓰지 않음. Bundle의 선택/Pending만으로 지급 성공을 추정하지 않고 원래 요청을 조회·복구. #53/#55 표시 UI는 #124/#125 main 인계(실제 호스트/거래 연결은 별도), #57 표시 UI는 fixture로 진행 |
+| #51~#58 공통 UI | 프로필/출처·현재 gate·콘텐츠/규칙 버전·대상 ID/revision·준비/확정 requestId·시도 세대 → Loading/내용(빈값)/Pending/실패/미지원/확정 snapshot | HostSession·QueryController·ResultsHostController·각 View 재사용. 현재 StoredHostSource의 기본 원장은 SIMULATION이며 차량 gate 허용을 실제 보상 출처로 혼동하지 않음. HostSnapshot은 개별 순차 조회이며 DB 일괄 원자 snapshot이 아님. 서로 의존하는 필드의 일관 조회/기준 revision은 저장 후속의 해당 조회에서 보완. 제한/페이지 이동/재생성 뒤 늦은 응답을 새 요청 결과로 쓰지 않음. Bundle의 선택/Pending만으로 지급 성공을 추정하지 않고 원래 요청을 조회·복구. #53/#55의 초기 표시 모듈은 #124/#125에서 공급했다. #203 Main HOME은 #55 미리보기·구매·재적용과 저장된 원결과를 연결한다. #57 표시와 저장 조회는 해당 휴식 읽기 계약을 따른다. |
 
 ### 시간·초기화·이전과 검증 게이트
 
@@ -596,6 +605,16 @@ PR #127은 가챠 검토용 커밋 `08eb3c4`를 기반으로 `core.contract.Mate
 #139의 예약 prefix 규칙은 새 요청에 적용한다. v4가 허용한 정합적인 GENERAL 정산은 source와 실제 기능 소유 이력을 검사한 뒤, 동일 전체 명령·원래 정산 연결을 검증해 먼저 재생한다. 기능 소유 행이 있는 ID·다른 명령은 재생 예외가 아니며 충돌이다. 활성 구매는 공급본 b12f268의 readRequest 단계에서 실제 결제 Settlement를 검증해 active/inProgress/terms 경로에서도 누락·오연결을 저장 오류로 반환한다.
 
 
+공용 `record`의 동일 명령 재생에서 `DELIVERY` 차감의 요청 ID가 남아 있는 활성 의뢰·경로·과거 경로·완료 행에 연결되고 선택 이력이 누락됐으면 `STORAGE_FAILURE` 및 `INVALID_RECORD`로 반환한다. 정상 선택 이력이 소유하는 결제 ID를 공용 `record`로 다시 쓰면 `STATE_CONFLICT`다. 정상 typed 재생과 독립 GENERAL 차감 재생은 기존 계약을 유지한다. 관련 탁송 행까지 모두 없어진 경우에는 이 검사로 결제의 소유권을 판별할 근거가 없다.
+
+### #38 관측 거리의 경로 결합과 schema20
+
+schema20은 기존 `delivery_routes`에 nullable `observed_binding`을 추가한다. 이전 경로의 참조는 SQL `NULL`로 유지한다. 이 열은 프로필·활성 의뢰/경로·수신 세션과 원 주행을 대조할 참조를 보관한다. 관측 표본과 참조 갱신은 같은 SQLite 거래에서 확정한다.
+
+`VEHICLE` 변경의 이동 거리는 경로를 선택한 뒤 같은 수신 세션에서 출발하고 관측 공백 없이 주차로 봉인한 한 구간의 원 주행 기록에서 읽는다. 출발 표본은 선택 시점의 UTC와 단조시각 조건을 모두 만족해야 한다. 같은 수신 세션의 단조시각으로 마지막 주차 표본의 신선도를 읽기와 최초 확정 때 검사한다. 동일 표본 재전송은 유효 기간을 연장하지 않는다.
+
+변경의 최초 확정은 활성 의뢰·이전 경로·관측 거리가 현재 저장 상태와 일치할 때 진행한다. 근거 없는 v19의 미실행 저장 명령은 `STATE_CONFLICT`를 반환하고, 기존 명령을 보존해 명시 취소를 허용한다. 이미 확정한 원명령은 당시 영수증을 재생한다. #38 호스트는 `VEHICLE`의 관측 이동 거리만 결합한다. 내비 포트의 새 예상 거리와 도착 판정은 별도 근거를 사용하며, 탁송용 SDK 도착 증거는 `Missing`으로 유지한다. [검증 범위](06_VERIFICATION.md#38-관측-거리-결합과-schema20-검증--2026-11-12)
+
 ### 휴식 저장의 현재 검토 경계 — 2026-11-09
 
 [#143](https://github.com/Yaho03/drive-growth/pull/143)의 `RestLedger`는 출발/기간 소모·전체 명령 재생을 위한 부분 제안이며 main 공급 전이다. [이력 완전성 수정 요청](https://github.com/Yaho03/drive-growth/pull/143#pullrequestreview-5820998093)이 남아 있다. 누락 이력을 정상 상태로 복원하지 않는 수정과 기존 재생/rollback 회귀를 확인한 뒤 #122가 공용 연결·테이블/이전과 기본 주행 수익의 원자 소모를 연결한다. 실제 구간/장소·정차 번호 발급·음성·제품 화면은 기존 담당 경계를 유지한다. 새 제품 규칙을 확정하거나 팀원 코드를 대신 구현한 변경이 아니다.
@@ -649,7 +668,9 @@ RentalRuntime는 UI 진입과 worker 저장 실행을 분리하고 한 작업만
 
 ### #51 실제 가게 HOME·탐색과 가챠 조회 연결
 
-2026-11-10 최초 HOME 연결은 `ShopHostMapper`의 순차 `HostSnapshot` 표시였다. 같은 날 아래 중앙 시험 정의·실제 확장 호스트 연결에서 HOME 조회·확장 소비 경로를 교체했다. appearance의 간판·색은 고정 표시 스타일이며 저장 꾸미기 상태가 아니다. Shop revision은 표시 세대이고 DB/거래 revision이 아니며 실제 저장 revision 검증을 대신하지 않는다.
+2026-11-10 최초 HOME 연결은 `ShopHostMapper`의 순차 `HostSnapshot` 표시였다. 같은 날 아래 중앙 시험 정의·실제 확장 호스트 연결에서 HOME 조회·확장 소비 경로를 교체했다. 최초 연결 당시 간판·색은 고정 표시였다. Shop revision은 표시 세대이며 실제 저장 revision 검증은 거래 경계에서 수행한다.
+
+#268로 반영한 HOME은 확정된 간판 문구·색과 시설·공간 상태를 표시한다. 결합 후보에서는 지도·목록에서 받은 `OwnedVehicleId`와 표시 `Revision`은 현재 HOME 화면·gate·처리 중 요청을 대조한 뒤 기존 차고 선택에 전달한다. 지도 좌표는 화면 배치에 사용한다. 전경과 상세 진입의 표시 기준은 [09의 Native HOME](09_UI_UX_SPEC.md#229-마을-전경의-native-적용)을 따른다.
 
 HostSession의 같은 worker에서 `StoredGachaHostSource`→기존 `GachaStoreHostSource.read`를 연결한다. 현재 권위 부재는 DATA_UNAVAILABLE, 다른 조회 실패는 원래 오류다. 전체 요청/명령의 durable checkpoint/load가 미제공이라 실제 제안이 있어도 UNSUPPORTED로 표시해 Draw를 활성화하지 않는다. 메모리 checkpoint 성공으로 영속 보존을 가장하지 않으며 prepare/commit은 이 조회 호스트가 호출하지 않는다. 아래 제품 세션 연결은 실제 NEW/SQLite 공급을 소비하며 legacy/불명은 Onboarding Unavailable을 유지한다. 필요한 입출력은 기존 #121/#122의 저장 연결 범위다.
 
@@ -705,10 +726,24 @@ expand는 기존 purchase atomic 안에서만 완료수를 preview의 servedCust
 
 E 원본 `26c1e7b`의 `trial-definitions.csv`와 `TrialDefinition`은 기존 PRD의 동의된 대여·확장 시험값을 버전 있는 한 정의로 공급한다. 확장 비용·용량·확정 완료 고객 조건, 차종별 대여 요금·시설·연료·Quest 숫자 입력을 구분하며 신규 Quest 사건/진행/수령·실제 자동 영업 생산자를 구현한 것은 아니다. 정의 누락·버전/등록 ID 불일치는 실패로 유지하고 정상 기본값을 만들지 않는다.
 
+중앙 정의 `trial-demo-2026-11-10-v5`의 `rental_categories`는 [PRD의 차종·해금 표](01_PRD.md#1차-차종가격-비율해금-배치)에 맞춰 차종별 대여 유형 하나를 공급한다. 친환경 행의 `eco-powertrain`은 분류 근거다. 요율·수요 가중치·공용 규칙 버전은 v4와 동일하다. v5는 새로 준비하는 방문에 적용하며, 저장된 준비 방문은 당시의 유형과 정의 버전으로 복구하고 확정 방문은 원래 요청과 배정 결과를 재생한다.
+
+공유 정의 버전 전환 시 v4에서 저장만 한 시설 구매의 실행은 `STATE_CONFLICT`를 반환한다. 원장과 `SAVED` 원명령은 보존되며, 사용자가 명시적으로 취소한 뒤 v5 제안으로 새 요청을 준비할 수 있다. 이미 확정되어 `STARTED`로 남은 시설 구매는 v5에서도 같은 원명령으로 당시 정산을 재생한다. 결과 확인은 슬롯만 정리한다.
+
 B 원본 `aef5a11`의 Main HOME은 같은 `HostSession.games` factory·단일 worker를 쓰는 `SessionShopExpansionSource`와 `ShopExpansionHostController`를 연결한다. 미리보기는 실제 완료 고객 수를 읽고, 확인 시 최신 저장 조건과 정의를 재검증한다. typed Expand 원명령은 기존 같은 DB/profile checkpoint의 SAVED→STARTED→원래 결과 확인·finish로 처리한다. 실행 전 명시 취소와 결과 불명 복구를 구분하고 현재 입력으로 명령을 다시 만들지 않는다. 기존 가챠/차량 관리 명령과 보관 슬롯을 공유하며 다른 종류의 명령은 해당 화면으로 안내한다. Garage adapter도 Expand를 자기 명령으로 해석하지 않는다.
 
 허용 상태의 실제 전이만 확장 호스트에 전달하며 동일 상태의 250ms 반복 전달은 재렌더하지 않는다. 제한·화면 이탈·Activity 해제 뒤 오래된 응답은 적용하지 않고, 재진입 시 같은 저장 원명령을 복구한다. 시설 구매·배치·꾸미기, 자동 영업 driver, 신규 Quest/Driving 생산자, 랭킹 Main 진입은 이 통합에 포함하지 않는다. 기존 #173·#174·#175 소스와 저장 공급은 유지한다. 실행 및 미검증 범위는 [06](06_VERIFICATION.md#중앙-시험-정의실제-확장-main-통합--2026-11-10)을 따른다.
 
+
+### #45 업적의 원장 연결
+
+제품 규칙은 [PRD의 업적 항목](01_PRD.md#시작-경험과-주요-기능)을 따른다. 숫자는 `trial-definitions.csv`의 `achievement_rewards`에서 독립 정의 버전과 시험값 여부를 공급한다. 업적 섹션의 누락·검증 실패는 업적 조회에서 오류로 전달한다. 기존 Quest 정의와 이미 저장된 업적 원결과를 읽는 경로는 그 오류와 별개다.
+
+schema19의 `achievements`는 기존 DB의 달성·수령 마커다. 실제 차량 취득과 소유 감소 직전 상태, 확정 대여, 가게 확장과 같은 거래에서 해당 값을 확인한다. 이전 DB에서는 현재 확정 원장과 실제 보존 이력만 읽는다. 현재 보유 수가 낮으면 과거에 보유 목표를 달성했다고 추정하지 않는다. 최초 달성 당시의 정의와 근거를 보존하고, 수령 키에는 정의 버전을 넣지 않는다.
+
+공통 `account`·`settlements`와 업적 수령 마커를 한 거래로 확정한다. 실제 `achievement-claim-v1` 원문은 공통 typed checkpoint의 재실행·정산 이력에서 검증한다. 누적 게임머니의 기존 집계에서는 업적 입금을 검증해 별도 원인으로 식별하고 합산 대상에서 제외한다.
+
+앱은 기존 진행 화면의 업적 영역과 Quest 6개를 같은 세션에서 읽는다. 보관한 보상 청구의 복구·미시작 취소는 공통 경로를 사용한다. [배포 시험값·원장 및 화면 검증 범위](06_VERIFICATION.md#45-업적-콘텐츠원장main-검증--2026-11-11)를 따른다.
 
 ### Quest·Delivery schema12 저장 공급 — 2026-11-10
 
@@ -716,6 +751,8 @@ E b8972b56의 기능 커밋만 main177 위에 통합한 후보는 schema12다. Q
 
 E 변경31파일 중30개는 b897과 동일하며 RentalLedger는 최신 main의 Pending.parkedSince·엄격 정수 조회만 추가 보존했다. 중앙 trial·helper/data에 새로운 제품 논리를 추가하지 않았다. 현 앱 소비 호환은 Garage adapter의 Quest/Delivery 명령·결과를 STATE_CONFLICT로 거절하고, 보관 경로 조회도 두 명령을 명시 실패로 반환해 UI의 재확인 상태로 전달한다. null은 실제 빈 checkpoint에만 사용하며 명령을 지우거나 다른 페이지 명령으로 실행/취소하지 않는다. Driving schema13·제품 Progress/Delivery Main·랭킹 진입은 포함하지 않는다. 제품 연결과 공식 SDK/기기 범위는 별도다.
 
+
+Quest 청구는 공통 정산과 수령 마커를 확정한 뒤 같은 거래에서 STARTED 원명령을 다시 읽는다. 완료·취소는 슬롯의 실제 삭제를 확인한 뒤 성공을 반환한다. 마지막 쓰기가 슬롯을 되돌리거나 재삽입하면 거래를 롤백하고 저장 오류를 반환한다. [Quest·꾸미기 공용 원장 계측](06_VERIFICATION.md#122-quest-원자성update-정산-재생과-구버전-apk-이전--2026-11-13)
 
 ### 관측 주행 schema13 저장 공급 — 2026-11-10
 
@@ -783,3 +820,127 @@ D 정확92c4ee3의6파일은FusedLocation1.1.3 의존성과FUSED_LOCATION권한�
 start/close의main호출은현재어댑터의상태직렬화API계약이다. SDK자체main필수조건이나임의다중스레드동시호출안전성을확정하지않는다. 세대/현재권한을전달직전에검사하고수신elapsed/UTC를main queue소비시각으로바꾸지않는다. 권한거부/미지원/null·알려진오류는명시Missing이며첫callback전에는NO_DATA다. release실패는원client소유권과예외를보존해새연결생성을막는다. 예상밖RuntimeException도정리시도뒤숨기지않는다. F추가정적감사의원격register/unregisterProxy는oneway전송이며원격완료응답동기대기로단정하지않는다. PackageManager·권한검사·unbindService의caller경계와최악지연미측정은유지한다.
 
 source=VEHICLE/Available은SDK원시출처/형식가용성이며실차·센서clock축/신선도/정확도·휴식장소inside/outside·주차/출발·Rest인정을뜻하지않는다. rawconfidence를m로환산하거나rawtimestamp를현재값으로보정하지않는다. 공공좌표점으로임의반경/영역을만들지않고background/프로세스·전원·정책허용을가정하지않는다. A실제SDK진단과F26·추가스레드감사/새조합검사는 [06](06_VERIFICATION.md#fusedlocation-sdk-6파일-통합-검증--2026-11-10)에서구분한다. main187 위에원6파일만정상통합했고B Main/HostSession·currentInactive/앞모듈·schema15를보존하며Rest schema16은포함하지않았다.
+
+
+### 원관측 영업과 시설·전체 정산의 제품 호스트 연결 — 2026-11-10
+
+같은 GameSessionFactory·프로필·출처·직렬 worker에서 ObservedDriving의 원 저장 결과와 RentalProduct 소비자를 연결한다. 원 anchor/source가 일치하는 연속 관측 범위만 기존 RentalTick에 전달한다. 별도 SDK 리스너·원장·가격 계산은 만들지 않고 중앙 정의·원 방문 저널·기존 RentalRuntime·FirstGift를 소비한다. 최초 P만으로 과거 종료를 만들거나 현재 재고로 지나간 고객을 합성하지 않는다.
+
+DeviceRentalClock은 실제 OS BOOT_COUNT·UTC·elapsedRealtime을 읽는다. receiver/UUID/0을 boot로 채우지 않으며 원 calibration·허용 skew·overflow와 불명 boot를 명시 처리한다. 실제 이탈과 구성 변경을 구분하고 currentInactive의 원 marker·원점·최초 resume 시각을 보존한다. PREPARED/COMPLETED는 원 interval을 현재 clock보다 먼저 소비하며 다른 host slot을 실행·삭제하지 않는다. 확인한 최초 완료만 기존 첫 선물 명령으로 연결한다.
+
+Main HOME은 시설의 typed 구매/쉬기 요청과 원결과를 소비하고, Results는 전체 history·전체/미확인 필터·선택·열람 및 Bundle 복원을 연결한다. 기존 gate·Back·세대/epoch/receiver 검사를 유지하며 제한 뒤 UI 응답으로 새 명령을 발행하지 않는다. stop 전에 수락한 원관측의 영속 처리와 stop 뒤 UI 전달은 구분한다.
+
+B 원본0dd969f는 main187에 기반한다. 새 통합은 main188의 위치 SDK 공급을 보존하며 B 소유18파일을 그대로 반영한다. 위치 SDK의 실제 Main 등록과 Rest 원자 저장은 이 연결에 포함하지 않는다. 신호 공백·지나간 방문·legacy 원점을 현재값으로 채우지 않으므로 일부 종료 영업은 보류될 수 있다. [실제 원본 시험과 새로운 조합](06_VERIFICATION.md#제품-영업시설정산-호스트-연결-검증--2026-11-10)은 구분한다.
+
+
+#### UTC 전진과 종료 영업 복구
+
+같은 부팅에서 수락한 표본과 독립 raw clock을 대조해 양의 UTC 전진을 확인한다. 실제 이탈 근거와 원 marker가 있는 경우, 이탈 전까지 수락한 원관측·준비 방문을 먼저 처리한다. 이미 PREPARED인 명령은 최초 복귀 시각 쌍과 원 경제 원점을 재사용한다. 최초 구간의 종료 영업은 기존 30분·30%·최대 8시간 규칙을 따른다. 원래 종료점 뒤부터 새 기준까지는 확인된 대여만 미관측 구간으로 이어 수익 0을 기록한다. 전경에서 확인된 연속 P는 기존 물리 주차 원점과 수락 구간으로 별도 처리한다.
+
+저널은 최초 구간 반영, 남은 미관측 구간, 만료 대여의 기존 정산·반납 처리, COMPLETED 기록, 방문 일정 이동을 같은 SQLite 거래에서 확정한다. 일정 쓰기가 실패하면 최초 PREPARED와 기존 커서를 유지해 같은 입력을 재생한다. 완료 응답을 잃으면 영속 일정과 수락 시각 기준이 일치할 때 그 기준을 복원한다. 누락 슬롯은 새 요청 없이 미래로 넘기며 원방문 sequence를 보존한다. 새 고객·주행·휴식·P 근거는 만들지 않는다. 시계 역행이나 부팅·관측 근거가 불충분한 구간은 기존 보류 규칙을 따른다. [실행 범위](06_VERIFICATION.md#43-utc-전진-후-대여-복구--2026-11-13)
+
+### Rest schema16 원자 저장·세 수정의 검토 후보 — 2026-11-10
+
+이절은정확6a4d820의main188통합검토후보다. 원E46 source/APK/계획은고정보존하며제품6a동일+F원문1의c28 조합은A실제SQLite47을통과했다. 최종독립회수와#190후최신Main조합검증은남아있으며전체승인·완료·merge-ready로표시하지않는다. 원830은관측원문/segment별boot·clock-domain·장소관측sidecar와여러pending departure를같은helper에보존하고schema16·중앙TrialDefinition v4를준비했다. 원정수거리/출발일·일500km·기존1h/5m/20m/150%와선택된chronological-prefix-rational-v1을보존하며원drive금액을한번내린다. base입금뒤별도bonus CREDIT를만들거나원drive를조각정산으로나누지않는다.
+
+명시Rest활성화는실제profile/source·기존observed module과진행중trip/outbox조건을검증한다. 기존metadata가남은legacy를현재boot/proof로채택하지않는다. phase1은원관측save와context/actualdeparture준비를보관할뿐지급/확정Rest갱신이아니다. phase2는원순서plan·소모/새departure·단일금융/day·원결과/provenance/ack를같은거래로처리하고기존원결과재생이현재정의/상태보다우선한다. confirmed core와effective pending projection을구분한다. 기존v1 RestHostSource가이새typed writer를구현했다고표시하지않고B0dd의실제producer/Main연결은포함하지않았다.
+
+9db는동일boot의물리elapsed/raw중복과공개원문검증을보완한원본이다. 후속6a4의세수정은(1)물리cursor와별개로(boot,domain)UTC cursor를보존해A→B→A복귀의UTC퇴행을거절,(2)신규ack뒤실제day가paid.day와정확히맞지않으면전체rollback,(3)활성Rest근거뒤observed marker/state/receipts전체소실을진짜미활성부재로숨기지않는것이다. 새금액/기본clock/단계성공을합성하지않고과거정상원결과재생을현재day로거절하지않는다. 후속A의c28실행에서C metadata/공개읽기와D day의후행12표행보존/rollback단언까지통과했다.
+
+정상통합41파일은6a4원문과같고Main/HostSession·Location6·시설12·Results14·marker의생산API를보존했다. RankingReadSource는공통DrivingRecordReader로Rest가격원결과를읽는의도된변경이며기존Provenance hook/typedFailure catch·원출발지역검사는유지한다. marker시험은schema16fixture만원본대로갱신했다. 실제boot/domain/장소·정책권위/B opt-in·UI/SDK·프로세스/전원·실차는별도다. 원830/9db의성공과C/D/A실패·미도달을 [06](06_VERIFICATION.md#rest-6a4-세-수정의-main188-통합-검토-대기--2026-11-10)에서분리하며F복수departure1은제품불변의후속c28에시험파일로만통합했으며원E46쌍과별도조합으로보존한다.
+
+
+### Rest와 main190의 공급 경계 — 2026-11-10
+
+main190 `af2ee70dee24c7ad9310372255d4b20d5ed79ee3`을 Rest c28 후속 후보의 정상 부모로 포함했다. Rest 소스/시험/자산42파일은 정확c28과 같고 B18·ActualMainResults 정식 시험1·PNG2·Location6 및 기존 main 공급을 보존했다. 생산 소스 충돌/추가 수정0이며 README의 현재 공급 행과 양쪽02/06추가 절을 모두 보존해 문서3곳의 동시 추가 충돌만 병합했다.
+
+C는 metadata/공개 읽기의 코드·호환 JVM8과 A c28 C1 GREEN을, D는 UTC16 및 day 코드·A SQL4의 후행12표 rollback GREEN을 각 배정 범위에서 수용했다. 전체 Rest/제품 승인으로 확대하지 않는다. 새 main190 조합 자동 검사와 원 c28 실제SQLite47·기존B Native65/추가Results1은 [06](06_VERIFICATION.md#rest-schema16과-main190-제품-호스트의-최종-로컬-조합--2026-11-10)에서 구분한다.
+
+main190의 실제 원관측 영업/이탈·복구·시설·전체 Results 연결은 유지하지만, Rest의 실제 boot/domain/place·정책 권위/producer·명시 opt-in과 v1 RestHostSource 소비는 이 후보에서 새로 연결하지 않았다. #189 디자인은 기능 구현 이후 검토/적용한다는 최신 지시를 유지하며 schema17 꾸미기·새 core·SDK확장·새 producer·통합모의주행을 섞지 않는다.
+
+
+### 가게 꾸미기 순수 계약 — 2026-11-10
+
+`core.decoration`은 가게의 간판·색 표현 키 한 묶음에 대한 소유·선택·가격 검증을 담당한다. `DecorationCommand`는 원 request/profile/source, 품목·동작, 정의 버전, 예상 꾸미기 revision·가격을 보존한다. `prepareDecorationChange`는 같은 거래에서 읽은 실제 잔액·가게 레벨·소유 상태와 대조해 구매/적용 예정 결과를 반환하며 저장을 수행하지 않는다. 정의 목록과 소유 집합은 방어 복사한 읽기 전용 snapshot이다.
+
+`BUY_AND_APPLY`는 미소유·해금·정확한 가격을 검사한다. `APPLY_OWNED`는 이미 소유한 다른 품목을 비용 없이 적용하며 구매 해금 레벨을 다시 요구하지 않는다. 다른 프로필/출처는 `INVALID_INPUT`, 오래된 정의·revision·가격·중복 구매/현재 선택은 `STATE_CONFLICT`, 없는 정의는 `DATA_UNAVAILABLE`, 부족 잔액은 `INSUFFICIENT_FUNDS`다. 실패 시 입력 상태를 변경하지 않는다.
+
+같은 전체 원명령의 `replayDecorationChange`는 현재 정의·잔액·가게 레벨로 재계산하지 않고 당시 결과를 반환한다. 양수 구매만 기존 공통 `FACILITY`/`DEBIT` 정산을 갖는다. 무료 구매와 소유품 적용은 `settlement=null`인 typed 결과를 사용하며 가짜 0원 정산을 만들지 않는다. 전역 요청 소유권, 이전 상태와 원문·정산의 DB 연결, 잔액·소유·선택·revision·원결과의 원자 확정은 SQLite 소비자의 책임이다. 확인된 초기 empty/null 상태를 누락·손상·legacy의 보정값으로 사용하지 않는다.
+
+중앙 `trialDecorationDefinitions()`의 두 품목은 조정 가능한 시연 시험값이다. `neutral-sign`은 Lv1/0, `blue-sign`은 Lv2/100이며 별도 자동 지급이나 경제 효과가 없다. `themeKey`만 기존 `ShopAppearance`로 매핑한다. 자유 배치·차량 꾸미기·이미지·좌표·최종 색상을 새로 정하지 않으며 #189 최종 디자인 적용과 구분한다. 이 순수 계약 공급만으로 실제 저장·제품 화면·#55 전체 완료가 되지 않는다.
+
+
+### FusedLocation 영역 수신과 권위의 구분 — 2026-11-11
+
+기존 `ForegroundPleosLocation`의 같은 SDK client에 외부 공급 원형 영역 1개의 등록·해제를 연결한다. `start(area, onArea)`는 등록된 alertId와 일치하는 ENTER/EXIT만 전달한다. 등록 전·이전 세대·외부 ID·종료 뒤 이벤트는 폐기하고, 알려진 등록 ID는 해제 실패 시 client와 함께 보존해 새 연결이 겹치지 않게 한다. 영역 포트가 실제로 없을 때만 `UNSUPPORTED`다. initialize/register/add 등 실제 SDK 호출의 예상 밖 RuntimeException은 정리 후 원예외를 전파하고 정리 실패는 suppressed로 보존한다.
+
+`PleosAreaDefinition`은 외부 검증자가 공급한 경계·출처/사용 조건·버전을 담으며 형식 검사가 장소 권위를 보증하지 않는다. 공식 SDK1.1.3의 공개 영역 이벤트는 alertId·transition을 제공한다. 발생시각·초기 inside·현재 inside는 제공된 것으로 간주하지 않는다. callback 수신 elapsed/UTC는 수신 사실이며 `RestAreaProof`의 현재 장소·발생 시각으로 승격하지 않는다. 원 위치 timestamp/confidence도 신선도나 정확도(m)로 환산하지 않는다.
+
+소비자는 close/start 전 또는 cleanup 성공과 관계없는 finally에서 캐시를 무효화해야 한다. close는 마지막 Missing 전달을 보장하지 않고 새 start의 Missing도 비동기다. 제품 영역 정의는 아직0개이며 공공 215좌표점·공식 sample의 시험 반경으로 제품 경계를 만들지 않는다. 유효한 현재 장소·시각 권위가 없으면 휴식 장소는 Missing이다. Main 등록·권한 동의·실제 SDK 영역/Rest 지급은 별도 연결·검증 범위다. 근거는 [공식 릴리즈 노트](https://document.pleos.ai/docs/pleos-only/release-note/sdk-release-note)와 [공식 샘플](https://github.com/Pleos-Playground/pleos-sample-fusedlocation-app)의1.1.3 공개 API 및 실제 AAR 대조다.
+
+
+### 가게 꾸미기 schema17 원자 저장과 복구
+
+`SqliteGameChangeStore.decorations`는 앞의 `core.decoration` 계약을 같은 helper·공통 잔액·전역 요청 ID와 연결한다. schema17은 `decoration_module`과 `decoration_requests`를 추가하며 지원 구버전 이전 시 미활성 marker만 보존한다. `activate(profileId)`의 명시 호출 전에는 소유·선택을 만들지 않는다. 소실·손상된 marker/이력은 빈 상태로 복구하지 않으며, 기존 표시용 외형을 과거 소유로 추정하지 않는다.
+
+`state`는 실제 현재 공통 잔액·가게 레벨과 저장된 꾸미기 revision/소유/선택을 반환한다. `settlement(command)`와 `commit(command)`는 전체 원명령과 최초 결과를 먼저 대조한다. 양수 구매만 기존 FACILITY/DEBIT 정산을 사용하고 무료 구매·소유품 적용은 금융 정산 없는 typed 결과를 보존한다. preview는 순수 계산이며 activate/save/commit을 대신 호출하지 않는다.
+
+차감·소유/선택/revision·당시 정의·원결과·host STARTED를 같은 거래에서 확정한다. `HostCheckpointCommand.Decoration`의 save→execute→finish를 기존 checkpoint에 연결하고, 같은 거래에서 실제 SAVED→STARTED를 확인한 경우만 내부 신규 확정 경로를 쓴다. 원결과 없는 기존 STARTED는 공개 commit/execute 모두 DATA_UNAVAILABLE로 보존하며 현재 정의 조회·새 차감·소유 쓰기를 하지 않는다. 원결과가 있으면 현재 정의가 없어도 당시 결과를 재생한다. 다른 기능의 slot은 실행·취소·교체하지 않는다.
+
+전체 이력의 revision 연속성·원명령/정의/상태·공통 원정산을 대조한다. 금융 원문의 balance/at 소수가 공통 객체 변환 중 절삭돼도 꾸미기 경계의 canonical 원문 비교에서 STORAGE_FAILURE로 거절한다. 실패는 기존 atomic 경계에서 전체 rollback하며 무료 결과에 가짜 0원 정산을 만들지 않는다. #203 Main HOME은 이 저장을 사용해 미리보기·무료/유료 구매·보유품 재적용을 연결한다. 실제 Activity 복원과 원결과 소비는 [Main 소비 검증](06_VERIFICATION.md#55-main-가게-꾸미기와-원결과-소비-검증)에 기록한다. 저장 자체의 실행 범위는 [저장 공급 검증](06_VERIFICATION.md#가게-꾸미기-schema17-저장-공급-검증)을 따른다.
+
+
+### 전경 휴식 증거 생산자와 원입력 재시도
+
+`ForegroundRestObservationProducer`는 같은 serial worker에서 당시 receiver·boot/domain·원 차량 관측·장소 Observation을 받아 `RestObservationProvider`의 원 context/출발 batch를 준비한다. DB·지급·SDK 영역 판별을 수행하지 않으며 장소/시각 권위가 부족하면 Missing을 보존한다. 출처·연속성·gap·P/UX·규칙을 기존 검증에 넘기고, 현재 위치로 과거 장소를 보충하지 않는다.
+
+생산자는 같은 previous/next 전체 제안의 재시도에서 계산한 recognition과 batch를 재생한다. `SessionObservedDrivingSource`의 Rest 경로도 최초 reduce 결과·drive ID·전체 입력/실제 previous 원문과 준비된 batch를 단일 메모리 슬롯에 보존한다. capture 실패 뒤 같은 입력은 새 ID/provider batch를 만들지 않는다. 다른 frame·receiver·clock·pause·provider·actual previous/revision은 원 제안을 덮지 않고 STATE_CONFLICT다. capture가 실제 거래로 확정된 뒤 슬롯을 해제하므로 별도 금융 drain 실패가 다음 관측을 옛 제안에 묶지 않는다. 내부 자동 반복·재귀·누적 큐는 없다. provider=null의 기존 저장·지급 본문은 유지한다.
+
+이 경계는 같은 source 인스턴스의 미확정 제안 재시도이며 디스크 큐/프로세스 사망 전 미저장 입력 복원을 새로 보장하지 않는다. 호출자는 실패한 원 frame/clock의 재시도와 수명 종료 순서를 보존해야 한다. 새 producer는 같은 session worker에서 같은 store.atomic 안의 `restDriving.projectionIn(db, identity)`를 먼저 검증하고 `RestAtomicStorage.contexts(db, identity).map { it.value }`의 원 ordinal 순서를 읽어 성공한 전체 목록만 restore한다. contexts 단독·별도 거래 조회·elapsed 재정렬·실패를 빈 목록으로 보정하지 않는다. 실제 차량 입력의 Main/HostSession 등록·동의·boot/domain/장소 권위 공급과 SDK·프로세스 검증은 별도다.
+
+### 대여 결과 시간 근거 schema18
+
+#54의 정상/감액/8시간 상한 설명을 위해 새 배정부터 같은 DB의 선택 metadata 표 `rental_result_basis`에 실제 수락 구간과 최초 정산 연결을 기록한다. 기존 rentals·settlements의 열/명령·금액 산식은 유지한다. 배정의 빈 metadata, account의 수락 구간/정확 weighted delta, settle의 원래 settlementId는 각각 기존 변경과 같은 거래에서 저장하고 실제 쓰기를 검증한다. 기록 실패는 해당 거래 전체를 롤백한다. 연속된 같은 종류/원점/정책 구간은 시간과 정확한 delta 합을 보존해 합친다.
+
+`ParkingIncomePolicy`는 기존 30분/30%/8시간 값을 한 곳에 둔다. 기존 parkingIncomeWindow와 equivalentMillis의 공개 시그니처/산식/값은 유지한다. 각 구간은 당시 정책 값과 버전을 보존하며 읽기는 현재 콘텐츠/정책으로 재분류하지 않는다. 금액을 구간별로 재배분하지 않고 기존 Settlement를 유일한 금액 권위로 쓴다. INACTIVE는 accountInactive 경로이며 물리 주차나 실제 앱 이탈의 별도 증거를 뜻하지 않는다. 입력의 관측/종료 영업 원점 검증은 기존 runtime/journal 책임이다.
+
+`RentalResultBasisReader.read(rentalId)`와 `SettlementHistoryEntry.rentalBasis`는 `ContractResult<Observation<RentalResultBasis>>` 경계로 원래 profile/source/rule·대여/정산 ID와 정상/감액/상한 제외 시간·원본 구간을 제공한다. 신규/옛 결과를 섞어 추정하지 않는다. 기존 완료 행의 metadata 없음은 Missing(NO_DATA), 존재하는 원문/숫자/연속 구간/원래 대여·금융 연결 손상은 STORAGE_FAILURE다. schema18에서 표 자체가 사라지면 읽기 실패이며 자동 재생성하지 않는다. 구버전 active 대여도 중간부터 이력을 채우지 않는다. 기존 Main의 정산 조회 경로에 이 입력을 전달하며 `ResultsHostMapper`와 `ResultsView`에서 원래 구간을 표시한다. 열람 저장과 주행 제한 경계는 유지한다.
+
+
+### 자동 방문의 수요 권위와 원요청 조회
+
+신규 방문은 같은 `GameSession`의 콘텐츠와 가게 레벨에서 해금 차종의 가중치와 방문 간격을 얻는다. Lv1~4의 간격은 30/25/20/15분이다. 이미 저장된 방문 시각은 유지하고, 해당 방문을 처리할 때 읽은 정의로 다음 방문을 예약한다. 계획과 저장은 당시 카탈로그·정의로 검증하며 미저장 draft 재시도도 그 입력을 재사용한다. 현재 정의를 읽기 전에 영속 pending과 같은 ID의 최초 결과를 확인한다. Debug 신규 run의 seed도 같은 해금 분포를 사용한다.
+
+가상 도시는 기존 차종·기간·고객·사고 추첨 뒤에 고른다. 희망 차종과 용도는 원방문의 기존 필드를 사용한다. 도시를 포함한 준비 v2는 배정과 함께 기존 `visits.host_command`에 저장된다. v1의 원문 바이트와 정산 산식은 유지한다.
+
+정산 조회는 한 SELECT 행에서 정산, 완료 대여, 방문 원문, 배정 차량, 프로필·출처를 함께 읽고 기존 원문 검증을 재사용한다. 전체 조회를 감싸는 쓰기 거래 없이 해당 행의 연결을 확인한다. 원문이 없는 구형 방문과 연결이 깨진 원문을 구분한다. 과거 고객 표시는 원래 카탈로그의 이름을 사용한다. [화면 규칙](09_UI_UX_SPEC.md#영업-정산의-가상-고객-요청)
+
+### #40·#57 진행 화면의 휴식 원장 읽기
+
+`FactoryProgressionSource`의 선택적 읽기 포트는 퀘스트와 같은 `GameSession`에서 `restDriving.state(profileId)`를 조회할 수 있다. 저장소가 검증한 `RestDrivingProjection`과 `ContractResult` 오류를 진행 상태에 전달한다. 포트가 없으면 `UNSUPPORTED`를 유지한다. 기록 없음, 읽기 실패, 빈 원장, 미확정 주행은 잔여 시간 미확인으로 표시하며, 미확정 투영으로 활성 버프를 표시하지 않는다.
+
+진행 화면은 확정 주행이 있고 미확정 주행이 없는 스냅샷의 저장 잔여 시간과 입력 출처만 표시한다. 이 조회는 현재 장소, 이번 휴식 인정 여부나 다음 출발 효과를 제공하지 않는다. Debug `HostSession`은 이 포트에 같은 SIMULATION 프로필의 저장 상태를 공급한다. 실제 차량 입력 호스트에 등록하려면 같은 프로필의 읽기 허용·동의·근거를 확인해야 한다. 저장 활성화, 주행 명령·지급, SDK 등록은 조회 범위 밖이다.
+
+
+### #40·#57 Debug 휴식 시연 화면
+
+`UnifiedSimulationActivity`는 Main의 공통 조작 허용 상태에서 **휴식 모의 시연 · 별도 원장**을 표시한다. 진입을 한 번 수락하면 화면이 돌아올 때까지 잠근다. 별도 `RestSimulationActivity`는 명시 시작 뒤 `rest-simulation-demo.db`의 SIMULATION 프로필에서 기존 휴식 생산자와 주행·정산 원장을 사용한다. 화면을 여는 것만으로는 DB를 만들지 않는다. 일반 시연 원장과 제품 원장은 분리한다.
+
+화면 이탈 시 처리 중인 표본의 거래를 마치고 다음 표본 생성 전에 멈춘다. 구성 변경은 이탈로 처리하지 않는다. 같은 프로세스에서 보존된 Run과 실패 표본을 명시 재개하며, 이미 마지막 거래가 확정됐다면 저장 결과를 읽는다. 준비 재시도와 원입력 재시도, 확정 뒤 결과 재조회는 각각 해당 단계만 수행한다.
+
+결과 화면은 같은 프로필의 휴식 원장 투영과 원정산에서 확정 건수·부스트 사용·다음 주행 수익·저장 잔여 시간을 읽는다. Quest 진행 조회나 화면용 값을 금융 근거로 사용하지 않는다. 시연 화면은 Debug 전용이며, 실제 장소 판정·제품 휴식 입력·OS 종료 뒤 미확정 표본 재개는 후속 범위다. [장치 및 빌드 기록](06_VERIFICATION.md#debug-휴식-시연-진입과-원결과-검증)
+
+
+#### 현재 시연 원장을 사용하는 휴식
+
+Debug Main의 휴식 포함 모의주행은 같은 `GameSessionFactory`의 `unified-simulation.db`와 SIMULATION 프로필을 사용한다. 시작 요청을 받으면 다른 조작을 제한하고, session worker에서 최초 지급 완료·공용 checkpoint·진행 중 탁송·휴식 시험 정의를 확인한 뒤 명시 논리 시연을 시작한다. 시연 표본은 `ForegroundRestObservationProducer`와 기존 관측 주행 저장에 공급한다. 진행 화면의 읽기는 위 휴식 원장 조회 계약을 따른다. 일반 시연의 주차 종료에서 휴식 시연 첫 표본으로 넘어갈 때는 명시적인 `startsRestRun`을 대여 소비자에 전달한다. 같은 SIMULATION 프로필·boot, 연속 기록 revision, 이전 P·UX 허용 표본과 새 출발 anchor, elapsed/UTC 차이 일치 및 기존 최대 간격 안의 원본 두 표본을 확인한 경우에만 이전 주차 구간을 이어 기록한다. 실제 차량의 수신자 변경이나 누락 구간을 이 경로로 보정하지 않는다. 같은 표본 재시도는 기존 구간을 다시 추가하지 않는다.
+
+화면이 숨겨진 동안 다음 시연 표본과 논리 시간의 진행을 멈춘다. 완료 후 다시 열면 확인된 원결과를 읽는다. 프로세스 종료로 진행 중 휴식의 미저장 연속성 근거를 잃으면 시연을 보류하고 기존 확정 원장을 보존한다. 실제 차량 입력의 장소 권위와 휴식 판정은 별도 범위다. [실행 근거와 잔여 검증](06_VERIFICATION.md#일반-모의주행-휴식의-main-통합-검증--2026-11-12)
+
+휴식 시연 뒤 일반 모의주행을 새 프로세스에서 열면, 먼저 저장된 고객 배정 명령을 복구한다. 같은 SIMULATION 프로필·주행·boot·clock domain의 저장 관측이 원 대여 커서부터 첫 재생 표본까지 연속일 때만 기존 대여 소비자에 넘긴다. 이미 시간을 누적한 대여는 원 커서의 정산과 기한이 지난 반납을 기존 소비자로 재시도한다. 일반 시연의 종료 표본에서 주행이 먼저 확정된 경우에는 같은 표본·시간대·시계와 연결되는 유일한 저장 주행 영수증을 검증한 뒤 남은 정산·반납만 처리한다. 누락·공백·불일치는 보류한다. 과거 고객과 관측 시간을 합성하지 않으며, 닫힌 주행의 추가 시간 누적과 D→P 경계의 새 프로세스 복원은 미검증이다. 격리 모의 실행의 [활성 대여 60초 복구와 단일 도착 정산](06_VERIFICATION.md#219-포함-revision-8의-결합-장치-시험)과 [재생성 후 진행 모델·View 확인](06_VERIFICATION.md#466f80c-기준-진행-카드-판별-계측)은 서로 다른 APK의 실행 근거다.
+
+### #55 가게 꾸미기·확장 완료 원결과 조회
+
+`ShopOriginalResultReader(store).decoration(profileId, requestId)`는 `ContractResult<DecorationSettlement?>`를, `expansion(profileId, requestId, fullShopExpansion)`은 `ContractResult<Settlement?>`를 반환한다. 같은 SQLite 거래에서 실제 프로필과 저장 출처를 확인하고 원명령·최초 결과와 전역 요청 ID 소유자를 대조한다. 확장 호출자는 처음 확정한 전체 입력을 전달하고 reader는 공통 정산의 원명령과 최초 결과를 대조한다. 시설 구매 원결과는 기존 `hostCommands.facilityResult`에서 읽는다. 유료 꾸미기의 공통 원정산과 무료 구매·보유품 적용의 금융 정산 없는 typed 결과를 그대로 읽는다.
+
+완료 기록이 없으면 `Success(null)`, 다른 명령 내용이나 소유자가 확인되면 `STATE_CONFLICT`, 저장 손상이 확인되면 `STORAGE_FAILURE`, 다른 프로필이면 `INVALID_INPUT`을 반환한다. 현재 정의·가격·잔액 조회나 거래·checkpoint 변경 없이 원결과를 확인하며 정상 미완료 slot을 보존한다. 기존 `requestUnavailable` 계약과 소유자 검사 순서를 사용하고, 자기 소유자는 해당 원결과를 검증한 뒤에만 제외한다. #203의 Main/Shop은 저장된 전체 요청으로 이 reader를 호출하고 확정 당시 결과를 복원한다. 현재 외형·잔액은 같은 factory의 현재 상태 조회에서 표시한다.

@@ -52,6 +52,93 @@ class DeliveryCheckpointTest:InstrumentationTestCase() {
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.hostCommands.execute(profile,c));assertEquals(before,rows());assertNull(ok(store.delivery.active()))
         raw{it.execSQL("DROP TRIGGER ignore_route")};execute(c);assertEquals(GameMoney(9000),ok(store.balance()));assertEquals(GameMoney(1000),ok(store.delivery.terms())!!.paid);finish(c)
     }
+    fun testPaidSelectionReplaysWholeOriginalAfterReopenAndAnotherActiveRequest() {
+        val conflict = ContractResult.Failure(ContractError.STATE_CONFLICT)
+        val beforeSelection = rows()
+        assertEquals(conflict, store.delivery.select(proposed, purchase.id, RequestId("fund")))
+        assertEquals(beforeSelection, rows())
+
+        val originalCommand = select(purchase)
+        val original = execute(originalCommand) as DeliveryCheckpointReceipt.Selected
+        val payment = checkNotNull(original.value.selected.payment)
+        val receipt = checkNotNull(original.value.settlement)
+        assertEquals(request, receipt.transaction.requestId)
+        assertEquals(MoneyChange(MoneyDirection.DEBIT, GameMoney(1000)), receipt.transaction.money)
+        assertEquals(GameMoney(9000), receipt.balance)
+        val committed = rows()
+        assertEquals(conflict, store.commitGameChange(payment))
+        assertEquals(committed, rows())
+        finish(originalCommand)
+        ok(store.delivery.abandon(change, request))
+
+        val current = wrap(DeliveryCheckpointOperation.Select(
+            proposed, income.id, RequestId("new-active"), RouteId("new-active-route"), start))
+        execute(current)
+        finish(current)
+        val active = ok(store.delivery.inProgress())
+        assertEquals(current.requestId, active?.active?.requestId)
+        assertTrue(receipt.balance != ok(store.balance()))
+        store.close()
+        store = open()
+        val beforeReplay = rows()
+        assertEquals(original, execute(originalCommand))
+        finish(originalCommand)
+        assertEquals(active, ok(store.delivery.inProgress()))
+        assertEquals(beforeReplay, rows())
+    }
+
+    fun testOrphanedPurchasePaymentCannotReplayThroughCommonWriter() {
+        val command = select(purchase)
+        val original = execute(command) as DeliveryCheckpointReceipt.Selected
+        val payment = checkNotNull(original.value.selected.payment)
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), store.commitGameChange(payment))
+        // Only selection history is missing. The common debit, STARTED checkpoint and route still identify the purchase.
+        raw { it.execSQL("DELETE FROM delivery_requests WHERE request_id=?", arrayOf(request.value)) }
+        store.close()
+        store = open()
+        val damaged = rows()
+        assertEquals(HostCheckpointPhase.STARTED, ok(store.hostCommands.load(profile))?.phase)
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.delivery.inProgress())
+        val replay = store.commitGameChange(payment)
+        val reason = store.lastStorageFailure
+        assertEquals(damaged, rows())
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), replay)
+        assertEquals(LedgerFailureReason.INVALID_RECORD, reason)
+    }
+
+    fun testOrphanedCompletedPurchasePaymentCannotReplayAfterReopen() {
+        val command = select(purchase)
+        val original = execute(command) as DeliveryCheckpointReceipt.Selected
+        val payment = checkNotNull(original.value.selected.payment)
+        finish(command)
+        ok(store.delivery.abandon(change, request))
+        assertNull(ok(store.delivery.inProgress()))
+        assertNull(ok(store.hostCommands.load(profile)))
+        raw { it.execSQL("DELETE FROM delivery_requests WHERE request_id=?", arrayOf(request.value)) }
+        store.close()
+        store = open()
+        val damaged = rows()
+        val replay = store.commitGameChange(payment)
+        val reason = store.lastStorageFailure
+        assertEquals(damaged, rows())
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), replay)
+        assertEquals(LedgerFailureReason.INVALID_RECORD, reason)
+    }
+
+    fun testGeneralDeliveryDebitWithoutFeatureHistoryStillReplays() {
+        val command = GameChange(RequestId("standalone-delivery-debit"), TransactionKind.DELIVERY,
+            source, rules, MoneyChange(MoneyDirection.DEBIT, GameMoney(1000)))
+        val original = ok(store.commitGameChange(command))
+        assertEquals(GameMoney(9000), original.balance)
+        store.close()
+        store = open()
+        val committed = rows()
+        assertEquals(original, ok(store.commitGameChange(command)))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
+            store.commitGameChange(command.copy(money = MoneyChange(MoneyDirection.DEBIT, GameMoney(1001)))))
+        assertEquals(committed, rows())
+    }
+
     fun testAwaitingEvidenceReturnsSavedWithoutFalseCompletionAndAllowsNewEvidence() {
         choose();val c=arrival(true);val result=execute(c);assertFalse(result.isFinal);assertTrue((result as DeliveryCheckpointReceipt.Arrived).value.outcome is DeliveryOutcome.AwaitingEvidence)
         assertEquals(HostCheckpointPhase.SAVED,ok(store.hostCommands.load(profile))!!.phase);assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),store.hostCommands.finish(profile,c))
@@ -111,7 +198,7 @@ class DeliveryCheckpointTest:InstrumentationTestCase() {
         // helper 생성자는 lazy다. 공개 읽기로 실제 upgrade를 연 뒤 버전/전체 행을 대조한다.
         assertEquals(beforeBalance,ok(store.balance()));assertEquals(before,rows())
         raw{db->for(table in listOf("delivery_requests","delivery_changes","delivery_outcomes","delivery_hold_outcomes"))db.rawQuery("PRAGMA table_info($table)",null).use{r->var found=false;while(r.moveToNext())if(r.getString(1)=="host_command")found=true;assertTrue(table,found)}}
-        raw{db->assertEquals(15,db.version);val after=db.rawQuery("SELECT * FROM quest_tracking",null).use{r->buildList{while(r.moveToNext())add((0 until r.columnCount).joinToString("|"){r.getString(it)})}};assertEquals(tracking,after)}
+        raw{db->assertEquals(20, db.version);val after=db.rawQuery("SELECT * FROM quest_tracking",null).use{r->buildList{while(r.moveToNext())add((0 until r.columnCount).joinToString("|"){r.getString(it)})}};assertEquals(tracking,after)}
     }
     fun testIgnoredSaveAndNonfinalSavedRestorationCannotReportDurability() {
         val first=select();raw{it.execSQL("CREATE TRIGGER ignore_save BEFORE INSERT ON host_command_checkpoint BEGIN SELECT RAISE(IGNORE); END")};val initial=rows()

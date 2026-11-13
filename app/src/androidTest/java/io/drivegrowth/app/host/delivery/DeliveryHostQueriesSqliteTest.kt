@@ -2,11 +2,16 @@ package io.drivegrowth.app.host.delivery
 
 import android.test.InstrumentationTestCase
 import io.drivegrowth.app.host.*
+import io.drivegrowth.app.host.garage.GaragePreparation
+import io.drivegrowth.app.host.garage.StoredGarageCommandSource
 import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
+import io.drivegrowth.app.ui.garage.GarageEvent
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.delivery.*
 import io.drivegrowth.core.garage.FirstGrant
 import io.drivegrowth.core.garage.CollectionKey
+import io.drivegrowth.core.garage.Garage
+import io.drivegrowth.core.progression.VehicleAction
 import java.time.LocalDate
 import java.util.UUID
 
@@ -38,5 +43,50 @@ class DeliveryHostQueriesSqliteTest : InstrumentationTestCase() {
         val proposed=DeliveryProposed(DestinationKey("shown"),EstimatedRouteDistance(1000,identity.source),list,list.offers)
         ok(queries.discover(identity,proposed));ok(games.open()).use{assertEquals(setOf(CollectionKey(vehicle,Rarity.RARE)),ok(it.store.discoveredVehicles()))}
         assertEquals(list,ok(queries.lists(identity,list.createdOn)).single())
+    }
+
+    fun testSaleOfOneSameModelVehicleUpdatesOwnershipRentalAndDeliverySlotsAfterReopen() {
+        val deliveryQueries = FactoryDeliveryHostQueries(games) { it.terms() }
+        val identity = ok(deliveryQueries.identity())
+        val (kept, sold) = ok(games.open()).use { session ->
+            val store = session.store
+            val content = ok(session.content)
+            val first = ok(store.listOwnedVehicles()).single()
+            val duplicate = first.copy(
+                ownedVehicleId = OwnedVehicleId("duplicate-for-sale"),
+                rarity = Rarity.RARE,
+                acquisitionCost = GameMoney(500),
+                acquisitionSource = VehicleAcquisitionSource.GACHA,
+            )
+            ok(store.commitGameChange(GameChange(
+                RequestId("add-duplicate-for-sale"), TransactionKind.GARAGE, identity.source, content.ruleVersion,
+                vehicle = VehicleWrite.Add(duplicate),
+            )))
+            assertEquals(setOf(first, duplicate), ok(store.listOwnedVehicles()).toSet())
+            first to duplicate
+        }
+        val beforeSale = ok(deliveryQueries.read(identity))
+        assertEquals(1, beforeSale.freeSlots)
+
+        val garageCommands = StoredGarageCommandSource(context, sessions = games)
+        val request = GarageEvent.RequestAction(sold.ownedVehicleId, sold.revision, VehicleAction.SELL)
+        val prepared = ok(garageCommands.prepare(request, RequestId("sell-duplicate"))) as GaragePreparation.Ready
+        ok(garageCommands.commit(prepared.pending.command))
+
+        val reopened = GameSessionFactory(context, names, InputSource.SIMULATION)
+        ok(reopened.open()).use { session ->
+            assertEquals(identity, session.identity)
+            val store = session.store
+            val history = ok(store.listVehicleHistory())
+            assertEquals(2, history.size)
+            assertEquals(VehicleLifecycle.SOLD, history.single { it.ownedVehicleId == sold.ownedVehicleId }.lifecycle)
+            val expectedIds = listOf(kept.ownedVehicleId)
+            assertEquals(expectedIds, ok(store.listOwnedVehicles()).map { it.ownedVehicleId })
+            val garage = Garage(ok(session.content).catalog)
+            val available = ok(garage.availableForRental(history, store.rental::activity))
+            assertEquals(expectedIds, available.map { it.ownedVehicleId })
+        }
+        val reopenedQueries = FactoryDeliveryHostQueries(reopened) { it.terms() }
+        assertEquals(beforeSale.freeSlots + 1, ok(reopenedQueries.read(identity)).freeSlots)
     }
 }

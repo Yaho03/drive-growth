@@ -1,6 +1,7 @@
 package io.drivegrowth.app.ui.shop
 
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.progression.VehicleActivity
 import io.drivegrowth.core.rental.*
 
 /** 고정 표시 입력. 잠금·비용·효과는 시험 공급값이며 UI 경제 계산/실제 저장이 아니다. */
@@ -12,8 +13,10 @@ object ShopPreviewStates {
         val fuel = FacilityOffer(Facility.FUEL_STATION, rule, true, GameMoney(500))
         return ShopScreenState.Content(
             Revision(12), "시험 가게", 2, 2, 5, GameMoney(2400), appearance,
-            listOf(ShopVehicle(OwnedVehicleId("fixture-car-1"), "캐스퍼 · 시험 표시", "대여 가능 · 공급값"),
-                ShopVehicle(OwnedVehicleId("fixture-car-2"), "아반떼 · 시험 표시", "대여 중 · 공급값")),
+            listOf(ShopVehicle(OwnedVehicleId("fixture-car-1"), "캐스퍼 · 시험 표시", "대여 가능 · 공급값",
+                    VehicleId("hyundai_casper"), Rarity.COMMON, VehicleActivity.IDLE),
+                ShopVehicle(OwnedVehicleId("fixture-car-2"), "아반떼 · 시험 표시", "대여 중 · 공급값",
+                    VehicleId("hyundai_avante"), Rarity.ADVANCED, VehicleActivity.RENTED)),
             listOf(
                 ShopFacility(Facility.FUEL_STATION, ShopOption("fuel", "주유소", "보유 차량 5대 필요 · 현재 2대", "구입 후 대여 추가 수익 · 금액 미제공",
                     ShopAvailability.LOCKED, ShopCommand.BuyFacility(fuel), fuel.price, rule, true)),

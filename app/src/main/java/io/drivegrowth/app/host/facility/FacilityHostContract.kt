@@ -11,7 +11,8 @@ import io.drivegrowth.core.rental.*
 data class FacilityFacts(val identity:GameIdentity, val definitionVersion:ContentVersion,
     val shop:ShopState, val balance:GameMoney, val vehicles:List<OwnedVehicle>,
     val activities:Map<OwnedVehicleId,VehicleActivity>, val resting:Set<OwnedVehicleId>,
-    val offers:Map<Facility,FacilityOffer>)
+    val offers:Map<Facility,FacilityOffer>,
+    val fuelBonusPerRental:GameMoney? = null)
 
 /** 호스트 포트의 전체 입력이다. 실제 E typed codec/원결과는 별도 adapter가 공급한다. */
 sealed interface FacilityCommand {

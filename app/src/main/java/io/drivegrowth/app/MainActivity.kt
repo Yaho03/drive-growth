@@ -1,7 +1,6 @@
 package io.drivegrowth.app
 
 import android.app.Activity
-import android.widget.ScrollView
 import io.drivegrowth.app.ui.delivery.*
 import io.drivegrowth.app.host.delivery.DeliveryHostReceipt
 import io.drivegrowth.core.delivery.DeliveryOutcome
@@ -16,22 +15,20 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.View
 import android.widget.FrameLayout
-import android.widget.Spinner
-import android.widget.ArrayAdapter
-import android.widget.AdapterView
+import android.widget.Button
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.LinearLayout
 import io.drivegrowth.app.host.garage.GarageCommandHost
 import io.drivegrowth.app.host.garage.GarageCommandState
 import io.drivegrowth.app.host.garage.GarageCommandView
 import io.drivegrowth.app.host.garage.GarageActionAvailability
-import io.drivegrowth.app.host.shop.ShopExpansionHostController
-import io.drivegrowth.app.host.shop.ShopExpansionAccess
-import io.drivegrowth.app.host.shop.SessionShopExpansionSource
 import io.drivegrowth.app.ui.shop.ShopScreenState
 import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.app.ui.shop.ShopEvent
 import io.drivegrowth.app.ui.shop.ShopMode
 import io.drivegrowth.app.ui.shop.ShopUiState
+import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.gacha.GachaView
 import io.drivegrowth.app.ui.gacha.GachaEvent
 import io.drivegrowth.app.host.GarageHostMapper
@@ -46,6 +43,7 @@ import io.drivegrowth.app.ui.ranking.RankingView
 import io.drivegrowth.app.ui.ranking.RankingMode
 import io.drivegrowth.app.ui.ranking.RankingUiState
 import io.drivegrowth.app.host.HostSession
+import io.drivegrowth.app.host.SimulationInputState
 import io.drivegrowth.app.host.ResultsHostMapper
 import io.drivegrowth.app.host.ResultsStateBundle
 import io.drivegrowth.app.ui.results.ResultsEvent
@@ -59,6 +57,7 @@ import io.drivegrowth.app.ui.garage.GarageEvent
 import io.drivegrowth.app.ui.garage.GarageScreenState
 import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.garage.GarageView
+import io.drivegrowth.app.runtime.rental.product.RentalAppExit
 import io.drivegrowth.app.vehicle.ForegroundInteraction
 import io.drivegrowth.app.vehicle.VehicleInput
 import io.drivegrowth.core.contract.ContractError
@@ -71,11 +70,13 @@ import io.drivegrowth.core.contract.Revision
 import io.drivegrowth.core.contract.VehicleInteraction
 import io.drivegrowth.core.progression.VehicleAction
 
-class MainActivity : Activity() {
+open class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private val interaction = ForegroundInteraction()
     private var input: VehicleInput? = null
     private var drivingStatus: String? = null
+    private var rentalFingerprint: Any? = null
+    private val rentalAppExit = RentalAppExit()
     private var navigation = HostNavigation()
     private var screen: HostQueryState = HostQueryState.Restricted
     private lateinit var management: GarageCommandHost
@@ -83,14 +84,13 @@ class MainActivity : Activity() {
     private var managementState: GarageCommandState = GarageCommandState.Idle
     private var recoveredManagement = false
     private var managementVisible = false
-    private lateinit var expansionSource: SessionShopExpansionSource
-    private lateinit var expansionHost: ShopExpansionHostController
-    private lateinit var expansionAccess: ShopExpansionAccess
-    private var expansionState: ShopScreenState = ShopScreenState.Loading
+    private lateinit var facilityControls: io.drivegrowth.app.ui.shop.FacilityControlsView
     private var pendingPage: HostPage? = null
     private var pendingRouteGeneration = 0L
     private var pendingRouteFailed = false
     private var pendingRouteEnabled = false
+    private var failedShopRestore: Bundle? = null
+    private val shopRestoreFailed get() = failedShopRestore != null
     private lateinit var shop: ShopView
     private lateinit var progression: io.drivegrowth.app.ui.progress.ProgressView
     private var progressionFrame: io.drivegrowth.app.host.progression.ProgressionFrame? = null
@@ -101,11 +101,17 @@ class MainActivity : Activity() {
     private var rankingState: RankingState = RankingState.Restricted
     private lateinit var delivery: DeliveryView
     private var deliveryAccessEnabled = false
+    private var restStartTicket: Any? = null
     private var deliveryReceipt: DeliveryHostReceipt? = null
-    private lateinit var deliveryBody: LinearLayout
     private var deliveryFrame = DeliveryFrame(0, DeliveryScreen.Loading)
     private lateinit var gacha: GachaView
-    private var navigationGeneration = 0L
+    private var navigationBar: MainNavigationBar? = null
+    private var simulationControlsExpanded = false
+    private var simulationToggle: Button? = null
+    private var simulationDetails: ScrollView? = null
+    private var simulationStatus: TextView? = null
+    private var simulationStart: Button? = null
+    private var simulationRetry: Button? = null
     private val destinations = listOf(HostPage.HOME to "가게", HostPage.GARAGE to "보유 차량", HostPage.COLLECTION to "도감",
         HostPage.GACHA to "가챠", HostPage.PROGRESSION to "퀘스트·진행", HostPage.DELIVERY to "탁송", HostPage.RANKING to "기록·랭킹", HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내")
     private val mapper = GarageHostMapper()
@@ -135,14 +141,32 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         navigation = restoreNavigation(savedInstanceState)
+        simulationControlsExpanded = savedInstanceState?.getBoolean("simulationControlsExpanded") == true
         style = GarageStyle(this)
         garage = GarageView(this, ::onGarageEvent).also { it.restoreSelection(navigation.selectedVehicleId) }
         collection = CollectionView(this, ::refresh)
         results = ResultsView(this, ::onResultsEvent)
-        shop = ShopView(this, ::onShopEvent)
+        shop = ShopView(this, ::onShopEvent).also { it.onOpenVehicle = ::openVehicleFromShop }
+        facilityControls = io.drivegrowth.app.ui.shop.FacilityControlsView(this, ::onFacilityEvent)
+        shop.facilityPanel = facilityControls
         val shopMode = ShopMode.entries.firstOrNull { it.name == savedInstanceState?.getString("shopMode") } ?: ShopMode.OVERALL
-        shop.restoreUiState(ShopUiState(mode = shopMode, sceneScrollY = savedInstanceState?.getInt("shopSceneY", 0) ?: 0,
-            controlsScrollY = savedInstanceState?.getInt("shopControlsY", 0) ?: 0))
+        var restoredFacility: io.drivegrowth.app.host.facility.FacilityCommand.Buy? = null
+        val restoredShop = if (savedInstanceState?.containsKey("shopUi") == true) {
+            val bundle = savedInstanceState.getBundle("shopUi")
+            val decoded = io.drivegrowth.app.host.shop.ShopUiStateBundle.decodePresent(bundle)
+            val original = io.drivegrowth.app.host.shop.ShopUiStateBundle.decodeFacility(bundle)
+            if (decoded is ContractResult.Success && original is ContractResult.Success) {
+                restoredFacility = original.value
+                decoded.value
+            } else {
+                // 잘못된 shopUi만 보존하고 다른 화면의 저장 상태는 현재 값으로 갱신한다.
+                failedShopRestore = Bundle(savedInstanceState).apply {
+                    keySet().filter { it != "shopUi" }.forEach(::remove)
+                }
+                ShopUiState()
+            }
+        } else ShopUiState(mode = shopMode, sceneScrollY = savedInstanceState?.getInt("shopSceneY", 0) ?: 0,
+            controlsScrollY = savedInstanceState?.getInt("shopControlsY", 0) ?: 0)
         ranking = RankingView(this) {
             if (allowed() && navigation.page == HostPage.RANKING) session.ranking.refresh()
             else { updateAccess(); ranking.render(RankingState.Restricted, false) }
@@ -156,9 +180,19 @@ class MainActivity : Activity() {
         automaticIntroAllowed = if (savedInstanceState?.containsKey("onboardingAutoEntryAllowed") == true)
             savedInstanceState.getBoolean("onboardingAutoEntryAllowed") else savedInstanceState == null && lastNonConfigurationInstance == null
         val deliveryHandler = handler
-        session = lastNonConfigurationInstance as? HostSession ?: HostSession(applicationContext, { deliveryHandler.post(it) },
-            ResultsStateBundle.decode(savedInstanceState?.getBundle("results")),
-            OnboardingStateBundle.decode(savedInstanceState?.getBundle("onboardingHost")))
+        session = lastNonConfigurationInstance as? HostSession ?: HostSession(
+            context = applicationContext,
+            main = { deliveryHandler.post(it) },
+            restoredResults = ResultsStateBundle.decode(savedInstanceState?.getBundle("results")),
+            restoredOnboarding = OnboardingStateBundle.decode(savedInstanceState?.getBundle("onboardingHost")),
+            restoredShop = restoredShop,
+            restoredFacility = restoredFacility,
+            failedShopRestore = failedShopRestore,
+            simulation = io.drivegrowth.app.host.HostSimulationProvider.create(this),
+        )
+        if (session.failedShopRestore == null) session.failedShopRestore = failedShopRestore
+        failedShopRestore = session.failedShopRestore
+        shop.restoreUiState(session.home.uiState)
         progression = io.drivegrowth.app.ui.progress.ProgressView(this) { event ->
             if (allowed() && navigation.page == HostPage.PROGRESSION) session.progression.handle(event) else updateAccess()
         }
@@ -171,23 +205,20 @@ class MainActivity : Activity() {
         progression.restoreUiState(session.progressionUi)
         deliveryFrame = session.deliveryUi.frame ?: DeliveryFrame(0, DeliveryScreen.Loading)
         delivery = DeliveryView(this, { request ->
-            session.deliveryUi = delivery.saveUiState()
-            session.delivery.onRequest(request)
-        }, session.deliveryUi)
-        deliveryBody = style.column()
+            if (restStartTicket == null) {
+                session.deliveryUi = delivery.saveUiState()
+                session.delivery.onRequest(request)
+            }
+        }, session.deliveryUi, navigationControls = ::deliveryNavigationControls, hostStatus = ::deliveryHostStatus,
+            canConfirmOffer = { !session.delivery.isSavingDisplayedOffers })
         gacha = GachaView(this, ::onGachaEvent, session.gacha.uiState)
         results.restoreUiState(session.results.uiState)
         queries = session.queries
-        expansionSource = SessionShopExpansionSource(applicationContext, session.games)
-        expansionHost = ShopExpansionHostController(expansionSource, session::expansionWorker,
-            { handler.post(it) }, { state, _ ->
-                expansionState = state
-                if (state is ShopScreenState.Content && shop.uiState.pending != null)
-                    shop.restoreUiState(shop.uiState.copy(pending = null, selection = null, message = "최신 저장 상태를 표시합니다."))
-                if (::body.isInitialized) render()
-            }, shop::complete, shop::completeRetry, committed = { if (allowed()) queries.refresh() },
-            initialRevision = shop.uiState.latestRevision ?: Revision(0))
-        expansionAccess = ShopExpansionAccess(expansionHost)
+        session.home.attach({ _, _ -> if (::body.isInitialized) render() }, { request, result ->
+            shop.complete(request, result)
+            if (result is ContractResult.Success && allowed()) { queries.refresh(); refreshPendingRoute() }
+            if (::body.isInitialized) render()
+        }, shop::completeRetry)
         management = GarageCommandHost(applicationContext, { handler.post(it) }, session.games) { state ->
             val prior = managementState
             managementState = state
@@ -204,7 +235,8 @@ class MainActivity : Activity() {
         }
         managementView = GarageCommandView(this, { management.controller.confirm() }, ::cancelPreparation,
             { management.controller.retry() }, { management.controller.cancelPending() }, { management.controller.chooseMaterial(it) }, { management.controller.acknowledge() })
-        panel = style.column().apply { setBackgroundColor(style.base) }
+        panel = style.column().apply { setBackgroundColor(PixelStyle.background) }
+        if (session.simulation != null) panel.addView(createSimulationControls())
         chrome = style.column().apply { setPadding(style.dp(16), 0, style.dp(16), 0) }
         body = FrameLayout(this)
         panel.addView(chrome)
@@ -255,19 +287,21 @@ class MainActivity : Activity() {
         }, { request, frame ->
             delivery.complete(request, frame)
             session.deliveryUi = delivery.saveUiState()
-        })
+        }, onDiscoverySaved = queries::refresh, onOriginalResolved = ::refreshPendingRoute)
         session.deliveryNavigation.changed = { if (active && allowed() && navigation.page == HostPage.DELIVERY) render() }
         queries.attach {
             screen = it
             if (it is HostQueryState.Content) refreshPendingRoute()
             render()
             if (it is HostQueryState.Content || it is HostQueryState.Failure) {
-                session.results.completeQuery()
-                results.completeRetry()
+                if (!session.results.hasHistorySource) {
+                    session.results.completeQuery()
+                    results.completeRetry()
+                }
                 shop.completeRetry()
             }
         }
-        if (savedInstanceState == null) {
+        if (savedInstanceState == null && session.simulation == null) {
             val permissions = arrayOf("android.car.permission.CAR_SPEED", "android.car.permission.CAR_POWERTRAIN")
                 .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
             if (permissions.isNotEmpty()) requestPermissions(permissions.toTypedArray(), 1)
@@ -286,10 +320,14 @@ class MainActivity : Activity() {
     }
 
     private fun startObserving() {
+        rentalAppExit.clear()
         setVisible(true)
         if (active) return
         active = true
-        session.driving.start { result ->
+        rentalFingerprint = null
+        session.simulation?.changed = { if (active) { updateAccess(); if (::chrome.isInitialized) render() } }
+        if (session.simulation?.clock() is ContractResult.Failure) { updateAccess(); return }
+        val rentalReceiver = session.driving.start { result ->
             val status = when (result) {
                 is ContractResult.Failure -> {
                     android.util.Log.w("DriveGrowthDriving", "recording_failure code=${result.error}")
@@ -301,11 +339,31 @@ class MainActivity : Activity() {
                         session.progression.refresh()
                         session.ranking.refresh()
                     }
-                    if (result.value.waiting != null) "주행 기록의 정산 근거를 확인하고 있어요."
-                    else "수신한 주행 관측을 기록하고 있어요."
+                    if (result.value.waiting != null) "주행 기록을 확인하고 있어요."
+                    else null
                 }
             }
             if (drivingStatus != status) { drivingStatus = status; if (::chrome.isInitialized) render() }
+        }
+        session.rental.start(rentalReceiver) { result ->
+            when (result) {
+                is ContractResult.Failure -> if (rentalFingerprint != result.error) {
+                    rentalFingerprint = result.error
+                    android.util.Log.w("DriveGrowthRental", "driver_deferred code=${result.error}")
+                    queries.refresh(); session.onboarding.refresh()
+                }
+                is ContractResult.Success -> {
+                    val snapshot = result.value
+                    val fingerprint = listOf(snapshot.pending.map { it.id to it.phase }, snapshot.firstCompleted?.rentalId,
+                        snapshot.deferred.toMap())
+                    if (rentalFingerprint != fingerprint) {
+                        rentalFingerprint = fingerprint
+                        queries.refresh(); session.progression.refresh(); session.ranking.refresh(); session.onboarding.refresh()
+                        if (navigation.page == HostPage.RESULTS) session.results.refreshHistory()
+                        if (snapshot.deferred.isNotEmpty()) android.util.Log.w("DriveGrowthRental", "motion_ranges_deferred")
+                    }
+                }
+            }
         }
         session.progression.attach { frame ->
             progressionFrame = frame
@@ -324,7 +382,15 @@ class MainActivity : Activity() {
             updateAccess()
             results.completeMarkViewed(id, result)
         }
-        try {
+        session.results.attachHistory { state ->
+            if (state !is io.drivegrowth.app.ui.results.ResultsScreenState.Loading) results.completeRetry()
+            if (::chrome.isInitialized) render()
+        }
+        if (session.simulation != null) {
+            session.attachSimulation { frame, done ->
+                if (active) { session.driving.accept(frame, done); updateAccess() }
+            }
+        } else try {
             input = VehicleInput(this, { observation ->
                 val zone = session.drivingCalendar.take(observation)
                 if (active) {
@@ -345,10 +411,14 @@ class MainActivity : Activity() {
     }
 
     private fun stopObserving() {
+        restStartTicket = null
+        session.simulation?.stop()
+        session.simulation?.changed = null
         active = false // 새 UI/관측 입구를 먼저 닫고 SDK queue를 중단한다.
         input?.stop()
         input = null
         session.driving.stop() // 같은 serial worker 뒤에 실제 중단 시각과 receiver 경계를 보존한다.
+        session.rental.pause()
         session.progressionUi = progression.uiState
         session.progression.setControlsEnabled(false)
         session.progression.detach()
@@ -365,6 +435,18 @@ class MainActivity : Activity() {
         input = null
     }
 
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (active && isTaskRoot) rentalAppExit.userLeaveHint()
+    }
+
+    override fun onStop() {
+        if (rentalAppExit.consumeStop(isChangingConfigurations)) {
+            session.rental.inactive(false, session.rentalClock.read())
+        }
+        super.onStop()
+    }
+
     override fun onDestroy() {
         session.progressionUi = progression.uiState
         session.progression.detach()
@@ -374,7 +456,8 @@ class MainActivity : Activity() {
         delivery.release()
         pendingRouteGeneration++
         session.ranking.detach()
-        expansionHost.release()
+        session.home.remember(shop.uiState)
+        session.home.detach()
         management.release()
         queries.detach()
         session.gacha.remember(gacha.uiState)
@@ -399,11 +482,16 @@ class MainActivity : Activity() {
         outState.putString("rankingMode", ranking.uiState.mode.name)
         outState.putString("rankingMetric", ranking.uiState.metric.name)
         outState.putInt("rankingY", ranking.uiState.scrollY)
+        failedShopRestore?.let(outState::putAll) ?: run {
+            session.home.remember(shop.uiState)
+            outState.putBundle("shopUi", io.drivegrowth.app.host.shop.ShopUiStateBundle.encode(shop.uiState, session.home.facilityOriginalCommand))
+        }
         outState.putString("shopMode", shop.uiState.mode.name)
         outState.putInt("shopSceneY", shop.uiState.sceneScrollY)
         outState.putInt("shopControlsY", shop.uiState.controlsScrollY)
         outState.putString("returnPage", navigation.returnPage.name)
         outState.putString("page", navigation.page.name)
+        if (session.simulation != null) outState.putBoolean("simulationControlsExpanded", simulationControlsExpanded)
         outState.putString("selectedVehicle", navigation.selectedVehicleId?.value)
         navigation.pendingGarageRequest?.let {
             outState.putString("pendingVehicle", it.id.value)
@@ -413,11 +501,103 @@ class MainActivity : Activity() {
         super.onSaveInstanceState(outState)
     }
 
-    private fun allowed() = active &&
-        interaction.state(SystemClock.elapsedRealtime()) == Observation.Available(VehicleInteraction.ALLOWED)
+    protected fun allowed() = active && restStartTicket == null &&
+        (session.simulation?.controlsAllowed ?: (interaction.state(SystemClock.elapsedRealtime()) == Observation.Available(VehicleInteraction.ALLOWED)))
+
+    protected fun canStartRestSimulation(): Boolean =
+        session.simulation != null && navigation.page != HostPage.ONBOARDING && allowed()
+
+    protected fun startRestSimulation() {
+        if (!canStartRestSimulation()) return
+        val simulation = session.simulation ?: return
+        val ticket = Any()
+        restStartTicket = ticket
+        // 같은 UI 이벤트에서 새 탁송 요청을 닫고, 앞선 거래 뒤 worker에서 원장을 확인한다.
+        updateAccess()
+        session.prepareSimulation(rest = true) { result ->
+            if (restStartTicket !== ticket) return@prepareSimulation
+            try {
+                if (active && simulation.controlsAllowed && navigation.page != HostPage.ONBOARDING) when (result) {
+                    is ContractResult.Failure -> simulation.rejected(result.error)
+                    is ContractResult.Success -> { collapseSimulationControls(); simulation.beginRest() }
+                }
+            } finally {
+                restStartTicket = null
+                if (active) updateAccess()
+            }
+        }
+    }
+
+    protected open fun onControlsAvailabilityChanged(allowed: Boolean) = Unit
+
+    protected open fun addSimulationActions(content: LinearLayout) = Unit
+
+    private fun createSimulationControls(): View {
+        val simulation = checkNotNull(session.simulation)
+        val content = style.column()
+        simulationStatus = style.text("", 16).apply { tag = "simulation:status"; content.addView(this) }
+        simulationStart = style.button("모의주행 시작") {
+            if (allowed() && navigation.page != HostPage.ONBOARDING) session.prepareSimulation { result ->
+                if (allowed()) when (result) {
+                    is ContractResult.Failure -> simulation.rejected(result.error)
+                    is ContractResult.Success -> { collapseSimulationControls(); simulation.begin() }
+                }
+            }
+        }.apply { tag = "simulation:start"; content.addView(this) }
+        addSimulationActions(content)
+        val retry = style.button("같은 모의 입력 다시 시도") {
+            if (simulation.canRetry) simulation.retry()
+        }.apply {
+            tag = "simulation:retry"
+            visibility = View.GONE
+        }
+        simulationRetry = retry
+        val details = ScrollView(this).apply {
+            addView(content)
+            visibility = View.GONE
+        }
+        simulationDetails = details
+        val toggle = style.button("시연 · 모의 입력") {
+            simulationControlsExpanded = !simulationControlsExpanded
+            renderSimulationControls(allowed())
+        }.apply {
+            tag = "simulation:controls"
+            minimumHeight = style.dp(44)
+            minHeight = style.dp(44)
+            textSize = 16f
+            setPadding(style.dp(12), 0, style.dp(12), 0)
+        }
+        simulationToggle = toggle
+        return style.column().apply {
+            addView(toggle, LinearLayout.LayoutParams(-1, -2))
+            addView(retry, LinearLayout.LayoutParams(-1, -2))
+            addView(details, LinearLayout.LayoutParams(-1, style.dp(144)))
+        }
+    }
+
+    private fun collapseSimulationControls() {
+        simulationControlsExpanded = false
+        renderSimulationControls(allowed())
+    }
+
+    private fun renderSimulationControls(enabled: Boolean) {
+        val simulation = session.simulation ?: return
+        simulationToggle?.apply {
+            isSelected = simulationControlsExpanded
+            text = if (simulationControlsExpanded) "시연 · 모의 입력 ▾" else "시연 · 모의 입력 ▸"
+        }
+        simulationDetails?.visibility = if (simulationControlsExpanded) View.VISIBLE else View.GONE
+        simulationStatus?.text = simulation.status
+        simulationStart?.isEnabled = enabled && navigation.page != HostPage.ONBOARDING
+        simulationRetry?.visibility = if (simulation.canRetry) View.VISIBLE else View.GONE
+    }
 
     private fun updateAccess() {
         val enabled = allowed()
+        updateNavigationBar(enabled)
+        onControlsAvailabilityChanged(enabled)
+        renderSimulationControls(enabled)
+        session.results.setControlsEnabled(enabled && navigation.page == HostPage.RESULTS)
         queries.setControlsEnabled(enabled)
         session.progression.setControlsEnabled(enabled && navigation.page == HostPage.PROGRESSION)
         renderProgression()
@@ -430,7 +610,7 @@ class MainActivity : Activity() {
         session.gacha.setControlsEnabled(enabled && navigation.page == HostPage.GACHA)
         session.ranking.setControlsEnabled(enabled && navigation.page == HostPage.RANKING)
         session.onboarding.setControlsEnabled(enabled)
-        expansionAccess.setControlsEnabled(enabled && navigation.page == HostPage.HOME)
+        session.home.setControlsEnabled(enabled && navigation.page == HostPage.HOME && !shopRestoreFailed)
         management.controller.setControlsEnabled(enabled)
         val routeGained = enabled && !pendingRouteEnabled
         pendingRouteEnabled = enabled
@@ -441,82 +621,116 @@ class MainActivity : Activity() {
     private fun refresh() {
         if (!allowed()) { updateAccess(); return }
         session.onboarding.refresh()
-        if (navigation.page == HostPage.PROGRESSION) session.progression.refresh()
+        if (navigation.page == HostPage.RESULTS) { session.results.remember(results.uiState); session.results.refreshHistory() }
+        else if (navigation.page == HostPage.PROGRESSION) session.progression.refresh()
         else if (navigation.page == HostPage.DELIVERY) { session.deliveryNavigation.refresh(); session.delivery.refresh() }
-        else if (navigation.page == HostPage.HOME) expansionHost.load()
+        else if (navigation.page == HostPage.HOME) { session.facility.refresh(); session.home.refresh() }
         else if (navigation.page == HostPage.GACHA) session.gacha.refresh()
         else if (navigation.page == HostPage.RANKING) session.ranking.refresh()
         else if (screen != HostQueryState.Loading) queries.refresh()
     }
 
+    private fun updateNavigationBar(enabled: Boolean) {
+        val page = navigation.page
+        val previous = navigationBar
+        if (enabled && previous?.selectedPage == page) return
+        navigationBar = null
+        previous?.let(panel::removeView)
+        if (!enabled) return
+
+        lateinit var bar: MainNavigationBar
+        fun isCurrent() = navigationBar === bar && navigation.page == page && allowed()
+        bar = MainNavigationBar(this, destinations,
+            { target -> if (isCurrent() && target != page) select(target) },
+            { if (isCurrent()) onBackPressed() },
+            { if (isCurrent()) refresh() })
+        bar.showSelected(page)
+        navigationBar = bar
+        panel.addView(bar, LinearLayout.LayoutParams(-1, -2))
+    }
+
     private fun render() {
         val enabled = allowed()
+        updateNavigationBar(enabled)
         val garageState = when (val current = screen) {
             is HostQueryState.Content -> GarageActionAvailability.map(mapper.garage(current.snapshot), current.snapshot)
-            is HostQueryState.Failure -> GarageScreenState.Error("조회 실패 (${current.error})")
+            is HostQueryState.Failure -> GarageScreenState.Error("차량 정보를 읽지 못했어요. 다시 조회해 주세요.")
             else -> GarageScreenState.Loading
         }
         val collectionState = when (val current = screen) {
             is HostQueryState.Content -> mapper.collection(current.snapshot, current.snapshot.collectionHistory)
-            is HostQueryState.Failure -> CollectionScreenState.Error("조회 실패 (${current.error})")
+            is HostQueryState.Failure -> CollectionScreenState.Error("도감을 읽지 못했어요. 다시 조회해 주세요.")
             else -> CollectionScreenState.Loading
         }
         ranking.render(rankingState, enabled && navigation.page == HostPage.RANKING)
         managementView.render(managementState, enabled)
-        val shopState = when (val current = expansionState) {
-            is ShopScreenState.Content -> current.copy(name = current.name + when (expansionSource.identity?.source) {
-                InputSource.SIMULATION -> " · 모의 원장"
-                InputSource.VEHICLE -> " · 차량 원장"
-                null -> " · 출처 확인 필요"
-            })
-            else -> current
-        }
-        shop.render(shopState, enabled)
+        val homeEnabled = enabled && navigation.page == HostPage.HOME && !shopRestoreFailed
+        shop.render(if (shopRestoreFailed) ShopScreenState.Failure("가게 화면 상태를 복원하지 못해 요청을 보존하고 조작을 제한합니다.")
+            else session.home.state.screen, homeEnabled)
+        val facility = session.facility.state
+        val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
+            ?.associate { it.vehicleId to it.displayName }.orEmpty()
+        facilityControls.render(facility, homeEnabled && session.home.facilityControlsEnabled, names)
         garage.render(garageState, enabled)
         collection.render(collectionState, enabled)
-        results.render(resultsMapper.map(screen), enabled)
+        results.render(if (session.results.hasHistorySource) session.results.historyState else resultsMapper.map(screen), enabled)
         onboarding.render(onboardingState, enabled)
         renderDelivery(enabled && navigation.page == HostPage.DELIVERY)
         chrome.removeAllViews()
+        renderSimulationControls(enabled)
         if (!enabled) {
-            showBody(style.text("주차 후 조작이 허용되면 이용할 수 있습니다."))
+            val simulation = session.simulation
+            val message = when (simulation?.inputState) {
+                null -> "주차 후 조작이 허용되면 이용할 수 있습니다."
+                SimulationInputState.PROCESSING -> "모의 입력을 처리하고 있어요. 잠시 기다려 주세요."
+                SimulationInputState.RETRYABLE_FAILURE -> "모의 입력이 중단됐어요. 같은 입력을 다시 시도해 주세요."
+                SimulationInputState.UNAVAILABLE -> "모의 입력을 확인할 수 없어요. 기존 저장 기록은 그대로예요."
+                SimulationInputState.READY -> "지금은 시연을 조작할 수 없어요. 시연 상태를 확인해 주세요."
+            }
+            showBody(style.text(message).apply { if (simulation != null) tag = "simulation:blocked" })
             return
         }
-        val token = ++navigationGeneration
-        val links = style.row()
-        links.addView(style.button("뒤로") { if (token == navigationGeneration) onBackPressed() })
-        val destination = Spinner(this).apply {
-            tag = "host:destination"
-            contentDescription = "화면 선택"
-            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, destinations.map { it.second })
-            setSelection(destinations.indexOfFirst { it.first == navigation.page }.coerceAtLeast(0))
-            onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                    val target = destinations.getOrNull(position)?.first ?: return
-                    if (token == navigationGeneration && target != navigation.page) select(target)
-                }
+        if (session.simulation == null) drivingStatus?.let { chrome.addView(style.text(it)) }
+        if (navigation.page == HostPage.HOME && homeEnabled) {
+            val home = session.home.state
+            if (home.activationRequired) chrome.addView(style.button("꾸미기 기능 사용 시작") {
+                if (allowed() && navigation.page == HostPage.HOME && !shopRestoreFailed) session.home.activateDecoration()
+            }.apply { tag = "decoration:activate"; isEnabled = homeEnabled })
+            (home.decoration?.receipt ?: (home.original as? io.drivegrowth.app.data.HostCheckpointResult.Decoration)?.value)?.let { receipt ->
+                val cost = if (receipt.settlement == null) "비용 없음" else "사용한 게임머니 ${receipt.command.expectedPrice.units}"
+                chrome.addView(style.text("꾸미기 적용 완료 · $cost · 적용 당시 잔액 ${receipt.state.balance.units}")
+                    .apply { tag = "decoration:receipt" })
             }
+            val recovered = when (val original = home.original) {
+                is io.drivegrowth.app.data.HostCheckpointResult.Expand -> "확장" to original.value
+                is io.drivegrowth.app.data.HostCheckpointResult.FacilityPurchase -> "시설" to original.value
+                else -> null
+            }
+            recovered?.let { (kind, receipt) ->
+                chrome.addView(style.text("$kind 완료 · 적용 당시 잔액 ${receipt.balance.units}")
+                    .apply { tag = "shop:original-receipt" })
+            }
+            if (home.decoration?.pending != null && home.decoration.receipt?.command != home.decoration.pending)
+                chrome.addView(style.button("아직 적용되지 않은 꾸미기 취소") {
+                    if (allowed() && navigation.page == HostPage.HOME) session.home.cancelDecorationSaved()
+                }.apply { tag = "decoration:cancel-saved"; isEnabled = homeEnabled })
+            if (home.screen is ShopScreenState.Failure) chrome.addView(style.button("아직 적용되지 않은 확장 취소") {
+                if (allowed() && navigation.page == HostPage.HOME) session.home.cancelExpansionSaved()
+            }.apply { isEnabled = homeEnabled })
         }
-        links.addView(destination, LinearLayout.LayoutParams(0, style.dp(56), 1f))
-        links.addView(style.button("새로고침") { if (token == navigationGeneration) refresh() })
-        chrome.addView(links)
-        drivingStatus?.let { chrome.addView(style.text(it)) }
-        if (navigation.page == HostPage.HOME && expansionState is ShopScreenState.Failure)
-            chrome.addView(style.button("보관한 미실행 확장 요청 취소") { expansionHost.cancelSaved() })
         if (navigation.page == HostPage.PROGRESSION) {
             if (progressionRestoreFailed) chrome.addView(style.text("화면 상태를 복원하지 못해 저장 기록을 다시 확인합니다."))
-            chrome.addView(style.button("미시작 퀘스트 청구 취소 확인") { if (allowed()) session.progression.cancelSaved() })
+            chrome.addView(style.button("아직 처리되지 않은 보상 요청 취소") { if (allowed()) session.progression.cancelSaved() })
         }
         if (pendingRouteFailed)
-            chrome.addView(style.button("보관 요청 종류를 다시 확인") { refreshPendingRoute() })
+            chrome.addView(style.button("처리 중인 요청 다시 확인") { refreshPendingRoute() })
         pendingPage?.takeIf { it != navigation.page }?.let { target ->
             chrome.addView(style.button(when (target) {
                 HostPage.GACHA -> "보관한 가챠 요청 확인"
                 HostPage.GARAGE -> "보관한 차량 관리 요청 확인"
                 HostPage.DELIVERY -> "보관한 탁송 요청 확인"
-                HostPage.PROGRESSION -> "보관한 퀘스트 청구 확인"
-                else -> "보관한 가게 확장 요청 확인"
+                HostPage.PROGRESSION -> "보관한 보상 청구 확인"
+                else -> "보관한 가게 요청 확인"
             }) {
                 select(target)
                 if (target == HostPage.GARAGE) { managementVisible = true; management.controller.recover() }
@@ -524,9 +738,14 @@ class MainActivity : Activity() {
         }
         if (navigation.page == HostPage.GACHA && session.gacha.failed)
             chrome.addView(style.button("보관한 미실행 가챠 요청 취소") { session.gacha.cancelUnstarted() })
-        navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE && !managementVisible }?.let {
+        navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE && !managementVisible }?.let { request ->
             chrome.addView(style.text("이전 관리 준비 요청입니다. 최신 상태와 비용을 다시 확인해 주세요."))
-            chrome.addView(style.button("관리 조건 다시 조회") { managementVisible = true; management.controller.open(it) })
+            chrome.addView(style.button("관리 조건 다시 조회", enabled = managementState != GarageCommandState.Loading) {
+                if (!allowed() || navigation.page != HostPage.GARAGE || navigation.pendingGarageRequest != request ||
+                    managementVisible || managementState == GarageCommandState.Loading) return@button
+                managementVisible = true
+                management.controller.open(request)
+            })
             chrome.addView(style.button("준비 요청 닫기") { cancelPreparation() })
         }
         when (navigation.page) {
@@ -537,7 +756,7 @@ class MainActivity : Activity() {
             HostPage.HOME -> showBody(shop)
             HostPage.GACHA -> showBody(gacha)
             HostPage.DELIVERY -> {
-                showBody(deliveryBody)
+                showBody(delivery)
                 val shown = deliveryFrame.version
                 delivery.post {
                     if (active && allowed() && navigation.page == HostPage.DELIVERY && delivery.isShown &&
@@ -564,18 +783,26 @@ class MainActivity : Activity() {
     private fun renderDelivery(enabled: Boolean) {
         delivery.render(deliveryFrame, enabled)
         session.deliveryUi = delivery.saveUiState()
-        deliveryBody.removeAllViews()
+    }
+
+    private fun deliveryNavigationControls(): View {
         val details = style.column()
-        if (enabled) {
+        if (session.simulation != null) {
+            details.addView(style.text(session.deliveryNavigation.description.orEmpty()))
+            details.addView(style.button("시연 목적지 확인") {
+                if (allowed() && session.deliveryNavigation.confirm() is ContractResult.Success) session.delivery.refresh()
+            }.apply { tag = "simulation:destination" })
+        } else {
             val raw = session.deliveryNavigation.snapshot
             val destination = raw?.destination as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
             val distance = raw?.remainingEstimatedMeters as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
             details.addView(style.text("내비에서 목적지를 먼저 설정한 뒤 여기서 조회하고 확인해 주세요."))
+            details.addView(style.text("현재 경로의 도착이 확인될 때까지 보상은 대기해요."))
             details.addView(style.button("내비 목적지 다시 조회") { session.deliveryNavigation.refresh() })
             if (destination != null && distance != null && destination.stamp == distance.stamp) {
-                details.addView(style.text("내비 반환 목적지: ${destination.value.name ?: "이름 없음"} · ${destination.value.address ?: "주소 없음"}"))
-                details.addView(style.text("남은 예상거리 ${distance.value}m · 수신 UTC ${destination.stamp.receivedAtMillis}ms"))
-                details.addView(style.text("남은 예상거리는 실제 이동거리·도착 증거와 별개예요."))
+                details.addView(style.text("내비 목적지: ${destination.value.name ?: "이름 없음"} · ${destination.value.address ?: "주소 없음"}"))
+                details.addView(style.text("남은 예상거리 ${distance.value}m"))
+                details.addView(style.text("남은 거리는 내비가 계산한 예상거리예요."))
                 details.addView(style.button("이 목적지와 남은 예상거리 확인") {
                     when (session.deliveryNavigation.confirm()) {
                         is ContractResult.Success -> session.delivery.refresh()
@@ -583,46 +810,53 @@ class MainActivity : Activity() {
                     }
                 })
             }
-            details.addView(style.text("실제 이동거리와 도착 상관 근거는 확인 대기예요. 프로필만으로 실차 주행을 확정하지 않아요."))
-            val state = session.delivery.state
-            val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
-                ?.associate { it.vehicleId to it.displayName }.orEmpty()
-            val date = DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"))
-            for (held in state?.held.orEmpty()) {
-                val name = names[held.vehicle.vehicleId] ?: "차량 정보 확인 중"
-                details.addView(style.text("임시 보관 · $name · ${style.rarity(held.vehicle.rarity)} · 낸 금액 ${held.price.units}"))
-                details.addView(style.text("보관 기한 ${date.format(Instant.ofEpochMilli(held.deadline.value))} (한국시간)"))
-            }
-            if (state?.held?.isNotEmpty() == true)
-                details.addView(style.button("보관 차량 처리 조건 다시 확인") { session.delivery.refresh() })
-            state?.receipt?.let { receipt ->
-                val message = when (receipt) {
-                    is DeliveryHostReceipt.Selected -> "의뢰 선택이 확정됐어요."
-                    is DeliveryHostReceipt.Changed -> "목적지 변경이 확정됐어요."
-                    is DeliveryHostReceipt.Abandoned -> "의뢰 포기가 확정됐어요."
-                    is DeliveryHostReceipt.Arrived -> when (receipt.value.outcome) {
-                        is DeliveryOutcome.AwaitingEvidence -> "도착 근거를 확인하고 있어요."
-                        is DeliveryOutcome.IncomeCompleted -> "수익 탁송 보상이 확정됐어요."
-                        is DeliveryOutcome.VehicleDelivered -> "구매 차량 지급이 확정됐어요."
-                        is DeliveryOutcome.VehicleHeld -> "구매 차량을 임시 보관했어요."
-                        is DeliveryOutcome.IncomeExpired -> "도착 기한이 지나 의뢰가 종료됐어요."
-                        is DeliveryOutcome.PurchaseRefunded -> "미도착 의뢰의 구매 대금 환급이 확정됐어요."
-                    }
-                    is DeliveryHostReceipt.Held -> when (receipt.value.outcome) {
-                        is HoldOutcome.StillHeld -> "차량을 계속 보관하고 있어요."
-                        is HoldOutcome.Claimed -> "보관 차량 수령이 확정됐어요."
-                        is HoldOutcome.Refunded -> "보관 만료 환급이 확정됐어요."
-                    }
-                }
-                details.addView(style.text(message))
-                details.addView(style.button("처리 결과 확인하고 새로 조회") { session.delivery.acknowledge() })
-            }
-            if (session.delivery.canCancelUnstarted == true)
-                details.addView(style.button("미실행 요청 취소 확인") { session.delivery.cancelUnstarted() })
         }
-        if (details.childCount > 0) deliveryBody.addView(ScrollView(this).apply { addView(details) },
-            LinearLayout.LayoutParams(-1, style.dp(144)))
-        deliveryBody.addView(delivery, LinearLayout.LayoutParams(-1, 0, 1f))
+        return details
+    }
+
+    private fun deliveryHostStatus(): View? {
+        val state = session.delivery.state
+        val heldVehicles = state?.held.orEmpty()
+        val canCancel = session.delivery.canCancelUnstarted
+        if (heldVehicles.isEmpty() && state?.receipt == null && !canCancel) return null
+        val details = style.column()
+        val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
+            ?.associate { it.vehicleId to it.displayName }.orEmpty()
+        val date = DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"))
+        for (held in heldVehicles) {
+            val name = names[held.vehicle.vehicleId] ?: "차량 정보 확인 중"
+            details.addView(style.text("임시 보관 · $name · ${style.rarity(held.vehicle.rarity)} · 낸 금액 ${held.price.units}"))
+            details.addView(style.text("보관 기한 ${date.format(Instant.ofEpochMilli(held.deadline.value))} (한국시간)"))
+        }
+        if (heldVehicles.isNotEmpty())
+            details.addView(style.button("보관 차량 처리 조건 다시 확인", enabled = !session.delivery.isSavingDisplayedOffers) { session.delivery.refresh() })
+        state?.receipt?.let { receipt ->
+            val message = when (receipt) {
+                is DeliveryHostReceipt.Selected -> "의뢰 선택이 확정됐어요."
+                is DeliveryHostReceipt.Changed -> "목적지 변경이 확정됐어요."
+                is DeliveryHostReceipt.Abandoned -> "의뢰 포기가 확정됐어요."
+                is DeliveryHostReceipt.Arrived -> when (receipt.value.outcome) {
+                    is DeliveryOutcome.AwaitingEvidence -> "도착 근거를 확인하고 있어요."
+                    is DeliveryOutcome.IncomeCompleted -> "수익 탁송 보상이 확정됐어요."
+                    is DeliveryOutcome.VehicleDelivered -> "구매 차량 지급이 확정됐어요."
+                    is DeliveryOutcome.VehicleHeld -> "구매 차량을 임시 보관했어요."
+                    is DeliveryOutcome.IncomeExpired -> "도착 기한이 지나 의뢰가 종료됐어요."
+                    is DeliveryOutcome.PurchaseRefunded -> "미도착 의뢰의 구매 대금 환급이 확정됐어요."
+                }
+                is DeliveryHostReceipt.Held -> when (receipt.value.outcome) {
+                    is HoldOutcome.StillHeld -> "차량을 계속 보관하고 있어요."
+                    is HoldOutcome.Claimed -> "보관 차량 수령이 확정됐어요."
+                    is HoldOutcome.Refunded -> "보관 만료 환급이 확정됐어요."
+                }
+            }
+            details.addView(style.text(message))
+            details.addView(style.button("처리 결과 확인하고 새로 조회", enabled = session.delivery.canAcknowledge) {
+                session.delivery.acknowledge()
+            }.apply { tag = "delivery:acknowledge" })
+        }
+        if (canCancel)
+            details.addView(style.button("미실행 요청 취소 확인") { session.delivery.cancelUnstarted() })
+        return details
     }
 
     private fun showBody(view: View) {
@@ -654,16 +888,45 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun openVehicleFromShop(id: OwnedVehicleId, revision: Revision) {
+        if (!allowed() || navigation.page != HostPage.HOME || shopRestoreFailed) return
+        val current = session.home.state.screen as? ShopScreenState.Content ?: return
+        if (current.revision != revision || current.vehicles.none { it.id == id } ||
+            shop.uiState.pending != null || navigation.pendingGarageRequest != null) return
+        navigation.selectedVehicleId = id
+        garage.restoreSelection(id)
+        select(HostPage.GARAGE)
+        queries.refresh()
+    }
+
     private fun onShopEvent(event: ShopEvent) {
-        if (!allowed()) {
+        session.home.remember(shop.uiState)
+        if (!allowed() || navigation.page != HostPage.HOME || shopRestoreFailed) {
             updateAccess()
             if (event is ShopEvent.Submit) shop.complete(event.request, ContractResult.Failure(ContractError.UX_RESTRICTED))
             else shop.completeRetry()
             return
         }
         when (event) {
-            ShopEvent.Retry -> if (!expansionHost.load()) shop.completeRetry()
-            is ShopEvent.Submit -> expansionHost.submit(event.request)
+            ShopEvent.Retry -> if (!session.home.refresh()) shop.completeRetry()
+            is ShopEvent.Submit -> session.home.submit(event.request)
+        }
+    }
+
+    private fun onFacilityEvent(event: io.drivegrowth.app.ui.shop.FacilityControlsEvent) {
+        if (!allowed() || navigation.page != HostPage.HOME) { updateAccess(); return }
+        when (event) {
+            is io.drivegrowth.app.ui.shop.FacilityControlsEvent.SetResting -> session.facility.setResting(
+                io.drivegrowth.app.host.facility.RestingRequest(event.version,
+                    io.drivegrowth.core.contract.RequestId("facility-rest-" + java.util.UUID.randomUUID()),
+                    event.vehicle, event.expected, event.desired))
+            io.drivegrowth.app.ui.shop.FacilityControlsEvent.Retry -> session.facility.refresh()
+            io.drivegrowth.app.ui.shop.FacilityControlsEvent.Acknowledge -> if (session.facility.acknowledge()) {
+                session.home.refresh(); queries.refresh(); refreshPendingRoute()
+            }
+            io.drivegrowth.app.ui.shop.FacilityControlsEvent.CancelSaved -> if (session.facility.cancelSaved()) {
+                session.home.refresh(); refreshPendingRoute()
+            }
         }
     }
 
@@ -700,7 +963,7 @@ class MainActivity : Activity() {
     }
 
     private fun onResultsEvent(event: ResultsEvent) {
-        if (!allowed()) {
+        if (!allowed() || navigation.page != HostPage.RESULTS) {
             updateAccess()
             // View가 callback 전에 만든 Pending은 실제 제출 상태로 되돌린다.
             results.restoreUiState(session.results.uiState)
@@ -790,6 +1053,8 @@ class MainActivity : Activity() {
         // 다중 창에서 Task를 뒤로 보내도 RESUMED·표시가 유지되는 경우를 함께 처리한다.
         stopObserving()
         setVisible(false)
+        rentalAppExit.clear()
+        session.rental.inactive(false, session.rentalClock.read())
         moveTaskToBack(true)
     }
 }

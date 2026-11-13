@@ -1,0 +1,1172 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>르르렌트카 · 사선 마을 · 움직임과 줌</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700;900&family=IBM+Plex+Sans+KR:wght@500;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
+<style>
+/* 한 화면 게임 UI: 위 상태 바 · 가운데 화면 · 아래 탐색. 2차 시안 A의 어두운 둥근 카드와 파란 주요 버튼 */
+:root{
+  color-scheme:dark;
+  --bg:#151a28; --card:rgba(18,22,34,.94); --card2:#1d2335; --line:#2c3349;
+  --fg:#ffffff; --mut:#aab3c5; --accent:#2f6fe8; --accent-fg:#ffffff;
+  --ok:#7ee2a6; --ok-bg:#1f3a2c; --warn:#ffd36b; --warn-bg:#3d3216; --bad:#ff9a8a; --bad-bg:#4a2026;
+  --info:#9cc2ff; --info-bg:#1e2f57; --teal:#7fd8cf; --teal-bg:#173c3c;
+  --r-common:#d6dce6; --r-adv:#68a0f0; --r-rare:#f08caa; --r-legend:#fcdc64;
+  --font:'Noto Sans KR',system-ui,-apple-system,sans-serif;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;border:0;cursor:pointer;background:none}
+button:focus-visible,select:focus-visible{outline:3px solid var(--info);outline-offset:2px}
+.px{image-rendering:pixelated}
+.app{max-width:1360px;margin:0 auto;padding-block:12px 16px;display:flex;flex-direction:column;gap:12px;min-height:100%}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.title{font-size:clamp(22px,2.4vw,30px);font-weight:900;margin:0}
+.money{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:18px;padding:10px 18px;font-size:clamp(20px,2.2vw,28px);font-weight:900;font-variant-numeric:tabular-nums}
+.coin{width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff2a8,#fcdc64 45%,#c86e28);box-shadow:0 0 0 2px #6e4a38 inset;flex:none}
+.coin.s{width:16px;height:16px}
+.screen{flex:1;min-height:0}
+.card{background:var(--card);border-radius:22px;padding:18px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.grid{display:grid;gap:14px}
+.mut{color:var(--mut)}
+.h2{font-size:22px;font-weight:900;margin:0}
+.btn{min-height:52px;padding:0 22px;border-radius:14px;font-size:18px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--line)}
+.btn.p{background:var(--accent);color:var(--accent-fg)}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:2px 12px;border-radius:16px;font-size:15px;font-weight:700;white-space:nowrap}
+.st-idle{background:var(--ok-bg);color:var(--ok)} .st-repair{background:var(--bad-bg);color:var(--bad)}
+.st-rest{background:#2c3141;color:#c3c9d6} .st-rent{background:var(--info-bg);color:var(--info)}
+.rar{border:2px dashed var(--r-common);color:#e8ecf3}
+.rar.advanced{border:2px solid var(--r-adv);color:var(--info)}
+.rar.rare{border:4px double var(--r-rare);color:var(--r-rare)}
+.rar.legend{border:3px solid var(--r-legend);color:var(--r-legend);box-shadow:0 0 10px rgba(252,220,100,.45)}
+.nav{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;background:var(--card);border-radius:20px;padding:8px}
+.nav button{min-height:56px;border-radius:14px;font-weight:700;font-size:16px;color:var(--mut)}
+.nav button[aria-current="page"]{background:var(--accent);color:#fff}
+.notice{border-radius:16px;padding:12px 16px;font-weight:700}
+.notice.warn{background:var(--warn-bg);color:var(--warn)} .notice.bad{background:var(--bad-bg);color:var(--bad)} .notice.info{background:var(--info-bg);color:var(--info)}
+.bar{flex:1;height:10px;border-radius:5px;background:var(--line);overflow:hidden;min-width:60px}
+.bar>div{height:100%;background:#68a0f0}
+/* 지도 */
+.map{position:relative;width:100%;aspect-ratio:3/2;border-radius:22px;overflow:hidden;container-type:inline-size;background:#86c05a;max-width:100%}
+.map img{position:absolute;display:block;max-width:none}
+.map .full{inset:0;width:100%;height:100%}
+.map .sign{position:absolute;color:#fcdc64;font-weight:900;text-align:center;white-space:nowrap;transform-origin:0 0;line-height:1;text-shadow:0 1px 0 #1c1e2c}
+.hud{position:absolute;display:flex;gap:8px;align-items:center;background:rgba(18,22,34,.9);border-radius:14px;padding:6px 12px;font-weight:700;font-size:clamp(12px,1.6cqw,18px)}
+.ring{position:absolute;border-radius:50%;pointer-events:none}
+.ring.common{border:2px dashed var(--r-common)} .ring.advanced{border:2px solid var(--r-adv);box-shadow:0 0 8px var(--r-adv)}
+.ring.rare{border:4px double var(--r-rare)} .ring.legend{border:3px solid var(--r-legend);box-shadow:0 0 12px var(--r-legend)}
+.slotbtn{position:absolute;border-radius:12px}
+.shop{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr);gap:14px}
+@media (max-width:900px){.shop{grid-template-columns:1fr}}
+/* 차 그림 */
+.carpic{position:relative;height:120px;display:grid;place-items:center}
+.carpic img{width:168px;height:auto}
+.carpic .ring{width:150px;height:56px;left:50%;top:62%;transform:translate(-50%,-50%)}
+.cars{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.slot-empty{border:3px dashed var(--line);border-radius:22px;display:grid;place-items:center;text-align:center;padding:18px;min-height:220px;color:var(--mut)}
+.dex{overflow-x:auto}
+.dex table{border-collapse:separate;border-spacing:6px;min-width:620px}
+.dex td,.dex th{text-align:center}
+.dex th{font-size:14px;color:var(--mut);font-weight:700}
+.dexcell{width:110px;height:70px;border-radius:12px;background:var(--card2);display:grid;place-items:center;position:relative}
+.dexcell img{width:84px}
+.dexcell.unseen img{filter:brightness(0);opacity:.55}
+.dexcell.seen img{filter:grayscale(1) brightness(.85);opacity:.7}
+.dexcell .q{position:absolute;font-weight:900;font-size:22px;color:var(--mut)}
+.tools{border:2px dashed #3a4258;background:transparent}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--card2);border-radius:16px;padding:12px 16px;flex-wrap:wrap}
+.item>div{min-width:0}
+.overlay{position:fixed;inset:0;background:rgba(5,8,15,.72);display:grid;place-items:center;padding:20px;z-index:20}
+.modal{width:min(640px,100%);max-height:90vh;overflow:auto}
+.big{font-size:clamp(28px,4vw,44px);font-weight:900}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#0d111c;border:1px solid var(--line);border-radius:14px;padding:12px 18px;font-weight:700;z-index:30;max-width:calc(100% - 32px)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{min-height:44px;padding:0 14px;border-radius:12px;background:var(--card2);font-weight:700}
+.tabs button[aria-pressed="true"]{background:var(--accent)}
+@media (prefers-reduced-motion:no-preference){.pop{animation:pop .45s ease-out}@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}}
+.scenery{pointer-events:none}.facility-label{position:absolute;background:#1c1e2c;color:#e8d6b4;padding:3px 7px;border-radius:5px;font-size:clamp(10px,1.6cqw,15px)}
+</style>
+<link rel="stylesheet" href="town-style.css">
+<style>
+</style>
+
+<div class="app" id="app">
+  <div class="top">
+    <h1 class="title" id="scrTitle">렌터카 가게</h1>
+    <div class="money" aria-label="보유 게임머니"><span class="coin"></span><span id="money">0</span></div>
+  </div>
+  <main class="screen" id="screen"></main>
+  <nav class="nav" id="nav" aria-label="화면 이동"></nav>
+</div>
+<div id="layer"></div>
+
+<script>
+const IMG = {ground:"assets/legacy-35645153652c.png", cover1:"assets/legacy-f2a78b46b729.png", cover2:"assets/legacy-6e5d370b01ab.png", cover3:"assets/legacy-97109a3e84aa.png",
+  b1:"assets/legacy-2e49efeedec6.png", b2:"assets/legacy-bc756f763c76.png", staff:"assets/legacy-c326d4f9ffd3.png",
+  light:"assets/legacy-16deb50aeab2.png", sedan:"assets/legacy-cab84d9fef8c.png", suv:"assets/legacy-aff1cd414e6b.png", van:"assets/legacy-827c9c5f7c09.png", luxury:"assets/legacy-b64feb502231.png"};
+const SPR = {light:[56,51], sedan:[66,46], suv:[69,58], van:[73,64], luxury:[73,48]};
+Object.assign(IMG,{"b1": "assets/legacy-71ebe9d0a519.png", "b2": "assets/legacy-a6e4310f38ef.png", "fuel": "assets/legacy-ff669785a3bc.png", "insurance": "assets/legacy-dc9ec925416b.png", "손님 A": "assets/legacy-6b120a461ce7.png", "정비사 A": "assets/legacy-c64134e8756b.png", "주유소 직원 A": "assets/legacy-c64e341a7d95.png", "rururu": "assets/legacy-a98ceea055bf.gif", "genesis_gv80": "assets/genesis_gv80_se.png", "hyundai_palisade": "assets/hyundai_palisade_se.png", "hyundai_santafe": "assets/hyundai_santafe_se.png", "hyundai_kona": "assets/hyundai_kona_se.png", "hyundai_avante": "assets/hyundai_avante_se.png", "hyundai_casper": "assets/hyundai_casper_se.png", "hyundai_grandeur": "assets/hyundai_grandeur_se.png", "hyundai_staria_tourer": "assets/hyundai_staria_tourer_se.png", "hyundai_ioniq6": "assets/hyundai_ioniq6_se.png", "hyundai_nexo": "assets/hyundai_nexo_se.png", "hyundai_venue": "assets/hyundai_venue_se.png", "hyundai_casper_electric": "assets/hyundai_casper_electric_se.png", "genesis_gv70": "assets/genesis_gv70_se.png", "hyundai_ioniq9": "assets/hyundai_ioniq9_se.png", "hyundai_ioniq5": "assets/hyundai_ioniq5_se.png", "genesis_g90": "assets/genesis_g90_se.png", "genesis_g80": "assets/genesis_g80_se.png", "hyundai_sonata": "assets/hyundai_sonata_se.png", "hyundai_tucson": "assets/hyundai_tucson_se.png", "hyundai_staria_lounge": "assets/hyundai_staria_lounge_se.png"});
+IMG.isoTown="assets/town.png";
+const RURU_FRAMES={"idle": ["assets/rururu_se_idle5.png", "assets/rururu_se_idle5.png", "assets/rururu_se_idle3.png", "assets/rururu_se_idle4.png", "assets/rururu_se_idle5.png", "assets/rururu_se_idle5.png"], "walk": ["assets/rururu_se_walk1.png", "assets/rururu_se_walk2.png", "assets/rururu_se_walk3.png", "assets/rururu_se_walk4.png", "assets/rururu_se_walk5.png", "assets/rururu_se_walk6.png", "assets/rururu_se_walk7.png", "assets/rururu_se_walk8.png"]};
+const SLOTS = [{"x": 253, "y": 635}, {"x": 326, "y": 672}, {"x": 400, "y": 709}, {"x": 474, "y": 745}, {"x": 548, "y": 781}, {"x": 984, "y": 758}, {"x": 1063, "y": 796}, {"x": 1142, "y": 835}, {"x": 1220, "y": 873}, {"x": 1299, "y": 912}];
+const BUILD = {"main_lv1": {"left": 339, "top": 101, "w": 196, "h": 129, "sign": [[356.0, 136.79999999999995], [408.80000000000007, 163.2], [408.80000000000007, 155.2], [356.0, 128.79999999999995]]}, "main_lv2": {"left": 339, "top": 101, "w": 260, "h": 161, "sign": [[356.0, 136.79999999999995], [424.80000000000007, 171.2], [424.80000000000007, 161.2], [356.0, 126.79999999999995]]}};
+
+// ── 콘텐츠(PRD 시험값) ──
+const MODELS = [
+ ["hyundai_casper","캐스퍼",100,1,"light",0],["hyundai_venue","베뉴",110,1,"light",95],["hyundai_kona","코나",130,1,"suv",-25],
+ ["hyundai_avante","아반떼",120,1,"sedan",0],["hyundai_sonata","쏘나타",150,1,"sedan",200],["hyundai_tucson","투싼",150,1,"suv",0],
+ ["hyundai_staria_tourer","스타리아 투어러",170,1,"van",160],["hyundai_casper_electric","캐스퍼 일렉트릭",130,1,"light",170],
+ ["hyundai_grandeur","그랜저",200,2,"sedan",120],["hyundai_santafe","싼타페",180,2,"suv",60],["hyundai_staria_lounge","스타리아 라운지",200,2,"van",0],
+ ["hyundai_ioniq5","아이오닉 5",180,2,"suv",250],["hyundai_ioniq6","아이오닉 6",180,2,"sedan",300],["hyundai_nexo","넥쏘",220,2,"suv",140],
+ ["genesis_g80","G80",240,3,"luxury",0],["hyundai_palisade","팰리세이드",230,3,"suv",320],["genesis_gv70","GV70",240,3,"suv",200],
+ ["hyundai_ioniq9","아이오닉 9",250,3,"van",280],["genesis_g90","G90",300,4,"luxury",180],["genesis_gv80","GV80",280,4,"suv",100]
+].map(([id,name,ratio,unlock,type,hue])=>({id,name,ratio,unlock,type,hue,price:Math.floor(1000*ratio/100)}));
+const M = Object.fromEntries(MODELS.map(m=>[m.id,m]));
+const RAR = [
+ {k:"common",n:"일반",w:747,inc:1.0,cost:100,prog:100},{k:"advanced",n:"고급",w:200,inc:1.1,cost:105,prog:150},
+ {k:"rare",n:"희귀",w:50,inc:1.2,cost:110,prog:250},{k:"legend",n:"전설",w:3,inc:1.3,cost:115,prog:400}];
+const R = Object.fromEntries(RAR.map(r=>[r.k,r]));
+const CAP = {1:3,2:5,3:7,4:10};
+const EXPAND = {2:{cust:3,cost:500},3:{cust:10,cost:1500},4:{cust:25,cost:3000}};
+const TICKET = 500, PITY = 30, KM_PAY = 10, KM_CAP = 500;
+const DEST = [{k:"mart",n:"마트",km:4,band:"근거리"},{k:"school",n:"학교",km:18,band:"중거리"},{k:"home",n:"본가",km:46,band:"원거리"}];
+
+</script>
+<script src="town-runtime.js"></script>
+<script>
+// ── 상태 ──
+let S, seq = 0;
+function fresh(){ return {started:false, money:0, level:1, customers:0, earned:0, km:0, kmToday:0, day:1,
+  cars:[], hold:null, dex:{}, free:0, pity:0, gifted:false, firstRental:false, unread:[], log:[], delivery:null, offers:null, dest:null}; }
+function save(){ try{ localStorage.setItem("rentShop_iso_v2_preview", JSON.stringify(S)); }catch(e){} }
+function load(){ try{ const v = JSON.parse(localStorage.getItem("rentShop_iso_v2_preview")); if(v && v.cars) return v; }catch(e){} return null; }
+S = load() || fresh();
+seq = S.cars.reduce((a,c)=>Math.max(a,+c.id.split("-")[1]||0),0);
+
+const won = n => n.toLocaleString("ko-KR");
+const cap = () => CAP[S.level];
+const unlocked = () => MODELS.filter(m=>m.unlock<=S.level);
+const see = (model,rar,owned) => { const k=model+"|"+rar; if(owned) S.dex[k]="owned"; else if(!S.dex[k]) S.dex[k]="seen"; };
+function addCar(model,rar,cost,src){ const c={id:"car-"+(++seq),model,rar,lv:1,prog:0,acc:0,cost,st:"idle",rest:false,src};
+  see(model,rar,true); if(S.cars.length<cap()){ S.cars.push(c); return "garage"; } S.hold={car:c,day:S.day}; return "hold"; }
+function income(src,amount,text){ if(amount>0){ S.money+=amount; S.earned+=amount; } S.unread.push({src,amount,text}); }
+
+// ── 규칙(PRD 시험값) ──
+const lvCost = c => Math.floor(M[c.model].price*2*c.lv*R[c.rar].cost/10000);
+const repairCost = c => Math.floor(M[c.model].price*5*R[c.rar].cost/10000);
+const salePct = c => Math.max(60-5*c.acc,30) + (c.lv-1);
+const salePrice = c => Math.floor(c.cost*salePct(c)/100);
+const scrapPrice = c => Math.floor(c.cost*20/100);
+function gainProg(c,pct){ let p=c.prog+pct; while(p>=100 && c.lv<20){ p-=100; c.lv++; } c.prog = c.lv>=20?0:p; }
+function rollRar(){ if(S.pity>=PITY-1){ return Math.random()<50/53?"rare":"legend"; }
+  let x=Math.random()*1000; for(const r of RAR){ if((x-=r.w)<0) return r.k; } return "common"; }
+
+// ── 화면 공통 ──
+const NAV = [["shop","가게"],["garage","차고"],["dex","도감"],["gacha","뽑기"],["delivery","탁송"],["settle","정산"],["rank","랭킹"]];
+let view = "shop", detailId = null;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+function carImg(model,cls="px"){ const m=M[model]; return `<img class="${cls}" src="${(IMG[m.id]||IMG[m.type])}" alt="${esc(m.name)}" style="filter:hue-rotate(0deg)">`; }
+function rarChip(k){ return `<span class="chip rar ${k}">${R[k].n}</span>`; }
+function stChip(c){ if(c.st==="repair") return `<span class="chip st-repair">수리 필요</span>`;
+  if(c.rest) return `<span class="chip st-rest">영업 쉬기</span>`; return `<span class="chip st-idle">대기</span>`; }
+function toast(t){ const el=document.createElement("div"); el.className="toast"; el.setAttribute("role","status"); el.textContent=t; document.body.appendChild(el); setTimeout(()=>el.remove(),2600); }
+function modal(html){ $("#layer").innerHTML=`<div class="overlay" id="ov"><div class="card modal pop" role="dialog" aria-modal="true">${html}</div></div>`;
+  $("#ov").addEventListener("click",e=>{ if(e.target.id==="ov") closeModal(); }); }
+function closeModal(){ $("#layer").innerHTML=""; }
+function go(v){ view=v; detailId=null; render(); window.scrollTo(0,0); }
+
+function render(){
+  cancelAnimationFrame(townRAF);
+  save();
+  $("#money").textContent = won(S.money);
+  if(!S.started){ $("#nav").hidden=true; $("#scrTitle").textContent="첫 실행"; return renderOnboarding(); }
+  $("#nav").hidden=false;
+  $("#nav").innerHTML = NAV.map(([k,n])=>`<button data-go="${k}" ${view===k||(view==="detail"&&k==="garage")?'aria-current="page"':""}>${n}${k==="settle"&&S.unread.length?` · ${S.unread.length}`:""}</button>`).join("");
+  const titles={shop:"가게",garage:"차고",detail:"차량 상세",dex:"도감",gacha:"뽑기",delivery:"탁송",settle:"정산",rank:"랭킹"};
+  $("#scrTitle").textContent = titles[view];
+  ({shop:renderShop,garage:renderGarage,detail:renderDetail,dex:renderDex,gacha:renderGacha,delivery:renderDelivery,settle:renderSettle,rank:renderRank})[view]();
+  if(view==="shop") mountTown();
+}
+document.addEventListener("click", e=>{
+  const b = e.target.closest("[data-go],[data-act]"); if(!b || b.disabled) return;
+  if(b.dataset.go){ go(b.dataset.go); return; }
+  ACT[b.dataset.act](b.dataset.arg, b);
+});
+
+// ── ⑦ 첫 실행 ──
+let ob = {step:0, pick:"hyundai_casper"};
+function renderOnboarding(){
+  const s=$("#screen");
+  if(ob.step===0) s.innerHTML=`<div class="card pop" style="max-width:640px;margin:40px auto;display:grid;gap:16px;justify-items:start">
+    <div class="row"><img class="px" src="${IMG.staff}" alt="안내 직원" style="width:48px"><span class="mut">안내 직원</span></div>
+    <div class="big">어서 오세요, 사장님!</div>
+    <p class="mut" style="margin:0;font-size:18px;line-height:1.6">오늘부터 이 렌터카 가게를 맡게 되었어요. 차를 모아 빌려주고, 가게를 조금씩 키워 봐요. 먼저 첫 차를 한 대 골라 볼까요?</p>
+    <button class="btn p" data-act="obNext">시작하기</button></div>`;
+  if(ob.step===1) s.innerHTML=`<div style="display:grid;gap:16px;max-width:900px;margin:0 auto"><div><div class="h2">첫 차를 골라 주세요</div><div class="mut">둘 다 일반 등급 · Lv1로 시작해요</div></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+    ${["hyundai_casper","hyundai_avante"].map(id=>`<button class="card" data-act="obPick" data-arg="${id}" aria-pressed="${ob.pick===id}" style="text-align:left;border:3px solid ${ob.pick===id?"var(--accent)":"transparent"}">
+      <div class="carpic"><span class="ring common"></span>${carImg(id)}</div>
+      <div class="row" style="justify-content:space-between"><span class="h2">${M[id].name}</span>${rarChip("common")}</div>
+      <div class="mut">${id==="hyundai_casper"?"경형 SUV · 작고 높아서 짧은 대여에 좋아요":"준중형 세단 · 무난해서 누구나 찾아요"}</div></button>`).join("")}</div>
+    <button class="btn p" data-act="obNext">${M[ob.pick].name}로 할게요</button></div>`;
+  if(ob.step===2) s.innerHTML=`<div class="card pop" style="max-width:560px;margin:40px auto;display:grid;gap:16px;justify-items:center;text-align:center">
+    <div class="carpic"><span class="ring common"></span>${carImg(ob.pick)}</div><div class="h2">${M[ob.pick].name}로 시작할까요?</div>
+    <div class="notice warn">한 번 고르면 바꿀 수 없어요</div>
+    <div class="row"><button class="btn" data-act="obBack">다시 고르기</button><button class="btn p" data-act="obGrant">확인</button></div></div>`;
+  if(ob.step===3) s.innerHTML=`<div style="max-width:900px;margin:20px auto;display:grid;gap:16px;text-align:center">
+    <div class="big pop">가게 문을 열 준비가 됐어요!</div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+      <div class="card"><span class="coin" style="width:48px;height:48px;display:inline-block"></span><div class="mut">초기 게임머니</div><div class="big">1,000</div></div>
+      <div class="card"><div class="carpic"><span class="ring common"></span>${carImg(ob.pick)}</div><div class="h2">${M[ob.pick].name} · 일반 Lv1</div></div>
+      <div class="card"><div class="mut">차고</div><div class="big">3칸</div><div class="mut">가게 레벨이 오르면 늘어나요</div></div></div>
+    <div><button class="btn p" data-act="obDone">가게로 가기</button></div></div>`;
+}
+
+// ── 가게(지도) ──
+function renderShop(){
+  const b = S.level===1?BUILD.main_lv1:BUILD.main_lv2;
+  const pct=(v,base)=>v/base*100;
+  const cars = S.cars.slice(0,cap()).map((c,i)=>{ const sl=SLOTS[i], m=M[c.model], [w,h]=SPR[m.type];
+    return {c,sl,m,w,h,y:sl.y}; }).sort((a,b)=>a.y-b.y);
+  const sign = b.sign; // [bl,br,tr,tl]
+  const sw = Math.hypot(sign[1][0]-sign[0][0], sign[1][1]-sign[0][1]), sh = sign[0][1]-sign[3][1];
+  const next = EXPAND[S.level+1];
+  const canExp = next && S.customers>=next.cust && S.money>=next.cost;
+  $("#screen").innerHTML = `<div class="shop">
+   <div class="map-shell">
+    <div class="map-tools" aria-label="지도 보기 조절">
+      <span>마을 둘러보기</span><button data-act="zoomOut" aria-label="지도 축소">−</button><output id="zoomValue" aria-live="polite">${Math.round(mapZoom*100)}%</output><button data-act="zoomIn" aria-label="지도 확대">＋</button><button data-act="zoomFit">전체 보기</button><button data-act="toggleTownMotion" aria-pressed="${!townMotion}">${townMotion?'움직임 멈춤':'움직임 재생'}</button>
+    </div>
+    <div class="map" id="townViewport" aria-label="가게 지도. 주차 ${S.cars.length}/${cap()}칸">
+     <div class="town-world" id="townWorld">
+      <img class="full town-background" src="${IMG.isoTown}" alt="사선 시점의 파란 렌트카 본관, 빨간 HR주유소, 민트 보험회사와 주황 세차장">
+      ${SLOTS.map((sl,i)=>i>=cap()?`<span class="lot-lock" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-35,1024)}%;z-index:2500">확장 예정</span>`:'').join('')}
+      ${cars.map(({c,sl,m})=>`<span class="ring parked-ring ${c.rar}" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y+13,1024)}%;z-index:2"></span>
+       <img class="town-car" src="${IMG[m.id]||IMG[m.type]}" alt="${esc(m.name)}" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-7,1024)}%;width:${pct(m.type==='light'?88:100,1536)}%;z-index:${100+Math.round(sl.y+13)}">
+       <span class="car-label" style="left:${pct(sl.x-36,1536)}%;top:${pct(sl.y+25,1024)}%;z-index:2500">${esc(m.name)}${c.st==='repair'?' · 수리':c.rest?' · 쉼':''}</span>
+       <button class="slotbtn parked-hit" data-act="openCar" data-arg="${c.id}" aria-label="${esc(m.name)} 자세히" style="left:${pct(sl.x,1536)}%;top:${pct(sl.y-7,1024)}%;z-index:3000"></button>`).join("")}
+      ${TOWN_ACTORS.map((p,i)=>`<img class="px town-actor" id="townActor${i}" alt="${p.name}" style="width:${pct(p.ruru?64:40,1536)}%;left:${pct(p.a[0],1536)}%;top:${pct(p.a[1],1024)}%" src="${p.ruru?RURU_FRAMES.idle[0]:npcFrames(p.kind)[0]}">`).join('')}
+     </div>
+     <div class="hud" style="left:2%;top:3%">● 정상 영업 중</div>
+     <div class="hud" style="right:2%;top:3%">P ${S.cars.length} / ${cap()}</div>
+     <div class="hud" style="left:2%;bottom:3%">가게 Lv${S.level} · 완료 손님 ${S.customers}명</div>
+    </div>
+    <p class="map-help">− 버튼으로 50%까지 축소 · 확대 후 빈 곳을 드래그해 이동 · 전체 보기로 복귀</p>
+   </div>
+   <div style="display:grid;gap:14px;align-content:start">
+    <div class="card" style="display:grid;gap:10px">
+      <div class="h2">가게 확장</div>
+      ${next?`<div class="mut">Lv${S.level} → Lv${S.level+1} · 주차 ${cap()} → ${CAP[S.level+1]}칸</div>
+        <div>완료 손님 ${S.customers} / ${next.cust}명 · 비용 <b>${won(next.cost)}</b></div>
+        <button class="btn p" data-act="expand" ${canExp?"":"disabled"}>확장하기</button>
+        ${canExp?"":`<div class="mut" style="font-size:14px">${S.customers<next.cust?`손님 ${next.cust-S.customers}명을 더 받아야 해요`:`게임머니 ${won(next.cost-S.money)}이 더 필요해요`}</div>`}`
+        :`<div class="mut">최고 레벨이에요 · 주차 10칸</div>`}
+      <div class="mut" style="font-size:14px">사선 시점에 새 건물 디자인을 적용했어요. NPC와 르르르는 장식용 이동 연출이며, 시설 기능은 아직 연결하지 않았어요.</div>
+    </div>
+    <div class="card tools" style="display:grid;gap:10px">
+      <div class="h2">시험 도구</div>
+      <div class="mut" style="font-size:14px">실제 앱의 주행·시간 흐름을 대신하는 버튼이에요. 결과는 정산 화면에 모여요.</div>
+      <button class="btn" data-act="hour">영업 1시간 흘려보내기</button>
+      <button class="btn" data-act="drive">30km 주행 후 주차</button>
+      <button class="btn" data-act="arrive" ${S.delivery?"":"disabled"}>탁송 목적지에 도착</button>
+      <button class="btn" data-act="nextDay">다음 날로</button>
+      <div class="h2" style="font-size:16px;margin-top:6px">연출 다시 보기 (게임 상태는 안 바뀜)</div>
+      <div class="row" style="gap:6px">${["common","advanced","rare","legend"].map(k=>`<button class="btn" style="min-height:44px;padding:0 12px" data-act="demoGacha" data-arg="${k}">뽑기 ${R[k].n}</button>`).join("")}
+        <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoGacha" data-arg="reduced">움직임 줄이기</button>
+        <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="grant">첫 지급</button>
+        <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="settle">정산 동전</button>
+        <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="expand">가게 확장</button></div>
+      <button class="btn danger" data-act="resetAsk">처음부터 다시</button>
+      <div class="mut" style="font-size:13px">${S.day}일째 · 오늘 반영 거리 ${S.kmToday} / ${KM_CAP}km</div>
+    </div>
+   </div></div>`;
+}
+
+// ── ① 차고 ──
+function renderGarage(){
+  const locked = 10 - cap();
+  $("#screen").innerHTML = `<div style="display:grid;gap:14px">
+   <div class="row"><span class="card" style="padding:10px 16px;font-weight:900">차고 ${S.cars.length} / ${cap()}칸${S.cars.length>=cap()?" · 꽉 참":""}</span>
+     <span class="mut">${S.level<4?`가게 Lv${S.level+1}이 되면 ${CAP[S.level+1]}칸으로 늘어나요`:"최대 10칸"}</span></div>
+   ${S.hold?`<div class="notice warn row" style="justify-content:space-between"><span>임시 보관함 1대 · ${M[S.hold.car.model].name}(${R[S.hold.car.rar].n}) · 24시간 안에 자리를 비워 주세요</span>
+     <button class="btn p" data-act="unhold" ${S.cars.length<cap()?"":"disabled"}>차고로 옮기기</button></div>`:""}
+   ${S.cars.length===0?`<div class="slot-empty"><div><img class="px" src="${IMG.staff}" alt="" style="width:40px"><div class="h2">아직 차가 없어요</div></div></div>`:""}
+   <div class="grid cars">
+    ${S.cars.map(c=>`<button class="card" data-act="openCar" data-arg="${c.id}" style="text-align:left;display:grid;gap:8px">
+      <div class="carpic"><span class="ring ${c.rar}"></span>${carImg(c.model)}</div>
+      <div class="row" style="justify-content:space-between"><span class="h2">${M[c.model].name}</span>${rarChip(c.rar)}</div>
+      <div class="row" style="flex-wrap:nowrap"><b>Lv ${c.lv}</b><div class="bar"><div style="width:${c.prog}%"></div></div><span class="mut">${c.prog}%</span></div>
+      <div>${stChip(c)}${c.acc?` <span class="chip" style="background:#2c3141">사고 ${c.acc}회</span>`:""}</div></button>`).join("")}
+    ${Array.from({length:cap()-S.cars.length},()=>`<div class="slot-empty"><div><div class="h2">빈 칸</div><div>뽑기나 구매 탁송으로 채울 수 있어요</div></div></div>`).join("")}
+    ${locked>0?`<div class="slot-empty" style="background:rgba(18,22,34,.5);border-style:solid"><div><div class="h2">잠긴 칸 ${locked}개</div><div>가게를 확장하면 열려요</div></div></div>`:""}
+   </div></div>`;
+}
+
+// ── ② 차량 상세 ──
+function renderDetail(){
+  const c = S.cars.find(x=>x.id===detailId); if(!c){ view="garage"; return render(); }
+  const m=M[c.model], busyRepair=c.st==="repair", scrapOnly=c.acc>=3, max=c.lv>=20;
+  const mats = S.cars.filter(x=>x.id!==c.id && x.model===c.model && x.st!=="repair");
+  const row=(t,sub,price,btn)=>`<div class="item"><div><b>${t}</b><div class="mut" style="font-size:14px">${sub}</div></div><div class="row">${price!=null?`<span class="row" style="gap:6px;font-weight:900"><span class="coin s"></span>${won(price)}</span>`:""}${btn}</div></div>`;
+  $("#screen").innerHTML = `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+   <div class="card" style="display:grid;gap:10px;align-content:start">
+     <button class="btn" data-go="garage" style="justify-self:start">← 차고</button>
+     <div class="carpic" style="height:180px"><span class="ring ${c.rar}" style="width:220px;height:80px"></span><img class="px" src="${(IMG[m.id]||IMG[m.type])}" alt="${esc(m.name)}" style="width:240px;filter:hue-rotate(0deg)"></div>
+     <div class="row"><span class="big" style="font-size:30px">${m.name}</span>${rarChip(c.rar)}${stChip(c)}</div>
+     <div class="row" style="flex-wrap:nowrap"><b>Lv ${c.lv}</b><div class="bar"><div style="width:${c.prog}%"></div></div><span class="mut">${c.prog}%</span></div>
+     <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+       <div class="item" style="display:block"><div class="mut">사고</div><b>${c.acc}회</b></div>
+       <div class="item" style="display:block"><div class="mut">구매가</div><b>${won(c.cost)}</b></div>
+       <div class="item" style="display:block"><div class="mut">차종 가격</div><b>${won(m.price)}</b></div></div>
+   </div>
+   <div class="card list">
+     ${busyRepair?`<div class="notice bad">사고가 나서 수리가 필요해요 · 수리, 판매, 폐차만 할 수 있어요</div>`:""}
+     ${row(max?"레벨업 · 최대 Lv20":`레벨업 · Lv${c.lv} → Lv${c.lv+1}`, `${won(m.price)} × 2% × Lv${c.lv} × ${R[c.rar].n} ${R[c.rar].cost/100}`, max?null:lvCost(c),
+        `<button class="btn p" data-act="levelup" data-arg="${c.id}" ${busyRepair||max||S.money<lvCost(c)?"disabled":""}>레벨업</button>`)}
+     ${row("재료 강화", busyRepair?"수리 후 가능":max?"이미 Lv20이라 재료를 쓸 수 없어요":mats.length?`같은 ${m.name} ${mats.length}대를 재료로 쓸 수 있어요 · 일반 100% · 고급 150% · 희귀 250% · 전설 400%`:"같은 차종 차가 있어야 재료로 쓸 수 있어요", null,
+        `<button class="btn" data-act="matPick" data-arg="${c.id}" ${busyRepair||max||!mats.length?"disabled":""}>재료 고르기</button>`)}
+     ${row("수리", busyRepair?`${won(m.price)} × 5% × ${R[c.rar].cost/100}`:"지금은 수리할 곳이 없어요", repairCost(c),
+        `<button class="btn ${busyRepair?"p":""}" data-act="repair" data-arg="${c.id}" ${!busyRepair||S.money<repairCost(c)?"disabled":""}>수리</button>`)}
+     ${row("판매 · 받는 금액", scrapOnly?"사고 3회 이상은 폐차만 가능해요":`${won(c.cost)} × (60% − 사고 ${c.acc}회 ${5*c.acc}%p + Lv${c.lv} ${c.lv-1}%p) = ${salePct(c)}%`, scrapOnly?null:salePrice(c),
+        `<button class="btn" data-act="sellAsk" data-arg="${c.id}" ${scrapOnly||S.cars.length<=1?"disabled":""}>판매</button>`)}
+     ${row("폐차 · 받는 금액", `구매가 ${won(c.cost)} × 20%`, scrapPrice(c),
+        `<button class="btn danger" data-act="scrapAsk" data-arg="${c.id}" ${S.cars.length<=1?"disabled":""}>폐차</button>`)}
+     ${row("영업 쉬기", busyRepair?"수리 중엔 영업을 안 해요":"켜면 손님에게 빌려주지 않아요", null,
+        `<button class="btn" data-act="rest" data-arg="${c.id}" aria-pressed="${c.rest}">${c.rest?"켜짐":"꺼짐"}</button>`)}
+     ${S.cars.length<=1?`<div class="mut" style="font-size:14px">마지막 한 대는 판매·폐차할 수 없어요(시제품 규칙).</div>`:""}
+   </div></div>`;
+}
+
+// ── ③ 도감 ──
+function renderDex(){
+  const owned = Object.values(S.dex).filter(v=>v==="owned").length;
+  const groups=[1,2,3,4].map(l=>MODELS.filter(m=>m.unlock===l));
+  $("#screen").innerHTML = `<div style="display:grid;gap:14px">
+   <div class="row"><span class="card" style="padding:10px 16px;font-weight:900">보유 ${owned} / 80칸</span>
+     <span class="mut">보유: 선명 · 발견: 흐림 · 미발견: ? · 판매·폐차해도 보유 기록은 남아요</span></div>
+   <div class="card dex"><table><thead><tr><th scope="col">차종</th>${RAR.map(r=>`<th scope="col"><span class="chip rar ${r.k}">${r.n}</span></th>`).join("")}</tr></thead><tbody>
+   ${groups.map((g,i)=>`<tr><th colspan="5" style="text-align:left;padding-top:10px">가게 Lv${i+1}${i?" · +":" · "}${g.length}종 ${i+1>S.level?"(잠김)":""}</th></tr>
+     ${g.map(m=>`<tr><th scope="row" style="text-align:left;color:var(--fg)">${m.name}</th>${RAR.map(r=>{const st=S.dex[m.id+"|"+r.k]||"unseen";
+       return `<td><div class="dexcell ${st}" title="${m.name} ${r.n} · ${{owned:"보유",seen:"발견",unseen:"미발견"}[st]}">${carImg(m.id)}${st==="unseen"?`<span class="q">?</span>`:""}</div></td>`}).join("")}</tr>`).join("")}`).join("")}
+   </tbody></table></div></div>`;
+}
+
+// ── ④ 뽑기 ──
+function renderGacha(){
+  const full=S.cars.length>=cap(), left=PITY-S.pity;
+  $("#screen").innerHTML = `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+   <div class="card" style="display:grid;gap:14px">
+     <div class="h2">어떤 차가 나올까요?</div>
+     <div class="item"><span>30회 안에 희귀 이상 1대 보장 · 남은 횟수 <b>${left}</b>회</span><div class="bar"><div style="width:${S.pity/PITY*100}%;background:var(--r-rare)"></div></div></div>
+     <div class="row"><span class="mut">뽑기 1회</span><span class="coin s"></span><b>${TICKET}</b><span class="chip" style="background:var(--info-bg);color:var(--info)">무료 뽑기권 ${S.free}장</span></div>
+     ${full?`<div class="notice warn">차고 공간이 부족해요 · 차고 ${S.cars.length} / ${cap()}칸 · 차를 팔거나 재료로 쓰면 다시 뽑을 수 있어요</div>`:""}
+     ${!full&&S.free===0&&S.money<TICKET?`<div class="notice bad">게임머니가 ${won(TICKET-S.money)} 부족해요 · 영업 수익이 쌓이면 다시 뽑을 수 있어요</div>`:""}
+     <div class="row"><button class="btn p" data-act="pull" data-arg="free" ${full||!S.free?"disabled":""}>무료권으로 뽑기</button>
+       <button class="btn" data-act="pull" data-arg="paid" ${full||S.money<TICKET?"disabled":""}>500으로 뽑기</button></div>
+   </div>
+   <div class="card" style="display:grid;gap:12px">
+     <div class="h2">등급별 확률</div>
+     ${RAR.map(r=>`<div class="row" style="flex-wrap:nowrap"><span class="chip rar ${r.k}" style="min-width:64px;justify-content:center">${r.n}</span><div class="bar"><div style="width:${r.w/10}%"></div></div><b style="min-width:56px;text-align:right">${(r.w/10).toLocaleString("ko-KR")}%</b></div>`).join("")}
+     <div class="h2" style="font-size:18px">지금 나올 수 있는 차종 · 가게 Lv${S.level} · ${unlocked().length}종</div>
+     <div class="row" style="gap:6px">${unlocked().map(m=>`<span class="chip" style="background:var(--card2)">${m.name}</span>`).join("")}</div>
+   </div></div>`;
+}
+
+// ── ⑤ 탁송 ──
+function makeOffers(d, downgrade){
+  const pool=unlocked(), pick=()=>pool[Math.floor(Math.random()*pool.length)];
+  const rar=()=>{ let k=rollRarSimple(); if(downgrade){ const i=RAR.findIndex(r=>r.k===k); k=RAR[Math.max(0,i-1)].k; } return k; };
+  return [0,1,2,3].map(i=>{ const m=pick(), r=rar(), kind=i<2?"profit":"buy";
+    see(m.id,r,false);
+    return {id:"o"+Date.now()+i, kind, model:m.id, rar:r, km:d.km, dest:d.n,
+      reward: kind==="profit"? Math.round((80 + d.km*8)*R[r].inc/10)*10 : null,
+      price: kind==="buy"? Math.round(m.price*(1+RAR.findIndex(x=>x.k===r)*.25)/10)*10 : null}; });
+}
+function rollRarSimple(){ let x=Math.random()*1000; for(const r of RAR){ if((x-=r.w)<0) return r.k; } return "common"; }
+function renderDelivery(){
+  const d=S.delivery;
+  if(d){ const o=d.offer;
+    $("#screen").innerHTML = `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+     <div class="card" style="display:grid;gap:10px">
+       <div class="row"><span class="chip st-rent">진행 중</span><span class="chip" style="background:var(--warn-bg);color:var(--warn)">${o.kind==="buy"?"구매 탁송":"수익 탁송"}</span></div>
+       <div class="carpic"><span class="ring ${o.rar}"></span>${carImg(o.model)}</div>
+       <div class="row"><span class="h2">${M[o.model].name}</span>${rarChip(o.rar)}</div>
+       <div class="item"><span class="mut">목적지</span><b>${o.dest} · ${o.km}km</b></div>
+       <div class="item"><span class="mut">도착 기한</span><b>${d.day+1}일째까지(24시간)</b></div>
+       <div class="item"><span class="mut">${o.kind==="buy"?"결제":"완료 보상"}</span><b>${o.kind==="buy"?`${won(d.paid)} · 확정할 때 냈어요`:`+${won(o.reward)}`}</b></div>
+       <div class="notice info">운전하는 동안에는 이 화면을 쓰지 않아요. 도착해서 주차하면 정산에서 결과를 볼 수 있어요.</div>
+     </div>
+     <div class="card list">
+       <div class="h2">이 의뢰로 할 수 있는 것</div>
+       <div class="item"><div><b>변경 기회 ${d.changed?0:1}회 남음</b><div class="mut" style="font-size:14px">${d.changed?"변경 기회를 이미 썼어요 · 이제 포기만 할 수 있어요":"목적지를 바꾸면 새 거리로 목록을 다시 받아요 · 대신 희귀도가 1단계 낮아져요"}${!d.changed&&o.kind==="buy"?" · 구매 탁송은 차액만 더 내거나 돌려받아요":""}</div></div>
+         <button class="btn" data-act="changeAsk" ${d.changed?"disabled":""}>목적지 바꾸기</button></div>
+       <div class="item"><div><b>포기</b><div class="mut" style="font-size:14px">${o.kind==="buy"?`수수료를 빼고 환급해요(수수료 10%는 예시 값) · ${won(d.paid)} → ${won(Math.floor(d.paid*.9))}`:"수익 탁송은 벌금이 없어요"}</div></div>
+         <button class="btn danger" data-act="giveup">포기하기</button></div>
+       <div class="mut" style="font-size:14px">진행 중인 의뢰는 한 번에 하나예요. 도착은 가게 화면의 시험 도구로 할 수 있어요.</div>
+     </div></div>`;
+    return; }
+  const dest = DEST.find(x=>x.k===S.dest) || DEST[1];
+  if(!S.offers || S.offers.dest!==dest.k){ S.offers={dest:dest.k, list:makeOffers(dest,false)}; save(); }
+  $("#screen").innerHTML = `<div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,2.2fr);gap:14px" id="dgrid">
+   <div class="card list"><div class="h2">1. 목적지 고르기</div>
+     ${DEST.map(x=>`<button class="item" data-act="dest" data-arg="${x.k}" aria-pressed="${x.k===dest.k}" style="border:2px solid ${x.k===dest.k?"var(--accent)":"transparent"};text-align:left"><div><b>${x.n}</b><div class="mut">${x.km}km · ${x.band}</div></div></button>`).join("")}
+     <div class="mut" style="font-size:14px">출발 전에 고르고, 도착해서 주차하면 결과를 볼 수 있어요.</div></div>
+   <div class="card" style="display:grid;gap:12px"><div class="h2">2. ${dest.n}까지 의뢰 · ${dest.band}</div>
+     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+     ${S.offers.list.map(o=>{ const can = o.kind==="profit" || S.money>=o.price;
+       return `<div class="item" style="display:grid;gap:6px;align-items:start"><div class="carpic" style="height:96px"><span class="ring ${o.rar}"></span>${carImg(o.model)}</div>
+       <div class="row"><b>${M[o.model].name}</b>${rarChip(o.rar)}<span class="chip" style="background:${o.kind==="buy"?"var(--warn-bg)":"var(--ok-bg)"};color:${o.kind==="buy"?"var(--warn)":"var(--ok)"}">${o.kind==="buy"?"구매 탁송":"수익 탁송"}</span></div>
+       <div class="row" style="justify-content:space-between"><span class="mut">${o.kind==="buy"?"가격 · 확정할 때 전액(예시 값)":"완료 보상(예시 값)"}</span><b>${o.kind==="buy"?won(o.price):"+"+won(o.reward)}</b></div>
+       <button class="btn ${can?"p":""}" data-act="accept" data-arg="${o.id}" ${can?"":"disabled"}>${can?"이 의뢰 받기":"게임머니 부족"}</button></div>`}).join("")}
+     </div></div></div>`;
+  if(innerWidth<760) $("#dgrid").style.gridTemplateColumns="1fr";
+}
+
+// ── ⑥ 정산 ──
+function renderSettle(){
+  const icon={drive:"주행",delivery:"탁송",rental:"영업",gift:"선물"};
+  const total=S.unread.reduce((a,x)=>a+x.amount,0);
+  $("#screen").innerHTML = S.unread.length? `<div class="card pop" style="max-width:820px;margin:0 auto;display:grid;gap:12px">
+     <div class="h2">주차하는 동안 생긴 일 · 아직 안 본 결과 ${S.unread.length}건</div>
+     ${S.unread.map(x=>`<div class="item"><div><span class="chip" style="background:var(--card);margin-right:8px">${icon[x.src]}</span>${esc(x.text)}</div><b class="row" style="gap:6px">${x.amount?`<span class="coin s"></span>+${won(x.amount)}`:""}</b></div>`).join("")}
+     <div class="item" style="border:2px solid var(--r-legend)"><b>합계</b><span class="big" style="color:var(--r-legend)">+${won(total)}</span></div>
+     <div class="row" style="justify-content:flex-end"><button class="btn p" data-act="read">확인</button></div></div>`
+   : `<div class="slot-empty" style="max-width:720px;margin:0 auto"><div><img class="px" src="${IMG.staff}" alt="" style="width:40px"><div class="h2">새로 정산할 결과가 없어요</div><div>영업이나 탁송 결과가 생기면 여기에 모여요</div>
+       ${S.log.length?`<div class="list" style="margin-top:14px;text-align:left">${S.log.slice(-5).reverse().map(x=>`<div class="item"><span>${esc(x.text)}</span><b>${x.amount?"+"+won(x.amount):""}</b></div>`).join("")}</div>`:""}</div></div>`;
+}
+
+// ── ⑧ 랭킹 ──
+let rankTab="best";
+function myStats(){ const best=S.cars.reduce((a,c)=>Math.max(a,M[c.model].price*R[c.rar].inc),0);
+  const bestCar=S.cars.slice().sort((a,b)=>M[b.model].price*R[b.rar].inc-M[a.model].price*R[a.rar].inc)[0];
+  return {level:S.level, dex:Object.values(S.dex).filter(v=>v==="owned").length, cars:S.cars.length, earned:S.earned, km:S.km, best:Math.round(best), bestCar}; }
+const SAMPLE = {level:[["드라이브왕",4],["새벽주차",3],["주말기사",3],["출퇴근러",1]], dex:[["드라이브왕",41],["새벽주차",27],["주말기사",12],["출퇴근러",5]],
+  cars:[["드라이브왕",10],["새벽주차",7],["주말기사",5],["출퇴근러",3]], earned:[["드라이브왕",58200],["새벽주차",23100],["주말기사",9800],["출퇴근러",2400]],
+  km:[["드라이브왕",2840],["새벽주차",1320],["주말기사",610],["출퇴근러",150]], best:[["드라이브왕",3900],["새벽주차",3000],["주말기사",2990],["출퇴근러",1000]]};
+function renderRank(){
+  const me=myStats(), tabs=[["level","가게 레벨"],["dex","도감 수집 수"],["cars","보유 차량 수"],["earned","누적 게임머니"],["km","주행거리"],["best","가장 비싼 차"]];
+  const fmt={level:v=>"Lv"+v,dex:v=>v+" / 80",cars:v=>v+"대",earned:won,km:v=>won(v)+"km",best:won};
+  const rows=[...SAMPLE[rankTab].map(([n,v])=>({n,v})),{n:"나 · 사장님",v:me[rankTab],me:true}].sort((a,b)=>b.v-a.v);
+  rows.forEach((r,i)=>{ r.rank = i && rows[i-1].v===r.v ? rows[i-1].rank : i+1; });
+  rows.forEach(r=>{ r.tie = rows.filter(x=>x.rank===r.rank).length>1; });
+  $("#screen").innerHTML = `<div style="display:grid;gap:14px">
+   <div class="tabs" role="group" aria-label="랭킹 부문">${tabs.map(([k,n])=>`<button data-act="rankTab" data-arg="${k}" aria-pressed="${rankTab===k}">${n}</button>`).join("")}</div>
+   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+    <div class="card" style="display:grid;gap:10px;align-content:start"><div class="h2">내 기록</div>
+      <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">${tabs.map(([k,n])=>`<div class="item" style="display:block"><div class="mut">${n}</div><b style="font-size:22px">${fmt[k](me[k])}</b></div>`).join("")}</div>
+      ${me.bestCar?`<div class="item"><div class="row">${carImg(me.bestCar.model)}<div><b>${M[me.bestCar.model].name}</b> ${rarChip(me.bestCar.rar)}<div class="mut">${won(M[me.bestCar.model].price)} × ${R[me.bestCar.rar].n} ${R[me.bestCar.rar].inc} = ${won(me.best)}</div></div></div></div>`:""}
+    </div>
+    <div class="card list"><div class="row" style="justify-content:space-between"><div class="h2">${tabs.find(t=>t[0]===rankTab)[1]} 순위</div><span class="chip" style="background:var(--warn-bg);color:var(--warn)">예시 데이터 · 시연용</span></div>
+      ${rankTab==="best"?`<div class="mut" style="font-size:14px">차종 가격 × 희귀도 수익 배율로 계산해요</div>`:""}
+      ${rows.map(r=>`<div class="item" style="${r.me?"border:2px solid var(--accent)":""}"><b style="min-width:70px">${r.tie?"공동 ":""}${r.rank}위</b><span style="flex:1">${esc(r.n)}</span><b>${fmt[rankTab](r.v)}</b></div>`).join("")}
+    </div></div></div>`;
+}
+
+// ── 연출(4차 Claude Design) 연결 ──
+const TIER_OF = {common:"common", advanced:"uncommon", rare:"rare", legend:"legend"};
+const carData = id => { const m=M[id]; return {src:(IMG[m.id]||IMG[m.type]), w:SPR[m.type][0], h:SPR[m.type][1], hue:m.hue}; };
+const canMotion = () => typeof window.playMotion === "function";
+function gachaMotion(kind, r, m, isNew, guaranteed, pityBefore){
+  window.playMotion("gacha", {tier:TIER_OF[r], name:m.name, car:carData(m.id), isNew, guaranteed, price:kind==="free"?"무료권":String(TICKET),
+    pity:`희귀 이상 보장까지 ${PITY-pityBefore}회`, pityAfter:`다음 보장까지 ${PITY-S.pity}회`,
+    againPrice: S.free>0?"무료권":String(TICKET),
+    canAgain: S.cars.length<cap() && (S.free>0 || S.money>=TICKET),
+    onAgain:()=>{ window.closeMotion(); ACT.pull(S.free>0?"free":"paid"); },
+    onGarage:()=>{ window.closeMotion(); go("garage"); }});
+}
+
+// ── 동작 ──
+const ACT = {
+  zoomOut(){setTownZoom(mapZoom-.25);},
+  zoomIn(){setTownZoom(mapZoom+.25);},
+  zoomFit(){mapPan={x:0,y:0};setTownZoom(1);},
+  toggleTownMotion(){townMotion=!townMotion;render();},
+  obNext(){ ob.step++; render(); }, obBack(){ ob.step=1; render(); }, obPick(id){ ob.pick=id; render(); },
+  obGrant(){ S=fresh(); S.money=1000; S.earned=0; addCar(ob.pick,"common",0,"첫 지급"); ob.step=3; render();
+    if(canMotion()) window.playMotion("grant",{money:1000, name:M[ob.pick].name, car:carData(ob.pick), onClose:()=>{ window.closeMotion(); ACT.obDone(); }}); },
+  obDone(){ S.started=true; ob.step=0; view="shop"; render(); },
+  openCar(id){ detailId=id; view="detail"; render(); window.scrollTo(0,0); },
+  expand(){ const n=EXPAND[S.level+1], from=cap(); S.money-=n.cost; S.level++; render();
+    if(canMotion()) window.playMotion("expand",{lv:S.level, from, to:cap(), onClose:()=>window.closeMotion()}); else toast(`가게 Lv${S.level}이 되었어요 · 주차 ${cap()}칸`); },
+  hour(){ let n=0;
+    for(const c of S.cars){ if(c.st!=="idle"||c.rest) continue; if(Math.random()>.45) continue;
+      const m=M[c.model]; const hours=1+Math.floor(Math.random()*3);
+      let fee=Math.round(100*hours*(1+(m.ratio/100-1)*.25)*R[c.rar].inc*(1-Math.min(.15,.03*c.acc)));
+      let text=`${m.name} ${hours}시간 대여`;
+      if(Math.random()<.03){ fee=Math.round(fee*.5); c.acc++; c.st="repair"; text+=" · 사고: 수익 50%, 수리 필요"; }
+      S.customers++; n++; income("rental",fee,text); S.log.push({text,amount:fee});
+      if(!S.firstRental){ S.firstRental=true; if(!S.gifted){ S.gifted=true; S.free++; S.unread.push({src:"gift",amount:0,text:"첫 영업을 마쳤어요 · 개업 선물: 무료 뽑기권 1장"}); setTimeout(giftModal,50); } } }
+    toast(n?`손님 ${n}명이 차를 빌려 갔어요 · 정산에서 확인하세요`:"이번 시간엔 손님이 없었어요"); render(); },
+  drive(){ const km=Math.min(30, KM_CAP-S.kmToday); S.km+=30;
+    if(km<=0){ toast("오늘은 하루 최대 500km를 넘어서 주행 수익이 더 쌓이지 않아요"); return render(); }
+    S.kmToday+=km; const pay=km*KM_PAY; const text=`기본 주행 수익 · ${km}km × ${KM_PAY}`; income("drive",pay,text); S.log.push({text,amount:pay}); toast(`+${pay} · 정산에서 확인하세요`); render(); },
+  arrive(){ const d=S.delivery; if(!d) return; const o=d.offer, m=M[o.model];
+    if(o.kind==="profit"){ const text=`${m.name} 수익 탁송 · ${o.dest} 도착 완료`; income("delivery",o.reward,text); S.log.push({text,amount:o.reward}); }
+    else { const where=addCar(o.model,o.rar,d.paid,"구매 탁송"); const text=`${m.name}(${R[o.rar].n}) 구매 탁송 도착 · ${where==="garage"?"차고에 들어갔어요":"차고가 꽉 차서 임시 보관함에 있어요"}`; income("delivery",0,text); S.log.push({text,amount:0}); }
+    S.delivery=null; S.offers=null; toast("탁송을 마쳤어요 · 정산에서 확인하세요"); render(); },
+  nextDay(){ S.day++; S.kmToday=0;
+    if(S.delivery && S.day>S.delivery.day+1){ const d=S.delivery; if(d.offer.kind==="buy"){ S.money+=d.paid; S.unread.push({src:"delivery",amount:0,text:`도착 기한이 지나 구매 탁송 결제금 ${won(d.paid)}을 전액 돌려드렸어요`}); }
+      else S.unread.push({src:"delivery",amount:0,text:"도착 기한이 지나 수익 탁송이 사라졌어요 · 벌금은 없어요"}); S.delivery=null; }
+    if(S.hold && S.day>S.hold.day+1){ S.unread.push({src:"delivery",amount:0,text:"임시 보관함 기한이 지났어요(실제 처리 규칙은 미정)"}); }
+    toast(`${S.day}일째가 되었어요`); render(); },
+  resetAsk(){ modal(`<div style="display:grid;gap:14px"><div class="h2">처음부터 다시 할까요?</div><div class="mut">지금까지의 차, 돈, 도감이 모두 지워져요.</div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn danger" data-act="reset">처음부터</button></div></div>`); },
+  reset(){ closeModal(); S=fresh(); seq=0; ob={step:0,pick:"hyundai_casper"}; view="shop"; render(); },
+  close(){ closeModal(); },
+  unhold(){ if(S.hold && S.cars.length<cap()){ S.cars.push(S.hold.car); S.hold=null; toast("차고로 옮겼어요"); render(); } },
+  levelup(id){ const c=S.cars.find(x=>x.id===id), cost=lvCost(c); if(S.money<cost) return; S.money-=cost; c.lv++; if(c.lv>=20) c.prog=0; toast(`Lv${c.lv}이 되었어요`); render(); },
+  matPick(id){ const c=S.cars.find(x=>x.id===id); const mats=S.cars.filter(x=>x.id!==id&&x.model===c.model&&x.st!=="repair");
+    modal(`<div style="display:grid;gap:12px"><div class="h2">재료로 쓸 차를 골라 주세요</div>
+      ${mats.map(x=>`<button class="item" data-act="matAsk" data-arg="${id}|${x.id}" style="text-align:left"><div class="row">${carImg(x.model)}<div><b>${M[x.model].name}</b> ${rarChip(x.rar)}<div class="mut">Lv${x.lv} · +${R[x.rar].prog}%</div></div></div></button>`).join("")}
+      <button class="btn" data-act="close">취소</button></div>`); },
+  matAsk(arg){ const [tid,mid]=arg.split("|"), t=S.cars.find(x=>x.id===tid), m=S.cars.find(x=>x.id===mid);
+    const sim={lv:t.lv,prog:t.prog}; gainProg(sim,R[m.rar].prog);
+    modal(`<div style="display:grid;gap:14px"><div class="h2">재료 강화할까요?</div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+       <div class="item" style="display:grid"><div class="carpic"><span class="ring ${t.rar}"></span>${carImg(t.model)}</div><b>${M[t.model].name} · ${R[t.rar].n}</b><span class="mut">대상 · Lv${t.lv} · ${t.prog}%</span></div>
+       <div class="item" style="display:grid"><div class="carpic"><span class="ring ${m.rar}"></span>${carImg(m.model)}</div><b>${M[m.model].name} · ${R[m.rar].n}</b><span class="chip st-repair">사라짐 · +${R[m.rar].prog}%</span></div>
+       <div class="item" style="display:grid;border:2px solid var(--accent)"><span class="mut">결과 미리보기</span><span class="big">Lv${sim.lv}</span><span>${sim.prog}%</span></div></div>
+      <div class="notice warn">재료로 쓴 차는 차고에서 사라지고 되돌릴 수 없어요</div>
+      <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn p" data-act="matDo" data-arg="${arg}">강화하기</button></div></div>`); },
+  matDo(arg){ const [tid,mid]=arg.split("|"), t=S.cars.find(x=>x.id===tid), m=S.cars.find(x=>x.id===mid);
+    gainProg(t,R[m.rar].prog); S.cars=S.cars.filter(x=>x.id!==mid); closeModal(); toast(`${M[t.model].name} Lv${t.lv} ${t.prog}%가 되었어요`); render(); },
+  repair(id){ const c=S.cars.find(x=>x.id===id), cost=repairCost(c); if(S.money<cost) return; S.money-=cost; c.st="idle"; toast("수리했어요 · 다시 영업할 수 있어요"); render(); },
+  sellAsk(id){ const c=S.cars.find(x=>x.id===id); confirmDispose(c,"sell",salePrice(c)); },
+  scrapAsk(id){ const c=S.cars.find(x=>x.id===id); confirmDispose(c,"scrap",scrapPrice(c)); },
+  dispose(arg){ const [id,kind]=arg.split("|"), c=S.cars.find(x=>x.id===id); const amt=kind==="sell"?salePrice(c):scrapPrice(c);
+    S.cars=S.cars.filter(x=>x.id!==id); if(amt){ S.money+=amt; S.earned+=amt; } closeModal(); view="garage"; toast(`${M[c.model].name}을 ${kind==="sell"?"판매":"폐차"}했어요 · +${won(amt)}`); render(); },
+  rest(id){ const c=S.cars.find(x=>x.id===id); c.rest=!c.rest; render(); },
+  pull(kind){ if(S.cars.length>=cap()) return; if(kind==="free"){ if(!S.free) return; S.free--; } else { if(S.money<TICKET) return; S.money-=TICKET; }
+    if(canMotion()){ const before=S.pity, guaranteed=before>=PITY-1; const r=rollRar(); const pool=unlocked(); const m=pool[Math.floor(Math.random()*pool.length)];
+      const isNew=S.dex[m.id+"|"+r]!=="owned"; S.pity=(r==="rare"||r==="legend")?0:S.pity+1; addCar(m.id,r,kind==="free"?0:TICKET,"뽑기");
+      render(); gachaMotion(kind,r,m,isNew,guaranteed&&(r==="rare"||r==="legend"),before); return; }
+    modal(`<div style="display:grid;gap:14px;justify-items:center;text-align:center;padding:20px"><div class="carpic"><span class="ring common"></span><span class="big">?</span></div><div class="h2">차를 고르는 중이에요</div></div>`);
+    setTimeout(()=>{ const r=rollRar(); const pool=unlocked(); const m=pool[Math.floor(Math.random()*pool.length)];
+      S.pity = (r==="rare"||r==="legend") ? 0 : S.pity+1; addCar(m.id,r,kind==="free"?0:TICKET,"뽑기");
+      modal(`<div class="pop" style="display:grid;gap:14px;justify-items:center;text-align:center;${r==="legend"?"border:3px solid var(--r-legend);border-radius:18px;padding:18px":""}">
+        <div class="h2" style="color:var(--r-${r==="advanced"?"adv":r})">${r==="legend"?"★ 전설 등급! ★":R[r].n+" 등급"}</div>
+        <div class="carpic" style="height:170px"><span class="ring ${r}" style="width:220px;height:80px"></span><img class="px" src="${(IMG[m.id]||IMG[m.type])}" alt="${esc(m.name)}" style="width:230px;filter:hue-rotate(0deg)"></div>
+        <div class="row"><span class="h2">${m.name}</span>${rarChip(r)}<span class="chip" style="background:var(--card2)">Lv1</span></div>
+        <div class="mut">차고에 들어갔어요 · 차고 ${S.cars.length} / ${cap()}칸${r==="rare"||r==="legend"?" · 보장 횟수는 30회부터 다시 세요":""}</div>
+        <div class="row"><button class="btn" data-act="close">닫기</button><button class="btn p" data-act="toGarage">차고에서 보기</button></div></div>`);
+      render(); }, 900); },
+  toGarage(){ closeModal(); go("garage"); },
+  demoGacha(k){ if(!canMotion()) return toast("연출을 불러오는 중이에요"); const reduced=k==="reduced", r=reduced?"rare":k;
+    const m=M[{common:"hyundai_casper",advanced:"hyundai_sonata",rare:"hyundai_ioniq6",legend:"genesis_g90"}[r]];
+    window.playMotion("gacha",{tier:TIER_OF[r], name:m.name, car:carData(m.id), isNew:r!=="common", guaranteed:r==="rare", price:String(TICKET),
+      pity:"희귀 이상 보장까지 12회", pityAfter:r==="rare"||r==="legend"?"다음 보장까지 30회":"희귀 이상 보장까지 11회", canAgain:false,
+      onAgain:()=>{}, onGarage:()=>window.closeMotion()}, {reduced}); },
+  demoMotion(k){ if(!canMotion()) return toast("연출을 불러오는 중이에요"); const close=()=>window.closeMotion();
+    if(k==="grant") window.playMotion("grant",{money:1000, name:"캐스퍼", car:carData("hyundai_casper"), onClose:close});
+    if(k==="settle") window.playMotion("settle",{rows:[["기본 주행 수익",300],["탁송 결과",200],["영업 결과",450]], start:3240, onClose:close});
+    if(k==="expand") window.playMotion("expand",{lv:3, from:5, to:7, onClose:close}); },
+  dest(k){ S.dest=k; S.offers=null; render(); },
+  accept(oid){ const o=S.offers.list.find(x=>x.id===oid); if(o.kind==="buy"){ if(S.money<o.price) return; S.money-=o.price; }
+    S.delivery={offer:o, day:S.day, changed:false, paid:o.price||0}; toast(`${o.dest}까지 의뢰를 받았어요 · 출발 전 확인 완료`); render(); },
+  changeAsk(){ const cur=S.delivery; const others=DEST.filter(x=>x.n!==cur.offer.dest);
+    modal(`<div style="display:grid;gap:12px"><div class="h2">어디로 바꿀까요?</div><div class="mut">새 거리로 의뢰를 다시 받아요 · 희귀도가 1단계 낮아지고, 변경 기회는 한 번뿐이에요</div>
+      ${others.map(x=>`<button class="item" data-act="changeTo" data-arg="${x.k}" style="text-align:left"><div><b>${x.n}</b><div class="mut">${x.km}km · ${x.band}</div></div></button>`).join("")}
+      <button class="btn" data-act="close">취소</button></div>`); },
+  changeTo(k){ const d=S.delivery, dest=DEST.find(x=>x.k===k); const list=makeOffers(dest,true).filter(o=>o.kind===d.offer.kind);
+    const o=list[0]; let note="";
+    if(o.kind==="buy"){ const diff=o.price-d.paid; if(diff>0 && S.money<diff){ closeModal(); toast("차액을 낼 게임머니가 부족해요"); return; }
+      S.money-=diff; d.paid=o.price; note = diff>=0?` · 차액 ${won(diff)} 추가 결제`:` · 차액 ${won(-diff)} 환급`; }
+    d.offer=o; d.changed=true; closeModal(); toast(`${dest.n}(으)로 바꿨어요 · ${M[o.model].name} ${R[o.rar].n}${note}`); render(); },
+  giveup(){ const d=S.delivery; if(d.offer.kind==="buy"){ const back=Math.floor(d.paid*.9); S.money+=back; toast(`포기했어요 · ${won(back)} 환급(수수료 10%는 예시)`); } else toast("포기했어요 · 벌금은 없어요");
+    S.delivery=null; S.offers=null; render(); },
+  read(){ const names={drive:"기본 주행 수익",delivery:"탁송 결과",rental:"영업 결과",gift:"선물"};
+    const sums={}; S.unread.forEach(x=>{ if(x.amount>0) sums[x.src]=(sums[x.src]||0)+x.amount; });
+    const rows=Object.keys(sums).map(k=>[names[k],sums[k]]), total=rows.reduce((a,r)=>a+r[1],0);
+    const done=()=>{ S.unread=[]; render(); toast("정산을 확인했어요"); };
+    if(canMotion() && rows.length) window.playMotion("settle",{rows:rows.slice(0,4), start:S.money-total, onClose:()=>{ window.closeMotion(); done(); }}); else done(); },
+  rankTab(k){ rankTab=k; render(); },
+};
+function confirmDispose(c,kind,amt){ const m=M[c.model];
+  modal(`<div style="display:grid;gap:14px"><div class="h2">${m.name}을 ${kind==="sell"?"판매":"폐차"}할까요?</div>
+    <div class="row">${carImg(c.model)}<div>${rarChip(c.rar)} Lv${c.lv} · 사고 ${c.acc}회<div class="row" style="gap:6px;margin-top:6px"><span class="coin s"></span><b>+${won(amt)}</b></div></div></div>
+    <div class="notice warn">${kind==="sell"?"판매":"폐차"}한 차는 되돌릴 수 없어요 · 도감의 보유 기록은 남아요</div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn ${kind==="sell"?"p":"danger"}" data-act="dispose" data-arg="${c.id}|${kind}">${kind==="sell"?"판매하기":"폐차하기"}</button></div></div>`); }
+function giftModal(){ modal(`<div class="pop" style="display:grid;gap:14px;justify-items:center;text-align:center"><span class="mut">첫 영업을 마쳤어요</span><div class="big">개업 선물이 도착했어요!</div>
+  <img class="px" src="${IMG.staff}" alt="" style="width:40px"><div class="h2">무료 뽑기권 1장</div><div class="mut">뽑기에서 게임머니 대신 쓸 수 있어요</div>
+  <div class="row"><button class="btn" data-act="close">나중에</button><button class="btn p" data-act="toGacha">지금 뽑으러 가기</button></div></div>`); }
+ACT.toGacha = ()=>{ closeModal(); go("gacha"); };
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
+render();
+</script>
+<script type="text/babel" data-presets="react">
+// 4차 · 연출(Claude Design 원본: motion-piece.jsx)을 시제품용으로 옮긴 것.
+// 바꾼 점: 우리 차 그림·이름·금액·레벨을 props(d)로 받고, 버튼은 실제로 눌리며, 미리보기 전용 Reel/MotionApp은 뺐다.
+// 원본의 픽셀 글꼴(Galmuri)은 허용 CDN이 아니라 IBM Plex Sans KR로 대신한다.
+const clamp = window.clamp || ((v, a, b) => Math.min(b, Math.max(a, v)));
+const Easing = window.Easing || {
+  easeOutCubic: t => 1 - Math.pow(1 - t, 3),
+  easeInQuad: t => t * t,
+  easeOutBack: t => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); },
+};
+const SW = 1360, SH = 948;
+const seg = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const lerp = (a, b, p) => a + (b - a) * p;
+const MOTION = {
+  enter: (t, a, b) => Easing.easeOutCubic(seg(t, a, b)),
+  pop: (t, a, b) => Easing.easeOutBack(seg(t, a, b)),
+  drop: (t, a, b) => Easing.easeInQuad(seg(t, a, b)),
+};
+const rnd = (i, s) => { const x = Math.sin(i * 127.1 + (s || 1) * 311.7) * 43758.5453; return x - Math.floor(x); };
+const snap = (v, g) => Math.round(v / (g || 4)) * (g || 4);
+const FPX = "'IBM Plex Sans KR',system-ui,sans-serif";
+const FUI = "'IBM Plex Sans KR',system-ui,sans-serif";
+const C = {
+  ink: '#0b0e1f', navy0: '#141a33', navy: '#1d2547', navy2: '#2a3463', slate: '#3b4a85', slate2: '#56679f', mist: '#8796c4', mist2: '#c3cce6',
+  white: '#f4f5fa', blue: '#2f6bff', blue2: '#4f8cff', blue3: '#9cc1ff', blueD: '#1b3fb0', pink: '#ff4fa3', pink2: '#ff8cc6', pinkD: '#b02a74',
+  gold: '#ffc83d', gold2: '#ffe38a', goldD: '#d98a1c', bronze: '#8a4a12', red: '#e8483f', orange: '#ff8a5c', green: '#46c46a', lime: '#a5e86a',
+  greenD: '#2b8a5a', dirt: '#6e5338', wood: '#a07a50', wood2: '#d9b380', gray0: '#4a4a5a', gray: '#7a7a8c', gray2: '#b5b5c3', tire: '#1f1f2a',
+};
+
+// ── iso → svg strings ─────────────────────────────────────────────
+const pj = (x, y, z, k) => [(x - y) * k, (x + y) * k / 2 - z * k];
+const pts = (arr, k) => arr.map(a => pj(a[0], a[1], a[2], k).map(v => +v.toFixed(2)).join(',')).join(' ');
+const pg = (arr, k, f) => `<polygon points="${pts(arr, k)}" fill="${f}"/>`;
+const box = (x, y, z, w, d, h, k, c) =>
+  pg([[x, y + d, z], [x + w, y + d, z], [x + w, y + d, z + h], [x, y + d, z + h]], k, c[1]) +
+  pg([[x + w, y, z], [x + w, y + d, z], [x + w, y + d, z + h], [x + w, y, z + h]], k, c[2]) +
+  pg([[x, y, z + h], [x + w, y, z + h], [x + w, y + d, z + h], [x, y + d, z + h]], k, c[0]);
+const yF = (yp, x1, x2, z1, z2, k, f) => pg([[x1, yp, z1], [x2, yp, z1], [x2, yp, z2], [x1, yp, z2]], k, f);
+const xF = (xp, y1, y2, z1, z2, k, f) => pg([[xp, y1, z1], [xp, y2, z1], [xp, y2, z2], [xp, y1, z2]], k, f);
+const gq = (x1, y1, x2, y2, z, k, f) => pg([[x1, y1, z], [x2, y1, z], [x2, y2, z], [x1, y2, z]], k, f);
+const flat = s => `<g stroke="none">${s}</g>`;
+const svgWrap = (vb, w, h, body) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${vb}" shape-rendering="crispEdges"><g stroke="${C.ink}" stroke-width="1" stroke-linejoin="round">${body}</g></svg>`;
+
+const CARS = {
+  hatch: { L: 7, Wd: 4, ch: 1.5, cab: [1.3, 4.0, 1.7, 0.35], body: [C.lime, C.green, C.greenD] },
+  sedan: { L: 8.6, Wd: 4, ch: 1.3, cab: [2.0, 4.4, 1.5, 0.4], body: [C.blue3, C.blue2, C.blueD] },
+  coupe: { L: 8.6, Wd: 4, ch: 1.1, cab: [2.8, 3.3, 1.2, 0.5], body: [C.pink2, C.pink, C.pinkD], stripe: C.white },
+  gt: { L: 9, Wd: 4.2, ch: 1.1, cab: [3.0, 3.1, 1.1, 0.55], body: [C.gold2, C.gold, C.goldD], stripe: C.ink, spoiler: true },
+};
+function carSVG(type) {
+  const k = 4, c = CARS[type], L = c.L, Wd = c.Wd, z0 = 0.5, zt = z0 + c.ch;
+  const [cx, cw, chh, ins] = c.cab; let s = '';
+  if (c.spoiler) s += box(0.2, 0.7, zt, 0.4, 0.4, 0.8, k, [C.gray0, C.tire, C.tire]);
+  s += box(0, 0, z0, L, Wd, c.ch, k, c.body);
+  if (c.spoiler) s += box(0.2, Wd - 1.1, zt, 0.4, 0.4, 0.8, k, [C.gray0, C.tire, C.tire]) + box(-0.2, 0, zt + 0.8, 1.2, Wd, 0.3, k, c.body);
+  s += box(cx, ins, zt, cw, Wd - 2 * ins, chh, k, c.body);
+  s += yF(Wd - ins, cx + 0.4, cx + cw - 0.4, zt + 0.25, zt + chh - 0.2, k, C.navy2);
+  s += flat(yF(Wd - ins, cx + 0.6, cx + 1.1, zt + chh - 0.5, zt + chh - 0.3, k, C.blue3));
+  s += xF(cx + cw, ins + 0.3, Wd - ins - 0.3, zt + 0.2, zt + chh - 0.2, k, C.slate);
+  if (c.stripe) s += flat(yF(Wd, 0.4, L - 0.4, z0 + c.ch * 0.42, z0 + c.ch * 0.68, k, c.stripe));
+  s += xF(L, 0.4, 1.3, zt - 0.6, zt - 0.2, k, C.gold2) + xF(L, Wd - 1.3, Wd - 0.4, zt - 0.6, zt - 0.2, k, C.gold2);
+  [1.0, L - 2.5].forEach(wx => { s += box(wx, Wd - 0.3, 0, 1.5, 0.45, 1.35, k, [C.gray0, C.tire, C.tire]) + flat(yF(Wd + 0.15, wx + 0.5, wx + 1.0, 0.45, 0.95, k, C.gray2)); });
+  return svgWrap('-20 -20 58 48', 58, 48, s);
+}
+const OurCar = ({ car, s = 5, style }) => <img src={car.src} alt="" style={Object.assign({ display: 'block', width: car.w * s, height: car.h * s, imageRendering: 'pixelated', filter: `hue-rotate(${car.hue || 0}deg)` }, style)} />;
+const carAnchor = type => { const c = CARS[type]; return [(c.L / 2 - c.Wd / 2) * 4 + 20, (c.L / 2 + c.Wd / 2) * 2 + 20]; };
+
+// map (shop) layers — shared viewBox so layers stack 1:1
+const MK = 8, MS = 5, MVB = '-84 -40 200 144';
+const mpos = (x, y, z) => { const p = pj(x, y, z, MK); return [(p[0] + 84) * MS, (p[1] + 40) * MS]; };
+const slotLines = (x0, y1, y2, w, th, col) => gq(x0, y1, x0 + th, y2, 0, MK, col) + gq(x0 + w - th, y1, x0 + w, y2, 0, MK, col) + gq(x0, y1, x0 + w, y1 + th, 0, MK, col);
+const WOOD = [C.wood2, C.wood, C.dirt];
+const FRONT_PLANKS = (() => {
+  const a = [];
+  for (let i = 0; i < 6; i++) a.push({ b: [5 + i * 0.6, 9.28, 0, 0.55, 0.12, 1.1] });
+  for (let j = 0; j < 6; j++) a.push({ b: [8.48, 5.6 + j * 0.63, 0, 0.12, 0.56, 1.1] });
+  a.forEach(p => { p.o = p.b[0] + p.b[1]; p.c = mpos(p.b[0] + p.b[3] / 2, p.b[1] + p.b[4] / 2, 0.55); });
+  return a.sort((x, y) => x.o - y.o);
+})();
+function mapLayer(name) {
+  const k = MK; let s = '';
+  if (name === 'ground') {
+    s += box(0, 0, -0.6, 14, 10, 0.6, k, [C.green, C.greenD, C.dirt]);
+    s += gq(4.8, 0.6, 13.6, 9.6, 0, k, C.gray0) + gq(4, 2.2, 4.8, 3.2, 0, k, C.gray2) + gq(5, 5.6, 8.6, 9.4, 0, k, C.dirt);
+    let l = ''; for (let i = 0; i < 5; i++) l += slotLines(5.2 + i * 1.6, 1.0, 3.8, 1.6, 0.14, C.white);
+    for (let i = 0; i < 3; i++) l += slotLines(9.2 + i * 1.4, 6.0, 8.8, 1.4, 0.14, C.slate2);
+    s += flat(l);
+  } else if (name === 'newLot') s += gq(5, 5.6, 8.6, 9.4, 0, k, C.gray0);
+  else if (name.indexOf('slot') === 0) s += flat(slotLines(5.2 + (+name[4]) * 1.6, 6.0, 8.8, 1.6, 0.14, C.white));
+  else if (name.indexOf('glow') === 0) s += flat(slotLines(5.2 + (+name[4]) * 1.6, 6.0, 8.8, 1.6, 0.34, C.gold2) + gq(5.4 + (+name[4]) * 1.6, 6.2, 6.6 + (+name[4]) * 1.6, 8.8, 0, k, 'rgba(255,227,138,.35)'));
+  else if (name === 'bld1') {
+    s += box(1, 1, 0, 3, 4, 2.4, k, [C.white, C.mist2, C.mist]) + box(0.8, 0.8, 2.4, 3.4, 4.4, 0.5, k, [C.orange, C.red, C.pinkD]);
+    s += xF(4, 2.3, 3.1, 0, 1.3, k, C.slate) + xF(4, 1.3, 4.7, 1.6, 2.2, k, C.blue) + yF(5, 1.5, 2.3, 1.1, 1.8, k, C.blue3) + yF(5, 2.7, 3.5, 1.1, 1.8, k, C.blue3);
+  } else if (name === 'bld2') {
+    s += box(1, 1, 0, 3, 4, 4.2, k, [C.white, C.mist2, C.mist]) + box(0.8, 0.8, 4.2, 3.4, 4.4, 0.5, k, [C.orange, C.red, C.pinkD]);
+    s += xF(4, 2.3, 3.1, 0, 1.3, k, C.slate) + xF(4, 1.3, 4.7, 3.3, 3.9, k, C.blue);
+    [1.1, 2.6].forEach(z => { s += yF(5, 1.5, 2.3, z, z + 0.7, k, C.blue3) + yF(5, 2.7, 3.5, z, z + 0.7, k, C.blue3); });
+    s += xF(4, 1.3, 2.0, 1.6, 2.3, k, C.blue3) + xF(4, 3.4, 4.3, 1.6, 2.3, k, C.blue3);
+    s += box(1, 5.4, 0, 3, 2.4, 2.0, k, [C.gray2, C.gray, C.gray0]) + box(0.9, 5.3, 2.0, 3.2, 2.6, 0.35, k, [C.blue2, C.blue, C.blueD]);
+    s += xF(4, 5.7, 7.5, 0, 1.5, k, C.mist2) + flat(xF(4, 5.7, 7.5, 0.5, 0.6, k, C.gray) + xF(4, 5.7, 7.5, 1.0, 1.1, k, C.gray));
+  } else if (name === 'fenceBack') {
+    for (let i = 0; i < 6; i++) s += box(5 + i * 0.6, 5.6, 0, 0.55, 0.12, 1.1, k, WOOD);
+    for (let j = 0; j < 6; j++) s += box(5, 5.6 + j * 0.63, 0, 0.12, 0.56, 1.1, k, WOOD);
+  } else if (name.indexOf('plank') === 0) { const b = FRONT_PLANKS[+name.slice(5)].b; s += box(b[0], b[1], b[2], b[3], b[4], b[5], k, WOOD); }
+  else if (name === 'deco') {
+    [[0.3, 8.4], [2.4, 8.7], [12.4, 0.0]].forEach(([x, y]) => { s += box(x + 0.5, y + 0.5, 0, 0.4, 0.4, 0.7, k, [C.wood, C.dirt, C.bronze]) + box(x, y, 0.7, 1.4, 1.4, 1.5, k, [C.lime, C.green, C.greenD]); });
+  }
+  return svgWrap(MVB, 200, 144, s);
+}
+const coinSVG = () => `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" shape-rendering="crispEdges"><circle cx="6" cy="6" r="5.6" fill="${C.ink}"/><circle cx="6" cy="6" r="4.6" fill="${C.goldD}"/><circle cx="5.6" cy="5.6" r="3.8" fill="${C.gold}"/><rect x="5" y="3" width="2" height="6" fill="${C.gold2}"/></svg>`;
+const keySVG = () => `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="10" viewBox="0 0 18 10" shape-rendering="crispEdges"><rect x="0" y="1" width="8" height="8" fill="${C.ink}"/><rect x="1" y="2" width="6" height="6" fill="${C.gold}"/><rect x="3" y="4" width="2" height="2" fill="${C.ink}"/><rect x="7" y="3" width="11" height="4" fill="${C.ink}"/><rect x="8" y="4" width="9" height="2" fill="${C.gold2}"/><rect x="13" y="6" width="2" height="3" fill="${C.ink}"/><rect x="16" y="6" width="2" height="3" fill="${C.ink}"/></svg>`;
+const slotsSVG = n => { let s = ''; if (n < 0) { s += gq(0, 0, 4.8, 2.8, 0, 8, C.gray0); let l = ''; for (let i = 0; i < 3; i++) l += slotLines(i * 1.6, 0, 2.8, 1.6, 0.18, C.white); s += flat(l); } else s += flat(gq(n * 1.6 + 0.25, 0.25, n * 1.6 + 1.35, 2.8, 0, 8, C.gold)); return svgWrap('-26 -4 66 38', 66, 38, s); };
+
+// ── rasterizer: svg string → real pixels ─────────────────────────
+const PXC = {}; const PXL = new Set();
+function raster(id, mk, w, h) {
+  if (id in PXC) return PXC[id];
+  PXC[id] = null;
+  const img = new Image();
+  img.onload = () => { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(img, 0, 0, w, h); PXC[id] = cv.toDataURL(); PXL.forEach(f => f()); };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(mk());
+  return null;
+}
+function Pix({ id, mk, w, h, s, style }) {
+  const [, force] = React.useState(0);
+  React.useEffect(() => { const l = () => force(n => n + 1); PXL.add(l); return () => PXL.delete(l); }, []);
+  const url = raster(id, mk, w, h);
+  const st = Object.assign({ width: w * s, height: h * s, display: 'block' }, style);
+  return url ? <img src={url} alt="" style={Object.assign({ imageRendering: 'pixelated' }, st)} /> : <div style={st}></div>;
+}
+const Car = ({ type, s = 6, style }) => <Pix id={'car-' + type} mk={() => carSVG(type)} w={58} h={48} s={s} style={style} />;
+const Coin = ({ s = 4, style }) => <Pix id="coin" mk={coinSVG} w={12} h={12} s={s} style={style} />;
+const MapL = ({ name, style }) => <Pix id={'map-' + name} mk={() => mapLayer(name)} w={200} h={144} s={MS} style={Object.assign({ position: 'absolute', left: 0, top: 0 }, style)} />;
+
+// ── particles ────────────────────────────────────────────────────
+const Sq = ({ x, y, s, c, o = 1, r = 0 }) => <div style={{ position: 'absolute', left: snap(x - s / 2), top: snap(y - s / 2), width: s, height: s, background: c, opacity: o, transform: r ? `rotate(${r}deg)` : undefined }}></div>;
+const Star = ({ x, y, s, c, o = 1 }) => (
+  <div style={{ position: 'absolute', left: snap(x - s * 1.5), top: snap(y - s * 1.5), width: s * 3, height: s * 3, opacity: o }}>
+    <div style={{ position: 'absolute', left: 0, top: s, width: s * 3, height: s, background: c }}></div>
+    <div style={{ position: 'absolute', left: s, top: 0, width: s, height: s * 3, background: c }}></div>
+  </div>
+);
+function burst(t, t0, n, cx, cy, rad, cols, seed, big) {
+  if (t < t0 || t > t0 + 1) return null;
+  const p = MOTION.enter(t, t0, t0 + 0.7), o = 1 - seg(t, t0 + 0.4, t0 + 0.95), out = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + rnd(i, seed) * 0.4, d = rad * (0.55 + 0.45 * rnd(i, seed + 1)) * p;
+    const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d * 0.72, c = cols[i % cols.length], s = big && i % 3 === 0 ? 8 : 4;
+    out.push(i % 2 ? <Star key={seed + '-' + i} x={x} y={y} s={s} c={c} o={o} /> : <Sq key={seed + '-' + i} x={x} y={y} s={s * 2} c={c} o={o} />);
+  }
+  return out;
+}
+function confetti(t, t0, n, seed, h = SH, cols) {
+  if (t < t0) return null; const out = [], L = t - t0;
+  cols = cols || [C.pink, C.blue2, C.gold, C.white, C.lime];
+  for (let i = 0; i < n; i++) {
+    const v = 160 + rnd(i, seed) * 170; let y = -40 + L * v - rnd(i, seed + 1) * 700;
+    if (y < -40) continue; y = ((y + 40) % (h + 80)) - 40;
+    const x = rnd(i, seed + 2) * SW + Math.sin(L * 2 + i) * 18, r = (Math.floor(L * 5 + rnd(i, seed + 3) * 4) % 4) * 90;
+    out.push(<div key={'cf' + seed + i} style={{ position: 'absolute', left: snap(x), top: snap(y), width: i % 2 ? 8 : 12, height: i % 2 ? 12 : 8, background: cols[i % cols.length], transform: `rotate(${r}deg)` }}></div>);
+  }
+  return out;
+}
+function shakeAt(t, list) {
+  let dx = 0, dy = 0;
+  list.forEach(([t0, d, a], i) => { if (t >= t0 && t < t0 + d) { const amp = a * (1 - (t - t0) / d); dx += Math.sin((t - t0) * 70 + i) * amp; dy += Math.cos((t - t0) * 55 + i * 2) * amp; } });
+  return [snap(dx, 2), snap(dy, 2)];
+}
+const Diamond = ({ cx, cy, hw, hh, col, sw = 4, o = 1, sc = 1, fill = 'none' }) => (
+  <svg width={hw * 2 + 20} height={hh * 2 + 20} style={{ position: 'absolute', left: cx - hw - 10, top: cy - hh - 10, opacity: o, transform: `scale(${sc})`, overflow: 'visible' }} shapeRendering="crispEdges">
+    <polygon points={`${hw + 10},10 ${hw * 2 + 10},${hh + 10} ${hw + 10},${hh * 2 + 10} 10,${hh + 10}`} fill={fill} stroke={col} strokeWidth={sw} vectorEffect="non-scaling-stroke" />
+  </svg>
+);
+function Rays({ cx, cy, n, col, rot, o, sc = 1, r = 900 }) {
+  const ws = []; const h = Math.PI / n * 0.55;
+  for (let i = 0; i < n; i++) { const a = i * 2 * Math.PI / n; ws.push(`0,0 ${Math.cos(a - h) * r},${Math.sin(a - h) * r} ${Math.cos(a + h) * r},${Math.sin(a + h) * r}`); }
+  return (
+    <svg width={2} height={2} style={{ position: 'absolute', left: cx - 1, top: cy - 1, overflow: 'visible', opacity: o, transform: `rotate(${rot}deg) scale(${sc})` }} shapeRendering="crispEdges">
+      {ws.map((p, i) => <polygon key={i} points={p} fill={col} />)}
+    </svg>
+  );
+}
+const Flash = ({ o, c = '#fff' }) => o > 0.001 ? <div style={{ position: 'absolute', inset: 0, background: c, opacity: o, pointerEvents: 'none' }}></div> : null;
+// white flash: ≤0.13s above zero, never held (photosensitivity rule)
+const flashAt = (t, t0, peak, dur = 0.13) => (t >= t0 && t < t0 + dur) ? peak * (1 - (t - t0) / dur) : 0;
+
+// ── shared UI ────────────────────────────────────────────────────
+const Btn = ({ label, primary, coin, style, sc = 1, o = 1, onClick, disabled }) => React.createElement(onClick ? 'button' : 'div', { onClick: disabled ? undefined : onClick, disabled, style: Object.assign({ border: 0, cursor: onClick && !disabled ? 'pointer' : 'default', filter: disabled ? 'grayscale(1) brightness(.7)' : undefined, pointerEvents: o > 0.5 ? 'auto' : 'none',  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, height: 64, padding: '0 18px', borderRadius: 16, whiteSpace: 'nowrap', background: primary ? C.blue : C.navy2, boxShadow: primary ? `inset 0 -6px 0 ${C.blueD}` : `inset 0 -6px 0 ${C.ink}`, color: C.white, font: `700 22px ${FUI}`, transform: `scale(${sc})`, opacity: o }, style) },
+    <span>{label}</span>,
+    coin ? <span style={{ display: 'flex', alignItems: 'center', gap: 6, font: `400 20px ${FPX}`, color: C.gold2 }}><Coin s={2} />{coin}</span> : null);
+const Chip = ({ label, bg, fg, sc = 1, o = 1, border }) => <div style={{ padding: '6px 14px', borderRadius: 10, background: bg, color: fg, font: `400 18px ${FPX}`, transform: `scale(${sc})`, opacity: o, boxShadow: border ? `inset 0 0 0 2px ${border}` : undefined }}>{label}</div>;
+const Sfx = ({ t, cues, on }) => {
+  if (!on) return null; let a = null; cues.forEach(c => { if (t >= c[0] && t < c[0] + 0.9) a = c; });
+  return a ? <div style={{ position: 'absolute', left: 28, bottom: 24, padding: '6px 12px', borderRadius: 8, background: 'rgba(11,14,31,.8)', boxShadow: `inset 0 0 0 2px ${C.slate}`, color: C.mist2, font: `400 16px ${FPX}`, opacity: 1 - seg(t, a[0] + 0.7, a[0] + 0.9) }}>♪ SFX 자리 · {a[1]}</div> : null;
+};
+const HudChip = ({ children, style }) => <div style={Object.assign({ display: 'flex', alignItems: 'center', gap: 10, height: 48, padding: '0 18px', borderRadius: 14, background: 'rgba(29,37,71,.92)', boxShadow: `inset 0 0 0 2px ${C.slate}`, color: C.white, font: `400 20px ${FPX}` }, style)}>{children}</div>;
+const Backdrop = () => (
+  <div style={{ position: 'absolute', inset: 0, background: C.navy0 }}>
+    <div style={{ position: 'absolute', left: 0, right: 0, top: 560, bottom: 0, background: C.navy }}></div>
+    <svg width={SW} height={SH - 560} style={{ position: 'absolute', left: 0, top: 560, opacity: 0.35 }} shapeRendering="crispEdges">
+      {[-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6].map(i => <g key={i}><line x1={680 + i * 120} y1={0} x2={680 + i * 120 - 776} y2={388} stroke={C.slate} strokeWidth="2" /><line x1={680 + i * 120} y1={0} x2={680 + i * 120 + 776} y2={388} stroke={C.slate} strokeWidth="2" /></g>)}
+    </svg>
+    {Array.from({ length: 26 }).map((_, i) => <Sq key={i} x={rnd(i, 40) * SW} y={rnd(i, 41) * 520} s={4} c={C.mist} o={0.25 + rnd(i, 42) * 0.4} />)}
+  </div>
+);
+
+// ── gacha ────────────────────────────────────────────────────────
+const TIERS = {
+  common: { col: C.white, car: 'hatch', name: '꼬마 해치', chip: '일반', band: '일반 등급', seq: [[C.white, 0.5]], W: 2.0, pity: '희귀 이상 보장까지 24회', ember: 10 },
+  uncommon: { col: C.blue2, car: 'sedan', name: '시티 세단', chip: '고급', band: '고급 등급!', seq: [[C.blue2, 0.5]], W: 2.0, pity: '희귀 이상 보장까지 23회', ember: 14, isNew: true },
+  rare: { col: C.pink, car: 'coupe', name: '네온 쿠페', chip: '희귀', band: '희귀 등급!', seq: [[C.blue2, 0.5], [C.pink, 1.4]], W: 2.0, pity: '희귀 이상 보장까지 1회', pityAfter: '다음 보장까지 30회', ember: 18, guaranteed: true },
+  legend: { col: C.gold, car: 'gt', name: '골드 스톰 GT', chip: '전설', band: '★ 전설 등급! ★', seq: [[C.blue2, 0.5], [C.pink, 1.15], [C.gold, 1.85]], W: 2.4, pity: '희귀 이상 보장까지 22회', ember: 26, isNew: true },
+};
+const gachaTimes = (tier, reduced) => {
+  if (reduced) return { W: 0.6, O: 1.25, R: 1.65, C: 1.8 };
+  const W = TIERS[tier].W, O = W + 0.9, R = O + 0.55; return { W, O, R, C: R + 0.9 };
+};
+const UPFLASH = { rare: [0, 0.45], legend: [0, 0.35, 0.55] };
+const UPSHAKE = { rare: [0, 10], legend: [0, 10, 18] };
+
+function ResultCard({ t, tier, Ct, reduced, d }) {
+  const T = TIERS[tier];
+  const p = reduced ? seg(t, Ct, Ct + 0.3) : MOTION.enter(t, Ct, Ct + 0.35);
+  if (p <= 0) return null;
+  const st = (d, dur = 0.3) => reduced ? seg(t, Ct + 0.1, Ct + 0.4) : MOTION.pop(t, Ct + d, Ct + d + dur);
+  const bandBg = { common: C.mist2, uncommon: C.blue2, rare: C.pink, legend: C.gold }[tier];
+  const glow = tier === 'legend' ? 0.5 + 0.5 * Math.sin((t - Ct) * 3) : 0;
+  const frame = {
+    common: `0 0 0 2px ${C.slate}`,
+    uncommon: `0 0 0 4px ${C.blue2}`,
+    rare: `0 0 0 4px ${C.pink}, inset 0 0 0 8px ${C.navy}, inset 0 0 0 10px ${C.pink2}`,
+    legend: `0 0 0 4px ${C.gold}, 0 0 0 8px ${C.goldD}, 0 0 0 ${16 + glow * 8}px rgba(255,200,61,${0.18 + glow * 0.12}), inset 0 0 0 8px ${C.navy}, inset 0 0 0 10px ${C.gold2}`,
+  }[tier];
+  return (
+    <div style={{ position: 'absolute', left: 800, top: 196, width: 480, borderRadius: 24, background: C.navy, boxShadow: frame, opacity: p, transform: `translateX(${(1 - p) * (reduced ? 0 : 60)}px)`, overflow: 'visible' }}>
+      <div style={{ margin: 18, height: 64, borderRadius: 12, background: bandBg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.ink, font: `400 30px ${FPX}`, transform: `scale(${st(0.15)})` }}>{T.band}</div>
+      <div style={{ padding: '6px 36px 34px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{ color: C.mist, font: `500 20px ${FUI}` }}>새 차가 차고에 들어왔어요</div>
+        <div style={{ color: C.white, font: `700 44px ${FUI}`, letterSpacing: '-0.01em' }}>{d.name}</div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <Chip label={T.chip} bg={bandBg} fg={C.ink} sc={st(0.25)} />
+          <Chip label="Lv1" bg={C.navy2} fg={C.white} sc={st(0.33)} border={C.slate} />
+          {d.isNew ? <Chip label="NEW · 도감 등록" bg={C.lime} fg={C.ink} sc={st(0.45, 0.35)} /> : null}
+        </div>
+        {d.guaranteed ? <div style={{ color: C.mist2, font: `500 18px ${FUI}`, opacity: st(0.5) }}>30회 보장으로 얻었어요 · 다음 보장은 30회부터 다시 세요</div> : null}
+        <div style={{ height: 2, background: C.navy2, margin: '6px 0' }}></div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <Btn label="한 번 더 뽑기" coin={d.againPrice || d.price} primary sc={lerp(0.9, 1, st(0.55))} o={seg(t, Ct + 0.5, Ct + 0.6)} style={{ flex: 1.3 }} onClick={d.onAgain} disabled={!d.canAgain} />
+          <Btn label="차고에서 보기" sc={lerp(0.9, 1, st(0.6))} o={seg(t, Ct + 0.55, Ct + 0.65)} style={{ flex: 1 }} onClick={d.onGarage} />
+        </div>
+      </div>
+      {d.guaranteed ? <div style={{ position: 'absolute', right: -18, top: -22, padding: '10px 16px', background: C.gold, color: C.ink, font: `400 22px ${FPX}`, borderRadius: 8, boxShadow: `0 0 0 3px ${C.ink}, 6px 6px 0 ${C.ink}`, transform: `rotate(-6deg) scale(${st(0.5, 0.4)})` }}>보장 달성!</div> : null}
+    </div>
+  );
+}
+
+function Gacha({ t, tier, reduced, sfx = true, d }) {
+  const T = TIERS[tier], tm = gachaTimes(tier, reduced), { W, O, R } = tm, Ct = tm.C;
+  const seq = reduced ? [[T.col, 0.3]] : T.seq;
+  let col = seq[0][0]; seq.forEach(s => { if (t >= s[1]) col = s[0]; });
+  // light intensity with anticipation dip before each upgrade
+  let I = reduced ? seg(t, 0.3, 0.55) : MOTION.enter(t, 0.5, 1.0) * (0.88 + 0.12 * Math.sin(t * 5));
+  if (!reduced) seq.slice(1).forEach(s => { const u = s[1]; if (t < u && t > u - 0.25) I *= 1 - 0.55 * seg(t, u - 0.25, u); if (t >= u) I += 0.7 * (1 - seg(t, u, u + 0.4)); });
+  const open = reduced ? MOTION.enter(t, O, R) : MOTION.drop(t, O, R);
+  I *= 1 + open * 1.4;
+  // shutter unit drop + landing
+  const dropY = reduced ? 0 : -720 * (1 - MOTION.drop(t, 0.05, 0.42)) - 16 * Math.sin(Math.PI * seg(t, 0.42, 0.62));
+  const squash = reduced ? 1 : 1 - 0.04 * Math.sin(Math.PI * seg(t, 0.42, 0.54));
+  const unitO = reduced ? seg(t, 0.1, 0.4) : 1;
+  const shakes = reduced ? [] : [[0.42, 0.22, 8]];
+  if (!reduced) seq.slice(1).forEach((s, i) => { shakes.push([s[1] - 0.25, 0.25, 2], [s[1], 0.3, UPSHAKE[tier][i + 1]]); });
+  if (!reduced) { if (tier === 'uncommon') shakes.push([R, 0.15, 4]); if (tier === 'rare') shakes.push([R, 0.25, 8]); if (tier === 'legend') shakes.push([R, 0.45, 18], [R + 0.45, 0.3, 10]); }
+  const [sx, sy] = shakeAt(t, shakes);
+  const cam = reduced ? 1 : 1 + 0.035 * MOTION.enter(t, 0.5, W) - 0.035 * MOTION.enter(t, O, R);
+  const revealed = t >= R;
+  const glide = reduced ? -230 : -230 * MOTION.enter(t, Ct, Ct + 0.5);
+  const carX = 680 + glide, carY = 712;
+  const anc = carAnchor(T.car);
+  const carS = reduced ? 1 : lerp(0.2, 1, MOTION.pop(t, R, R + 0.5));
+  const floatY = reduced ? 0 : Math.sin((t - R - 0.5) * 2.4) * 8 * MOTION.enter(t, R + 0.5, R + 1.0);
+  const carO = reduced ? seg(t, R, R + 0.3) : (revealed ? 1 : 0);
+  const rayCfg = { common: [[12, C.white, 0.08, 14]], uncommon: [[12, C.blue2, 0.28, 18]], rare: [[14, C.pink, 0.32, 20], [7, C.pink2, 0.16, -12]], legend: [[16, C.gold, 0.4, 20], [8, C.gold2, 0.3, -14]] }[tier];
+  const rayS = MOTION.enter(t, R, R + 0.45);
+  const tapP = seg(t, O - 0.05, O + 0.3);
+  const promptO = t >= W && t < O + 0.1 ? seg(t, W, W + 0.25) * (1 - seg(t, O, O + 0.1)) * (0.45 + 0.55 * (0.5 + 0.5 * Math.cos((t - W) * Math.PI * 2 / 1.4))) : 0;
+  const hudO = seg(t, 0.3, 0.55);
+  const bgO = reduced ? seg(t, 0, 0.25) : seg(t, 0, 0.22);
+  const sfxCues = reduced ? [[R - 0.4, '셔터 열림(약하게)']] : [[0.42, '셔터 쿵']].concat(seq.slice(1).map((s, i) => [s[1], '승급 차임 ' + (i + 1)]), [[O, '개봉 휘익'], [R, tier === 'legend' ? '전설 팡파르' : '공개 반짝']]);
+  const sparkleN = { common: 10, uncommon: 18, rare: 26, legend: 32 }[tier];
+  const burstCols = { common: [C.white, C.mist2], uncommon: [C.blue2, C.blue3, C.white], rare: [C.pink, C.pink2, C.white], legend: [C.gold, C.gold2, C.white, C.pink2] }[tier];
+  const upFlash = !reduced && UPFLASH[tier] ? seq.slice(1).reduce((a, s, i) => a + (t >= s[1] && t < s[1] + 0.25 ? UPFLASH[tier][i + 1] * (1 - (t - s[1]) / 0.25) : 0), 0) : 0;
+  const embers = [];
+  if (t >= 0.5 && t < R + 0.1) for (let i = 0; i < T.ember; i++) {
+    const ph = ((t - 0.5) * 0.7 + rnd(i, 3)) % 1, x = 680 + (rnd(i, 1) - 0.5) * 560 + Math.sin(ph * 6 + i) * 10;
+    embers.push(<Sq key={'e' + i} x={x} y={600 - ph * 380} s={4 + Math.floor(rnd(i, 2) * 2) * 4} c={i % 3 ? col : C.white} o={clamp(I, 0, 1) * (ph < 0.1 ? ph * 10 : 1 - ph)} />);
+  }
+  const rings = [];
+  if (!reduced && t >= 0.5 && t < R) for (let k = 0; k < 3; k++) {
+    if (t - 0.5 < k * 0.3) continue; const ph = ((t - 0.5) / 0.9 + k / 3) % 1;
+    rings.push(<Diamond key={'r' + k} cx={680} cy={712} hw={300} hh={150} col={col} sc={0.15 + ph * 1.1} o={(1 - ph) * clamp(I, 0, 1) * 0.7} />);
+  }
+  const twinkles = [];
+  if (revealed) for (let i = 0; i < 10; i++) {
+    const a = rnd(i, 60) * Math.PI * 2, d = 150 + rnd(i, 61) * 120;
+    twinkles.push(<Star key={'tw' + i} x={carX + Math.cos(a) * d} y={carY - 110 + Math.sin(a) * d * 0.7} s={4} c={i % 2 ? col : C.white} o={Math.max(0, Math.sin((t - R) * 2.6 + i * 1.7)) * seg(t, R + 0.6, R + 0.9) * (reduced ? 0 : 1)} />);
+  }
+  const rim = { common: [[C.slate2, 4]], uncommon: [[C.blue2, 4]], rare: [[C.pink, 4], [C.pink2, 2, 0.86]], legend: [[C.gold, 6], [C.gold2, 2, 0.86], [C.goldD, 2, 1.12]] }[tier];
+  const shutterSlats = [];
+  for (let i = 0; i < 12; i++) shutterSlats.push(<div key={i} style={{ position: 'absolute', left: 0, right: 0, top: i * 29, height: 29, background: i % 2 ? C.gray : '#858598', boxShadow: `inset 0 3px 0 ${C.gray2}, inset 0 -3px 0 ${C.gray0}` }}></div>);
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: C.navy0 }}>
+      <div style={{ position: 'absolute', inset: 0, opacity: 1 - bgO }}><div style={{ position: 'absolute', left: 180, top: 150 }}><ShopMap /></div></div>
+      <div style={{ position: 'absolute', inset: 0, opacity: bgO, transform: `translate(${sx}px,${sy}px) scale(${cam})`, transformOrigin: '680px 450px' }}>
+        <Backdrop />
+        {/* floor spill */}
+        {!revealed ? [[400, 960, 600, 0.45], [360, 1000, 650, 0.25], [320, 1040, 700, 0.12]].map(([a, b, y, o], i) => (
+          <div key={'sp' + i} style={{ position: 'absolute', left: 0, top: 560, width: SW, height: y - 560 + open * 120, background: col, opacity: clamp(o * I, 0, 0.9), clipPath: `polygon(424px 0, 936px 0, ${b + open * 60}px 100%, ${a - open * 60}px 100%)` }}></div>
+        )) : null}
+        {rim.map(([c, w, k], i) => <Diamond key={'rim' + i} cx={carX} cy={712} hw={300 * (k || 1)} hh={150 * (k || 1)} col={revealed || i === 0 ? c : C.slate} sw={w} o={revealed ? 1 : (i === 0 ? 0.5 + 0.5 * clamp(I, 0, 1) : 0)} />)}
+        {rings}
+        {revealed && !reduced ? <div style={{ position: 'absolute', inset: 0, }}>
+          {tier === 'legend' ? [280, 220, 160].map((r, i) => <div key={'h' + i} style={{ position: 'absolute', left: carX - r, top: carY - 110 - r * 0.9, width: r * 2, height: r * 1.8, borderRadius: '50%', background: C.gold, opacity: (0.08 + i * 0.05) * rayS * (0.85 + 0.15 * Math.sin(t * 2)) }}></div>) : null}
+          {rayCfg.map(([n, c, o, sp], i) => <Rays key={'ray' + i} cx={carX} cy={carY - 110} n={n} col={c} o={o} rot={(t - R) * sp} sc={rayS} />)}
+        </div> : null}
+        {/* shutter unit */}
+        {!revealed ? (
+          <div style={{ position: 'absolute', left: 0, top: 0, width: SW, height: SH, opacity: unitO, transform: `translateY(${dropY}px) scaleY(${squash})`, transformOrigin: '680px 560px' }}>
+            <div style={{ position: 'absolute', left: 400, top: 150, width: 560, height: 410, background: C.gray0, boxShadow: `0 0 0 4px ${C.ink}` }}></div>
+            <div style={{ position: 'absolute', left: 424, top: 200, width: 512, height: 360, background: C.ink, overflow: 'hidden' }}>
+              {[[0, 0.35], [70, 0.6], [150, 0.9]].map(([ins, o], i) => <div key={i} style={{ position: 'absolute', left: ins, right: ins, top: ins * 0.6, bottom: 0, background: i === 2 ? C.white : col, opacity: o * clamp(0.25 + open * 1.2, 0, 1) }}></div>)}
+              <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 348, overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', left: 0, right: 0, top: -348 * open, height: 348 }}>
+                  {shutterSlats}
+                  <div style={{ position: 'absolute', left: 226, width: 60, top: 322, height: 12, background: C.gray2, boxShadow: `0 0 0 3px ${C.ink}` }}></div>
+                </div>
+              </div>
+              <div style={{ position: 'absolute', left: 0, right: 0, top: 348 - 348 * open, height: 12 + 348 * open * 0, background: col, opacity: clamp(I, 0, 1) }}></div>
+            </div>
+            <div style={{ position: 'absolute', left: 392, top: 140, width: 576, height: 60, background: C.gray, boxShadow: `0 0 0 4px ${C.ink}, inset 0 -8px 0 ${C.gray0}, inset 0 6px 0 ${C.gray2}` }}></div>
+            {[[404, 156], [944, 156]].map(([x, y], i) => <div key={i} style={{ position: 'absolute', left: x, top: y, width: 12, height: 12, background: C.gray2, boxShadow: `0 0 0 2px ${C.ink}` }}></div>)}
+            <div style={{ position: 'absolute', left: 600, top: 156, width: 160, height: 28, background: C.blue, boxShadow: `0 0 0 3px ${C.ink}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.white, font: `400 16px ${FPX}` }}>GARAGE</div>
+          </div>
+        ) : null}
+        {/* landing dust */}
+        {!reduced && t > 0.42 && t < 1.1 ? Array.from({ length: 18 }).map((_, i) => { const p = MOTION.enter(t, 0.42, 1.0), side = i % 2 ? 1 : -1; return <Sq key={'d' + i} x={680 + side * (280 + p * (60 + rnd(i, 7) * 140))} y={556 - p * (10 + rnd(i, 8) * 60)} s={8 + Math.floor(rnd(i, 9) * 2) * 4} c={i % 3 ? C.mist : C.slate2} o={1 - seg(t, 0.7, 1.05)} />; }) : null}
+        {embers}
+        {/* car */}
+        <div style={{ position: 'absolute', left: carX - d.car.w * 5 * 0.45, top: carY - (d.car.h - 10) * 5 + floatY, opacity: carO, transform: `scale(${carS})`, transformOrigin: `${d.car.w * 5 * 0.45}px ${(d.car.h - 10) * 5}px` }}><OurCar car={d.car} s={5} /></div>
+        {!reduced ? burst(t, R + 0.05, sparkleN, carX, carY - 110, tier === 'common' ? 200 : 330, burstCols, 11, tier !== 'common') : null}
+        {tier === 'legend' && !reduced ? burst(t, R + 0.45, 32, carX, carY - 110, 460, [C.gold, C.gold2, C.white], 23, true) : null}
+        {twinkles}
+      </div>
+      {tier === 'legend' && !reduced ? <div style={{ position: 'absolute', inset: 0 }}>{confetti(t, R + 0.1, 44, 5)}{confetti(t, R + 0.3, 14, 9, SH, [C.gold, C.gold2])}</div> : null}
+      <Flash o={upFlash} c={col} />
+      {!reduced ? <Flash o={flashAt(t, R, 0.85)} /> : null}
+      {tier === 'legend' && !reduced ? <Flash o={t >= R + 0.45 && t < R + 0.7 ? 0.35 * (1 - (t - R - 0.45) / 0.25) : 0} c={C.gold} /> : null}
+      {/* tap ripple + prompt */}
+      {tapP > 0 && tapP < 1 ? <Diamond cx={680} cy={380} hw={90} hh={45} col={C.white} sw={4} sc={0.3 + tapP * 0.9} o={1 - tapP} /> : null}
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 820, textAlign: 'center', color: C.white, font: `400 30px ${FPX}`, opacity: promptO }}>화면을 눌러 셔터 올리기</div>
+      {/* HUD */}
+      <div style={{ position: 'absolute', left: 28, top: 28, display: 'flex', gap: 12, opacity: hudO }}>
+        <HudChip><Coin s={2.5} /><span style={{ color: C.gold2 }}>{d.price}</span></HudChip>
+        <HudChip style={{ color: C.mist2 }}>{t >= Ct ? d.pityAfter : d.pity}</HudChip>
+        {reduced ? <HudChip style={{ color: C.lime }}>움직임 줄이기 켜짐</HudChip> : null}
+      </div>
+      <button onClick={d.onSkip} style={{ position: 'absolute', right: 28, top: 28, opacity: hudO * (1 - seg(t, Ct, Ct + 0.2)), border: 0, background: 'none', padding: 0, cursor: 'pointer', pointerEvents: t < Ct ? 'auto' : 'none' }}>
+        <HudChip style={{ gap: 8 }}>건너뛰기 <span style={{ color: C.blue3 }}>▶▶</span></HudChip>
+      </button>
+      <ResultCard t={t} tier={tier} Ct={Ct} reduced={reduced} d={d} />
+      <Sfx t={t} cues={sfxCues} on={sfx} />
+    </div>
+  );
+}
+
+// ── shop map ─────────────────────────────────────────────────────
+function ShopMap({ lv = 1, fenced = true, plankT = -1, back = 0, newLot = 0, slotOn = [0, 0], glow = [0, 0], bSquash = [1, 1], bOrigin }) {
+  return (
+    <div style={{ position: 'relative', width: 1000, height: 720 }}>
+      <MapL name="ground" />
+      <MapL name="newLot" style={{ opacity: newLot }} />
+      {[0, 1].map(i => <MapL key={'s' + i} name={'slot' + i} style={{ opacity: slotOn[i] }} />)}
+      {[0, 1].map(i => <MapL key={'g' + i} name={'glow' + i} style={{ opacity: glow[i] }} />)}
+      {fenced ? <MapL name="fenceBack" style={{ opacity: 1 - back, transform: `translateY(${back * 24}px)` }} /> : null}
+      <div style={{ position: 'absolute', inset: 0, transform: `scale(${bSquash[0]},${bSquash[1]})`, transformOrigin: bOrigin || '560px 530px' }}>
+        <MapL name="bld1" style={{ opacity: lv === 1 ? 1 : 0 }} />
+        <MapL name="bld2" style={{ opacity: lv === 2 ? 1 : 0 }} />
+      </div>
+      {fenced ? FRONT_PLANKS.map((p, i) => {
+        let tr = 'none', o = 1;
+        if (plankT >= 0) {
+          const t0 = i * 0.035, L = Math.max(0, plankT - t0), vx = (rnd(i, 30) - 0.35) * 320, vy = -(320 + rnd(i, 31) * 220), r = (rnd(i, 32) - 0.5) * 900;
+          if (plankT >= t0) { tr = `translate(${vx * L}px,${vy * L + 0.5 * 1600 * L * L}px) rotate(${snap(r * L, 15)}deg)`; o = 1 - seg(L, 0.35, 0.6); }
+        }
+        return <MapL key={'p' + i} name={'plank' + i} style={{ transform: tr, transformOrigin: `${p.c[0]}px ${p.c[1]}px`, opacity: o }} />;
+      }) : null}
+      <MapL name="deco" />
+    </div>
+  );
+}
+
+function Expand({ t, sfx = true, d }) {
+  const z = 1 + 0.16 * MOTION.enter(t, 0, 0.4);
+  const fc = mpos(6.8, 7.5, 0.5);
+  const sq = t < 1.45 ? [1 + 0.08 * seg(t, 1.3, 1.45), 1 - 0.15 * seg(t, 1.3, 1.45)] : [lerp(1.08, 1, MOTION.pop(t, 1.45, 1.75)), lerp(0.85, 1, MOTION.pop(t, 1.45, 1.75))];
+  const lv = t >= 1.45 ? 2 : 1;
+  const glowAt = i => { const a = 1.0 + i * 0.2; return t < a ? 0 : (t < a + 0.12 ? seg(t, a, a + 0.12) : lerp(1, 0.35, seg(t, a + 0.12, a + 0.6))); };
+  const dust = [];
+  if (t > 0.42 && t < 1.3) for (let i = 0; i < 30; i++) {
+    const p = MOTION.enter(t, 0.42 + rnd(i, 50) * 0.15, 1.2), a = rnd(i, 51) * Math.PI * 2, d = 40 + rnd(i, 52) * 160;
+    dust.push(<Sq key={'du' + i} x={fc[0] + Math.cos(a) * d * p} y={fc[1] + Math.sin(a) * d * 0.5 * p - p * 60} s={8 + Math.floor(rnd(i, 53) * 3) * 4} c={[C.wood2, C.wood, C.mist2][i % 3]} o={(1 - seg(t, 0.8, 1.25)) * 0.9} />);
+  }
+  const bo = '560px 530px';
+  const bandP = MOTION.pop(t, 1.7, 2.0), btnP = MOTION.pop(t, 1.95, 2.25);
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: C.navy0 }}>
+      <div style={{ position: 'absolute', left: 180, top: 150, width: 1000, height: 720, transform: `scale(${z})`, transformOrigin: `${fc[0]}px ${fc[1]}px` }}>
+        <ShopMap lv={lv} plankT={t >= 0.4 ? t - 0.4 : -1} back={seg(t, 0.45, 0.75)} newLot={seg(t, 0.9, 1.1)} slotOn={[seg(t, 1.0, 1.1), seg(t, 1.2, 1.3)]} glow={[glowAt(0), glowAt(1)]} bSquash={sq} bOrigin={bo} />
+        {dust}
+        {burst(t, 1.47, 16, 560, 380, 170, [C.gold2, C.white], 70, true)}
+      </div>
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 96, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, opacity: seg(t, 1.7, 1.8) }}>
+        <div style={{ padding: '14px 44px', background: C.blue, color: C.gold2, font: `400 56px ${FPX}`, borderRadius: 14, boxShadow: `0 0 0 4px ${C.ink}, inset 0 -8px 0 ${C.blueD}`, transform: `scale(${bandP})` }}>가게 Lv{d.lv}!</div>
+        <div style={{ padding: '10px 24px', borderRadius: 12, background: 'rgba(29,37,71,.94)', boxShadow: `inset 0 0 0 2px ${C.slate}`, color: C.white, font: `400 28px ${FPX}`, transform: `translateY(${(1 - MOTION.enter(t, 1.8, 2.1)) * 16}px)`, opacity: seg(t, 1.8, 1.95) }}>주차 {d.from} → <span style={{ color: C.gold2 }}>{d.to}칸</span></div>
+      </div>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 56, display: 'flex', justifyContent: 'center' }}>
+        <Btn label="확인" primary sc={btnP} o={seg(t, 1.95, 2.05)} style={{ width: 280 }} onClick={d.onClose} />
+      </div>
+      {confetti(t, 1.75, 18, 77, SH, [C.gold, C.gold2, C.white])}
+      <Sfx t={t} cues={[[0.4, '판자 탁탁'], [1.0, '칸 띵'], [1.45, '건물 뿅'], [1.7, '레벨업']]} on={sfx} />
+    </div>
+  );
+}
+
+// ── first grant ──────────────────────────────────────────────────
+function FirstGrant({ t, sfx = true, d }) {
+  const count = Math.round(d.money * MOTION.enter(t, 0.45, 1.15));
+  const cards = [0, 1, 2].map(i => ({ p: MOTION.pop(t, i * 0.15, i * 0.15 + 0.4), o: seg(t, i * 0.15, i * 0.15 + 0.1), x: 250 + i * 300 }));
+  const coins = [];
+  for (let j = 0; j < 10; j++) {
+    const L = t - (0.45 + j * 0.05); if (L < 0 || L > 0.7) continue;
+    const vx = (rnd(j, 80) - 0.5) * 380, vy = -(560 + rnd(j, 81) * 240);
+    const sp = Math.abs(Math.cos(L * 14 + j)), sx = sp > 0.66 ? 1 : sp > 0.33 ? 0.6 : 0.25;
+    coins.push(<div key={'c' + j} style={{ position: 'absolute', left: snap(380 - 20 + vx * L), top: snap(410 + vy * L + 0.5 * 1700 * L * L), transform: `scaleX(${sx})`, opacity: 1 - seg(L, 0.5, 0.7) }}><Coin s={3.5} /></div>);
+  }
+  const hop = t < 0.95 ? 26 * Math.sin(Math.PI * seg(t, 0.75, 0.95)) : 12 * Math.sin(Math.PI * seg(t, 0.95, 1.12));
+  const horn = MOTION.pop(t, 0.78, 1.0) * (1 - seg(t, 1.2, 1.3));
+  const card = (i, children) => (
+    <div key={'k' + i} style={{ position: 'absolute', left: cards[i].x, top: 290, width: 260, height: 360, borderRadius: 24, background: C.navy, boxShadow: `0 0 0 2px ${C.slate}`, transform: `translateY(${(1 - cards[i].p) * 160}px)`, opacity: cards[i].o, overflow: 'hidden' }}>{children}</div>
+  );
+  const label = (a, b) => <div style={{ position: 'absolute', left: 0, right: 0, top: 236, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}><div style={{ color: C.mist, font: `500 18px ${FUI}` }}>{a}</div><div style={{ color: C.white, font: `400 34px ${FPX}` }}>{b}</div></div>;
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+      <Backdrop />
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 150, textAlign: 'center', color: C.white, font: `400 44px ${FPX}`, opacity: seg(t, 0, 0.25), transform: `translateY(${(1 - MOTION.enter(t, 0, 0.35)) * -20}px)` }}>가게 오픈 선물이 도착했어요</div>
+      {card(0, [<div key="a" style={{ position: 'absolute', left: 82, top: 70 }}><Coin s={8} /></div>, <div key="b">{label('게임머니', count.toLocaleString('en-US'))}</div>])}
+      {card(1, [<div key="a" style={{ position: 'absolute', left: 130 - d.car.w * 1.5, top: 215 - d.car.h * 3 + -hop }}><OurCar car={d.car} s={3} /></div>,
+        <div key="k" style={{ position: 'absolute', left: 170, top: 168, transform: `rotate(${-20 + 20 * MOTION.pop(t, 0.55, 0.85)}deg)` }}><Pix id="key" mk={keySVG} w={18} h={10} s={4} /></div>,
+        <div key="b">{label('첫 차', d.name)}</div>])}
+      {card(2, [<div key="a" style={{ position: 'absolute', left: 31, top: 60 }}>
+          <Pix id="slots" mk={() => slotsSVG(-1)} w={66} h={38} s={3} />
+          {[0, 1, 2].map(n => <Pix key={n} id={'slotg' + n} mk={() => slotsSVG(n)} w={66} h={38} s={3} style={{ position: 'absolute', left: 0, top: 0, opacity: seg(t, 0.7 + n * 0.1, 0.78 + n * 0.1) * 0.75 }} />)}
+        </div>, <div key="b">{label('주차 칸', '차고 3칸')}</div>])}
+      {coins}
+      {t > 0.6 && t < 1.05 ? [0, 1, 2].map(i => <Star key={'ks' + i} x={cards[1].x + 190 + [0, 40, -10][i]} y={290 + 170 + [-20, 4, 26][i]} s={4} c={C.gold2} o={Math.sin(Math.PI * seg(t, 0.6 + i * 0.08, 0.85 + i * 0.08))} />) : null}
+      <div style={{ position: 'absolute', left: cards[1].x + 186, top: 300, padding: '8px 14px', borderRadius: 10, background: C.white, color: C.ink, font: `400 26px ${FPX}`, transform: `scale(${horn})`, transformOrigin: '0 100%', boxShadow: `0 0 0 3px ${C.ink}` }}>빵!</div>
+      {confetti(t, 1.25, 26, 33)}
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 720, display: 'flex', justifyContent: 'center' }}>
+        <Btn label="가게로 가기" primary sc={MOTION.pop(t, 1.45, 1.75)} o={seg(t, 1.45, 1.55)} style={{ width: 320 }} onClick={d.onClose} />
+      </div>
+      <Sfx t={t} cues={[[0, '카드 톡톡톡'], [0.45, '동전 짤랑'], [0.78, '경적 빵'], [1.25, '축하']]} on={sfx} />
+    </div>
+  );
+}
+
+// ── settlement coins ─────────────────────────────────────────────
+const coinCount = amt => clamp(Math.round(amt / 84), 1, 12);
+function Settle({ t, sfx = true, d }) {
+  const ROWS = d.rows, start = d.start, end = [1180, 66], total = ROWS.reduce((a, r) => a + r[1], 0);
+  const counts = ROWS.map(r => coinCount(r[1]));
+  const list = [];
+  ROWS.forEach((r, ri) => { for (let c = 0; c < counts[ri]; c++) list.push({ ri, t0: 0.15 + ri * 0.12 + c * 0.04, val: r[1] / counts[ri], sy: 360 + ri * 86, j: list.length }); });
+  let arrived = 0, lastHit = -9;
+  list.forEach(k => { if (t >= k.t0 + 0.5) { arrived += k.val; lastHit = Math.max(lastHit, k.t0 + 0.5); } });
+  const bump = 1 + 0.12 * (1 - seg(t, lastHit, lastHit + 0.14));
+  const money = Math.round(start + arrived);
+  const press = t < 0.15 ? 1 - 0.06 * Math.sin(Math.PI * seg(t, 0, 0.15)) : 1;
+  const sweep = seg(t, 1.05, 1.4);
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+      <Backdrop />
+      <div style={{ position: 'absolute', right: 28, top: 28, transform: `scale(${bump})`, transformOrigin: '50% 50%' }}>
+        <HudChip style={{ height: 76, padding: '0 26px', gap: 14, overflow: 'hidden', position: 'relative' }}>
+          <Coin s={3.5} /><span style={{ color: C.gold2, font: `400 34px ${FPX}` }}>{money.toLocaleString('en-US')}</span>
+          {sweep > 0 && sweep < 1 ? <div style={{ position: 'absolute', top: 0, bottom: 0, left: -40 + sweep * 300, width: 24, background: C.white, opacity: 0.55, transform: 'skewX(-20deg)' }}></div> : null}
+        </HudChip>
+      </div>
+      <div style={{ position: 'absolute', left: 340, top: 200, width: 680, borderRadius: 24, background: C.navy, boxShadow: `0 0 0 2px ${C.slate}`, padding: '34px 44px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ color: C.white, font: `400 36px ${FPX}`, marginBottom: 10 }}>오늘의 정산</div>
+        {ROWS.map((r, i) => {
+          const gone = seg(t, 0.15 + i * 0.12, 0.15 + i * 0.12 + 0.3);
+          return <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 72, padding: '0 22px', borderRadius: 14, background: C.navy2 }}>
+            <span style={{ color: C.mist2, font: `500 24px ${FUI}` }}>{r[0]}</span>
+            <span style={{ color: C.gold2, font: `400 30px ${FPX}`, opacity: 1 - gone * 0.55 }}>+{r[1]}</span>
+          </div>;
+        })}
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 22px 8px', color: C.white, font: `400 30px ${FPX}` }}><span>합계</span><span style={{ color: C.gold }}>+{total.toLocaleString('en-US')}</span></div>
+        <Btn label="확인" primary sc={press} style={{ marginTop: 8 }} o={1 - seg(t, 0.2, 0.4) * 0.5} />
+      </div>
+      {list.map(k => {
+        const L = (t - k.t0) / 0.5; if (L < 0 || L > 1) return null;
+        const e = MOTION.enter(t, k.t0, k.t0 + 0.5) * 0.4 + L * 0.6;
+        const s0 = [930, k.sy], c1 = [s0[0] - 60 - (k.j % 3) * 30, Math.min(s0[1], end[1]) - 120 - (k.j % 4) * 30];
+        const x = (1 - e) * (1 - e) * s0[0] + 2 * (1 - e) * e * c1[0] + e * e * end[0], y = (1 - e) * (1 - e) * s0[1] + 2 * (1 - e) * e * c1[1] + e * e * end[1];
+        const sp = Math.abs(Math.cos(L * 9 + k.j)), sx = sp > 0.66 ? 1 : sp > 0.33 ? 0.6 : 0.25;
+        return <div key={'sc' + k.j} style={{ position: 'absolute', left: snap(x - 20), top: snap(y - 20), transform: `scaleX(${sx})` }}><Coin s={3.5} /></div>;
+      })}
+      {t > 1.0 ? [0, 1, 2].map(i => <Star key={'ss' + i} x={1240 + [-90, 10, 60][i]} y={66 + [-30, 34, -18][i]} s={4} c={C.gold2} o={Math.sin(Math.PI * seg(t, 1.05 + i * 0.07, 1.4 + i * 0.07))} />) : null}
+      <Sfx t={t} cues={[[0, '확인 톡'], [0.65, '동전 짤랑 ×12'], [1.05, '합계 반짝']]} on={sfx} />
+    </div>
+  );
+}
+
+
+// ── 시제품용 재생기 ───────────────────────────────────────────────
+const PIECE_DUR = { gacha: null, grant: 1.85, settle: 1.55, expand: 2.3 };
+function MotionPlayer({ kind, d, reduced, onEnd }) {
+  const [, tick] = React.useState(0);
+  const st = React.useRef({ t0: performance.now(), offset: 0, tapped: false, waitFrom: null });
+  const tier = kind === 'gacha' ? d.tier : null;
+  const tm = tier ? gachaTimes(tier, reduced) : null;
+  const clockT = () => (performance.now() - st.current.t0) / 1000 + st.current.offset;
+  let t = clockT();
+  if (tm && !reduced && !st.current.tapped && t > tm.O - 0.08) {           // 탭 대기: 예고 장면 반복
+    if (st.current.waitFrom === null) st.current.waitFrom = performance.now();
+    if (performance.now() - st.current.waitFrom > 3000) { st.current.tapped = true; st.current.offset -= (t - (tm.O - 0.08)); t = tm.O - 0.08; }
+    else t = tm.W + ((t - tm.W) % (tm.O - 0.1 - tm.W));
+  }
+  if (!tm && reduced) t = PIECE_DUR[kind] + 0.2;
+  React.useEffect(() => { let id; const f = () => { tick(n => n + 1); id = requestAnimationFrame(f); }; id = requestAnimationFrame(f); return () => cancelAnimationFrame(id); }, []);
+  React.useEffect(() => { if (kind === 'settle' && t > PIECE_DUR.settle + 0.9 && !st.current.ended) { st.current.ended = true; onEnd && onEnd(); } });
+  const tap = () => { if (tm && !st.current.tapped && clockT() > tm.W) { const cur = clockT(); st.current.tapped = true; st.current.offset += (tm.O - 0.08) - cur; } };
+  const skip = () => { if (tm) { st.current.tapped = true; st.current.offset += (tm.C + 0.7) - clockT(); } };
+  const dd = Object.assign({}, d, { onSkip: skip });
+  const body = kind === 'gacha' ? <Gacha t={t} tier={tier} reduced={reduced} d={dd} sfx={false} />
+    : kind === 'grant' ? <FirstGrant t={t} d={dd} sfx={false} />
+    : kind === 'settle' ? <Settle t={t} d={dd} sfx={false} />
+    : <Expand t={t} d={dd} sfx={false} />;
+  const s = Math.min(window.innerWidth / SW, window.innerHeight / SH);
+  return (
+    <div onClick={tap} style={{ position: 'fixed', inset: 0, zIndex: 40, background: C.navy0, overflow: 'hidden' }} role="dialog" aria-modal="true" aria-label="연출">
+      <div style={{ position: 'absolute', left: (window.innerWidth - SW * s) / 2, top: (window.innerHeight - SH * s) / 2, width: SW, height: SH, transform: `scale(${s})`, transformOrigin: '0 0', overflow: 'hidden' }}>{body}</div>
+    </div>
+  );
+}
+let motionRoot = null, motionHost = null;
+window.closeMotion = () => { if (motionRoot) { motionRoot.unmount(); motionRoot = null; } if (motionHost) { motionHost.remove(); motionHost = null; } };
+window.playMotion = (kind, d, opts = {}) => {
+  window.closeMotion();
+  const reduced = opts.reduced ?? (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  motionHost = document.createElement('div'); document.body.appendChild(motionHost);
+  motionRoot = ReactDOM.createRoot(motionHost);
+  motionRoot.render(<MotionPlayer kind={kind} d={d} reduced={reduced} onEnd={d.onClose} />);
+};
+window.MOTION_TIMES = { gachaTimes, TIERS };
+
+</script>

@@ -49,6 +49,62 @@ class RentalVisitPreparationTest {
         assertEquals(original,(h.source.next() as ContractResult.Success).value)
         assertEquals(1,h.inputReads);assertEquals(1,h.ids);assertEquals(original,h.snapshots.last());assertEquals(0,h.executions)
     }
+    @Test fun retainedVisitRecoveryUsesItsOriginalDraftAndNeverPlansAnEmptySlot() {
+        val h = Harness()
+        assertEquals(ContractResult.Success<PreparedRentalVisit?>(null), h.source.recover(h.identity))
+        assertEquals(0, h.inputReads)
+        h.saveFails = true
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), h.source.next())
+        val original = h.snapshots.single()
+        h.saveFails = false
+        h.inputsFail = true
+        assertEquals(ContractResult.Success(original), h.source.recover(h.identity) { visit, _ ->
+            assertEquals(original, visit)
+            h.save(visit)
+        })
+        assertEquals(1, h.inputReads)
+        assertEquals(1, h.ids)
+    }
+    @Test fun cityDraftKeepsItsFirstAuthorityAcrossSaveRetry() {
+        val h = Harness()
+        fun definition(interval: Long, city: RentalCity) = h.definition.let { old ->
+            RentalVisitDefinition(old.version, old.rules, old.trial, interval, old.categories, old.rates, old.demand,
+                old.durations, old.returns, old.customers, old.fuelBonus, old.rounding,
+                RentalCategory.entries.associateWith { RentalCity.entries.associateWith { candidate ->
+                    if (city == candidate) 2 else 1
+                } })
+        }
+        val first = RentalPreparationInputs(h.catalog, definition(1_800_000, RentalCity.URBAN), h.clock)
+        var current = first
+        var reads = 0
+        var draws = 0
+        var requestIds = 0
+        val saves = mutableListOf<Pair<PreparedRentalVisit, RentalPreparationInputs>>()
+        val preparation = RentalVisitPreparation({ ContractResult.Success(h.identity) }, h, RentalProductInputs {
+            reads++
+            ContractResult.Success(current)
+        }, { authority ->
+            assertSame(first, authority)
+            draws++
+            Random(7)
+        }, { RequestId("city-visit-${++requestIds}") }) { visit, authority ->
+            saves += visit to authority
+            if (saves.size == 1) ContractResult.Failure(ContractError.STORAGE_FAILURE)
+            else h.save(visit)
+        }
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), preparation.next())
+        current = first.copy(definition = definition(1_500_000, RentalCity.SUBURBAN))
+        val original = saves.single().first
+        assertNotNull(original.city)
+        assertEquals(1_800_000L, original.next.nextAt.elapsedMs - original.expected.nextAt.elapsedMs)
+        assertEquals(ContractResult.Success(original), preparation.next())
+        assertSame(first, saves.last().second)
+        assertEquals(saves.first(), saves.last())
+        assertEquals(1, reads)
+        assertEquals(1, draws)
+        assertEquals(1, requestIds)
+    }
+
     @Test fun durablePendingIsRecoveredBeforeUnavailableCurrentInputs() {
         val h=Harness();val original=h.planned();h.inputsFail=true
         assertEquals(original,(h.source.next() as ContractResult.Success).value)

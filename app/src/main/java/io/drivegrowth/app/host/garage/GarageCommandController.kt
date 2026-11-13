@@ -38,6 +38,7 @@ class GarageCommandController(
     fun recover() {
         if (released || busy || !allowed) return
         busy = true; val serial = ++generation
+        show(GarageCommandState.Loading)
         worker.execute {
             val result = safely { journal.load() }
             main.execute {

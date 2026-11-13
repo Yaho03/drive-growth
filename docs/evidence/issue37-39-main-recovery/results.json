@@ -1,0 +1,153 @@
+{
+  "deviceProductCommit": "4d23249c2c091c37c2cb7bda15c659d7f54884fb",
+  "device": "Pleos 2.1.0 / API 34 / ARM64 / Android user 10",
+  "returnedAt": "2026-11-13T02:22:46.786307+09:00",
+  "protectedChecks": "19/19",
+  "testSourceSha256": {
+    "app/src/androidTest/java/io/drivegrowth/app/host/delivery/Issue37NativeMainPurchaseTest.kt": "065ca7b1378946587475d0752974b20cbb292d05475dc88098dce3a843f0ecf6",
+    "app/src/androidTest/java/io/drivegrowth/app/simulation/DeliveryTerminalRecoveryMainTest.kt": "fafa208034db8728d391c1287951d5952d0560a7828665f5f4f83af5f76045c3"
+  },
+  "initialIssue37TestSourceSha256": "ce480ac7eff12e6100a97a63155579d22f03564e1ebaf509dea7b8cfc5f780e0",
+  "sdkPurchase": {
+    "firstSeconds": 11.794,
+    "coldSeconds": 8.631,
+    "quote": {
+      "kind": "sdk_quote",
+      "route": "fbd4894b-debb-11f1-92e3-72e3ec72fa29",
+      "generation": "1",
+      "sequence": "9",
+      "ageMs": "214",
+      "meters": "50",
+      "mode": "ROUTE_GUIDING"
+    },
+    "payment": {
+      "kind": "purchase",
+      "request": "delivery-choice-cf86e7d6-4266-405a-bfb4-ace9b7779e2a",
+      "settlement": "7a6c7a68-7120-484c-8679-730382cbb80e",
+      "offer": "offer-2",
+      "price": "1800",
+      "route": "delivery-route-07b62fb4-a744-432f-b774-8148d032da08"
+    },
+    "initial": {
+      "kind": "cold_fixture",
+      "pid": "13648",
+      "ledgerSha256": "2c536d3821b138a216507ba85b6846a3e7205fd20db8729f4acd24d65791e62a"
+    },
+    "restored": {
+      "kind": "cold_restored",
+      "pid": "16303",
+      "sdkRoute": "fbd4894b-debb-11f1-92e3-72e3ec72fa29",
+      "generation": "1",
+      "sdkMeters": "50",
+      "request": "delivery-choice-cf86e7d6-4266-405a-bfb4-ace9b7779e2a",
+      "appRoute": "delivery-route-07b62fb4-a744-432f-b774-8148d032da08",
+      "ledgerSha256": "2c536d3821b138a216507ba85b6846a3e7205fd20db8729f4acd24d65791e62a",
+      "arrival": "Missing"
+    },
+    "apkSha256": {
+      "app": "b2cd50c6199db81ba46c43de4df4b779dd282647cb4b4917c21d184497f2abd0",
+      "test": "405d442fbc409c84964763e890b7a330c890b5139cd494548d8953a7b618a765"
+    }
+  },
+  "sdkChangeRejection": {
+    "firstAttempt": {
+      "result": "FAIL",
+      "waitingFor": "새 목적지의 SDK 확인 대기",
+      "failureStage": "Destination 화면에서 AwaitingResult를 기다려 확정 버튼 클릭 전 타임아웃"
+    },
+    "seconds": 8.115,
+    "rejected": {
+      "kind": "change_rejected",
+      "pid": "19839",
+      "sdkRoute": "68a61462-debc-11f1-9335-72e3ec72fa29",
+      "generation": "1",
+      "sdkMeters": "3100",
+      "request": "delivery-choice-cf86e7d6-4266-405a-bfb4-ace9b7779e2a",
+      "appRoute": "delivery-route-07b62fb4-a744-432f-b774-8148d032da08",
+      "ledgerSha256": "2c536d3821b138a216507ba85b6846a3e7205fd20db8729f4acd24d65791e62a",
+      "arrival": "Missing"
+    },
+    "apkSha256": {
+      "app": "b2cd50c6199db81ba46c43de4df4b779dd282647cb4b4917c21d184497f2abd0",
+      "test": "20f80fdca67e916363880aff213aa300c1d1e2877771cbd46493ae1818c629c9"
+    }
+  },
+  "simulation": {
+    "missed": {
+      "firstSeconds": 3.721,
+      "coldSeconds": 2.917,
+      "pid": [
+        28566,
+        29676
+      ],
+      "request": "delivery39-terminal-fixture",
+      "settlement": "f4eaf100-9574-4af7-b7b0-cbc4abcab4f9",
+      "balance": 11000,
+      "changedTables": [
+        "host_command_checkpoint",
+        "observed_driving_state"
+      ],
+      "apkSha256": {
+        "app": "cc0ea4a09f5b1b879c86ec5d85ac7a8db60d4b4db65e4aaef085fc2e53972112",
+        "test": "d295f0c332adbca6d32458eee51a5ad02bd07c7ca617cae92c19dcca38fc5cf8"
+      }
+    },
+    "claim": {
+      "firstSeconds": 3.281,
+      "coldSeconds": 2.706,
+      "pid": [
+        30981,
+        32277
+      ],
+      "request": "delivery39-terminal-fixture",
+      "settlement": "ed49de9b-99ad-496f-8b21-a66ccb138b71",
+      "balance": 9680,
+      "changedTables": [
+        "host_command_checkpoint",
+        "observed_driving_state"
+      ],
+      "apkSha256": {
+        "app": "05ae18124e5db820c741ff20b5db3c22102aa6c63932e9d9574d6ee469a359c9",
+        "test": "ce4ab3bca37ed97f31afecf8bf8667aedb3718aed14f7032e0ba4c42f1d32868"
+      }
+    },
+    "fee": {
+      "firstSeconds": 2.8,
+      "coldSeconds": 2.473,
+      "pid": [
+        1704,
+        3419
+      ],
+      "request": "delivery39-terminal-fixture",
+      "settlement": "6bfad305-38b7-4c6b-a3fe-5604eb03b75c",
+      "balance": 10934,
+      "changedTables": [
+        "host_command_checkpoint",
+        "observed_driving_state"
+      ],
+      "apkSha256": {
+        "app": "af2b05d101fc8bfff4ac2714e07a8f2eef376ab5f106b4a8f7cd9a8397de0b6e",
+        "test": "207ae89a5549340a6c7356ecd7c681baf819477b6bd23a672c4dbe813e31dd86"
+      }
+    },
+    "income": {
+      "firstSeconds": 2.684,
+      "coldSeconds": 2.448,
+      "pid": [
+        4787,
+        5917
+      ],
+      "request": "delivery39-terminal-fixture",
+      "settlement": null,
+      "balance": 1000,
+      "changedTables": [
+        "host_command_checkpoint",
+        "observed_driving_state"
+      ],
+      "apkSha256": {
+        "app": "0bb31c2a0774559fc0fb77d34985afc0890401549d68895d7c1c38cb09413a03",
+        "test": "cb864088ad2786ba9cce3b72cf26fa110eef52e620310680938735a0f6213849"
+      }
+    }
+  }
+}

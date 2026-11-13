@@ -1,0 +1,2 @@
+core {"tests": 447, "failures": 0, "errors": 0, "skipped": 0}
+app {"tests": 829, "failures": 0, "errors": 0, "skipped": 0}

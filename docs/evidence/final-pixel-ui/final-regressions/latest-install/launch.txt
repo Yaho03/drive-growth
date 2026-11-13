@@ -1,0 +1,7 @@
+Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=io.drivegrowth.app.simulation/.UnifiedSimulationActivity }
+Status: ok
+LaunchState: COLD
+Activity: io.drivegrowth.app.simulation/.UnifiedSimulationActivity
+TotalTime: 591
+WaitTime: 592
+Complete

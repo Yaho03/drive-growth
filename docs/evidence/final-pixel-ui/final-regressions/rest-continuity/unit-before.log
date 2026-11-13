@@ -1,0 +1,18 @@
+app/src/main/java/io/drivegrowth/app/host/rental/SessionRentalProductSource.kt:298:31: warning: condition is always 'true'.
+            if (continuous && before != null) {
+                              ^^^^^^^^^^^^^^
+JUnit version 4.13.2
+.E.........................................
+Time: 0.287
+There was 1 failure:
+1) 일반 주차에서 휴식 출발로 전환해도 대여 관측의 원래 경계를 유지한다(io.drivegrowth.app.host.rental.SimulationRestRentalContinuityTest)
+java.lang.AssertionError: expected:<1000> but was:<null>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at org.junit.Assert.assertEquals(Assert.java:146)
+	at io.drivegrowth.app.host.rental.SimulationRestRentalContinuityTest.일반 주차에서 휴식 출발로 전환해도 대여 관측의 원래 경계를 유지한다(SimulationRestRentalContinuityTest.kt:37)
+
+FAILURES!!!
+Tests run: 42,  Failures: 1
+

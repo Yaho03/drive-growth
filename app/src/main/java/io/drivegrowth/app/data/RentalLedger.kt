@@ -4,6 +4,7 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteDatabase
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.achievement.AchievementMetric
 import io.drivegrowth.core.garage.Garage
 import io.drivegrowth.core.progression.VehicleActivity
 import io.drivegrowth.core.rental.*
@@ -29,6 +30,9 @@ data class ShopState(val progress: ShopProgress, val capacity: Int, val faciliti
 
 class RentalLedger internal constructor(private val store: SqliteGameChangeStore) : CompletedRentalSource {
     internal companion object {
+        const val completedColumns = """r.id,r.owned_id,s.result,r.accident,r.match_review,r.wash_review,
+            r.bonus,r.weighted,r.regular_customer,r.settlement_request,s.request_id,s.settlement_id"""
+
         fun createTables(db: SQLiteDatabase) {
             db.execSQL("""CREATE TABLE rentals (
                 id TEXT PRIMARY KEY NOT NULL, owned_id TEXT NOT NULL, version TEXT NOT NULL,
@@ -126,17 +130,38 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             if(!it.moveToFirst()||it.text(0)!=selected?.value||it.text(1)!=terms.rules.value||it.integer(2,0,Long.MAX_VALUE)!=terms.start.value||it.integer(3,0,Long.MAX_VALUE)!=end||it.integer(4,0,Long.MAX_VALUE)!=end+terms.returnMinutes*60000L||it.integer(5,0,Long.MAX_VALUE)!=terms.start.value||it.text(6)!="0"||it.text(7)!=quote.fare.toPlainString()||it.integer(8,0,Long.MAX_VALUE)!=quote.facilityBonus.units||it.text(9)!="RENTED")throw SQLiteException("배정 실제 대여 입력 쓰기 불일치")
             if((if(it.isNull(10))null else it.text(10))!=terms.rounding?.name||it.strictBoolean(11)!=quote.accident||it.strictBoolean(12)!=quote.exactMatchReviewBoost||it.strictBoolean(13)!=quote.carWashReviewBoost||(if(it.isNull(14))null else it.strictBoolean(14))!=terms.regularCustomer)throw SQLiteException("배정 실제 고객/사고/반올림 쓰기 불일치")
         }
+        RentalBasisStorage.begin(db, store, request.id)
         ContractResult.Success(selected)
     }
 
     /** 호출자가 확인한 연속 주행/주차 구간. 화면 가시성만으로 주행을 추정하지 않는다. */
-    fun account(id:RequestId,from:EpochMillis,to:EpochMillis,parkedSince:EpochMillis?)=accountBasis(id,from,to,parkedSince,true)
+    fun account(id:RequestId,from:EpochMillis,to:EpochMillis,parkedSince:EpochMillis?) =
+        accountObserved(id, from, to, parkedSince, null)
 
-    /** 원점은 마지막 주행 종료다. 앱 onStop을 물리 주차로 저장하지 않는다. */
-    fun accountInactive(id:RequestId,from:EpochMillis,to:EpochMillis,policyOrigin:EpochMillis)=accountBasis(id,from,to,policyOrigin,false)
+    internal fun accountObserved(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?,
+        unobservedSince: EpochMillis?) =
+        accountBasis(id, from, to, parkedSince, physical = true, unobservedSince = unobservedSince)
 
-    private fun accountBasis(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?, physical:Boolean) = store.atomic { db ->
-        if (from.value < 0 || to.value < 0 || (parkedSince != null && parkedSince.value !in 0..from.value))
+    /** 검증된 이탈 기록의 종료 전 공백은 저널에서 수락 관측 커서를 확인한 뒤 기록한다. */
+    internal fun accountInactive(id: RequestId, from: EpochMillis, to: EpochMillis, policyOrigin: EpochMillis,
+        verifiedExit: RentalInactiveBasis? = null, unobservedSince: EpochMillis? = null) =
+        accountBasis(id, from, to, policyOrigin, false, verifiedExit, unobservedSince)
+
+    /** 미관측 구간을 연결한 뒤 오래된 현재 주차 연결만 해제한다. 정산 근거는 그대로다. */
+    internal fun detachPreviousParking(id: RequestId, original: EpochMillis): ContractResult<Unit> = store.atomic { db ->
+        if (db.update("rentals", android.content.ContentValues().apply { putNull("parked_since") },
+                "id=? AND phase=? AND parked_since=?",
+                arrayOf(id.value, VehicleActivity.RENTED.name, original.value.toString())) != 1) return@atomic conflict()
+        db.rawQuery("SELECT parked_since FROM rentals WHERE id=?", arrayOf(id.value)).use {
+            if (!it.moveToFirst() || !it.isNull(0)) throw SQLiteException("이전 대여 주차 연결 실제 해제 불일치")
+        }
+        ContractResult.Success(Unit)
+    }
+
+    private fun accountBasis(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?,
+        physical: Boolean, verifiedExit: RentalInactiveBasis? = null, unobservedSince: EpochMillis? = null) = store.atomic { db ->
+        if (from.value < 0 || to.value < 0 || (parkedSince != null && parkedSince.value !in 0..from.value) ||
+            (unobservedSince != null && unobservedSince.value !in 0L until from.value))
             return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
         db.rawQuery("SELECT cursor,end,weighted,parked_since,start FROM rentals WHERE id=?", arrayOf(id.value)).use {
             if (!it.moveToFirst()) return@atomic missing()
@@ -144,15 +169,38 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             val oldPark=if(it.isNull(3))null else it.integer(3,0,Long.MAX_VALUE)
             val start=it.integer(4,0,Long.MAX_VALUE);val previous=it.text(2).toBigDecimal()
             if(cursor !in start..it.integer(1,start,Long.MAX_VALUE)||previous.signum()<0||previous>(cursor-start).toBigDecimal()||oldPark?.let{p->p>cursor}==true)throw SQLiteException("대여 누적/커서 범위 손상")
+            val basis = RentalBasisStorage.load(db, store, id)
             if (end <= cursor || to.value < from.value) return@atomic ContractResult.Success(EpochMillis(cursor))
-            if (from.value > cursor) return@atomic conflict()
-            if (parkedSince != null && oldPark!=null && oldPark != parkedSince.value) return@atomic conflict()
-            val increment = parkedSince?.let { start -> parkingIncomeWindow(start, EpochMillis(cursor), EpochMillis(end)).equivalentMillis() } ?: (end-cursor).toBigDecimal()
-            val amount=(previous+increment).toPlainString();val persistedPark=if(physical)parkedSince?.value else oldPark
+            if (from.value > cursor && verifiedExit == null && (unobservedSince == null || cursor < unobservedSince.value))
+                return@atomic conflict()
+            // 주행 중 이탈의 경제 원점은 이전 물리 주차 원점과 독립이다.
+            if (parkedSince != null && oldPark != null && oldPark != parkedSince.value &&
+                verifiedExit != RentalInactiveBasis.APPLICATION_EXIT_DRIVING) return@atomic conflict()
+            val creditedFrom = maxOf(cursor, minOf(from.value, end))
+            val periods = buildList {
+                if (cursor < creditedFrom) {
+                    add(RentalIncomePeriod(EpochMillis(cursor), EpochMillis(creditedFrom),
+                        RentalIncomeKind.UNOBSERVED, null, 0, 0, 0, BigDecimal.ZERO, null))
+                }
+                if (creditedFrom < end) {
+                    val window = parkedSince?.let { parkingIncomeWindow(it, EpochMillis(creditedFrom), EpochMillis(end)) }
+                    val normal = window?.fullMillis ?: (end - creditedFrom)
+                    val reduced = window?.reducedMillis ?: 0L
+                    add(RentalIncomePeriod(EpochMillis(creditedFrom), EpochMillis(end),
+                        if (!physical) RentalIncomeKind.INACTIVE else if (parkedSince == null) RentalIncomeKind.DRIVING else RentalIncomeKind.PARKED,
+                        parkedSince, normal, reduced, end - creditedFrom - normal - reduced,
+                        window?.equivalentMillis() ?: (end - creditedFrom).toBigDecimal(),
+                        if (window == null) null else RentalIncomePolicy(ParkingIncomePolicy.version, ParkingIncomePolicy.normalMillis,
+                            ParkingIncomePolicy.capMillis, ParkingIncomePolicy.reducedMultiplier)))
+                }
+            }
+            val increment = periods.fold(BigDecimal.ZERO) { total, period -> total + period.weightedMillis }
+            val amount=(previous+increment).toPlainString();val persistedPark=if(physical && creditedFrom < end)parkedSince?.value else oldPark
             if(db.update("rentals",android.content.ContentValues().apply{put("cursor",end);put("weighted",amount);if(persistedPark==null)putNull("parked_since")else put("parked_since",persistedPark)},"id=?",arrayOf(id.value))!=1)throw SQLiteException("대여 누적 무갱신")
             db.rawQuery("SELECT cursor,weighted,parked_since FROM rentals WHERE id=?",arrayOf(id.value)).use{r->
                 if(!r.moveToFirst()||r.integer(0,0,Long.MAX_VALUE)!=end||r.text(1)!=amount||(if(r.isNull(2))null else r.integer(2,0,Long.MAX_VALUE))!=persistedPark)throw SQLiteException("대여 실제 누적 쓰기 불일치")
             }
+            RentalBasisStorage.append(db, store, basis, periods)
             ContractResult.Success(EpochMillis(end))
         }
     }
@@ -185,8 +233,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
             else ContractResult.Success(countSettledAccidents(db, ownedVehicleId))
         }
 
-    private val completedSelect = """SELECT r.id,r.owned_id,s.result,r.accident,r.match_review,r.wash_review,
-        r.bonus,r.weighted,r.regular_customer,r.settlement_request,s.request_id,s.settlement_id FROM rentals r
+    private val completedSelect = """SELECT $completedColumns FROM rentals r
         LEFT JOIN settlements s ON s.request_id=r.settlement_request
         WHERE r.settlement_request IS NOT NULL"""
 
@@ -195,7 +242,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         ContractResult.Success(completedRentalCount(db))
     }
 
-    private fun completedRentalCount(db: SQLiteDatabase): Int {
+    internal fun completedRentalCount(db: SQLiteDatabase): Int {
         val rentals = HashSet<RequestId>()
         val receipts = HashSet<SettlementId>()
         db.rawQuery(completedSelect, null).use { rows ->
@@ -228,7 +275,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         }
     }
 
-    private fun decodeCompleted(row: Cursor): CompletedRental {
+    internal fun decodeCompleted(row: Cursor): CompletedRental {
         if (row.isNull(2) || row.isNull(10) || row.isNull(11)) throw SQLiteException("대여 정산 누락")
         val rentalId = RequestId(row.getString(0))
         val settlement = LedgerJson.settlement(JSONObject(row.getString(2)))
@@ -262,6 +309,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         db.rawQuery("""SELECT version,start,end,cursor,weighted,fare,bonus,rounding,accident,match_review,wash_review,
             settlement_request,regular_customer FROM rentals WHERE id=?""", arrayOf(id.value)).use { row ->
             if (!row.moveToFirst()) return@atomic missing()
+            val basis = RentalBasisStorage.load(db, store, id)
             val weightedMillis = BigDecimal(row.getString(4))
             val bonus = GameMoney(if (weightedMillis.signum() == 0) 0 else row.getLong(6))
             fun receipt(s: Settlement) = RentalReceipt(s, row.getInt(8)==1, row.getInt(9)==1, row.getInt(10)==1, bonus,
@@ -302,6 +350,9 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
                     }
                     val event = store.quests.onRentalCompleted(db, id, result.value)
                     if (event is ContractResult.Failure) return@atomic event
+                    RentalBasisStorage.finish(db, store, basis, result.value)
+                    val achievement = store.achievements.observe(db, setOf(AchievementMetric.CUSTOMERS))
+                    if (achievement is ContractResult.Failure) return@atomic achievement
                     ContractResult.Success(receipt(result.value))
                 }
             }
@@ -348,7 +399,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
     }
 
     fun expand(id: RequestId, offer: ShopExpansion) = purchase(id, offer.ruleVersion, offer.price,
-        listOf("expand", offer.fromLevel, offer.currentCapacity, offer.nextCapacity, offer.requiredCustomers, offer.trial)) { db, state, balance ->
+        listOf("expand", offer.fromLevel, offer.currentCapacity, offer.nextCapacity, offer.requiredCustomers, offer.trial), observesExpansion = offer) { db, state, balance ->
         val completed = completedRentalCount(db)
         offer.preview(state.progress.copy(servedCustomers = completed), state.capacity, balance).also {
             if (it is ContractResult.Success) db.execSQL("UPDATE shop SET level=?,capacity=? WHERE id=1",
@@ -357,6 +408,7 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
     }
 
     private fun purchase(id: RequestId, rules: RuleVersion, price: GameMoney, terms: List<Any>,
+                         observesExpansion: ShopExpansion? = null,
                          apply: (SQLiteDatabase, ShopState, GameMoney) -> ContractResult<*>) = store.atomic { db ->
         val command = JSONArray(terms + listOf(rules.value, price.units)).toString()
         db.rawQuery("SELECT command,result FROM settlements WHERE request_id=?", arrayOf(id.value)).use {
@@ -365,8 +417,20 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         }
         val result = apply(db, shop(db), store.readBalance(db))
         if (result is ContractResult.Failure) return@atomic result
-        store.record(db, GameChange(id, TransactionKind.FACILITY, store.source, rules,
+        val receipt = store.record(db, GameChange(id, TransactionKind.FACILITY, store.source, rules,
             MoneyChange(MoneyDirection.DEBIT, price)), command)
+        if (receipt is ContractResult.Success && observesExpansion != null && store.achievements.authority != null) {
+            val actual = shop(db)
+            if (actual.progress.shopLevel != observesExpansion.fromLevel + 1 || actual.capacity != observesExpansion.nextCapacity ||
+                store.readBalance(db) != receipt.value.balance) throw SQLiteException("업적 원인 확장 쓰기 불일치")
+            db.rawQuery("SELECT settlement_id,command,result FROM settlements WHERE request_id=?", arrayOf(id.value)).use {
+                if (!it.moveToFirst() || it.text(0) != receipt.value.settlementId.value || it.text(1) != command ||
+                    it.text(2) != LedgerJson.settlement(receipt.value).toString()) throw SQLiteException("업적 원인 확장 정산 누락")
+            }
+            val achievement = store.achievements.observe(db, setOf(AchievementMetric.SHOP))
+            if (achievement is ContractResult.Failure) return@atomic achievement
+        }
+        receipt
     }
 
     private fun readResult(db: SQLiteDatabase, id: String) =

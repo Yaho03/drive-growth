@@ -1,0 +1,27 @@
+--------- beginning of main
+11-12 12:03:14.932 11333 11333 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+11-12 12:03:14.938 11333 11333 I AndroidRuntime: Using default boot image
+11-12 12:03:14.938 11333 11333 I AndroidRuntime: Leaving lock profiling enabled
+11-12 12:03:15.148 11333 11333 D AndroidRuntime: Calling main entry com.android.commands.am.Am
+11-12 12:03:15.505 11416 11502 I TestRunner: started: testPaidDecorationWriteFailureRetriesSameRequestInActualMain(io.drivegrowth.app.host.shop.DecorationHomeActivityTest)
+11-12 12:03:16.180 11416 11416 I DriveGrowthVehicle: observation_start firstInProcess=true displayId=0
+11-12 12:03:16.191 11416 11416 I DriveGrowthVehicle: signal_state speed=NO_DATA gear=NO_DATA ux=NO_DATA
+11-12 12:03:17.204 11416 11416 I DriveGrowthVehicle: signal_state speed=OK gear=PARK ux=false
+11-12 12:03:21.955 11416 11416 D AndroidRuntime: Shutting down VM
+--------- beginning of crash
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: FATAL EXCEPTION: main
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: Process: io.drivegrowth.verify.shop55retrye, PID: 11416
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: java.lang.NullPointerException
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: 	at io.drivegrowth.app.host.shop.DecorationHomeActivityTest.click$lambda$1(DecorationHomeActivityTest.kt:55)
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: 	at io.drivegrowth.app.host.shop.DecorationHomeActivityTest.$r8$lambda$94SVGk1CHJrjFYTdX7JJqyB35lM(Unknown Source:0)
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: 	at io.drivegrowth.app.host.shop.DecorationHomeActivityTest$$ExternalSyntheticLambda17.run(D8$$SyntheticClass:0)
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: 	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2420)
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:958)
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:205)
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:294)
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:8194)
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: 	at java.lang.reflect.Method.invoke(Native Method)
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+11-12 12:03:21.955 11416 11416 E AndroidRuntime: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+11-12 12:03:22.010 11333 11333 I AndroidRuntime: VM exiting with result code 0.

@@ -6,7 +6,9 @@ import android.database.DatabaseErrorHandler
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import android.os.Looper
+import android.os.SystemClock
 import io.drivegrowth.app.data.AssetGameContent
+import io.drivegrowth.app.data.DeliveryDistanceSession
 import io.drivegrowth.app.data.InitializationAuthority
 import io.drivegrowth.app.data.MaterialVersions
 import io.drivegrowth.app.data.SqliteGameChangeStore
@@ -34,7 +36,13 @@ internal fun chooseGameSource(existing: Map<InputSource, ContractResult<InputSou
 internal fun gameGachaAuthority(content: GameContentSnapshot, source: InputSource, level: Int, capacity: Int): ContractResult<GachaAuthority> {
     if (level < 1 || capacity < 1) return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
     val ids = content.unlockedAt(level).map { it.vehicleId }.toSet()
-    if (ids.isEmpty() || ids.any { id -> content.catalog.vehicles.none { it.vehicleId == id } })
+    if (ids.isEmpty()) {
+        val validLockedCandidates = content.vehicles.isNotEmpty() &&
+            content.vehicles.all { candidate -> content.catalog.vehicles.any { it.vehicleId == candidate.vehicleId } }
+        val detail = if (validLockedCandidates) ContractFailureDetail.GACHA_NO_UNLOCKED_CANDIDATES else null
+        return ContractResult.Failure(ContractError.DATA_UNAVAILABLE, detail)
+    }
+    if (ids.any { id -> content.catalog.vehicles.none { it.vehicleId == id } })
         return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
     return ContractResult.Success(GachaAuthority(source, content.catalog.contentVersion, content.ruleVersion, level, capacity,
         GameMoney(500), content.gacha.pity, content.gacha.guaranteedFrom, ids,
@@ -49,12 +57,22 @@ class GameSession internal constructor(val identity: GameIdentity, val store: Sq
 /** worker 전용. 기존 모드를 보존하고 NEW 여부는 helper가 발급한 근거에만 맡긴다. */
 class GameSessionFactory internal constructor(context: Context, private val databaseNames: Map<InputSource, String>,
     private val newProfileSource: InputSource,
-    private val questDefinitions: (() -> ContractResult<io.drivegrowth.core.quest.QuestDefinitions>)? = null) {
+    private val questDefinitions: (() -> ContractResult<io.drivegrowth.core.quest.QuestDefinitions>)?,
+    private val clock: () -> Long) {
+    internal constructor(context: Context, databaseNames: Map<InputSource, String>, newProfileSource: InputSource,
+        questDefinitions: (() -> ContractResult<io.drivegrowth.core.quest.QuestDefinitions>)? = null) :
+        this(context, databaseNames, newProfileSource, questDefinitions, System::currentTimeMillis)
     constructor(context: Context, newProfileSource: InputSource = InputSource.VEHICLE,
         questDefinitions: (() -> ContractResult<io.drivegrowth.core.quest.QuestDefinitions>)? = null) : this(context,
-        InputSource.entries.associateWith { "game-ledger-${it.name.lowercase()}.db" }, newProfileSource, questDefinitions)
+        InputSource.entries.associateWith { "game-ledger-${it.name.lowercase()}.db" }, newProfileSource, questDefinitions, System::currentTimeMillis)
     private val context = context.applicationContext
     private var bound: GameIdentity? = null
+    // 현재 호스트에서 수락한 수신자만 거리 조회에 공급한다. 새 호스트는 과거 수신자를 상속하지 않는다.
+    @Volatile internal var deliveryDistanceSession: DeliveryDistanceSession? = null
+    internal var deliveryDistanceElapsedRealtime: () -> Long = SystemClock::elapsedRealtime
+    private var achievementTracking = false
+
+    internal fun enableAchievements() { achievementTracking = true }
 
     @Synchronized
     fun open(): ContractResult<GameSession> {
@@ -74,7 +92,7 @@ class GameSessionFactory internal constructor(context: Context, private val data
                 is ContentLoad.Rejected -> ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
             }
             lateinit var store: SqliteGameChangeStore
-            store = SqliteGameChangeStore(context, source, name,
+            store = SqliteGameChangeStore(context, source, name, clock = clock,
                 questDefinitions = questDefinitions,
                 gachaAuthority = {
                     when (content) {
@@ -101,6 +119,21 @@ class GameSessionFactory internal constructor(context: Context, private val data
                         is ContractResult.Success -> ContractResult.Success(MaterialVersions(content.value.catalog.contentVersion, content.value.ruleVersion))
                     }
                 })
+            store.currentDeliveryDistanceSession = { deliveryDistanceSession }
+            val achievementAuthority by lazy {
+                when (content) {
+                    is ContractResult.Failure -> content
+                    is ContractResult.Success -> when (val definition = store.trialDefinitions.load()) {
+                        is ContractResult.Failure -> definition
+                        is ContractResult.Success -> when (val achievements = definition.value.achievementDefinitions) {
+                            is ContractResult.Failure -> achievements
+                            is ContractResult.Success -> ContractResult.Success(io.drivegrowth.app.data.AchievementAuthority(
+                                achievements.value, content.value.catalog))
+                        }
+                    }
+                }
+            }
+            if (achievementTracking) store.achievements.authority = { achievementAuthority }
             when (val profile = store.localProfileId()) {
                 is ContractResult.Failure -> { store.close(); profile }
                 is ContractResult.Success -> {

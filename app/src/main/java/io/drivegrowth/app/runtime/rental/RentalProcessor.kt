@@ -24,6 +24,10 @@ internal class RentalProcessor(private val source: InputSource, private val ledg
             return ContractResult.Failure(ContractError.INVALID_INPUT)
         if (!continuous(tick.from, tick.to) || !continuous(tick.to, now))
             return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+        val gap = tick.unobservedSince
+        if (gap != null && (!valid(gap) || !continuous(gap, tick.from) ||
+                gap.elapsedMs == tick.from.elapsedMs || tick.to.elapsedMs == tick.from.elapsedMs))
+            return ContractResult.Failure(ContractError.INVALID_INPUT)
         val parked = ((tick.motion as? Observation.Available)?.value as? RentalMotion.Parked)?.originalSince
         if (parked != null && parked.value !in 0..tick.from.epoch.value)
             return ContractResult.Failure(ContractError.INVALID_INPUT)
@@ -43,7 +47,7 @@ internal class RentalProcessor(private val source: InputSource, private val ledg
             var cursor = rental.cursor
             if (cursor.value < rental.end.value && tick.to.epoch.value > cursor.value) {
                 val missing = tick.motion as? Observation.Missing
-                if (missing != null || tick.from.epoch.value > cursor.value) {
+                if (missing != null || (tick.from.epoch.value > cursor.value && (gap == null || cursor.value < gap.epoch.value))) {
                     deferred[rental.id] = if (missing?.reason == MissingReason.PERMISSION_DENIED)
                         ContractError.PERMISSION_DENIED else ContractError.DATA_UNAVAILABLE
                     continue
@@ -53,7 +57,7 @@ internal class RentalProcessor(private val source: InputSource, private val ledg
                     deferred[rental.id] = ContractError.STATE_CONFLICT
                     continue
                 }
-                when (val accounted = ledger.account(rental.id, tick.from.epoch, tick.to.epoch, parked)) {
+                when (val accounted = ledger.account(rental.id, tick.from.epoch, tick.to.epoch, parked, gap?.epoch)) {
                     is ContractResult.Failure -> { deferred[rental.id] = accounted.error; continue }
                     is ContractResult.Success -> cursor = accounted.value
                 }

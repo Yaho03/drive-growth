@@ -1,0 +1,45 @@
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.PurchaseDeliveryMainFlowTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+io.drivegrowth.app.simulation.PurchaseDeliveryMainFlowTest:
+INSTRUMENTATION_STATUS: test=testPendingPurchaseArrivesIntoHoldingWithoutGrantingVehicle
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.drivegrowth.app.simulation.PurchaseDeliveryMainFlowTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=InstrumentationTestRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stack=junit.framework.AssertionFailedError: expected:<[OwnedVehicle(ownedVehicleId=OwnedVehicleId(value=initial-grant), vehicleId=VehicleId(value=hyundai_casper), level=1, revision=Revision(value=0), lifecycle=OWNED, rarity=COMMON, levelProgressPercent=0, acquisitionCost=GameMoney(units=0), acquisitionSource=INITIAL_GRANT), OwnedVehicle(ownedVehicleId=OwnedVehicleId(value=issue53-hold-filler-0), vehicleId=VehicleId(value=hyundai_casper), level=1, revision=Revision(value=0), lifecycle=OWNED, rarity=COMMON, levelProgressPercent=0, acquisitionCost=GameMoney(units=0), acquisitionSource=GACHA), OwnedVehicle(ownedVehicleId=OwnedVehicleId(value=issue53-hold-filler-1), vehicleId=VehicleId(value=hyundai_casper), level=1, revision=Revision(value=0), lifecycle=OWNED, rarity=COMMON, levelProgressPercent=0, acquisitionCost=GameMoney(units=0), acquisitionSource=GACHA)]> but was:<[OwnedVehicle(ownedVehicleId=OwnedVehicleId(value=initial-grant), vehicleId=VehicleId(value=hyundai_casper), level=1, revision=Revision(value=1), lifecycle=OWNED, rarity=COMMON, levelProgressPercent=0, acquisitionCost=GameMoney(units=0), acquisitionSource=INITIAL_GRANT), OwnedVehicle(ownedVehicleId=OwnedVehicleId(value=issue53-hold-filler-0), vehicleId=VehicleId(value=hyundai_casper), level=1, revision=Revision(value=1), lifecycle=OWNED, rarity=COMMON, levelProgressPercent=0, acquisitionCost=GameMoney(units=0), acquisitionSource=GACHA), OwnedVehicle(ownedVehicleId=OwnedVehicleId(value=issue53-hold-filler-1), vehicleId=VehicleId(value=hyundai_casper), level=1, revision=Revision(value=1), lifecycle=OWNED, rarity=COMMON, levelProgressPercent=0, acquisitionCost=GameMoney(units=0), acquisitionSource=GACHA)]>
+	at io.drivegrowth.app.simulation.PurchaseDeliveryMainFlowTest.testPendingPurchaseArrivesIntoHoldingWithoutGrantingVehicle(PurchaseDeliveryMainFlowTest.kt:260)
+	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+	at android.test.ActivityInstrumentationTestCase2.runTest(ActivityInstrumentationTestCase2.java:192)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+
+INSTRUMENTATION_STATUS: stream=
+Failure in testPendingPurchaseArrivesIntoHoldingWithoutGrantingVehicle:
+junit.framework.AssertionFailedError: expected:<[OwnedVehicle(ownedVehicleId=OwnedVehicleId(value=initial-grant), vehicleId=VehicleId(value=hyundai_casper), level=1, revision=Revision(value=0), lifecycle=OWNED, rarity=COMMON, levelProgressPercent=0, acquisitionCost=GameMoney(units=0), acquisitionSource=INITIAL_GRANT), OwnedVehicle(ownedVehicleId=OwnedVehicleId(value=issue53-hold-filler-0), vehicleId=VehicleId(value=hyundai_casper), level=1, revision=Revision(value=0), lifecycle=OWNED, rarity=COMMON, levelProgressPercent=0, acquisitionCost=GameMoney(units=0), acquisitionSource=GACHA), OwnedVehicle(ownedVehicleId=OwnedVehicleId(value=issue53-hold-filler-1), vehicleId=VehicleId(value=hyundai_casper), level=1, revision=Revision(value=0), lifecycle=OWNED, rarity=COMMON, levelProgressPercent=0, acquisitionCost=GameMoney(units=0), acquisitionSource=GACHA)]> but was:<[OwnedVehicle(ownedVehicleId=OwnedVehicleId(value=initial-grant), vehicleId=VehicleId(value=hyundai_casper), level=1, revision=Revision(value=1), lifecycle=OWNED, rarity=COMMON, levelProgressPercent=0, acquisitionCost=GameMoney(units=0), acquisitionSource=INITIAL_GRANT), OwnedVehicle(ownedVehicleId=OwnedVehicleId(value=issue53-hold-filler-0), vehicleId=VehicleId(value=hyundai_casper), level=1, revision=Revision(value=1), lifecycle=OWNED, rarity=COMMON, levelProgressPercent=0, acquisitionCost=GameMoney(units=0), acquisitionSource=GACHA), OwnedVehicle(ownedVehicleId=OwnedVehicleId(value=issue53-hold-filler-1), vehicleId=VehicleId(value=hyundai_casper), level=1, revision=Revision(value=1), lifecycle=OWNED, rarity=COMMON, levelProgressPercent=0, acquisitionCost=GameMoney(units=0), acquisitionSource=GACHA)]>
+	at io.drivegrowth.app.simulation.PurchaseDeliveryMainFlowTest.testPendingPurchaseArrivesIntoHoldingWithoutGrantingVehicle(PurchaseDeliveryMainFlowTest.kt:260)
+	at android.test.InstrumentationTestCase.runMethod(InstrumentationTestCase.java:220)
+	at android.test.InstrumentationTestCase.runTest(InstrumentationTestCase.java:205)
+	at android.test.ActivityInstrumentationTestCase2.runTest(ActivityInstrumentationTestCase2.java:192)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:195)
+	at android.test.AndroidTestRunner.runTest(AndroidTestRunner.java:181)
+	at android.test.InstrumentationTestRunner.onStart(InstrumentationTestRunner.java:563)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+
+INSTRUMENTATION_STATUS: test=testPendingPurchaseArrivesIntoHoldingWithoutGrantingVehicle
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_RESULT: stream=
+Test results for InstrumentationTestRunner=.F
+Time: 41.233
+
+FAILURES!!!
+Tests run: 1,  Failures: 1,  Errors: 0
+
+
+INSTRUMENTATION_CODE: -1

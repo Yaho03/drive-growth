@@ -26,4 +26,37 @@ class ObservedDrivingHostTest {
         host.start{callbacks++};host.accept(frame());host.stop();host.start{callbacks++};host.accept(frame())
         w.drain();m.drain();assertEquals(listOf("receiver-1","receiver-2"),tokens);assertEquals(1,callbacks)
     }
+    @Test fun completionWaitsForAcceptedWorkerWorkAndRunsAfterOldUiIsDetached() {
+        val worker=Queue();val main=Queue();val calls=mutableListOf<String>()
+        val host=ObservedDrivingHost(worker,main,{RecordingClock(200,EpochMillis(1100))},
+            {_,_,_->calls+="stored";ContractResult.Failure(ContractError.DATA_UNAVAILABLE)},
+            {_,_->ContractResult.Failure(ContractError.DATA_UNAVAILABLE)},{"receiver"})
+        host.start{calls+="old-ui"};host.accept(frame()){calls+="completed"};host.stop()
+        assertTrue(calls.isEmpty());worker.drain();assertEquals(listOf("stored"),calls)
+        main.drain();assertEquals(listOf("stored","completed"),calls)
+    }
+
+    @Test fun missingClockSkipsObservationAndPauseButClosesReceiver() {
+        val worker = Queue()
+        val main = Queue()
+        var clock: RecordingClock? = RecordingClock(200, EpochMillis(1100))
+        val results = mutableListOf<ContractResult<DrivingRecordingResult>>()
+        var completed = false
+        val host = ObservedDrivingHost(worker, main, { clock },
+            { _, _, _ -> error("시각이 없는 관측을 저장하지 않습니다") },
+            { _, _ -> error("시각이 없는 중단을 저장하지 않습니다") })
+        host.start(results::add)
+        host.accept(frame()) { completed = true }
+        clock = null
+        worker.drain()
+        main.drain()
+        assertEquals(listOf(ContractResult.Failure(ContractError.DATA_UNAVAILABLE)), results)
+        assertTrue(completed)
+        host.stop()
+        assertTrue(worker.jobs.isEmpty())
+        host.start { error("이전 응답이 다시 전달되면 안 됩니다") }
+        host.stop()
+        assertTrue(worker.jobs.isEmpty())
+    }
+
 }

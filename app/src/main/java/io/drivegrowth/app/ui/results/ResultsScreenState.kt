@@ -1,15 +1,29 @@
 package io.drivegrowth.app.ui.results
 
+import io.drivegrowth.app.runtime.rental.product.RentalCity
 import io.drivegrowth.core.contract.ContractError
 import io.drivegrowth.core.contract.ContractResult
+import io.drivegrowth.core.contract.MissingReason
+import io.drivegrowth.core.contract.Observation
 import io.drivegrowth.core.contract.Settlement
 import io.drivegrowth.core.contract.SettlementId
+import io.drivegrowth.core.rental.RentalCategory
 import java.util.Collections
 
 /** 확정 정산을 그대로 보존한다. null 차종명은 조회 공급자가 이름을 제공하지 않은 상태다. */
 data class ResultPresentation(val settlement: Settlement, val vehicleName: String? = null,
     val viewed: Boolean = false, val rental: io.drivegrowth.core.rental.CompletedRental? = null,
-    val rentalVehicleName: String? = null)
+    val rentalVehicleName: String? = null,
+    val rentalBasis: io.drivegrowth.core.contract.Observation<io.drivegrowth.app.data.RentalResultBasis> =
+        Observation.Missing(MissingReason.NO_DATA),
+    val rentalDemand: Observation<RentalDemandPresentation> = Observation.Missing(MissingReason.NO_DATA))
+
+data class RentalDemandPresentation(
+    val desiredVehicleName: String,
+    val purpose: RentalCategory,
+    val city: Observation<RentalCity>,
+)
+
 enum class ResultsOrigin { STORED, FIXTURE }
 enum class ResultsScope { UNVIEWED, ALL }
 
@@ -129,4 +143,21 @@ class ResultsInteraction(private val onEvent: (ResultsEvent) -> Unit) {
     private fun update(value: ResultsUiState) {
         uiState = value.copy(readStates = Collections.unmodifiableMap(LinkedHashMap(value.readStates)))
     }
+}
+
+/** 밀리초를 손실 없이 표시한다. 양수인 짧은 구간을 절삭/반올림해 0초로 만들지 않는다. */
+internal fun rentalDuration(millis: Long): String {
+    require(millis >= 0)
+    val hours = millis / 3_600_000
+    val minutes = millis / 60_000 % 60
+    val seconds = millis / 1000 % 60
+    val fraction = millis % 1000
+    return buildList {
+        if (hours > 0) add(java.text.NumberFormat.getIntegerInstance(java.util.Locale.KOREA).format(hours) + "시간")
+        if (minutes > 0) add("${minutes}분")
+        if (seconds > 0 || fraction > 0 || isEmpty()) {
+            val decimal = if (fraction == 0L) "" else "." + fraction.toString().padStart(3, '0').trimEnd('0')
+            add("$seconds${decimal}초")
+        }
+    }.joinToString(" ")
 }

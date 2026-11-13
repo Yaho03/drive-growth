@@ -13,7 +13,9 @@ import android.view.ViewTreeObserver
 import android.view.MotionEvent
 import android.widget.Button
 import android.widget.TextView
-import android.widget.Spinner
+import io.drivegrowth.app.mainNavigation
+import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.data.SqliteGameChangeStore
 import io.drivegrowth.app.ui.onboarding.OnboardingView
@@ -41,10 +43,8 @@ class ResultsHostActivityTest : InstrumentationTestCase() {
     private fun texts(activity: MainActivity) = descendants(activity.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }
     private fun button(activity: MainActivity, label: String) = descendants(activity.window.decorView)
         .filterIsInstance<Button>().first { it.text.toString() == label }
-    private fun destination(activity: MainActivity, label: String) {
-        val spinner = activity.window.decorView.findViewWithTag<Spinner>("host:destination")
-        val position = (0 until spinner.count).first { spinner.getItemAtPosition(it).toString() == label }
-        spinner.setSelection(position)
+    private fun destination(activity: MainActivity, page: HostPage) {
+        activity.window.decorView.openMainPage(page)
     }
     private fun results(activity: MainActivity) = descendants(activity.window.decorView).filterIsInstance<ResultsView>().single()
     private fun tap(button: Button) {
@@ -99,14 +99,14 @@ class ResultsHostActivityTest : InstrumentationTestCase() {
         var current = instrumentation.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
         try {
             awaitUi(current, "실제 P SDK 관측으로 탐색과 정산 선택 항목이 준비돼야 한다") {
-                val navigation = current.window.decorView.findViewWithTag<Spinner>("host:destination")
-                // 현재 gate를 읽기만 한다. HOME의 미선택 항목 TextView 표시를 요구하지 않는다.
+                val navigation = current.window.decorView.mainNavigation()
+                // 현재 gate와 실제 정산 탐색 버튼을 확인한다.
                 val allowed = MainActivity::class.java.getDeclaredMethod("allowed").apply { isAccessible = true }
                     .invoke(current) as Boolean
                 allowed && navigation != null && navigation.isShown && navigation.isEnabled &&
-                    (0 until navigation.count).any { navigation.getItemAtPosition(it).toString() == "미확인 정산" }
+                    current.window.decorView.mainPage(HostPage.RESULTS)?.isEnabled == true
             }
-            ui { destination(current, "미확인 정산") }
+            ui { destination(current, HostPage.RESULTS) }
             val openTag = "results:open:${stored.settlementId.value}"
             val markTag = "results:mark:${stored.settlementId.value}"
             awaitUi(current, "저장된 정산이 실제 View에 전달돼야 한다") { current.window.decorView.findViewWithTag<View>(openTag) != null }
@@ -177,7 +177,7 @@ class ResultsHostActivityTest : InstrumentationTestCase() {
                 it.taskInfo.persistentId == current.taskId
             }.moveToFront() }
             awaitUi(current, "저장 후 사용자 복귀에서 새 gate·조회로 가게를 복원한다") { texts(current).contains("드라이브 키우기") }
-            ui { destination(current, "첫 차량 안내") }; instrumentation.waitForIdleSync()
+            ui { destination(current, HostPage.ONBOARDING) }; instrumentation.waitForIdleSync()
             screenshot(current, "host-narrow-onboarding.png")
             ui {
                 assertEquals(1, descendants(current.window.decorView).filterIsInstance<OnboardingView>().size)

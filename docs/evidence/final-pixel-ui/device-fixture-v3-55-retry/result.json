@@ -1,0 +1,14 @@
+{
+  "head": "ce03352830207409cf20ffbcd0cdcf6999e12ead",
+  "tree": "ce0c2d15a915620bda7e845bc2437fcf75015aac",
+  "testOverlaySHA256": "3751a6ea5a783917b1d251f28529e29e81fea2823cd4773794a5b54ccdbac9c3",
+  "package": "io.drivegrowth.verify.shop55retrye",
+  "selector": "io.drivegrowth.app.host.shop.DecorationHomeActivityTest#testPaidDecorationWriteFailureRetriesSameRequestInActualMain",
+  "sha256": {
+    "io.drivegrowth.verify.shop55retrye": "a2ff34057d386afd1daa1a46cb9d67047af8443bf5d86ae5aa5e33cceff73199",
+    "io.drivegrowth.verify.shop55retrye.test": "3769fca48fcc965ff05b14c2b7a2f2becd86ba028ba864312475f0d54be8c0ac"
+  },
+  "cleanupErrors": [],
+  "signerSHA256": "4241ac4162c67a0e0101009cec5a8810ae78bdf1346d4decdf55b191fc64d60b",
+  "passed": true
+}

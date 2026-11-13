@@ -1,6 +1,7 @@
 package io.drivegrowth.app.host.delivery
 
 import io.drivegrowth.app.data.DeliveryLedger
+import io.drivegrowth.app.data.DeliveryObservedDistance
 import io.drivegrowth.app.host.*
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.delivery.*
@@ -30,13 +31,23 @@ class FactoryDeliveryHostQueries(private val games: GameSessionFactory,
         val shop = when (val read = store.rental.shop()) { is ContractResult.Failure -> return@use read; is ContractResult.Success -> read.value }
         val terms = when (val read = readTerms(store.delivery)) { is ContractResult.Failure -> return@use read; is ContractResult.Success -> read.value }
         val active = when (val read = store.delivery.active()) { is ContractResult.Failure -> return@use read; is ContractResult.Success -> read.value }
-        val progress = when (val read = store.delivery.inProgress()) { is ContractResult.Failure -> return@use read; is ContractResult.Success -> read.value }
+        val routeDistance = store.atomic { db ->
+            val progress = store.delivery.inProgress(db)
+            when (val observed = DeliveryObservedDistance.read(db, identity, progress, store.currentDeliveryDistanceSession())) {
+                is ContractResult.Failure -> observed
+                is ContractResult.Success -> ContractResult.Success(progress to observed.value)
+            }
+        }
+        val (progress, vehicleObserved) = when (routeDistance) {
+            is ContractResult.Failure -> return@use routeDistance
+            is ContractResult.Success -> routeDistance.value
+        }
         val owned = when (val read = store.listOwnedVehicles()) { is ContractResult.Failure -> return@use read; is ContractResult.Success -> read.value }
         val held = when (val read = store.delivery.held()) { is ContractResult.Failure -> return@use read; is ContractResult.Success -> read.value }
         if (terms?.active != active || progress != null && progress.active != active ||
             active != null && active.proposed.estimated.source != identity.source || held.any { it.source != identity.source })
             return@use ContractResult.Failure(ContractError.STATE_CONFLICT)
-        ContractResult.Success(DeliveryHostData(identity, content, balance, shop.progress.shopLevel, (shop.capacity - owned.size).coerceAtLeast(0), terms, progress, held.toList()))
+        ContractResult.Success(DeliveryHostData(identity, content, balance, shop.progress.shopLevel, (shop.capacity - owned.size).coerceAtLeast(0), terms, progress, held.toList(), vehicleObserved))
     }
     override fun lists(identity: GameIdentity, day: LocalDate) = use(identity) { it.store.delivery.lists(day) }
     override fun saveList(identity: GameIdentity, list: DeliveryList) = use(identity) { session ->

@@ -40,9 +40,17 @@ class StoredShopExpansionSource(
             val activity=when(val r=store.rental.activity(car.ownedVehicleId)){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
             ShopVehicle(car.ownedVehicleId,names[car.vehicleId] ?: "${car.vehicleId.value} · 차종명 미제공",when(activity){
                 VehicleActivity.IDLE->"대기";VehicleActivity.RENTED->"대여 중";VehicleActivity.RETURNING->"반납 이동 중";VehicleActivity.NEEDS_REPAIR->"수리 필요"
-            })
+            }, car.vehicleId, car.rarity, activity)
         }
         ContractResult.Success(mapShopExpansion(profile,source,definition,shop,count,money,vehicles))
+    }
+    /** 호출자가 소유한 같은 연결을 읽으며 열거나 닫지 않는다. */
+    internal fun readIn(store: SqliteGameChangeStore): ContractResult<ShopExpansionSnapshot> {
+        if (store.source != source) return ContractResult.Failure(ContractError.INVALID_INPUT)
+        return when (val definition = definitions.load()) {
+            is ContractResult.Failure -> definition
+            is ContractResult.Success -> readSnapshot(store, definition.value)
+        }
     }
     override fun read(): ContractResult<ShopExpansionSnapshot> = when(val d=definitions.load()) {
         is ContractResult.Failure->d

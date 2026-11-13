@@ -17,7 +17,7 @@ internal fun mapShopExpansion(profile: ProfileId, source: InputSource, definitio
         ShopOption("expand","레벨 ${offer.fromLevel} → ${offer.fromLevel+1} · 공간 ${offer.currentCapacity} → ${offer.nextCapacity}",
             "완료 대여 ${completed}/${offer.requiredCustomers}건 · 현재 공간 ${shop.capacity}칸"+
                 (if(!capacityMatches) " · 공간 정의 불일치" else if(balance.units<offer.price.units) " · 잔액 부족" else ""),
-            "확정 후 공간 ${offer.nextCapacity}칸 · ${definition.version.value}",
+            "확정 후 공간 ${offer.nextCapacity}칸",
             if(!capacityMatches)ShopAvailability.UNKNOWN else if(available)ShopAvailability.AVAILABLE else ShopAvailability.LOCKED,
             ShopCommand.Expand(offer),offer.price,offer.ruleVersion,offer.trial)
     }
@@ -29,7 +29,7 @@ internal fun mapShopExpansion(profile: ProfileId, source: InputSource, definitio
             if(installed)ShopAvailability.INSTALLED else ShopAvailability.UNKNOWN))
     }
     val screen=ShopScreenState.Content(Revision(0),"내 가게 · 저장 상태",shop.progress.shopLevel,shop.progress.ownedVehicles,
-        shop.capacity,balance,ShopAppearance("외형 미연결",0xff8fbcff.toInt()),Collections.unmodifiableList(ArrayList(vehicles)),
+        shop.capacity,balance,ShopAppearance("기본 간판",0xff8fbcff.toInt()),Collections.unmodifiableList(ArrayList(vehicles)),
         Collections.unmodifiableList(facilities),expansion,listOf(ShopOption("decoration-unsupported","꾸미기",
             "품목/가격/보유 공급 미연결","이번 연결 미지원",ShopAvailability.UNKNOWN)),ShopOrigin.STORED)
     return ShopExpansionSnapshot(profile,source,definition.version,completed,screen)

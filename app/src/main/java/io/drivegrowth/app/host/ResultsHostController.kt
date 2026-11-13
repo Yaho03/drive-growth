@@ -26,7 +26,8 @@ class ResultsHostController(
         private set
     private var onResult: ((SettlementId, ContractResult<Unit>) -> Unit)? = null
     @Volatile private var released = false
-    @Volatile private var historyEnabled = false
+    @Volatile private var historyAccess: Any? = null
+    private val historyEnabled get() = historyAccess != null
     @Volatile private var historyGeneration = 0L
     private var history: io.drivegrowth.app.data.SettlementHistorySnapshot? = null
     private var onHistory: ((io.drivegrowth.app.ui.results.ResultsScreenState) -> Unit)? = null
@@ -39,7 +40,8 @@ class ResultsHostController(
     }
     fun setControlsEnabled(value: Boolean) {
         if (released || historyEnabled == value) return
-        historyEnabled = value; historyGeneration++
+        historyAccess = if (value) Any() else null
+        historyGeneration++
         if (value) refreshHistory()
     }
     fun refreshHistory(): Boolean {
@@ -79,15 +81,16 @@ class ResultsHostController(
     fun completeQuery() { uiState = uiState.copy(retryPending = false) }
 
     fun markViewed(id: SettlementId, snapshot: HostSnapshot?, controlsEnabled: Boolean): Boolean {
-        val eligible = if (hasHistorySource) historyEnabled && history?.let { data ->
+        val access = historyAccess
+        val eligible = if (hasHistorySource) access != null && history?.let { data ->
             data.entries.any { !it.viewed && it.settlement.settlementId == id && it.settlement.transaction.source == data.identity.source }
         } == true else snapshot?.let { data -> data.unviewedSettlements.any { it.settlementId == id && it.transaction.source == data.source } } == true
         if (released || !controlsEnabled || !eligible || uiState.selectedId != id ||
             uiState.readStates[id] == ResultsReadState.Done || uiState.readStates.values.any { it == ResultsReadState.Pending }) return false
         uiState = uiState.copy(readStates = immutable(uiState.readStates + (id to ResultsReadState.Pending)))
         worker.execute {
-            val result = if (released || (hasHistorySource && !historyEnabled)) ContractResult.Failure(ContractError.UX_RESTRICTED)
-                else write(id)
+            val result = if (released || (hasHistorySource && historyAccess !== access))
+                ContractResult.Failure(ContractError.UX_RESTRICTED) else write(id)
             main.execute {
                 if (!released) {
                     val next = when (result) {
@@ -108,7 +111,8 @@ class ResultsHostController(
 
     fun release() {
         released = true
-        historyEnabled = false; historyGeneration++
+        historyAccess = null
+        historyGeneration++
         detach()
     }
 

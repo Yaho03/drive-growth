@@ -104,7 +104,7 @@ class FacilityCheckpointTest:InstrumentationTestCase() {
         raw{it.execSQL("CREATE TRIGGER reinsert_finish AFTER DELETE ON host_command_checkpoint BEGIN INSERT INTO host_command_checkpoint VALUES(OLD.id,OLD.payload,OLD.phase,OLD.digest); END")};val original=rows();assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),store.hostCommands.finish(profile,c));assertEquals(original,rows())
     }
     fun testSchema14UpgradePreservesWholeLedgerAndStartsWithNoNewTypedResults() {
-        val before=rows().filterNot{it.startsWith("facility_command_results:")};store.close();raw{it.execSQL("DROP TABLE facility_command_results");it.version=14};store=open();ok(store.localProfileId());assertEquals(before,rows());raw{assertEquals(15,it.version)};assertNull(ok(store.hostCommands.facilityResult(profile,rest())))
+        val before=rows().filterNot{it.startsWith("facility_command_results:")};store.close();raw{stripRestFixture(it);it.execSQL("DROP TABLE facility_command_results");it.version=14};store=open();ok(store.localProfileId());assertEquals(before,rows());raw{assertEquals(20, it.version)};assertNull(ok(store.hostCommands.facilityResult(profile,rest())))
     }
     fun testIndependentCompletedRestingRequestIdCannotBeReusedByGeneralMoneyCommand() {
         val command=rest("independent-shared-request");execute(command);finish(command);val before=rows()

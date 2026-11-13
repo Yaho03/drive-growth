@@ -4,7 +4,7 @@ import android.os.SystemClock
 import android.test.ActivityInstrumentationTestCase2
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Spinner
+import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.app.ui.garage.GarageView
@@ -24,21 +24,17 @@ class ShopHostActivityTest : ActivityInstrumentationTestCase2<MainActivity>(Main
         }
         assertTrue("실제 주차 gate/저장 조회 이후 ${type.simpleName}에 도달해야 함", found)
     }
-    private fun select(current: MainActivity, label: String) {
-        instrumentation.runOnMainSync {
-            val spinner = current.window.decorView.findViewWithTag<Spinner>("host:destination")
-            spinner.setSelection((0 until spinner.count).first { spinner.getItemAtPosition(it).toString() == label })
-        }
-        instrumentation.waitForIdleSync()
+    private fun select(current: MainActivity, page: HostPage) {
+        instrumentation.runOnMainSync { current.window.decorView.openMainPage(page) }
     }
     fun testHomeUsesRealShopViewAndChildPagesReturnHome() {
         assertTrue("제품 패키지로 이 시험을 실행하지 않는다", instrumentation.targetContext.packageName != "io.drivegrowth.app")
         val current = activity
         awaitContent(current, ShopView::class.java)
-        select(current, "보유 차량"); awaitContent(current, GarageView::class.java)
+        select(current, HostPage.GARAGE); awaitContent(current, GarageView::class.java)
         instrumentation.runOnMainSync { current.onBackPressed() }; instrumentation.waitForIdleSync()
         awaitContent(current, ShopView::class.java)
-        select(current, "가챠"); awaitContent(current, GachaView::class.java)
+        select(current, HostPage.GACHA); awaitContent(current, GachaView::class.java)
         instrumentation.runOnMainSync { current.onBackPressed() }; instrumentation.waitForIdleSync()
         awaitContent(current, ShopView::class.java)
     }

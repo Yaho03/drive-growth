@@ -1,0 +1,22 @@
+Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=io.drivegrowth.verify.vehiclelauncher28/io.drivegrowth.app.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.android.permissioncontroller/.permission.ui.GrantPermissionsActivity
+TotalTime: 2569
+WaitTime: 2598
+Complete
+Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=io.drivegrowth.verify.vehiclelauncher28/io.drivegrowth.app.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: io.drivegrowth.verify.vehiclelauncher28/io.drivegrowth.app.MainActivity
+TotalTime: 496
+WaitTime: 499
+Complete
+Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=io.drivegrowth.verify.vehiclelauncher28/io.drivegrowth.app.MainActivity }
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+Status: ok
+LaunchState: UNKNOWN (0)
+Activity: io.drivegrowth.verify.vehiclelauncher28/io.drivegrowth.app.MainActivity
+TotalTime: 0
+WaitTime: 25
+Complete

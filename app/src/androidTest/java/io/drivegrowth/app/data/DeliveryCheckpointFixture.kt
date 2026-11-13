@@ -22,6 +22,7 @@ internal fun stripDeliveryCheckpointFixture(db:SQLiteDatabase) {
 
 /** schema14 metadata/열만 제거해 이전 helper의 실제 구조를 만든다. 기존 방문 세 열과 행을 보존한다. */
 internal fun stripRentalProductFixture(db:SQLiteDatabase) {
+    stripRestFixture(db)
     db.execSQL("DROP TABLE IF EXISTS facility_command_results")
     for(table in listOf("rental_product_marker","rental_product_state","rental_product_inactive"))db.execSQL("DROP TABLE IF EXISTS $table")
     val columns=db.rawQuery("PRAGMA table_info(visits)",null).use{r->buildList{while(r.moveToNext())add(r.getString(1))}}
@@ -30,4 +31,16 @@ internal fun stripRentalProductFixture(db:SQLiteDatabase) {
     db.execSQL("CREATE TABLE visits (id TEXT PRIMARY KEY NOT NULL, command TEXT NOT NULL, assigned TEXT)")
     db.execSQL("INSERT INTO visits(id,command,assigned) SELECT id,command,assigned FROM visits_schema14_fixture")
     db.execSQL("DROP TABLE visits_schema14_fixture")
+}
+
+/** schema16의 신규 표만 제거한다. legacy 이전 fixture용이며 원장 행의 기대값은 유지한다. */
+internal fun stripRestFixture(db:SQLiteDatabase) {
+    stripDecorationFixture(db)
+    for(table in listOf("rest_module","rest_contexts","rest_departures","rest_driving_receipts","rest_log","rest_head"))db.execSQL("DROP TABLE IF EXISTS $table")
+}
+
+/** schema17 도입 전 구조만 재현하는 시험 utility. */
+internal fun stripDecorationFixture(db:SQLiteDatabase) {
+    db.execSQL("DROP TABLE IF EXISTS rental_result_basis")
+    for(table in listOf("decoration_requests","decoration_module"))db.execSQL("DROP TABLE IF EXISTS $table")
 }

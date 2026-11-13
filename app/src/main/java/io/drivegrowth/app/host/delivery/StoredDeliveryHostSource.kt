@@ -17,6 +17,7 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
     private var changing: Pair<ActiveDelivery, Long?>? = null
     private var changeOffer: DeliveryChangeOffer? = null
     private var changeRevision: Long? = null
+    private var changeRoute: RouteId? = null
 
     override fun read(): ContractResult<DeliveryHostRead> {
         val identity = when (val read = queries.identity()) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
@@ -29,7 +30,7 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
         val data = when (val read = queries.read(identity)) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
         if (data.identity != identity) return ContractResult.Failure(ContractError.STATE_CONFLICT)
         val rules = when (val read = definitions()) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
-        val nav = readNavigation(identity)
+        val nav = readNavigation(identity, data)
         val names = data.content.catalog.vehicles.associate { it.vehicleId to it.displayName }
         val at = now()
         if (automatic) {
@@ -45,7 +46,7 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
         }
         val terms = data.terms
         if (terms == null) {
-            changing = null; changeOffer = null; changeRevision = null
+            changing = null; changeOffer = null; changeRevision = null; changeRoute = null
             if (nav.destination == null) return ContractResult.Success(DeliveryHostRead(identity,
                 DeliveryScreen.Destination(null, null, sourceLabel(identity.source), true), data.held, navigation = nav))
             return offers.offers(identity)
@@ -74,13 +75,13 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
             }
         }
         val change = changing
-        if (change != null && change.first == terms.active) {
+        if (change != null && change.first == terms.active && changeRoute == progress?.route) {
             val selectedRevision = nav.selectionRevision
             if (selectedRevision == null || (change.second != null && selectedRevision <= change.second!!)) return ContractResult.Success(DeliveryHostRead(identity,
                 DeliveryScreen.AwaitingResult(DeliveryHostMapper.active(terms, names, destinationName(terms.active, nav), nav.observed),
                     "내비게이션에서 새 목적지와 예상 경로를 확인해 주세요."), data.held, navigation = nav))
             val to = nav.destination ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
-            if (changeOffer?.let { !currentChange(it, nav) } == true) { changeOffer = null; changeRevision = null }
+            if (changeOffer?.let { !currentChange(it, nav, progress?.route) } == true) { changeOffer = null; changeRevision = null }
             val proposed = changeOffer ?: when (val read = DeliveryProposal(rules.proposal).proposeChange(terms.active,
                 nav.observed, nav.estimated, to, data.content, data.shopLevel, today(), random())) {
                 is ContractResult.Failure -> return read
@@ -96,7 +97,7 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
         val data = when (val read = queries.read(identity)) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
         if (data.identity != identity) return ContractResult.Failure(ContractError.STATE_CONFLICT)
         val rules = when (val read = definitions()) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
-        val nav = readNavigation(identity)
+        val nav = readNavigation(identity, data)
         val names = data.content.catalog.vehicles.associate { it.vehicleId to it.displayName }
         val terms = data.terms
         val prepared: ContractResult<DeliveryHostPrepared> = when (command) {
@@ -106,6 +107,7 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
                     is ContractResult.Failure -> chosen
                     is ContractResult.Success -> {
                         changing = command.active?.let { it to nav.selectionRevision }; changeOffer = null; changeRevision = null
+                        changeRoute = data.progress?.route
                         ContractResult.Success(DeliveryHostPrepared(DeliveryScreen.Destination(null, null, sourceLabel(identity.source), false,
                             "내비게이션에서 목적지를 선택한 뒤 다시 조회해 주세요.")))
                     }
@@ -114,7 +116,7 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
             is DeliveryCommand.Select -> {
                 val change = changeOffer
                 if (terms != null) {
-                    if (change == null || change.proposed != command.proposed || changing?.first != terms.active || !currentChange(change, nav))
+                    if (change == null || change.proposed != command.proposed || changing?.first != terms.active || !currentChange(change, nav, data.progress?.route))
                         return ContractResult.Failure(ContractError.STATE_CONFLICT)
                     val preview = when (val result = DeliveryChange(rules.change).change(terms, change, command.offerId, data.balance)) {
                         is ContractResult.Failure -> return result
@@ -143,12 +145,14 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
             }
             is DeliveryCommand.Change -> {
                 val change = changeOffer ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
-                if (terms?.active != command.active || change.proposed != command.proposed || !currentChange(change, nav))
+                if (terms?.active != command.active || change.proposed != command.proposed || !currentChange(change, nav, data.progress?.route))
                     return ContractResult.Failure(ContractError.STATE_CONFLICT)
+                val observedRoute = if (identity.source == InputSource.VEHICLE)
+                    data.progress?.route ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE) else null
                 when (val preview = DeliveryChange(rules.change).change(terms, change, command.offerId, data.balance)) {
                     is ContractResult.Failure -> preview
                     is ContractResult.Success -> ContractResult.Success(DeliveryHostPrepared(DeliveryScreen.Loading,
-                        DeliveryHostOperation.Change(rules.change, change, command.offerId, routeId())))
+                        DeliveryHostOperation.Change(rules.change, change, command.offerId, routeId(), observedRoute)))
                 }
             }
             is DeliveryCommand.ReviewAbandon -> if (terms?.active != command.active) ContractResult.Failure(ContractError.STATE_CONFLICT)
@@ -156,7 +160,7 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
             is DeliveryCommand.Abandon -> if (terms?.active != command.active) ContractResult.Failure(ContractError.STATE_CONFLICT)
                 else ContractResult.Success(DeliveryHostPrepared(DeliveryScreen.Loading, DeliveryHostOperation.Abandon(rules.change, command.active.requestId)))
             DeliveryCommand.ExitReview, DeliveryCommand.Refresh -> {
-                if (command == DeliveryCommand.ExitReview) { changing = null; changeOffer = null; changeRevision = null }
+                if (command == DeliveryCommand.ExitReview) { changing = null; changeOffer = null; changeRevision = null; changeRoute = null }
                 when (val read = current(identity, false)) {
                     is ContractResult.Failure -> read
                     is ContractResult.Success -> ContractResult.Success(DeliveryHostPrepared(read.value.screen))
@@ -176,7 +180,7 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
         when (val saved = journal.save(identity, operation)) { is ContractResult.Failure -> return saved; else -> Unit }
         val receipt = when (val result = journal.execute(identity, operation)) { is ContractResult.Failure -> return result; is ContractResult.Success -> result.value }
         if (!matches(operation, receipt)) return ContractResult.Failure(ContractError.STORAGE_FAILURE)
-        changing = null; changeOffer = null; changeRevision = null
+        changing = null; changeOffer = null; changeRevision = null; changeRoute = null
         return when (val read = current(identity, false)) {
             is ContractResult.Failure -> ContractResult.Success(DeliveryHostRead(identity,
                 DeliveryScreen.Failure("원래 처리 결과는 저장됐지만 현재 화면 정보를 읽지 못했어요. 다시 확인해 주세요.", true),
@@ -190,18 +194,21 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
         val change = changeOffer
         return if (change?.proposed == proposed) queries.discoverChange(identity, change) else offers.displayed(identity, proposed)
     }
-    private fun readNavigation(identity: GameIdentity): DeliveryNavigationSnapshot = when (val read = navigation.read(identity)) {
-        is ContractResult.Success -> read.value
-        is ContractResult.Failure -> {
-            val reason = if (read.error == ContractError.PERMISSION_DENIED) MissingReason.PERMISSION_DENIED else MissingReason.NO_DATA
-            DeliveryNavigationSnapshot(null, null, Observation.Missing(reason), Observation.Missing(reason), Observation.Missing(reason), null)
+    private fun readNavigation(identity: GameIdentity, data: DeliveryHostData): DeliveryNavigationSnapshot {
+        val nav = when (val read = navigation.read(identity)) {
+            is ContractResult.Success -> read.value
+            is ContractResult.Failure -> {
+                val reason = if (read.error == ContractError.PERMISSION_DENIED) MissingReason.PERMISSION_DENIED else MissingReason.NO_DATA
+                DeliveryNavigationSnapshot(null, null, Observation.Missing(reason), Observation.Missing(reason), Observation.Missing(reason), null)
+            }
         }
+        return if (identity.source == InputSource.VEHICLE) nav.copy(observed = data.vehicleObserved) else nav
     }
     private fun destinationName(active: ActiveDelivery, nav: DeliveryNavigationSnapshot): String? =
         nav.destinationName.takeIf { nav.destination == active.proposed.destination }
-    private fun currentChange(value: DeliveryChangeOffer, nav: DeliveryNavigationSnapshot): Boolean {
+    private fun currentChange(value: DeliveryChangeOffer, nav: DeliveryNavigationSnapshot, route: RouteId?): Boolean {
         val moved = (nav.observed as? Observation.Available)?.value
-        return nav.selectionRevision != null && changeRevision == nav.selectionRevision && nav.destination == value.proposed.destination &&
+        return changeRoute == route && nav.selectionRevision != null && changeRevision == nav.selectionRevision && nav.destination == value.proposed.destination &&
             (nav.estimated as? Observation.Available)?.value == value.proposed.estimated &&
             moved?.source == value.proposed.estimated.source && moved.meters == value.traveledMeters
     }

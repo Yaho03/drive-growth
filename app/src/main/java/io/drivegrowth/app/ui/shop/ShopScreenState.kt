@@ -1,6 +1,7 @@
 package io.drivegrowth.app.ui.shop
 
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.progression.VehicleActivity
 import io.drivegrowth.core.rental.Facility
 import io.drivegrowth.core.rental.FacilityOffer
 import io.drivegrowth.core.rental.ShopExpansion
@@ -9,7 +10,14 @@ import java.util.UUID
 
 /** 호스트가 조회한 표시 사실. 색과 간판은 승인된 표시 입력이며 저장 배치 모델이 아니다. */
 data class ShopAppearance(val sign: String, val accentArgb: Int)
-data class ShopVehicle(val id: OwnedVehicleId, val name: String, val status: String)
+data class ShopVehicle(
+    val id: OwnedVehicleId,
+    val name: String,
+    val status: String,
+    val vehicleId: VehicleId? = null,
+    val rarity: Rarity? = null,
+    val activity: VehicleActivity? = null,
+)
 enum class ShopAvailability { LOCKED, AVAILABLE, INSTALLED, UNKNOWN }
 
 sealed interface ShopCommand {

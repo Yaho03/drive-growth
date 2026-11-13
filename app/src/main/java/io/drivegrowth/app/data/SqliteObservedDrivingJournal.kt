@@ -121,12 +121,33 @@ class SqliteObservedDrivingJournal:ObservedDrivingJournal {
         }
         return ContractResult.Success(result)
     }
+    /** 종료 입력으로 끝난 유일한 영수증을 기존 원거래 검증 경로로 다시 읽는다. */
+    internal fun committedEndingAt(
+        db: SQLiteDatabase, identity: GameIdentity, frame: DrivingFrame,
+    ): ContractResult<ObservedDrivingReceipt?> {
+        val driveId = db.rawQuery("SELECT drive_id,payload FROM observed_driving_receipts WHERE profile=? AND source=?",
+            arrayOf(identity.profileId.value, identity.source.name)).use { rows ->
+            var match: String? = null
+            while (rows.moveToNext()) {
+                val original = ObservedDrivingJson.receipt(JSONObject(rows.getString(1)))
+                if (original.trip.segments.lastOrNull()?.to != frame.observation || original.trip.zone != frame.zone)
+                    continue
+                if (match != null) return@use null
+                match = rows.getString(0)
+            }
+            match
+        } ?: return ContractResult.Success(null)
+        return committed(db, identity, driveId)
+    }
+
     private fun validateReceipt(db:SQLiteDatabase,id:GameIdentity,r:ObservedDrivingReceipt) {
         validate(RecordingState(id,0,null,null,null,null,null,listOf(r.trip)))
         val rules=(r.trip.rules as? ContractResult.Success)?.value?:throw SQLiteException("관측 출발 규칙 누락")
         val drive=try{r.trip.confirmed(id.source)}catch(e:ArithmeticException){throw SQLiteException("관측 원거리 범위 손상",e)}?:throw SQLiteException("관측 출발 달력 누락")
         val reader=DrivingRecordReader(id.source);val original=reader.readDrive(db,r.trip.id)?:throw SQLiteException("관측 실제 주행 정산 누락")
-        if(original.command!=reader.command(rules,drive).toString()||original.commit!=r.commit)throw SQLiteException("관측 원래 주행 정산 불일치")
+        val matches=original.rest?.let{ObservedDrivingJson.trip(it.command.context.trip).toString()==ObservedDrivingJson.trip(r.trip).toString()}
+            ?: (original.command==reader.command(rules,drive).toString())
+        if(!matches||original.commit!=r.commit)throw SQLiteException("관측 원래 주행 정산 불일치")
     }
     private fun sameTrip(a:ObservedTrip,b:ObservedTrip)=ObservedDrivingJson.trip(a).toString()==ObservedDrivingJson.trip(b).toString()
     private fun values(s:RecordingState,raw:String)=ContentValues().apply{put("profile",s.identity.profileId.value);put("revision",s.revision);put("payload",raw);put("digest",ObservedDrivingJson.digest(raw))}

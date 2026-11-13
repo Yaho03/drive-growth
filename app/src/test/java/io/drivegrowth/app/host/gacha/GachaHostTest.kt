@@ -58,6 +58,7 @@ class GachaHostTest {
         val tasks = ArrayDeque<() -> Unit>()
         val replies = ArrayDeque<() -> Unit>()
         var reads = 0; var prepares = 0; val commands = mutableListOf<GachaCommand>()
+        var readFailure: ContractResult.Failure? = null
         var failure: ContractError? = null; var prepareFailure: ContractError? = null; var saveFailure = false
         val frames = mutableListOf<GachaFrame>(); val enabled = mutableListOf<Boolean>()
         val completed = mutableListOf<Pair<GachaRequest, ContractResult<Unit>>>()
@@ -71,7 +72,7 @@ class GachaHostTest {
             TransactionKind.GARAGE, fixed.source, fixed.ruleVersion, MoneyChange(MoneyDirection.DEBIT, GameMoney(500))),
             GameMoney(500), fixed.award.vehicle, EpochMillis(100)), GachaProgress(Revision(1), 0, 1))
         val source = object : GachaHostSource {
-            override fun read(paid: RequestId, free: RequestId): ContractResult<GachaOffers> { reads++; return ContractResult.Success(initial) }
+            override fun read(paid: RequestId, free: RequestId): ContractResult<GachaOffers> { reads++; return readFailure ?: ContractResult.Success(initial) }
             override fun prepare(input: GachaDrawInput): ContractResult<GachaCommand> { prepares++; return prepareFailure?.let { ContractResult.Failure(it) } ?: ContractResult.Success(fixed) }
             override fun commit(command: GachaCommand): ContractResult<GachaSettlement> {
                 commands += command
@@ -83,6 +84,23 @@ class GachaHostTest {
             { frame, gate -> frames += frame; enabled += gate }, { r, result -> completed += r to result }, {}, restored)
         fun drain() { while (tasks.isNotEmpty() || replies.isNotEmpty()) { if (tasks.isNotEmpty()) tasks.removeFirst()(); if (replies.isNotEmpty()) replies.removeFirst()() } }
         fun request(attempt: String = "one") = GachaRequest(1, GachaDrawInput(initial, initial.options[0]), attempt)
+    }
+
+    @Test fun `해금 후보 없음은 실제 실패 상세가 있을 때만 별도 표시한다`() {
+        val h = Harness()
+        h.host.setControlsEnabled(true)
+        val generic = ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+        h.readFailure = generic
+        assertTrue(h.host.load())
+        h.drain()
+        assertEquals(GachaScreen.Missing("가챠 권위 상태나 진행 정보를 확인할 수 없습니다.", true), h.frames.last().screen)
+
+        h.readFailure = generic.copy(detail = ContractFailureDetail.GACHA_NO_UNLOCKED_CANDIDATES)
+        assertTrue(h.host.load())
+        h.drain()
+        assertEquals(GachaScreen.Missing("현재 해금 후보가 없습니다.", true), h.frames.last().screen)
+        assertEquals(0, h.prepares)
+        assertTrue(h.commands.isEmpty())
     }
 
     @Test fun `반복 탭은 한 번만 준비 확정하고 실제 반환 정산으로 새 결과를 만든다`() {

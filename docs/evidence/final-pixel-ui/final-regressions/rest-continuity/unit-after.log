@@ -1,0 +1,12 @@
+app/src/androidTest/java/io/drivegrowth/app/host/rental/RentalProductSourceBindingTest.kt:5:8: warning: 'class InstrumentationTestCase : TestCase' is deprecated. Deprecated in Java.
+import android.test.InstrumentationTestCase
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app/src/androidTest/java/io/drivegrowth/app/host/rental/RentalProductSourceBindingTest.kt:85:18: warning: this declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+    override fun tearDown() {
+                 ^^^^^^^^
+JUnit version 4.13.2
+..........................................
+Time: 0.366
+
+OK (42 tests)
+

@@ -6,6 +6,8 @@ import io.drivegrowth.core.content.ContentLoad
 import io.drivegrowth.core.content.GameContentSnapshot
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.FirstGrant
+import org.json.JSONObject
+import java.security.MessageDigest
 
 /** 실제 공용 helper/factory를 쓰며 표를 시험에서 생성하지 않는다. 제품 Activity/프로세스 시험과 구분한다. */
 @Suppress("DEPRECATION")
@@ -59,6 +61,114 @@ class HostCheckpointStoreIntegrationTest : InstrumentationTestCase() {
         assertNull(ok(store.hostCommands.load(profile)))
         assertEquals(GameMoney(990), ok(store.balance()))
     }
+    private fun legacySale(car: OwnedVehicle) = HostCheckpointCommand.Garage(content.catalog.contentVersion,
+        GameChange(RequestId("achievement/legacy-sale"), TransactionKind.GARAGE, source, content.ruleVersion,
+            MoneyChange(MoneyDirection.CREDIT, GameMoney(25)),
+            VehicleWrite.Update(car.ownedVehicleId, car.revision, car.level, VehicleLifecycle.SOLD, car.levelProgressPercent)))
+
+    /** v18은 이 요청 접두사를 허용했다. 당시 envelope와 digest를 그대로 넣고 실제 helper로 이전한다. */
+    private fun reopenFromV18(profile: ProfileId, command: HostCheckpointCommand.Garage, phase: Int, digestValid: Boolean = true,
+        patchReceipt: ((SQLiteDatabase) -> Unit)? = null) {
+        val sale = command.value
+        val payload = JSONObject().put("type", "host-command-v1").put("profile", profile.value).put("kind", "garage")
+            .put("request", sale.requestId.value).put("source", sale.source.name).put("content", command.contentVersion.value)
+            .put("rule", sale.ruleVersion.value).put("command", LedgerJson.command(sale)).toString()
+        val digest = MessageDigest.getInstance("SHA-256").digest(("$phase\n$payload").toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it.toInt() and 255) }
+        store.close()
+        raw { db ->
+            patchReceipt?.invoke(db)
+            db.execSQL("DROP TABLE achievements")
+            db.execSQL("INSERT INTO host_command_checkpoint VALUES(1,?,?,?)",
+                arrayOf(payload, phase, if (digestValid) digest else "wrong-digest"))
+            db.version = 18
+        }
+        store = open()
+    }
+
+    fun testV18SavedReservedPrefixCanCancelWithoutReleasingReservationForNewRequests() {
+        val car = initialized().grant.changedVehicle!!
+        val profile = ok(store.localProfileId())
+        val sale = legacySale(car)
+        reopenFromV18(profile, sale, phase = 0)
+        val before = rows()
+        val saved = HostCommandCheckpoint(profile, sale, HostCheckpointPhase.SAVED)
+        assertEquals(saved, ok(store.hostCommands.load(profile)))
+        assertEquals(saved, ok(store.hostCommands.save(profile, sale)))
+        val changed = sale.copy(value = sale.value.copy(money = MoneyChange(MoneyDirection.CREDIT, GameMoney(26))))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), store.hostCommands.cancelUnstarted(profile, changed))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), store.commitGameChange(sale.value))
+        assertEquals(saved, ok(store.hostCommands.load(profile)))
+        ok(store.hostCommands.cancelUnstarted(profile, sale))
+        assertNull(ok(store.hostCommands.load(profile)))
+        assertEquals(before, rows())
+        assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT), store.hostCommands.save(profile, sale))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), store.commitGameChange(sale.value))
+        raw { assertEquals(20, it.version) }
+    }
+
+    fun testV18SavedReservedPrefixExecutesOnlyTheExactPersistedSale() {
+        val car = initialized().grant.changedVehicle!!
+        val profile = ok(store.localProfileId())
+        val sale = legacySale(car)
+        reopenFromV18(profile, sale, phase = 0)
+        val changed = sale.copy(value = sale.value.copy(money = MoneyChange(MoneyDirection.CREDIT, GameMoney(26))))
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), store.hostCommands.execute(profile, changed))
+        assertEquals(GameMoney(1000), ok(store.balance()))
+        val original = ok(store.hostCommands.execute(profile, sale)) as HostCheckpointResult.Garage
+        assertEquals(GameMoney(1025), original.value.balance)
+        assertEquals(VehicleLifecycle.SOLD, original.value.changedVehicle?.lifecycle)
+        assertEquals(original, ok(store.hostCommands.finish(profile, sale)))
+        assertNull(ok(store.hostCommands.load(profile)))
+        assertEquals(GameMoney(1025), ok(store.balance()))
+    }
+
+    fun testV18StartedReservedPrefixReplaysOriginalWithoutAnotherCredit() {
+        val car = initialized().grant.changedVehicle!!
+        val profile = ok(store.localProfileId())
+        val sale = legacySale(car)
+        val ordinary = sale.value.copy(requestId = RequestId("unreserved-fixture-sale"))
+        val actual = ok(store.commitGameChange(ordinary))
+        val original = actual.copy(transaction = actual.transaction.copy(requestId = sale.value.requestId))
+        reopenFromV18(profile, sale, phase = 1) { db ->
+            db.execSQL("UPDATE settlements SET request_id=?,command=?,result=? WHERE request_id=?", arrayOf(
+                sale.value.requestId.value, LedgerJson.command(sale.value).toString(), LedgerJson.settlement(original).toString(),
+                ordinary.requestId.value))
+        }
+        assertEquals(HostCommandCheckpoint(profile, sale, HostCheckpointPhase.STARTED), ok(store.hostCommands.load(profile)))
+        val before = rows()
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), store.hostCommands.cancelUnstarted(profile, sale))
+        assertEquals(HostCheckpointResult.Garage(original), ok(store.hostCommands.execute(profile, sale)))
+        assertEquals(HostCheckpointResult.Garage(original), ok(store.hostCommands.finish(profile, sale)))
+        assertNull(ok(store.hostCommands.load(profile)))
+        assertEquals(before, rows())
+        assertEquals(GameMoney(1025), ok(store.balance()))
+    }
+
+    fun testV18StartedReservedPrefixWithMissingOriginalDoesNotCreateASale() {
+        val car = initialized().grant.changedVehicle!!
+        val profile = ok(store.localProfileId())
+        val sale = legacySale(car)
+        reopenFromV18(profile, sale, phase = 1)
+        val started = HostCommandCheckpoint(profile, sale, HostCheckpointPhase.STARTED)
+        assertEquals(started, ok(store.hostCommands.load(profile)))
+        val before = rows()
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), store.hostCommands.execute(profile, sale))
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE), store.hostCommands.finish(profile, sale))
+        assertEquals(started, ok(store.hostCommands.load(profile)))
+        assertEquals(before, rows())
+    }
+
+    fun testV18ReservedPrefixDoesNotBypassDigestValidation() {
+        val car = initialized().grant.changedVehicle!!
+        val profile = ok(store.localProfileId())
+        val sale = legacySale(car)
+        reopenFromV18(profile, sale, phase = 0, digestValid = false)
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.hostCommands.load(profile))
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.hostCommands.execute(profile, sale))
+        assertEquals(GameMoney(1000), ok(store.balance()))
+    }
+
     private fun upgrade(version: Int) {
         val first = initialized(); val profile = ok(store.localProfileId()); val before = rows()
         store.close()
@@ -74,7 +184,7 @@ class HostCheckpointStoreIntegrationTest : InstrumentationTestCase() {
         assertNull(ok(store.hostCommands.load(profile)))
         val c = command(first.grant.changedVehicle!!)
         ok(store.hostCommands.save(profile, c)); ok(store.hostCommands.execute(profile, c))
-        raw { assertEquals(15, it.version) }
+        raw { assertEquals(20, it.version) }
     }
     fun testV9MigrationPreservesProfileProgressAndOriginalResults() = upgrade(9)
     fun testV8MigrationAddsGiftAndCheckpointWithoutReplacingProfile() = upgrade(8)
@@ -86,7 +196,7 @@ class HostCheckpointStoreIntegrationTest : InstrumentationTestCase() {
         store = open()
         assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.balance())
         store.close(); assertTrue(before.contentEquals(file.readBytes()))
-        raw { db -> assertEquals(9, db.version); db.version=15 }
+        raw { db -> assertEquals(9, db.version); db.version=18 }
         store = open(); assertEquals(GameMoney(1000), ok(store.balance()))
     }
 }

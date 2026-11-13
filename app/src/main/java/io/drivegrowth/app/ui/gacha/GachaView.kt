@@ -2,18 +2,19 @@ package io.drivegrowth.app.ui.gacha
 
 import android.content.Context
 import android.view.View
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.garage.GarageStyle
+import io.drivegrowth.app.ui.garage.VehicleArtwork
 import io.drivegrowth.core.contract.*
 import java.text.NumberFormat
 import java.util.Locale
 
 /** 복원은 새 View 생성 시만 받는다. 현재 Pending을 과거 상태로 덮는 API는 제공하지 않는다. */
 class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: GachaUiState = GachaUiState()) : LinearLayout(context) {
-    private val style = GarageStyle(context)
+    private val style = GarageStyle(context, pixelPanel = true)
+    private val artwork = VehicleArtwork(context, style)
     private val session = GachaInteraction(onEvent, restored)
     private var wide = false
     private var generation = 0L
@@ -70,12 +71,23 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
         panels.addView(facts,if(wide) LayoutParams(0,-2,1.1f) else LayoutParams(-1,-2))
         panels.addView(actions,(if(wide) LayoutParams(0,-2,1f) else LayoutParams(-1,-2)).apply { if(wide) marginStart=dp(24) })
         add(facts,card().apply {
-            addView(ImageView(context).apply { setImageResource(R.drawable.garage_vehicle_placeholder); contentDescription=s(R.string.gacha_neutral) },LayoutParams(-1,dp(100)))
-            addView(text(s(R.string.gacha_pool),28,bold=true)); addView(text(s(R.string.gacha_pool_note),color=muted))
+            addView(text(s(R.string.gacha_pool),28,bold=true))
+            addView(text(s(R.string.gacha_pool_note),color=muted))
+            addView(artwork.view(null, null, 116), LayoutParams(-1, dp(116)))
             val ids = value.candidates
             when { ids == null -> addView(text(s(R.string.gacha_missing)))
                 ids.isEmpty() -> addView(text(s(R.string.gacha_empty)))
-                else -> ids.forEach { id -> addView(text(value.content?.catalog?.vehicles?.singleOrNull { it.vehicleId == id }?.displayName ?: s(R.string.gacha_missing))) }
+                else -> ids.chunked(if (wide) 2 else 1).forEach { group ->
+                    add(this, row().apply {
+                        group.forEachIndexed { index, id ->
+                            val name = value.content?.catalog?.vehicles?.singleOrNull { it.vehicleId == id }?.displayName
+                            addView(text(name ?: s(R.string.gacha_missing), 18).apply {
+                                background = shape(inset)
+                                setPadding(dp(10), dp(6), dp(10), dp(6))
+                            }, LayoutParams(0, -2, 1f).apply { if (index > 0) marginStart = dp(8) })
+                        }
+                    }, 8)
+                }
             }
         })
         add(facts,card().apply {
@@ -92,8 +104,14 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
             addView(text(s(R.string.gacha_guarantee),28,bold=true))
             val rules=value.content?.gacha; val g=value.guarantee
             addView(text(s(R.string.gacha_threshold,rules?.let { rarity(it.guaranteedFrom) } ?: s(R.string.gacha_missing),rules?.pity?.toString() ?: s(R.string.gacha_missing))))
-            addView(text(s(R.string.gacha_remaining,g?.remaining?.toString() ?: s(R.string.gacha_missing))))
-            addView(text(s(when(g?.nextGuaranteed) { true -> R.string.gacha_next_guaranteed; false -> R.string.gacha_next_normal; null -> R.string.gacha_missing })))
+            val remaining = g?.remaining
+            addView(text(s(R.string.gacha_remaining,remaining?.toString() ?: s(R.string.gacha_missing)), 20, bold = true))
+            if (rules != null && rules.pity > 0 && remaining != null && remaining in 0..rules.pity) {
+                addView(progressTrack(rules.pity - remaining, rules.pity, rarityColor(rules.guaranteedFrom)),
+                    LayoutParams(-1, dp(8)))
+            }
+            addView(text(s(when(g?.nextGuaranteed) { true -> R.string.gacha_next_guaranteed; false -> R.string.gacha_next_normal; null -> R.string.gacha_missing }),
+                color = if (g?.nextGuaranteed == true) rarityColor(Rarity.RARE) else ink))
             if (g?.available == false) addView(text(s(R.string.gacha_status_guarantee)))
             g?.description?.let { addView(text(it,color=muted)) }
             addView(text(s(R.string.gacha_space),24,bold=true))
@@ -133,7 +151,7 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
         add(parent,text(s(if(value.origin == GachaOrigin.FIXTURE) R.string.gacha_fixture else R.string.gacha_stored),color=rarityColor(Rarity.LEGEND)))
         add(parent,card().apply {
             addView(text(s(R.string.gacha_result),28,bold=true)); addView(text(value.summary))
-            addView(ImageView(context).apply { setImageResource(R.drawable.garage_vehicle_placeholder); contentDescription=s(R.string.gacha_neutral) },LayoutParams(-1,dp(100)))
+            addView(artwork.view(vehicle.vehicleId, vehicle.rarity, 144), LayoutParams(-1, dp(144)))
             addView(text(s(R.string.gacha_vehicle,value.vehicleName ?: s(R.string.gacha_missing),rarity(vehicle.rarity)),30,color=rarityColor(vehicle.rarity),bold=true))
             addView(text(vehicle.ownedVehicleId.value,color=muted))
             addView(text(s(R.string.gacha_growth,vehicle.level,vehicle.levelProgressPercent)))

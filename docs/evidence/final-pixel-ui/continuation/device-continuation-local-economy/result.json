@@ -1,0 +1,16 @@
+{
+  "head": "3bd7d925c1133fd5a45ecf3cc5ee8d72faabbdfb",
+  "tree": "cc9a75d325b1112b236fd4d5351725719d4e8121",
+  "package": "io.drivegrowth.verify.e2e28continuation",
+  "selector": [
+    "io.drivegrowth.app.simulation.LocalEconomyContinuationTest#testOneIsolatedSimulationProfileFreeTicketPurchaseFacilityAndQuest"
+  ],
+  "sha256": {
+    "io.drivegrowth.verify.e2e28continuation": "c5c9bcbdfd2955e4004fba2c88803e6e5c5e973b93a7971bb42d0b27e526c744",
+    "io.drivegrowth.verify.e2e28continuation.test": "c019446090e5592efa6b5685307f400f58b1e32a90c4043dedcb762545e8a6ba"
+  },
+  "testSourceSHA256": "d2a177318d55af2f1ba820ceac6db8dc9648d010ac668ef6c57e6ac045733326",
+  "cleanupErrors": [],
+  "signerSHA256": "4241ac4162c67a0e0101009cec5a8810ae78bdf1346d4decdf55b191fc64d60b",
+  "passed": false
+}

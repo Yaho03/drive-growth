@@ -1,5 +1,11 @@
 package io.drivegrowth.app.vehicle.navigation
 
+import io.drivegrowth.app.host.GameIdentity
+import io.drivegrowth.app.host.delivery.FNavigationDeliveryPort
+import io.drivegrowth.app.host.delivery.NavigationDestinationConfirmation
+import io.drivegrowth.app.host.delivery.deliveryEstimateSource
+import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.delivery.DestinationKey
 import java.util.concurrent.Executor
 import org.junit.Assert.*
 import org.junit.Test
@@ -15,16 +21,18 @@ class NavigationAdapterTest {
     private class Port : NavigationSdkPort {
         lateinit var connected:()->Unit;lateinit var failed:(Throwable)->Unit;lateinit var events:(NavigationSdkEvent)->Unit
         var calls=0;var queries=0;var closes=0;var exception:RuntimeException?=null
+        var closeFailure: RuntimeException? = null
         override fun initialize(connected:()->Unit,failed:(Throwable)->Unit,events:(NavigationSdkEvent)->Unit){this.connected=connected;this.failed=failed;this.events=events}
         override fun query(){queries++}
         override fun requestRoute(request:NavigationRouteRequest){calls++;exception?.let{throw it}}
         override fun cancelRoute(){calls++;exception?.let{throw it}}
-        override fun close(){closes++}
+        override fun close(){closes++; closeFailure?.let { throw it }}
     }
     private class Rig {
         val worker=Queue();val main=Queue();val time=Time();val ports=mutableListOf<Port>();val events=mutableListOf<NavigationEvent>()
         var read=NavigationPermission.GRANTED;var search=NavigationPermission.GRANTED;var permissionError:RuntimeException?=null;var factoryError:LinkageError?=null
-        val adapter=NavigationAdapter(worker,main,time,time,{permissionError?.let{throw it};read},{search},{factoryError?.let{throw it};Port().also{ports+=it}},100)
+        var onReadPermission: (() -> Unit)? = null
+        val adapter=NavigationAdapter(worker,main,time,time,{permissionError?.let{throw it};onReadPermission?.invoke();read},{search},{factoryError?.let{throw it};Port().also{ports+=it}},100)
         fun drain(){worker.drain();main.drain()}
         fun connect():Port {adapter.connect(events::add);drain();return ports.last().also{it.connected();drain()}}
         fun state()=events.filterIsInstance<NavigationEvent.State>().last().snapshot
@@ -69,11 +77,271 @@ class NavigationAdapterTest {
     }
     @Test fun cancelThenNewRouteNeverAttributesLateOldArrivalToCurrentRoute(){
         val r=Rig();val p=r.connect();r.adapter.requestRoute(request("A"));r.adapter.cancelRoute("cancelA");r.adapter.requestRoute(request("B"));r.drain()
-        p.events(NavigationSdkEvent.RouteId("B"));p.events(NavigationSdkEvent.Arrived("old A",null,1,1));r.drain()
+        val actualB = NavigationDestination(37.0, 127.0, "같은 이름", "같은 주소", null, null, null)
+        p.events(NavigationSdkEvent.RouteId("B"))
+        p.events(NavigationSdkEvent.Destination(actualB, 2_000))
+        r.drain()
+        assertTrue(r.state().destination is NavigationField.Missing)
+        repeat(2) { p.events(NavigationSdkEvent.Arrived(actualB.name, actualB.address, 1, 1)) }
+        r.drain()
         assertEquals("B",r.state().latestCommand!!.command.id)
-        assertEquals(NavigationArrivalCorrelation.AwaitingIndependentRouteEvidence,r.events.filterIsInstance<NavigationEvent.ArrivalObserved>().single().correlation)
+        assertTrue(r.state().destination is NavigationField.Missing)
+        val arrivals = r.events.filterIsInstance<NavigationEvent.ArrivalObserved>()
+        assertEquals(2, arrivals.size)
+        assertTrue(arrivals.all { it.observation.sdkName == actualB.name && it.observation.sdkAddress == actualB.address &&
+            it.correlation == NavigationArrivalCorrelation.AwaitingIndependentRouteEvidence })
         assertEquals(3,p.calls)
     }
+    @Test fun routeIdChangeOrLossClearsThePriorRouteEstimate() {
+        val rig = Rig()
+        val sdk = rig.connect()
+        val destination = NavigationDestination(37.0, 127.0, "같은 목적지", null, null, null, null)
+        sdk.events(NavigationSdkEvent.Destination(destination, 500L))
+        sdk.events(NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"))
+        sdk.events(NavigationSdkEvent.RouteId("A"))
+        rig.drain()
+        assertEquals(500L, (rig.state().remainingEstimatedMeters as NavigationField.Value).value)
+
+        sdk.events(NavigationSdkEvent.RouteId("A"))
+        rig.drain()
+        assertEquals(500L, (rig.state().remainingEstimatedMeters as NavigationField.Value).value)
+
+        sdk.events(NavigationSdkEvent.RouteId("B"))
+        rig.drain()
+        assertEquals("B", (rig.state().routeId as NavigationField.Value).value)
+        assertEquals(NavigationMissing.REQUEST_CHANGED, (rig.state().destination as NavigationField.Missing).reason)
+        assertTrue(rig.state().remainingEstimatedMeters is NavigationField.Missing)
+        assertTrue(rig.state().guidance is NavigationField.Missing)
+
+        sdk.events(NavigationSdkEvent.Destination(destination, 800L))
+        sdk.events(NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"))
+        rig.drain()
+        assertTrue(rig.state().remainingEstimatedMeters is NavigationField.Missing)
+
+        sdk.events(NavigationSdkEvent.RouteId(""))
+        rig.drain()
+        assertEquals(NavigationMissing.NO_ROUTE_ID, (rig.state().routeId as NavigationField.Missing).reason)
+        assertTrue(rig.state().destination is NavigationField.Missing)
+        assertTrue(rig.state().remainingEstimatedMeters is NavigationField.Missing)
+
+        sdk.events(NavigationSdkEvent.Destination(destination, 800L))
+        sdk.events(NavigationSdkEvent.RouteId("C"))
+        rig.drain()
+        assertEquals("C", (rig.state().routeId as NavigationField.Value).value)
+        assertTrue(rig.state().remainingEstimatedMeters is NavigationField.Missing)
+        assertTrue(rig.events.none { it is NavigationEvent.ArrivalObserved })
+    }
+
+    private class Quote(rig: Rig) {
+        private val identity = GameIdentity(ProfileId("quote-profile"), InputSource.VEHICLE)
+        val confirmation = NavigationDestinationConfirmation({ true }, { DestinationKey("confirmed") })
+        private val port = FNavigationDeliveryPort({ confirmation.snapshot }, { owner, _ -> confirmation.selected(owner) },
+            { owner, raw -> deliveryEstimateSource(owner, raw) { true } },
+            { Observation.Missing(MissingReason.NO_DATA) }, { true }, { _, _ -> ContractResult.Success(Unit) })
+
+        init { confirmation.setEnabled(true); confirmation.bind(identity); accept(rig) }
+        fun accept(rig: Rig) { confirmation.accept(rig.state()) }
+        fun estimate() = (port.read(identity) as ContractResult.Success).value.estimated
+        fun assertBlocked() {
+            assertTrue(confirmation.confirm() is ContractResult.Failure)
+            assertTrue(estimate() is Observation.Missing)
+        }
+    }
+
+    @Test fun emptyFirstRouteIdBlocksQuoteOnFreshConnectionAndReconnect() {
+        for (reconnect in listOf(false, true)) {
+            val rig = Rig()
+            val original = rig.connect()
+            val sdk = if (reconnect) {
+                original.events(NavigationSdkEvent.RouteId("prior-connection"))
+                rig.drain()
+                rig.adapter.disconnect()
+                rig.drain()
+                rig.connect()
+            } else original
+            val quote = Quote(rig)
+            val destination = NavigationDestination(37.0, 127.0, "이전 목적지", "이전 주소", null, null, null)
+            val events = listOf(NavigationSdkEvent.Destination(destination, 500),
+                NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"), NavigationSdkEvent.RouteId(""),
+                NavigationSdkEvent.Destination(destination, 400), NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"),
+                NavigationSdkEvent.RouteId("new"), NavigationSdkEvent.Destination(destination, 300),
+                NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"))
+            for (event in events) {
+                sdk.events(event)
+                rig.drain()
+                quote.accept(rig)
+                quote.assertBlocked()
+            }
+        }
+    }
+
+    @Test fun newIdCannotReauthorizeDestinationAndGuidanceAfterInvalidation() {
+        val invalidations = listOf(NavigationSdkEvent.RouteId(""), NavigationSdkEvent.RouteEnded,
+            NavigationSdkEvent.DestinationChanged, NavigationSdkEvent.RouteCancelled)
+        for (invalidation in invalidations) for (newIdFirst in listOf(false, true)) {
+            val rig = Rig()
+            val sdk = rig.connect()
+            val quote = Quote(rig)
+            val destination = NavigationDestination(37.0, 127.0, "같은 목적지", "같은 주소", null, null, null)
+            fun send(event: NavigationSdkEvent) {
+                sdk.events(event)
+                rig.drain()
+                quote.accept(rig)
+            }
+
+            send(NavigationSdkEvent.RouteId("A"))
+            send(NavigationSdkEvent.Destination(destination, 500))
+            send(NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"))
+            assertTrue(quote.confirmation.confirm() is ContractResult.Success)
+            assertEquals(Observation.Available(EstimatedRouteDistance(500, InputSource.VEHICLE)), quote.estimate())
+
+            val late = listOf(NavigationSdkEvent.Destination(destination, 450), NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"))
+            val id = listOf(NavigationSdkEvent.RouteId("B"))
+            for (event in listOf(invalidation) + if (newIdFirst) id + late else late + id) {
+                send(event)
+                quote.assertBlocked()
+            }
+            send(NavigationSdkEvent.RouteId("A"))
+            quote.assertBlocked()
+            rig.adapter.refresh()
+            rig.drain()
+            quote.accept(rig)
+            for (event in id + late) {
+                send(event)
+                quote.assertBlocked()
+            }
+        }
+    }
+
+    @Test fun differentFirstIdAfterReconnectCannotAuthorizeLateOldDestination() {
+        val rig = Rig()
+        val oldPort = rig.connect()
+        val quote = Quote(rig)
+        val old = NavigationDestination(37.0, 127.0, "A", "A 주소", null, null, null)
+        oldPort.events(NavigationSdkEvent.RouteId("A"))
+        oldPort.events(NavigationSdkEvent.Destination(old, 500))
+        oldPort.events(NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"))
+        rig.drain()
+        quote.accept(rig)
+        assertTrue(quote.confirmation.confirm() is ContractResult.Success)
+        rig.adapter.disconnect()
+        rig.drain()
+        val newPort = rig.connect()
+        for (event in listOf(NavigationSdkEvent.RouteId("B"), NavigationSdkEvent.Destination(old, 450),
+            NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"))) {
+            newPort.events(event)
+            rig.drain()
+            quote.accept(rig)
+            quote.assertBlocked()
+        }
+    }
+
+    @Test fun deniedReadForChangeOrCancelBlocksQuoteUntilFreshRead() {
+        for (cancel in listOf(false, true)) {
+            val rig = Rig()
+            val sdk = rig.connect()
+            val quote = Quote(rig)
+            val destination = NavigationDestination(37.0, 127.0, "A", "A 주소", null, null, null)
+            fun observeA(meters: Long) {
+                sdk.events(NavigationSdkEvent.RouteId("A"))
+                sdk.events(NavigationSdkEvent.Destination(destination, meters))
+                sdk.events(NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"))
+                rig.drain()
+                quote.accept(rig)
+                assertTrue(quote.confirmation.confirm() is ContractResult.Success)
+                assertEquals(Observation.Available(EstimatedRouteDistance(meters, InputSource.VEHICLE)), quote.estimate())
+            }
+
+            observeA(500)
+            rig.read = NavigationPermission.DENIED
+            if (cancel) rig.adapter.cancelRoute("cancel") else rig.adapter.requestRoute(request("change"))
+            rig.drain()
+            quote.accept(rig)
+            assertEquals(0, sdk.calls)
+            assertEquals(0, sdk.queries)
+            assertEquals(NavigationCommandStatus.NOT_SENT, rig.command().status)
+            assertEquals(NavigationError.PERMISSION_DENIED, rig.state().failure?.error)
+            assertTrue(quote.confirmation.confirm() is ContractResult.Failure)
+            assertEquals(Observation.Missing(MissingReason.PERMISSION_DENIED), quote.estimate())
+
+            rig.read = NavigationPermission.GRANTED
+            rig.adapter.refresh()
+            rig.drain()
+            quote.accept(rig)
+            quote.assertBlocked()
+            assertEquals(1, sdk.queries)
+            observeA(490)
+        }
+    }
+
+    @Test fun deniedWriteForChangeOrCancelPreservesAnUnchangedRoute() {
+        for (cancel in listOf(false, true)) {
+            val rig = Rig()
+            val sdk = rig.connect()
+            val quote = Quote(rig)
+            val destination = NavigationDestination(37.0, 127.0, "A", "A 주소", null, null, null)
+            fun observeA(meters: Long) {
+                sdk.events(NavigationSdkEvent.RouteId("A"))
+                sdk.events(NavigationSdkEvent.Destination(destination, meters))
+                sdk.events(NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"))
+                rig.drain()
+                quote.accept(rig)
+                assertTrue(quote.confirmation.confirm() is ContractResult.Success)
+                assertEquals(Observation.Available(EstimatedRouteDistance(meters, InputSource.VEHICLE)), quote.estimate())
+            }
+
+            observeA(500)
+            rig.search = NavigationPermission.DENIED
+            if (cancel) rig.adapter.cancelRoute("cancel") else rig.adapter.requestRoute(request("change"))
+            rig.drain()
+            assertEquals(0, sdk.calls)
+            assertEquals(NavigationCommandStatus.NOT_SENT, rig.command().status)
+            assertEquals(NavigationError.PERMISSION_DENIED, rig.command().failure?.error)
+            quote.accept(rig)
+            assertNull(rig.state().failure)
+            assertTrue(quote.confirmation.confirm() is ContractResult.Success)
+            assertEquals(Observation.Available(EstimatedRouteDistance(500, InputSource.VEHICLE)), quote.estimate())
+            rig.adapter.refresh()
+            rig.drain()
+            assertEquals(1, sdk.queries)
+            observeA(490)
+        }
+    }
+
+    @Test fun disconnectReportsCleanupFailureAndDropsQueuedOldArrival() {
+        val rig = Rig()
+        val sdk = rig.connect()
+        sdk.events(NavigationSdkEvent.Arrived("구 연결 도착", null, 12, 3))
+        rig.worker.drain()
+        sdk.closeFailure = IllegalStateException("close failed")
+        rig.adapter.disconnect()
+        rig.drain()
+
+        val failures = rig.events.filterIsInstance<NavigationEvent.Failure>()
+        assertEquals(1, failures.size)
+        assertEquals(NavigationOperation.CLEANUP, failures.single().failure.operation)
+        assertEquals(NavigationConnection.DISCONNECTED, rig.state().connection)
+        assertTrue(rig.events.none { it is NavigationEvent.ArrivalObserved })
+        assertEquals(1, sdk.closes)
+    }
+
+    @Test fun callbackAlreadyOnWorkerCannotBePublishedUnderNewConnectionGeneration() {
+        val rig = Rig()
+        val oldSdk = rig.connect()
+        rig.onReadPermission = {
+            rig.onReadPermission = null
+            rig.adapter.disconnect()
+            rig.adapter.connect(rig.events::add)
+        }
+        oldSdk.events(NavigationSdkEvent.Arrived("이전 목적지", null, 300L, 60L))
+        rig.drain()
+
+        assertEquals(1, oldSdk.closes)
+        assertEquals(2, rig.ports.size)
+        assertTrue(rig.events.none { it is NavigationEvent.ArrivalObserved })
+        assertEquals(NavigationConnection.CONNECTING, rig.state().connection)
+    }
+
     @Test fun timeoutDoesNotBecomeFailureOrAutomaticRetryOfRoute(){
         val r=Rig();val p=r.connect();r.adapter.requestRoute(request());r.drain();r.time.advance(100);r.drain()
         assertEquals(NavigationCommandStatus.OUTCOME_UNKNOWN,r.command().status);assertEquals(1,p.calls)
