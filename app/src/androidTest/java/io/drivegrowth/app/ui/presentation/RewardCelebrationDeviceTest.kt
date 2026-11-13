@@ -13,6 +13,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.TextView
 import io.drivegrowth.app.ui.garage.CollectionScrollTestActivity
 import kotlin.math.roundToInt
 
@@ -86,6 +87,24 @@ class RewardCelebrationDeviceTest : InstrumentationTestCase() {
             }
         } finally {
             bitmap.recycle()
+        }
+    }
+
+    fun testSettlementCoinsHaveSeparateSpaceFromWrappedAmounts() = onUi {
+        val effect = RewardCelebrationView(host)
+        val amount = TextView(host).apply {
+            textSize = 36f
+            text = "이번 거래의 재화 변화\n+1,000 게임머니\n정산 후 확정 잔액\n2,345 게임머니"
+        }
+        effect.render("saved-settlement", RewardCelebrationKind.SETTLEMENT)
+        val frame = effect.over(amount)
+        for (width in listOf(260, 700)) {
+            frame.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            frame.layout(0, 0, width, frame.measuredHeight)
+            assertTrue("동전 영역은 텍스트가 끝난 뒤에 시작해야 한다", amount.bottom <= effect.top)
+            assertTrue("동전 영역이 화면 밖으로 넘치면 안 된다", effect.bottom <= frame.height)
+            assertTrue("동전을 그릴 영역이 있어야 한다", effect.height > 0)
         }
     }
 

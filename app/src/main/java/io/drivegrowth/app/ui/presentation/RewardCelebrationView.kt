@@ -15,6 +15,7 @@ import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import kotlin.math.PI
 import kotlin.math.abs
@@ -109,6 +110,15 @@ internal class RewardCelebrationView(context: Context) : View(context) {
     fun over(content: View, fillHeight: Boolean = false, stage: Boolean = false): View {
         if (key == null && !stage) return content
         if (key != null) rebuildContent { (parent as? ViewGroup)?.removeView(this) }
+        if (kind == RewardCelebrationKind.SETTLEMENT) {
+            // 확정 금액과 잔액의 줄바꿈·글꼴 크기에 관계없이 별도 영역에만 그린다.
+            return LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(content, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+                val stripHeight = (64 * resources.displayMetrics.density).toInt()
+                addView(this@RewardCelebrationView, LinearLayout.LayoutParams(MATCH_PARENT, stripHeight))
+            }
+        }
         // 무대는 결과가 재표시되거나 시스템 애니메이션이 꺼져도 그대로 남는다.
         val frame = if (stage) object : FrameLayout(context) {
             private val stageAccent = accent
