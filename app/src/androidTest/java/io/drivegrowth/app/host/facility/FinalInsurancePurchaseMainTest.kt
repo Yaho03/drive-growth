@@ -1,6 +1,5 @@
 package io.drivegrowth.app.host.facility
 
-import io.drivegrowth.app.exposeMainRefresh
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.Process
@@ -29,8 +28,6 @@ import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
 import io.drivegrowth.app.mainPage
 import io.drivegrowth.app.simulation.SimulationTimeline
 import io.drivegrowth.app.simulation.UnifiedSimulationActivity
-import io.drivegrowth.app.ui.shop.ShopCommand
-import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.FirstGrant
 import io.drivegrowth.core.progression.VehicleActivity
@@ -53,7 +50,7 @@ class FinalInsurancePurchaseMainTest :
     private val casper = VehicleId("hyundai_casper")
     private val bareRequest = RequestId("final-insurance-fixture-visit-1")
     private val insuredRequest = RequestId("final-insurance-fixture-visit-101")
-    private val previewTag = "shop:preview:facility-INSURANCE"
+    private val confirmTag = "shop:map-confirm"
 
     fun testMainBuysCentralInsuranceAndTheSameLedgerPaysAccidentBenefit() {
         assertEquals("새 격리 패키지에서 실행합니다", "io.drivegrowth.verify.finalinsurance44", context.packageName)
@@ -136,19 +133,19 @@ class FinalInsurancePurchaseMainTest :
             assertTrue(home.performClick())
             false
         }
-        val insuranceTitle = context.getString(R.string.shop_facility_insurance)
         val effect = context.getString(R.string.shop_effect, "사고 손실 절반 보전")
-        awaitUi("보험의 99/100 잠금·세 시설의 중앙 가격 표시") {
-            val expected = mapOf(
-                context.getString(R.string.shop_facility_fuel) to expectedPrices.getValue(Facility.FUEL_STATION),
-                insuranceTitle to expectedPrices.getValue(Facility.INSURANCE),
-                context.getString(R.string.shop_facility_wash) to expectedPrices.getValue(Facility.CAR_WASH),
-            )
-            expected.all { (title, price) ->
-                cardLabels(root, title).containsAll(listOf(priceLabel(price), context.getString(R.string.shop_trial)))
-            } && cardLabels(root, insuranceTitle).containsAll(listOf(
-                context.getString(R.string.shop_locked), conditionLabel(99), effect,
-            )) && root.findViewWithTag<Button>(previewTag) == null
+        for ((facility, price) in expectedPrices) {
+            openFacility(root, facility)
+            awaitUi("지도 시설 가격과 시험값 안내 $facility") {
+                val labels = overlayLabels(root)
+                priceLabel(price) in labels && context.getString(R.string.shop_trial) in labels
+            }
+            if (facility == Facility.INSURANCE) {
+                val labels = onUi { overlayLabels(root) }
+                assertTrue(labels.containsAll(listOf(context.getString(R.string.shop_locked), conditionLabel(99), effect)))
+                assertNull(onUi { root.findViewWithTag<Button>(confirmTag) })
+            }
+            click(root, "shop:map-close")
         }
         val locked = snapshot()
         assertEquals(identity, locked.identity)
@@ -164,22 +161,17 @@ class FinalInsurancePurchaseMainTest :
             }
             assertEquals(1, ok(ledger.completedRentalCount()))
         }
-        awaitUi("홈 설정의 새로고침") { root.exposeMainRefresh()?.performClick() == true }
-        awaitUi("고유 방문 100의 보험 미리보기 해금") {
-            cardLabels(root, insuranceTitle).containsAll(listOf(
+        click(root, "shop:map-settings")
+        click(root, "host:refresh")
+        openFacility(root, Facility.INSURANCE)
+        awaitUi("고유 방문 100의 보험 건설 해금") {
+            overlayLabels(root).containsAll(listOf(
                 context.getString(R.string.shop_available), conditionLabel(100), effect,
-            )) && root.findViewWithTag<Button>(previewTag)?.let { it.isShown && it.isEnabled } == true
+            )) && root.findViewWithTag<Button>(confirmTag)?.let { it.isShown && it.isEnabled } == true
         }
         val before = snapshot()
         assertEquals(locked.copy(shop = locked.shop.copy(progress = locked.shop.progress.copy(servedCustomers = 100))), before)
-        click(root, previewTag)
-        awaitUi("중앙 보험 제안과 확인 버튼") {
-            val shop = views(root).filterIsInstance<ShopView>().singleOrNull()
-            (shop?.uiState?.selection?.option?.command as? ShopCommand.BuyFacility)?.offer == insurance &&
-                root.findViewWithTag<Button>("shop:confirm")?.isEnabled == true
-        }
-        assertEquals(before, snapshot())
-        click(root, "shop:confirm")
+        click(root, confirmTag)
         awaitUi("보험 원결과와 결과 확인 버튼") {
             root.findViewWithTag<View>("facility:receipt")?.isShown == true &&
                 root.findViewWithTag<Button>("facility:ack")?.isEnabled == true
@@ -202,10 +194,17 @@ class FinalInsurancePurchaseMainTest :
         assertEquals(before.copy(shop = before.shop.copy(facilities = setOf(Facility.INSURANCE)),
             balance = original.balance, settlements = before.settlements + original, checkpoint = checkpoint), purchased)
         click(root, "facility:ack")
+        awaitUi("보험 결과 확인 후 원결과 패널에서 빠져나올 수 있다") {
+            root.findViewWithTag<View>("facility:receipt")?.isShown != true
+        }
+        // 결과 확인 뒤 남아 있는 시설 메뉴를 닫고 지도에서 다시 연다.
+        if (onUi { root.findViewWithTag<View>("shop:map-facilities")?.isShown != true }) {
+            instrumentation.runOnMainSync { activity.onBackPressed() }
+        }
+        openFacility(root, Facility.INSURANCE)
         awaitUi("보험 설치 유지와 재구매 선택 제거") {
-            root.findViewWithTag<View>("facility:receipt") == null &&
-                context.getString(R.string.shop_installed) in cardLabels(root, insuranceTitle) &&
-                root.findViewWithTag<Button>(previewTag) == null
+            context.getString(R.string.shop_installed) in overlayLabels(root) &&
+                root.findViewWithTag<Button>(confirmTag) == null
         }
         assertEquals(purchased.copy(checkpoint = null), snapshot())
 
@@ -275,11 +274,14 @@ class FinalInsurancePurchaseMainTest :
         return context.getString(R.string.shop_price, money)
     }
 
-    private fun cardLabels(root: View, title: String): Set<String> {
-        val shop = views(root).filterIsInstance<ShopView>().singleOrNull() ?: return emptySet()
-        val heading = views(shop).filterIsInstance<TextView>().firstOrNull { it.isShown && it.text.toString() == title }
-        val card = heading?.parent as? ViewGroup ?: return emptySet()
-        return views(card).filterIsInstance<TextView>().filter { it.isShown }.map { it.text.toString() }.toSet()
+    private fun openFacility(root: View, facility: Facility) {
+        click(root, "shop:map-facilities")
+        click(root, "shop:menu-facility:${facility.name}")
+    }
+
+    private fun overlayLabels(root: View): Set<String> {
+        val overlay = root.findViewWithTag<View>("shop:map-overlay") ?: return emptySet()
+        return views(overlay).filterIsInstance<TextView>().filter { it.isShown }.map { it.text.toString() }.toSet()
     }
 
     private fun views(view: View): Sequence<View> = sequence {
@@ -292,6 +294,12 @@ class FinalInsurancePurchaseMainTest :
         if (!button.isShown || !button.isAttachedToWindow || !button.isEnabled) return@awaitUi false
         assertTrue(button.performClick())
         true
+    }
+
+    private fun <T> onUi(block: () -> T): T {
+        val task = FutureTask(block)
+        instrumentation.runOnMainSync(task)
+        return task.get()
     }
 
     private fun awaitUi(label: String, condition: () -> Boolean) {
