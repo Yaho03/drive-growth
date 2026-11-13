@@ -110,6 +110,15 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         focusStartedAt = null
         drawScreen()
     }
+    internal fun containsManagementPanel(panel: View): Boolean {
+        var container = panel.parent
+        while (container != null) {
+            if (container === this) return true
+            container = container.parent
+        }
+        return false
+    }
+
     private fun rememberExpansion(request: ShopRequest) {
         val offer = (request.selection.option.command as? ShopCommand.Expand)?.offer ?: return
         committedExpansion = null

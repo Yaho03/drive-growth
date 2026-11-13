@@ -776,10 +776,11 @@ open class MainActivity : Activity() {
         shop.render(if (shopRestoreFailed) ShopScreenState.Failure("가게 화면 상태를 복원하지 못해 요청을 보존하고 조작을 제한합니다.")
             else session.home.state.screen, homeEnabled, (garageState as? GarageScreenState.Content)?.data?.vehicles,
             focusRest = restActions, focusRestRecovery = facilityEnabled && restRecovery,
-            focusError = (screen as? HostQueryState.Failure)?.let { "차량 정보를 읽지 못했어요. 새로고침으로 다시 확인해 주세요." },
+            focusError = (garageState as? GarageScreenState.Error)?.message,
             managementBusy = showHomeManagement,
             vehicleActionsBlocked = managementVisible || navigation.pendingGarageRequest != null ||
                 pendingPage != null || pendingRouteFailed || facility.busy || restRecovery)
+        val embeddedHomeManagement = showHomeManagement && shop.containsManagementPanel(managementView)
         val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
             ?.associate { it.vehicleId to it.displayName }.orEmpty()
         facilityControls.render(facility, facilityEnabled, names)
@@ -840,7 +841,7 @@ open class MainActivity : Activity() {
         }
         if (pendingRouteFailed)
             chrome.addView(style.button("처리 중인 요청 다시 확인") { if (gameControlsAllowed()) refreshPendingRoute() })
-        pendingPage?.takeIf { it != navigation.page && !(it == HostPage.GARAGE && showHomeManagement) }?.let { target ->
+        pendingPage?.takeIf { it != navigation.page && !(it == HostPage.GARAGE && embeddedHomeManagement) }?.let { target ->
             chrome.addView(style.button(when (target) {
                 HostPage.GACHA -> "보관한 가챠 요청 확인"
                 HostPage.GARAGE -> "보관한 차량 관리 요청 확인"
@@ -881,7 +882,7 @@ open class MainActivity : Activity() {
             HostPage.COLLECTION -> showBody(collection)
             HostPage.RESULTS -> showBody(results)
             HostPage.ONBOARDING -> showBody(onboarding)
-            HostPage.HOME -> showBody(if (showHomeManagement && shop.focusedVehicleId == null) managementView else shop)
+            HostPage.HOME -> showBody(if (showHomeManagement && !embeddedHomeManagement) managementView else shop)
             HostPage.GACHA -> showBody(gacha)
             HostPage.DELIVERY -> {
                 showBody(delivery)
