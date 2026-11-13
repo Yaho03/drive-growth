@@ -60,6 +60,23 @@ class MainNavigationAccessTest : ActivityInstrumentationTestCase2<MainActivity>(
 
             gate(Gear.PARK)
             render.invoke(main)
+            val home = checkNotNull(root.mainNavigation())
+            assertEquals(
+                listOf(HostPage.HOME, HostPage.GARAGE, HostPage.GACHA, HostPage.RESULTS, HostPage.DELIVERY).toSet(),
+                HostPage.entries.filter { home.mainPage(it) != null }.toSet(),
+            )
+            root.openMainPage(HostPage.GARAGE)
+            val collectionTab = checkNotNull(root.findViewWithTag<Button>("host:section:COLLECTION"))
+            assertTrue(collectionTab.performClick())
+            assertTrue(root.mainPage(HostPage.COLLECTION)?.isSelected == true)
+            root.openMainPage(HostPage.HOME)
+            root.openMainPage(HostPage.RESULTS)
+            for (page in listOf(HostPage.PROGRESSION, HostPage.RANKING, HostPage.RESULTS)) {
+                val tab = checkNotNull(root.findViewWithTag<Button>("host:section:${page.name}"))
+                assertTrue(tab.performClick())
+                assertTrue(root.mainPage(page)?.isSelected == true)
+            }
+            root.openMainPage(HostPage.HOME)
             root.openMainPage(HostPage.GACHA)
             val beforePageChange = captureButtons()
             root.openMainPage(HostPage.GARAGE)
