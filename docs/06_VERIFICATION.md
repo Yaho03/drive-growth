@@ -3346,3 +3346,39 @@ adb -s "$SERIAL" shell am instrument --user 10 -w -e class "$selectors" "$VERIFY
 - 공식 Landscape 1700×1185·200dpi는 DISPLAY2 생성과 같은 표준 앱 시작까지 확인했다. 캡처 직전 호스트 로그에 Qt의 잘못된 ColorBuffer 참조와 QEMU 메인 루프·CPU 스레드 응답 중단이 기록됐고 AVD가 종료됐다. 기본 렌더러로 데이터를 유지해 재기동했으나 ADB 연결 전에 멈췄다. 에뮬레이터 CLI 도움말에서 지원을 확인한 SwiftShader로 바꿔 ADB 연결과 Bridge 기동까지 확인했다. 5분 넘게 `sys.boot_completed`가 비어 있고 부팅 애니메이션이 계속 실행됐다. `am get-current-user`는 Activity 서비스를 찾지 못해 공식 창과 앱 시험을 재개하지 못했다.
 - 전용 에뮬레이터와 Bridge를 종료하고 해당 ADB transport와 포트가 내려간 것을 확인했다. 전용 AVD의 userdata 이미지를 보존했다. 앱 삭제·데이터 초기화는 없었다. Android 부팅이 끝나지 않아 종료 전 원장을 다시 읽지는 못했다. 공유 장치는 ADB 목록에서 연결 상태만 확인했다. 복구 실행은 충돌 보고와 사용량 전송을 끄는 CLI 옵션을 사용했다.
 - #28의 남은 확인은 공식 Landscape의 HOME 차량 관리 하단, 공식 창의 탁송 경로·도착 화면 하단 스크롤, 구매 차량 도착·차고 가득 참에 따른 보관 화면 캡처, 새 격리 프로필의 타이틀 계측이다. 이미 첫 지급을 받은 프로필에서 타이틀 단독 시험을 재실행했을 때는 첫 안내 전제를 충족하지 못했다. 새로 부팅되는 Pleos 전용 AVD를 할당한 뒤 공식 창을 순서대로 재현하고, 타이틀은 새 패키지 접미사를 사용한다. 구매·보관의 캡처에 제어 입력을 쓰면 그 범위를 표시한다. #29의 최종 영상·서명 APK 및 채택 자산 사용 조건은 별도다.
+
+### 2026-11-13 공식 창 복구와 시작 화면 재검증
+
+전용 신규 AVD의 host GPU cold boot에서 ADB가 연결된 뒤 zygote 사전 로드와 SystemServer·Package Manager 시작을 확인했다. 12분 동안 `sys.boot_completed`와 Activity 서비스가 준비되지 않았다. Pleos vendor 서비스의 반복 SIGABRT도 관측했다. 서비스 종료와 부팅 지연의 인과는 확인하지 못했다. 신규 AVD를 종료하고 데이터를 유지했다.
+
+과거 공식 창을 통과한 비활성 AVD의 userdata·암호화·캐시 디스크를 별도 경로에 복제했다. QCOW2의 backing 파일이 모두 사본 내부를 가리키는지 확인했다. 원본 디스크의 크기·수정 시각·파일 식별자는 복제 전후 일치했다. 공식 창 설정과 SwiftShader를 적용한 사본은 294.566초 뒤 부팅 완료, Pleos API34 ARM64/user10 및 Bridge를 확인했다. 가상 화면은 한 번에 하나만 사용했다. 공유 AVD는 읽기 조회에서 user10·부팅 완료와 headless 실행을 확인했고 설정은 바꾸지 않았다.
+
+- 시작 화면 전체 영역 회귀는 수정 전 702×438px 창의 y=81에서 시작해 실패했다. `846acca`의 전체 앱 영역 변경 뒤 새 격리 프로필에서 1/1을 확인했다. 원본 화면의 입체 로고·리본·시작 조작을 결합했고, 320×210dp에서 시작 문구가 16sp에 못 미치던 시험은 200% 글꼴 크기 지원 및 버튼 밖 터치를 포함해 6/6으로 통과했다.
+- 제목 비율 조정 표준 APK 소스는 `97f5799f6b121e177b13f4f4b6c22e34775e7822`다. 설치 회수본과 빌드의 SHA-256 `edbcfa374f9dd472da3252643157921d53eee945cc7c46d15dfc81229479e2d7`이 일치했다. 공식 Landscape 1700×1185·200dpi와 Portrait 840×1184·160dpi에서 제목 두 줄, 시작 버튼과 실제 첫 안내 진입을 확인했다. 제목에는 제품명을 사용한다.
+- 초기 가로 Main 계측은 관리 원결과 확인 뒤 판매 버튼 활성 대기에서 실패했다. 해당 격리 원장 사본에는 강화 Lv2가 남아 있고 공용 체크포인트는 0건이었다. 기존 활성 단언과 강화·판매·체크포인트 검사를 유지한 별도 진단 재실행은 1/1(104.619초)이었다. 초기 실패 원인은 재실행에서 확정되지 않았다. 별도 가로 화면 시험에서 관리 비용·확정/취소, Back 뒤 같은 차량 확대, 다음 Back 뒤 전체 지도를 확인했다.
+- 가로 모의 탁송에서는 출발과 활성 경로 하단을 확인했다. 첫 계측의 도착 연출 대기에는 실패했고, 별도 모의 입력 로그에 62단계 도착 및 65단계 종료, SQLite에 수익 정산 150 게임머니 한 건과 확인 전 도착 체크포인트 한 건이 남았다. 공식 가로의 제어 입력으로 수익 확정 보상·닫기 1/1과 구매 입고·만차 보관·닫기 1/1을 따로 확인했다. 같은 원결과 재표시에서 연출을 반복하거나 닫기·Back에서 호스트 명령을 보내지 않았다. 다음 새 격리 프로필의 공식 가로 Main에서는 더 긴 관측 시간으로 동일 출발·제한·도착·단일 정산·확인 후 연출 비반복을 1/1(116.507초) 확인했다.
+
+### 2026-11-13 시작·보상·탁송 결합 APK 검증
+
+아래 표준·격리 APK의 코드와 시험은 `bd42921e503a8fde7278d08a86bea26ef907826f`에서 빌드했다. 이 절의 게시 커밋은 문서와 PNG만 추가한다. 기존 기록은 각 소스에서 관측한 결과다. Pleos API34 ARM64/user10의 전용 복제 AVD에서 공식 Landscape 1700×1185·200dpi와 Portrait 840×1184·160dpi를 한 번에 하나씩 사용했다.
+
+| 빌드 | 앱 SHA-256 | 계측 SHA-256 |
+|---|---|---|
+| 표준 Debug | `92390261d6451de01c1e7df7e8dd965a5877b9e3166901775b52f91cc59ff948` | `7759b0f9236b42ef042a0db5e4d8eeab0b0cfb5125f6b4098c86e6e451d18dc6` |
+| 가로 화면 격리 계측 | `99303d212a0cdbb6308ddaa310fdf46639a20b0628dac0deb8a10b550e66532d` | `0a83dda7c37a25fc24c84b27912684f51251d29adc342317270ab95e7515b936` |
+| 가챠 새로고침 격리 계측 | `a30173b4a46b1134e6ade4306cfe3f99f7527fe2f5258464713f97f2eddd0de4` | `93e11cd0258ac0b0ec4f613ef2e1d4020bb17537e45f88fb4b89bfe6b2ae0d0a` |
+| 관리 재생성·판매 격리 계측 | `167b837db32652afdefa7a27f0461b097c487ea6a8f830f57a71b4e3e265bedf` | `222b5107c7dda589e1ada9d4634f922b66b925cb0c4be67642694a5c034e2d58` |
+| 첫 지급 버튼 터치 격리 계측 | `a1875a8ec33386b771287b7bdf381684de0113ff9159fd9e6d755093737defc0` | `f34e65d0f3430df9b320163fd4d66c1b42bd8cbb72525cfc93b913f12835af6d` |
+
+표준 앱과 격리 앱·각 계측 APK는 설치 뒤 회수한 바이트가 표와 일치했다. 표준 계측 APK는 조립했다. 가로 화면·첫 지급 버튼의 추가 캡처용 시험 코드는 격리 계측에만 제공했다.
+
+- `./gradlew --offline :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest` 통과. 코어 447/447, 앱 855/855, 오류·실패·생략 0건. lint 오류 0건·경고 65건. `python3 scripts/check_repository.py`와 `git diff --check` 통과.
+- 표준 앱의 [가로 시작](evidence/prototype-design-integration/verified-landscape-title.png)·[첫 안내](evidence/prototype-design-integration/verified-landscape-entry.png)와 [세로 시작](evidence/prototype-design-integration/verified-portrait-title.png)·[첫 안내](evidence/prototype-design-integration/verified-portrait-entry.png)를 확인했다. 초기 캡처에 모의 입력 준비 화면이 기록돼, 입력 처리가 끝난 뒤 제목 사진을 다시 찍고 두 줄과 시작 버튼을 확인했다.
+- 공식 가로의 새 격리 프로필 시작 화면 진입·재열기 1/1(3.107초). 별도 새 프로필의 셔터 새로고침 1/1(20.814초). 첫 새로고침에서 정적 결과와 기존 미확인 원명령을 유지했고, 두 번째에서 원명령을 확인했다. 전후 게임머니 500과 차량 2대를 확인했다.
+- 공식 가로의 격리 Main 1/1(75.408초). SQLite의 첫 지급 원결과, 정산 비반복, 가챠 셔터 공개, 지도 관리 확인·Back 두 단계, 탁송 출발·주행 제한·확정 도착·정산 한 건과 원결과 확인을 검증했다. 실제 앱 화면을 캡처했고 차량 입력은 앱의 모의 시연을 사용했다. [첫 지급 세 카드](evidence/prototype-design-integration/verified-first-grant.png) · [확정 금액과 잔액](evidence/prototype-design-integration/verified-settlement.png) · [가챠 셔터](evidence/prototype-design-integration/verified-gacha-shutter.png) · [공개 결과](evidence/prototype-design-integration/verified-gacha-reveal.png)
+- [가게 관리 확정 화면](evidence/prototype-design-integration/verified-map-review.png) · [Back 뒤 차량 확대](evidence/prototype-design-integration/verified-map-back-focus.png) · [다음 Back 뒤 전체](evidence/prototype-design-integration/verified-map-back-overall.png) · [탁송 출발](evidence/prototype-design-integration/verified-delivery-departure.png) · [고속도로 하단](evidence/prototype-design-integration/verified-delivery-highway-bottom.png) · [도착 확정 보상](evidence/prototype-design-integration/verified-delivery-arrival.png) · [도착 화면 하단](evidence/prototype-design-integration/verified-delivery-arrival-bottom.png)
+- 별도 새 격리 프로필에서 저장소의 Main 재생성·강화·판매 포함 시험을 공식 가로에서 1/1(106.050초)로 통과했다. 준비 화면과 확정 결과 각각의 재생성, 기존 원결과 확인, 판매 이후 선택 해제와 수익 탁송의 단일 정산을 확인했다. 또 다른 새 프로필에서 첫 지급 화면을 아래로 스크롤해 [가게로 버튼 전체](evidence/prototype-design-integration/verified-first-grant-action.png)를 표시하고 창에 터치 이벤트를 입력해 가게로 전환하는 계측 1/1(6.947초)을 확인했다.
+- 같은 격리 앱·계측 APK로 View 회귀 66/66(66.279초). 시작 화면의 글자 범위·조작 제한, 첫 지급 카드의 값 유지·누락 표시, 정산 코인과 텍스트 배치, 가챠·차고·가게 지도, 탁송의 좁은 창과 확정 결과를 확인했다. 가로 제어 입력 계측 2/2(12.067초)에서 같은 원결과의 비반복 및 닫기·Back에서 호스트 미호출을 확인했다. [구매 입고](evidence/prototype-design-integration/verified-controlled-purchase-top.png)와 [만차 임시 보관](evidence/prototype-design-integration/verified-controlled-held-bottom.png)은 제어 입력 화면이다.
+- 실제 SDK 도착·실차와 효과음 청취는 이번 결합 시험 범위 밖이다. #29의 서명 Release, 최종 영상과 자산 사용 조건을 별도로 확인한다.
+
+종료 시 전용 AVD의 부팅 완료·user10·실행 중인 계측 부재를 확인했다. 공식 보조 창을 제거하고 전용 Bridge와 ADB 5038의 `emulator-5580`을 종료했다. 관련 포트에 남은 프로세스가 없고 공유 `emulator-5556`의 읽기 전용 연결은 유지됐다. 원본 userdata 및 암호화 디스크의 파일 식별자·크기·수정 시각은 일치했고 사본과 격리 실행 데이터도 보존했다. 기어·속도·권한을 변경하거나 앱 데이터를 삭제하지 않았다.
