@@ -1,0 +1,5 @@
+free
+0
+1
+Physical size: 1080x600
+Physical density: 120
