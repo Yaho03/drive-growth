@@ -9,6 +9,7 @@
 .town-world{position:absolute;inset:0;transform-origin:50% 50%}
 .map .town-background{image-rendering:auto;user-select:none;pointer-events:none}
 .town-actor{transform:translate(-50%,-100%);pointer-events:none;z-index:4;user-select:none}
+.town-actor-touch{position:absolute;transform:translate(-50%,-100%);touch-action:none}
 .town-car{pointer-events:none;user-select:none}
 .car-label,.lot-lock{position:absolute;transform:translateX(-50%);white-space:nowrap;pointer-events:none;font-size:clamp(6px,1.1cqw,13px);line-height:1.2;border-radius:3px;padding:2px 4px}
 .car-label{background:#fff8e8;color:#16263e;font-weight:800}
@@ -55,3 +56,7 @@
 .shop.returning>:last-child{animation:fxFadeIn .45s .2s both}
 @keyframes fxFadeIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.shop.returning>:last-child{animation:none}}
+
+/* 주민 누르기: 손 흔들기·들어 올리기 */
+.map .town-emote{position:absolute;transform:translate(-50%,-100%);width:1.4%;image-rendering:pixelated;pointer-events:none}
+#townViewport{-webkit-user-select:none;user-select:none}
