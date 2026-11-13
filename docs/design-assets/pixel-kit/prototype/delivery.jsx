@@ -252,7 +252,7 @@ const D = window.DV;
 const { UI, CarImg, CAR_L, seg, lerp, MOTION, rnd, snap, FPX, FUI, C, RARITY, Truck, Pix, Coin, boxIconSVG, BED_TILT, BED_SLIDE, TOX, TOY, TK, beaconF, wheelF, Sq, Star, burst, dust, Btn, Sfx, HudChip, SkipChip } = D;
 const SM = 2;                    // 시제품은 차 그림을 2배로 그린다
 const TS = SM * 1.5;             // truck drawn 1.5× car scale
-const CAM = { town: [1.3, 265], dest: [1.6, 432] };
+const CAM = { town: [1.3, 265], dest: [1.3, 265] };   // 도착지도 같은 구도(주황 지붕 렌터카)
 let Z = 1.3, CY = 265;
 const AX = TK * TS, AY = TK * TS / 2;
 const LANE_Y = 774;              // lower (↘) lane centre; yellow centre dashes ≈ 740 + 0.5x
@@ -373,8 +373,7 @@ function Arrive({ t, buy, full, sfx = true, stripe = C.blue, d }) {
   return (
     <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: UI.bg }}>
       <World bg={buy ? window.DV_IMG.town : window.DV_IMG.dest} z={Z} cy={CY}>
-        {!buy ? <svg width="1536" height="1024" style={{ position: 'absolute', left: 0, top: 0 }}><polygon points="660,560 860,660 660,760 460,660" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.7)" strokeWidth="3" strokeDasharray="12 8" /></svg> : null}
-        {!buy ? <div style={{ position: 'absolute', left: 540, top: 640, width: 240, textAlign: 'center', color: '#1c2a14', font: `700 18px ${FUI}` }}>{d.dest}<br />목적지 건물 자리(임시 그림)</div> : null}
+        {!buy ? <div style={{ position: 'absolute', left: 742, top: 296, transform: 'skewY(26.565deg)', transformOrigin: '0 0', color: '#fff8e8', font: `900 40px/1 ${FUI}`, whiteSpace: 'nowrap' }}>씽씽렌터카</div> : null}   {/* 도착지: 다른 렌터카 가게(가상의 이름) */}
         {landed ? <Ring i={d.slot || 0} r={d.tier} sc={1 + 0.06 * Math.sin((t - 1.4) * 6)} glow={10 + 8 * (1 - seg(t, 1.4, 1.8))} o={seg(t, 1.4, 1.46) * (1 - seg(t, 2.0, 2.4))} /> : null}   {/* 칸 테두리는 도착 순간에만 잠깐 */}
         <Parked list={parked} />
         {cs.ground ? <GCar {...cs.ground} /> : null}
@@ -410,74 +409,41 @@ Object.assign(D.PIECES, {
 // 5차 · 탁송 — ② 고속도로 반복(6초, 이음매 없음) + 상태 정지 컷 + 움직임 줄이기 + 트럭 시트 + 재생기
 (() => {
 const D = window.DV;
-const { UI, CarImg, seg, lerp, MOTION, rnd, snap, FPX, FUI, C, RARITY, CARS, box, yF, xF, gq, flat, svgWrap, Pix, Car, Truck, TL, TBODY, TW, TH, TOX, TOY, truckMini, BED_TILT, BED_SLIDE, Coin, Sfx, HudChip, SW, SH } = D;
-const LOOP = 6, G = 256, V = G / LOOP, CARREL = 128; // ground 256 tu / loop; cars ±128 tu / loop → 1.5× / 0.5× truck speed
-const S = 3, SW4 = 4.2, K = 16.8, PW = 1304, PH = 736; // truck/cars native×3, world sprites (k=4)×4.2 → 16.8 px per unit
-const spr = (id, vb, body) => { const [x, y, w, h] = vb; return { id, vb, w, h, mk: () => svgWrap(`${x} ${y} ${w} ${h}`, w, h, body()) }; };
-const SP = {
-  dash: spr('dash', [-2, -1, 19, 11], () => flat(gq(0, 0, 4, 0.3, 0, 4, C.white))),
-  joint: spr('joint', [-77, -1, 79, 41], () => flat(gq(0, 0, 0.3, 19, 0, 4, C.gray))),
-  rail: spr('rail', [-3, -8, 22, 18], () => box(0.1, 0.25, 0, 0.3, 0.3, 1.4, 4, [C.gray2, C.gray, C.gray0]) + box(0, 0, 0.8, 4, 0.25, 0.6, 4, [C.white, C.mist2, C.mist])),
-  wall: spr('wall', [-5, -23, 39, 42], () => box(0, 0, 0, 8, 0.5, 5, 4, [C.mist2, C.mist, C.slate2]) + flat(yF(0.5, 0.3, 7.6, 1.6, 1.75, 4, C.slate2) + yF(0.5, 0.3, 7.6, 3.2, 3.35, 4, C.slate2)) + box(7.6, 0.5, 0, 0.4, 0.3, 5.3, 4, [C.gray2, C.gray, C.gray0])),
-  tree: spr('tree', [-14, -26, 28, 40], () => box(1.1, 1.1, 0, 0.8, 0.8, 2.2, 4, [C.wood, C.dirt, C.bronze]) + box(0, 0, 2.2, 3, 3, 2.6, 4, [C.lime, C.green, C.greenD]) + box(0.6, 0.6, 4.8, 1.8, 1.8, 1.4, 4, [C.lime, C.green, C.greenD])),
-  sign: spr('sign', [-4, -38, 56, 58], () => box(1.2, 0.2, 0, 0.35, 0.3, 4.2, 4, [C.gray2, C.gray, C.gray0]) + box(10.4, 0.2, 0, 0.35, 0.3, 4.2, 4, [C.gray2, C.gray, C.gray0]) + box(0, -0.1, 4, 12, 0.3, 4.5, 4, [C.green, C.greenD, C.greenD]) + flat(yF(0.21, 0.4, 11.6, 4.3, 4.45, 4, C.white) + yF(0.21, 0.4, 11.6, 8.05, 8.2, 4, C.white) + yF(0.21, 0.4, 0.55, 4.3, 8.2, 4, C.white) + yF(0.21, 11.45, 11.6, 4.3, 8.2, 4, C.white))),
-  hills: spr('hills', [-28, -30, 72, 64], () => box(0, 0, 0, 10, 6, 2.5, 4, [C.lime, C.green, C.greenD]) + box(2, 1, 2.5, 6, 4, 2, 4, [C.lime, C.green, C.greenD]) + box(3.5, 2, 4.5, 3, 2, 1.5, 4, [C.lime, C.green, C.greenD])),
-  houses: spr('houses', [-14, -16, 46, 40], () => box(0, 0, 0, 3, 2.5, 2, 4, [C.white, C.mist2, C.mist]) + box(-0.2, -0.2, 2, 3.4, 2.9, 0.8, 4, [C.orange, C.red, C.pinkD]) + flat(yF(2.5, 0.8, 1.6, 0.6, 1.3, 4, C.blue3)) + box(4.5, 1, 0, 2.5, 2, 1.6, 4, [C.white, C.mist2, C.mist]) + box(4.3, 0.8, 1.6, 2.9, 2.4, 0.7, 4, [C.blue2, C.blue, C.blueD])),
-  rest: spr('rest', [-36, -36, 92, 70], () => box(0, 0, 0, 12, 6, 4, 4, [C.white, C.mist2, C.mist]) + box(-0.3, -0.3, 4, 12.6, 6.6, 0.6, 4, [C.blue2, C.blue, C.blueD]) + flat([1, 3.6, 6.2, 8.8].map(x => yF(6, x, x + 1.8, 1.2, 3.0, 4, C.blue3)).join('')) + yF(6, 5.4, 6.6, 0, 2.2, 4, C.slate) + box(3, 6.4, 0, 0.5, 0.5, 0.8, 4, [C.wood2, C.wood, C.dirt]) + box(8, 6.4, 0, 0.5, 0.5, 0.8, 4, [C.wood2, C.wood, C.dirt])),
-};
-const Spr = ({ k, x, y, O }) => { const p = [O[0] + (x - y) * K, O[1] + (x + y) * K / 2], d = SP[k]; return <Pix id={'hw-' + k} mk={d.mk} w={d.w} h={d.h} s={SW4} style={{ position: 'absolute', left: Math.round(p[0] + d.vb[0] * SW4), top: Math.round(p[1] + d.vb[1] * SW4) }} />; };
-// periodic copies of one sprite along x at row y. shift = world scroll for this layer.
-function row(k, y, p, x0, shift, O, lo = -60, hi = 54) {
-  const out = [], off = ((shift % p) + p) % p;
-  for (let x = x0 - off - Math.ceil((x0 - (y + lo)) / p) * p; x < y + hi; x += p) out.push(<Spr key={k + y + '_' + x.toFixed(2)} k={k} x={x} y={y} O={O} />);
-  return out;
-}
-const wrap = (v, lo, n) => lo + (((v - lo) % n) + n) % n;
-const scrH = (O, x, y, z) => [O[0] + (x - y) * K, O[1] + (x + y) * K / 2 - z * K];
-const quad = (O, x1, y1, x2, y2, f, key) => <polygon key={key} points={[[x1, y1], [x2, y1], [x2, y2], [x1, y2]].map(a => scrH(O, a[0], a[1], 0).join(',')).join(' ')} fill={f} />;
-
+const { UI, CarImg, FPX, FUI, RARITY, Pix, Truck, TK, TW, TH, TOX, TOY, truckMini } = D;
+// 고속도로 배경은 마을 그림을 잘라 이어 붙인 한 장(make_highway.py → highway.png)이다. (366, 183)만큼 밀면 똑같아서 그만큼씩 되감는다.
+const S = 3.8, PW = 1304, PH = 736, ZH = 1.4, LOOP_X = 366, SPEED = 240;   // 트럭 배율, 그림 칸 크기, 배경 배율, 반복 길이(마을 px), 흐르는 빠르기(마을 px/초)
+const LANE_LO = 84, LANE_UP = 11;                                          // 차선 가운데: y = x/2 + 값 (마을 px)
 function HighwayPic({ t, still, mode, d }) {
-  const rest = mode === 'wait';
-  const O = rest ? [690, 40] : [690, 290];
-  const lt = still ? 0 : ((t % LOOP) + LOOP) % LOOP, sc = lt * V;
-  // joints every 32 tu → 1-art-px hop when a joint crosses a wheel (front, then rear)
-  let hop = 0;
-  if (!still && !rest) { const jo = ((-sc % 32) + 32) % 32; [[10.9, 12.5], [1.3, 4.7]].forEach(([a, b]) => { for (let j = -1; j < 2; j++) { const jx = jo + j * 32; if (jx >= a && jx <= b) hop = S; } }); }
-  const truckX = rest ? 4 : 0, truckY = rest ? 26.5 : 7.5;
-  const tp = scrH(O, truckX, truckY, 0);
-  const carA = wrap(-30 + CARREL * lt / LOOP, 1.5 - 70, CARREL), carC = wrap(40 - CARREL * lt / LOOP, 14.6 - 70, CARREL);
-  const signX = wrap(30 - sc, -1.4 - 72, G), signP = scrH(O, signX, -1.4, 8.05);
-  const showCars = mode !== 'reduced';
-  const carEl = (x, y, ty, key) => { const p = scrH(O, x + 4, y + 2, 0); return <CarImg key={key} k={ty} s={S / 1.5} cx={Math.round(p[0])} cy={Math.round(p[1])} />; };
+  const off = still ? 0 : (t * SPEED) % LOOP_X;
+  const cx = 600, cy = cx / 2 + LANE_LO * ZH, u = TK * S;                  // 트럭 가운데(화면 px)와 트럭 1단위의 화면 길이
+  const ox = cx - 4.3 * u, oy = cy - 4.65 * u;                             // 트럭 원점(짐칸 뒤끝, 먼 쪽 모서리)
+  // 옆 차선 차들: 차종·빠르기가 매번 다르다. 빠른 차는 뒤에서 와서 앞지르고, 느린 차는 앞에서 나타나 뒤로 처진다.
+  // 앞차에 가까워지면 앞차 빠르기에 맞춰 따라간다(겹치거나 뚫고 지나가지 않게).
+  const tr = React.useRef({ t: t, cars: [], next: 0 }).current;
+  if (!still) {
+    const dt = t < tr.t ? 0 : Math.min(t - tr.t, 0.1); tr.t = t;
+    if (t >= tr.next) {
+      const fast = Math.random() < 0.6, v = fast ? 60 + Math.random() * 150 : -(40 + Math.random() * 90), x = fast ? -220 : 1520;
+      if (!tr.cars.some(c => Math.abs(c.x - x) < 300)) { const ids = Object.keys(D.SPRITES); tr.cars.push({ x, v, k: ids[Math.floor(Math.random() * ids.length)], id: t }); }
+      tr.next = t + 1.2 + Math.random() * 2.6;
+    }
+    tr.cars.sort((a, b) => a.x - b.x);
+    tr.cars.forEach((c, i) => { const ahead = tr.cars[i + 1]; if (ahead && ahead.x - c.x < 240 && c.v > ahead.v) c.v = ahead.v; });
+    tr.cars.forEach(c => { c.x += c.v * dt; });
+    tr.cars = tr.cars.filter(c => c.x > -320 && c.x < 1620);
+  }
   return (
-    <div style={{ position: 'absolute', inset: 0, background: '#8fcb45', overflow: 'hidden' }}>
-      {row('hills', -34, 32, 0, sc / 8, O, -60, 90)}
-      {row('houses', -20, 32, 14, sc / 4, O, -60, 90)}
-      {row('tree', -8, 16, 3, sc, O)}
-      {row('wall', -3, 8, 0, sc, O)}
-      <svg width={PW} height={PH} style={{ position: 'absolute', left: 0, top: 0 }} shapeRendering="crispEdges">
-        {quad(O, -300, -2.5, 300, 0.5, '#e3c9b4', 'a')}{quad(O, -300, -2.5, 300, -2.2, '#c4a690', 'a2')}
-        {quad(O, -300, 0.5, 300, 19.5, '#4f5266', 'b')}
-        {quad(O, -300, 19.5, 300, 21.5, '#e3c9b4', 'c')}{quad(O, -300, 21.2, 300, 21.5, '#c4a690', 'c2')}
-        {quad(O, -300, 0.5, 300, 0.8, C.white, 'd')}
-        {quad(O, -300, 19.2, 300, 19.5, C.white, 'e')}
-        {rest ? [quad(O, -300, 23, 300, 36, '#4f5266', 'f'), quad(O, -300, 25.2, 300, 25.5, C.white, 'g'), quad(O, -300, 32.6, 300, 32.9, C.white, 'h')] : null}
-      </svg>
-      {row('joint', 0.5, 32, 0, sc, O)}
-      {row('dash', 6.68, 8, 0, sc, O)}
-      {row('dash', 13.02, 8, 4, sc, O)}
-      <Spr k="sign" x={signX} y={-1.4} O={O} />
-      <div style={{ position: 'absolute', left: signP[0] + 8, top: signP[1] + 4, width: 128, transform: 'skewY(26.565deg)', transformOrigin: '0 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, color: '#fff', font: `900 20px/1.15 ${FPX}` }}>
-        <span>{d.dest}</span><span style={{ color: '#ffd36b' }}>{Math.max(0, d.km - d.done).toFixed(1)}km</span>
+    <div style={{ position: 'absolute', inset: 0, background: '#72a449', overflow: 'hidden' }}>
+      <img src={window.DV_IMG.highway} alt="" style={{ position: 'absolute', left: -off * ZH, top: -off / 2 * ZH, width: 1342 * ZH, height: 760 * ZH, display: 'block' }} />
+      {!still ? tr.cars.map(c => {   // 바퀴 프레임이 없어서, 차체를 1~2px 떨고 뒤에 먼지를 날려 굴러가는 느낌을 낸다
+        const cy = c.x / 2 + LANE_UP * ZH + 2, bob = Math.floor(t * 11 + c.id * 7) % 2 ? 2 : 0;
+        const puffs = [0, 1, 2].map(i => { const p = (t * 2.2 + i / 3 + c.id) % 1, px = c.x - 58 - p * 110, py = cy + 14 - p * 55 - p * 10;
+          return <div key={i} style={{ position: 'absolute', left: Math.round(px / 3) * 3, top: Math.round(py / 3) * 3, width: 9 + (i % 2) * 3, height: 9 + (i % 2) * 3, background: '#f0ead8', opacity: (1 - p) * 0.7 }}></div>; });
+        return <React.Fragment key={c.id}>{puffs}<CarImg k={c.k} s={2.5} cx={c.x} cy={cy - bob} /></React.Fragment>;
+      }) : null}
+      <div style={{ position: 'absolute', left: ox - TOX * S, top: oy - TOY * S }}>
+        <Truck S={S} carScale={S * 2 / 3} wheel={still ? 0 : Math.floor(t / 0.1) % 2} beacon={still ? 0 : Math.floor(t / 0.6) % 2} car={{ type: d.car, u: 1 }} strapP={1} strapCol={RARITY[d.tier]} />
       </div>
-      {showCars ? carEl(carA, 1.5, 'hyundai_casper', 'cA') : null}
-      <div style={{ position: 'absolute', left: tp[0] - TOX * S, top: tp[1] - TOY * S - hop }}>
-        <Truck S={S} wheel={still || rest ? 0 : Math.floor(lt / 0.1) % 2} beacon={rest || mode === 'reduced' ? 0 : Math.floor(lt / 0.6) % 2} car={{ type: d.car, u: 1 }} strapP={1} strapCol={RARITY[d.tier]} />
-      </div>
-      {showCars ? carEl(carC, 14.6, 'hyundai_staria_tourer', 'cC') : null}
-      {row('rail', 21.7, 4, 0, sc, O)}
-      {rest ? <Spr k="rest" x={20} y={24} O={O} /> : row('tree', 24.5, 16, 9, sc, O)}
-      {rest ? row('tree', 36, 16, 5, 0, O) : null}
     </div>
   );
 }

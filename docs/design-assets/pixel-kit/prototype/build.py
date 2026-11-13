@@ -17,6 +17,7 @@ imgs = {"town": "town.png", "guest": "legacy-6b120a461ce7.png", "mechanic": "leg
 uri = lambda p: "data:image/png;base64," + base64.b64encode((TOWN / p).read_bytes()).decode()
 IMG = {k: uri(p) for k, p in imgs.items()}
 IMG["staff"] = IMG["mechanic"]  # 안내 직원은 정비사 그림을 쓴다(2026-11-13 결정)
+IMG["highway"] = "data:image/png;base64," + base64.b64encode((HERE / "highway.png").read_bytes()).decode()  # make_highway.py가 마을 그림에서 만든 고속도로 배경
 IMG["dest"] = "data:image/png;base64," + base64.b64encode((HERE / "dest-town.png").read_bytes()).decode()  # 탁송 목적지(Claude Design 임시 그림)
 SPR = {k: list(Image.open(TOWN / p).size) for k, p in imgs.items()}
 html = (HERE / "template.html").read_text(encoding="utf-8")

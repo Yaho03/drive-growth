@@ -179,7 +179,7 @@ const MODELS = [
 ].map(([id,name,ratio,unlock])=>({id,name,ratio,unlock,price:Math.floor(1000*ratio/100)}));   // 차종마다 전용 그림이라 색 변환은 없앴다
 const M = Object.fromEntries(MODELS.map(m=>[m.id,m]));
 window.DV_SPRITES = Object.fromEntries(MODELS.map(m=>[m.id,[IMG[m.id],SPR[m.id][0],SPR[m.id][1]]]));   // 탁송 연출(delivery.jsx)이 쓰는 차·마을·주차 칸
-window.DV_SLOTS = SLOTS.map(s=>[s.x,s.y]); window.DV_IMG = {town:IMG.town, dest:IMG.dest};
+window.DV_SLOTS = SLOTS.map(s=>[s.x,s.y]); window.DV_IMG = {town:IMG.town, dest:IMG.dest, highway:IMG.highway};
 const RAR = [
  {k:"common",n:"일반",w:747,inc:1.0,cost:100,prog:100},{k:"advanced",n:"고급",w:200,inc:1.1,cost:105,prog:150},
  {k:"rare",n:"희귀",w:50,inc:1.2,cost:110,prog:250},{k:"legend",n:"전설",w:3,inc:1.3,cost:115,prog:400}];
@@ -187,7 +187,9 @@ const R = Object.fromEntries(RAR.map(r=>[r.k,r]));
 const CAP = {1:3,2:5,3:7,4:10};
 const EXPAND = {2:{cust:3,cost:500},3:{cust:10,cost:1500},4:{cust:25,cost:3000}};
 const TICKET = 500, PITY = 30, KM_PAY = 10, KM_CAP = 500;
-const DEST = [{k:"mart",n:"마트",km:4,band:"근거리"},{k:"school",n:"학교",km:18,band:"중거리"},{k:"home",n:"본가",km:46,band:"원거리"}];
+// 목적지는 정해진 목록 없이 찍은 곳 하나다. 실제 앱은 내비 목적지의 경로 거리를 쓰고, 시제품은 이름으로 3~60km를 정한다(같은 이름은 늘 같은 거리)
+const destOf = name => { name=String(name||"").trim()||"학교"; let h=0; for(const ch of name) h=(h*31+ch.codePointAt(0))%9973; const km=3+h%58;
+  return {k:name, n:name, km, band:km<10?"근거리":km<30?"중거리":"원거리"}; };
 
 // ── 상태 ──
 let S, seq = 0;
@@ -462,13 +464,15 @@ function renderDelivery(){
     const done=Math.min(o.km, Math.round((S.km-(d.km0||0))*10)/10), mode=reduceMotion()?"reduced":done<=0?"wait":S.day>d.day?"due":"run";   // 막대는 확인된 주행 거리만
     if(canMotion()) window.playMotion("highway", deliveryData(o,{mode, done, due:`${d.day+1}일째까지`}), {host:$("#hwHost")});
     return; }
-  const dest = DEST.find(x=>x.k===S.dest) || DEST[1];
+  const dest = destOf(S.dest);
   if(!S.offers || S.offers.dest!==dest.k){ S.offers={dest:dest.k, list:makeOffers(dest,false)}; save(); }
   $("#screen").innerHTML = `<div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,2.2fr);gap:14px" id="dgrid">
-   <div class="card list"><div class="h2">1. 목적지 고르기</div>
-     ${DEST.map(x=>`<button class="item" data-act="dest" data-arg="${x.k}" aria-pressed="${x.k===dest.k}" style="border:2px solid ${x.k===dest.k?"var(--accent)":"transparent"};text-align:left"><div><b>${x.n}</b><div class="mut">${x.km}km · ${x.band}</div></div></button>`).join("")}
-     <div class="mut" style="font-size:14px">출발 전에 고르고, 도착해서 주차하면 결과를 볼 수 있어요.</div></div>
-   <div class="card" style="display:grid;gap:12px"><div class="row" style="justify-content:space-between"><div class="h2">2. ${dest.n}까지 의뢰 · ${dest.band}</div><span class="mut" style="font-size:14px">금액은 예시 값 · 구매 탁송은 확정할 때 전액을 내요</span></div>
+   <div class="card list"><div class="h2">1. 목적지 찍기</div>
+     <input id="destIn" value="${esc(dest.n)}" maxlength="14" aria-label="목적지 이름" style="font:inherit;font-weight:700;color:var(--fg);background:var(--card2);border:2px solid var(--line);border-radius:14px;min-height:52px;padding:0 16px;width:100%">
+     <button class="btn p" data-act="destSet">이 목적지로</button>
+     <div class="item" style="border:2px solid var(--accent)"><span class="mut">${esc(dest.n)}까지</span><b style="font-size:26px">${dest.km}km</b></div>
+     <div class="mut" style="font-size:14px">출발 전에 찍고, 도착해서 주차하면 결과를 볼 수 있어요. 실제 앱은 내비에 찍은 목적지의 거리를 가져와요(시제품은 이름으로 거리를 정해요).</div></div>
+   <div class="card" style="display:grid;gap:12px"><div class="row" style="justify-content:space-between"><div class="h2">2. ${esc(dest.n)}까지 의뢰 · ${dest.km}km</div><span class="mut" style="font-size:14px">금액은 예시 값 · 구매 탁송은 확정할 때 전액을 내요</span></div>
      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
      ${S.offers.list.map(o=>{ const can = o.kind==="profit" || S.money>=o.price;
        return `<div class="item" style="display:grid;gap:8px;grid-template-rows:96px auto 1fr auto;align-items:start"><div class="carpic" style="height:96px"><span class="ring ${o.rar}"></span>${carImg(o.model)}</div>
@@ -642,15 +646,14 @@ const ACT = {
     const demo={kind:"buy", model:"genesis_g80", rar:"rare", dest:"학교", km:18, reward:0};
     if(k==="depart") window.playMotion("depart", deliveryData(demo));
     if(k==="arrive") window.playMotion("arrive", deliveryData(demo,{slot:Math.min(S.cars.length,cap()-1), money:S.money})); },
-  dest(k){ S.dest=k; S.offers=null; render(); },
+  destSet(){ S.dest=$("#destIn").value.trim()||"학교"; S.offers=null; render(); },
   accept(oid){ const o=S.offers.list.find(x=>x.id===oid); if(o.kind==="buy"){ if(S.money<o.price) return; S.money-=o.price; }
     S.delivery={offer:o, day:S.day, changed:false, paid:o.price||0, km0:S.km}; render();
     if(canMotion()) window.playMotion("depart", deliveryData(o)); else { sfx("depart"); toast(`${o.dest}까지 의뢰를 받았어요 · 출발 전 확인 완료`); } },
-  changeAsk(){ const cur=S.delivery; const others=DEST.filter(x=>x.n!==cur.offer.dest);
-    modal(`<div style="display:grid;gap:12px"><div class="h2">어디로 바꿀까요?</div><div class="mut">새 거리로 의뢰를 다시 받아요 · 희귀도가 1단계 낮아지고, 변경 기회는 한 번뿐이에요</div>
-      ${others.map(x=>`<button class="item" data-act="changeTo" data-arg="${x.k}" style="text-align:left"><div><b>${x.n}</b><div class="mut">${x.km}km · ${x.band}</div></div></button>`).join("")}
-      <button class="btn" data-act="close">취소</button></div>`); },
-  changeTo(k){ const d=S.delivery, dest=DEST.find(x=>x.k===k); const list=makeOffers(dest,true).filter(o=>o.kind===d.offer.kind);
+  changeAsk(){ modal(`<div style="display:grid;gap:12px"><div class="h2">어디로 바꿀까요?</div><div class="mut">새 거리로 의뢰를 다시 받아요 · 희귀도가 1단계 낮아지고, 변경 기회는 한 번뿐이에요</div>
+      <input id="destIn2" placeholder="새 목적지" maxlength="14" aria-label="새 목적지 이름" style="font:inherit;font-weight:700;color:var(--fg);background:var(--card2);border:2px solid var(--line);border-radius:14px;min-height:52px;padding:0 16px;width:100%">
+      <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn p" data-act="changeTo">이 목적지로 바꾸기</button></div></div>`); },
+  changeTo(){ const d=S.delivery, name=$("#destIn2").value.trim(); if(!name || name===d.offer.dest) return toast("지금과 다른 목적지를 적어 주세요"); const dest=destOf(name); S.dest=dest.n; const list=makeOffers(dest,true).filter(o=>o.kind===d.offer.kind);
     const o=list[0]; let note="";
     if(o.kind==="buy"){ const diff=o.price-d.paid; if(diff>0 && S.money<diff){ closeModal(); toast("차액을 낼 게임머니가 부족해요"); return; }
       S.money-=diff; d.paid=o.price; note = diff>=0?` · 차액 ${won(diff)} 추가 결제`:` · 차액 ${won(-diff)} 환급`; }
