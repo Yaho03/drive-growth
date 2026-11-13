@@ -2594,6 +2594,8 @@ JDK 17·기존 Android SDK 35에서 `:core:test` 447개와 `:app:testDebugUnitTe
 
 최신 main `ea1eafefe3621e658b186968731f5eda40077c39`의 독립 worktree에서 JDK 17·기존 Android SDK 35로 다시 실행했다. `./gradlew --offline --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`는 성공했다. core 447개(개체 계약 11개·Garage 18개 포함), 앱 단위 814개가 실패·오류·생략 없이 통과했다. Debug APK 조립 성공, Lint 오류 0건·경고 39건이며 `python3 scripts/check_repository.py`와 `git diff --check`도 통과했다. 최초 Gradle 시작은 샌드박스 루프백 제한으로 실패했고, 루프백이 허용된 환경에서 같은 명령을 재실행했다. [해당 main의 원격 CI](https://github.com/Yaho03/drive-growth/actions/runs/43268127095)는 계정 결제 또는 사용 한도로 저장소 검사 시작 전 실패로 표시됐고 Android 검사는 건너뛰었다. 이 재검증에서는 SQLite 실행·앱 재실행·에뮬레이터·adb를 사용하지 않았다.
 
+원격 main `4f0f64267e2a279e2d99d5ae5738d1a06653d980`의 독립 worktree에서 JDK 17·기존 Android SDK 35로 지정 검사를 다시 실행했다. `./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`의 오프라인 실행은 4분 9초에 성공했다. core 447개(개체 계약 11개·Garage 18개 포함), 앱 단위 843개(Garage 저장 명령 소비 5개 포함)가 통과했으며 실패·오류·생략은 모두 0건이다. Debug APK 조립 성공, Lint 오류 0건·경고 50건이며 `python3 scripts/check_repository.py`와 `git diff --check`도 통과했다. 최초 Gradle 시작은 샌드박스의 로컬 소켓 제한으로 중단돼 로컬 소켓을 허용한 뒤 재실행했다. 이번에는 SQLite·앱 재실행·에뮬레이터·adb를 사용하지 않았다. [같은 main 커밋의 원격 CI](https://github.com/Yaho03/drive-growth/actions/runs/43368554156)에서 저장소·Android 검사도 통과했다.
+
 ## 대여 정산의 저장된 시간 근거와 화면 검증 — 2026-11-11
 
 정상·감액·상한 제외 시간을 실제 수락 구간과 각 구간에 적용된 당시 정책으로 저장하고 기존 Main 정산 조회→ResultsHostMapper→ResultsView에 연결했다. 금액은 최초 Settlement를 표시하며 시간에서 다시 지급하거나 현재 잔액으로 바꾸지 않는다. 기록이 없는 이전 결과는 확인 불가다. 계약은 [시간 근거 schema18](02_SYSTEM_ARCHITECTURE.md#대여-결과-시간-근거-schema18), 표현은 [시간 상세](09_UI_UX_SPEC.md#영업-정산의-시간-상세)를 따른다.
