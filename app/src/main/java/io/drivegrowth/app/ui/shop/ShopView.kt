@@ -50,7 +50,9 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     internal var onFocusedVehicleAction: ((GarageEvent.RequestAction) -> Unit)? = null
     internal var onFocusedVehicleRetry: (() -> Unit)? = null
     private var preparingVehicleAction = false
-    private val vehicleDetail = MapVehicleDetailView(context) { event ->
+    private val vehicleDetail: MapVehicleDetailView = MapVehicleDetailView(context, ::onVehicleDetailEvent)
+
+    private fun onVehicleDetailEvent(event: GarageEvent) {
         when (event) {
             GarageEvent.CloseDetail -> selectFocusedVehicle(null)
             GarageEvent.Retry -> onFocusedVehicleRetry?.invoke()
@@ -66,7 +68,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             is GarageEvent.SelectVehicle -> Unit
         }
     }
-    private fun vehicleDetailRequestFinished() = vehicleDetail.completeRequest()
+    private fun vehicleDetailRequestFinished() { vehicleDetail.completeRequest() }
 
     internal var onFocusedRest: ((FacilityControlsEvent) -> Unit)? = null
     internal var focusedVehicleId: OwnedVehicleId? = null
