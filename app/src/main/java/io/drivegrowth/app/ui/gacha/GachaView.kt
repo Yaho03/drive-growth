@@ -7,6 +7,8 @@ import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.garage.VehicleArtwork
+import io.drivegrowth.app.ui.presentation.RewardCelebrationKind
+import io.drivegrowth.app.ui.presentation.RewardCelebrationView
 import io.drivegrowth.core.contract.*
 import java.text.NumberFormat
 import java.util.Locale
@@ -15,7 +17,15 @@ import java.util.Locale
 class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: GachaUiState = GachaUiState()) : LinearLayout(context) {
     private val style = GarageStyle(context, pixelPanel = true)
     private val artwork = VehicleArtwork(context, style)
-    private val session = GachaInteraction(onEvent, restored)
+    internal var onCelebration: ((RewardCelebrationKind) -> Unit)? = null
+    private val celebration = RewardCelebrationView(context).apply {
+        onStarted = { onCelebration?.invoke(it) }
+    }
+    private var submittedRequest: RequestId? = null
+    private val session = GachaInteraction({ event ->
+        if (event is GachaEvent.Draw) submittedRequest = event.request.input.option.requestId
+        onEvent(event)
+    }, restored)
     private var wide = false
     private var generation = 0L
     private var scroll: ScrollView? = null
@@ -41,8 +51,13 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
         if (drawnFrame == session.frame?.generation) scroll?.takeIf { it.isLaidOut }?.let { savedY = it.scrollY } else savedY = 0
         drawnFrame = session.frame?.generation
         val focused = findFocus()?.tag
-        generation++; removeAllViews(); scroll = null; setPadding(dp(24),dp(16),dp(24),dp(16))
-        if (!session.controlsEnabled) { addView(text(s(R.string.gacha_restricted),28)); return@with }
+        generation++; celebration.rebuildContent { removeAllViews() }; scroll = null; setPadding(dp(24),dp(16),dp(24),dp(16))
+        if (!session.controlsEnabled) {
+            celebration.render(null, RewardCelebrationKind.GACHA)
+            submittedRequest = null
+            addView(text(s(R.string.gacha_restricted), 28))
+            return@with
+        }
         addView(text(s(R.string.gacha_title),32,bold=true))
         val body = column(); scroll = scroll(body,savedY); addView(scroll,LayoutParams(-1,0,1f))
         if (uiState.pending != null) add(body,text(s(R.string.gacha_pending),color=rarityColor(Rarity.RARE)))
@@ -151,7 +166,12 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
         add(parent,text(s(if(value.origin == GachaOrigin.FIXTURE) R.string.gacha_fixture else R.string.gacha_stored),color=rarityColor(Rarity.LEGEND)))
         add(parent,card().apply {
             addView(text(s(R.string.gacha_result),28,bold=true)); addView(text(value.summary))
-            addView(artwork.view(vehicle.vehicleId, vehicle.rarity, 144), LayoutParams(-1, dp(144)))
+            val art = artwork.view(vehicle.vehicleId, vehicle.rarity, 144)
+            val effectKey = receipt.settlementId.value.takeIf {
+                value.origin == GachaOrigin.STORED && receipt.transaction.requestId == submittedRequest
+            }
+            celebration.render(effectKey, RewardCelebrationKind.GACHA, rarityColor(vehicle.rarity))
+            addView(celebration.over(art, fillHeight = true), LayoutParams(-1, dp(144)))
             addView(text(s(R.string.gacha_vehicle,value.vehicleName ?: s(R.string.gacha_missing),rarity(vehicle.rarity)),30,color=rarityColor(vehicle.rarity),bold=true))
             addView(text(vehicle.ownedVehicleId.value,color=muted))
             addView(text(s(R.string.gacha_growth,vehicle.level,vehicle.levelProgressPercent)))

@@ -156,10 +156,22 @@ class ResultsViewTest : InstrumentationTestCase() {
         assertEquals(before, onUi { view.findViewWithTag<ScrollView>("results:list").scrollY })
         onUi { view.render(ResultsPreviewStates.longText, true); view.restoreSelection(SettlementId("fixture-result-1")) }
         layout(view, 480, 360)
-        val overflows = onUi { descendants(view).filterIsInstance<TextView>().filter { text ->
-            val content = text.layout
-            content != null && (0 until content.lineCount).any { content.getLineWidth(it) > content.width + 2 }
-        }.map { it.text.toString() } }
+        val overflows = onUi {
+            descendants(view).filterIsInstance<TextView>().mapNotNull { text ->
+                val content = text.layout ?: return@mapNotNull null
+                // getLineWidth에는 줄 끝 공백이 포함된다. 화면에 표시되는 양쪽 경계를 확인한다.
+                val lines = (0 until content.lineCount).filter { line ->
+                    content.getLineLeft(line) < -2 || content.getLineRight(line) > content.width + 2
+                }
+                if (lines.isEmpty()) null else buildString {
+                    append("${text.text} (layoutWidth=${content.width}, ")
+                    append(lines.joinToString { line ->
+                        "line=$line left=${content.getLineLeft(line)} right=${content.getLineRight(line)}"
+                    })
+                    append(")")
+                }
+            }
+        }
         assertTrue("긴 텍스트가 가로로 넘치면 안 된다: $overflows", overflows.isEmpty())
         layout(view, 1360, 948)
         // 이 시험은 window 미부착 위젯이다. attach 전 post queue 대신 다음 render를 명시한다.

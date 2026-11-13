@@ -16,13 +16,23 @@ import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.VehicleSprites
+import io.drivegrowth.app.ui.presentation.RewardCelebrationKind
+import io.drivegrowth.app.ui.presentation.RewardCelebrationView
 import io.drivegrowth.core.contract.VehicleId
 import java.io.IOException
 
 /** 실제 지급·저장·탐색을 호출하지 않고 호스트가 전달한 단계와 확정 결과만 표시한다. */
 class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : LinearLayout(context) {
     private val style = GarageStyle(context)
-    private val interaction = OnboardingInteraction(onEvent)
+    internal var onCelebration: ((RewardCelebrationKind) -> Unit)? = null
+    private val celebration = RewardCelebrationView(context).apply {
+        onStarted = { onCelebration?.invoke(it) }
+    }
+    private var confirmedChoice: VehicleId? = null
+    private val interaction = OnboardingInteraction { event ->
+        if (event is OnboardingEvent.ConfirmSelection) confirmedChoice = event.vehicleId
+        onEvent(event)
+    }
     private val sprites = VehicleSprites(context)
     private val townBitmap by lazy(LazyThreadSafetyMode.NONE) {
         try {
@@ -69,9 +79,11 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         if (scene == previousScene) scroll?.takeIf { it.isLaidOut }?.let { savedY = it.scrollY } else savedY = 0
         previousScene = scene
         val focused = findFocus()?.tag
-        removeAllViews(); scroll = null
+        celebration.rebuildContent { removeAllViews() }; scroll = null
         setPadding(dp(PixelStyle.panelPaddingDp), dp(PixelStyle.gapDp), dp(PixelStyle.panelPaddingDp), dp(PixelStyle.gapDp))
         if (!interaction.controlsEnabled) {
+            celebration.render(null, RewardCelebrationKind.FIRST_GRANT)
+            confirmedChoice = null
             addView(label(s(R.string.onboarding_restricted), 28, bold = true))
             addView(label(s(R.string.onboarding_restricted_body), color = PixelStyle.muted))
             return@with
@@ -146,7 +158,9 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
                 heading(body, if (state.alreadyGranted) R.string.onboarding_already_granted else R.string.onboarding_complete,
                     R.string.onboarding_completed_note)
                 add(body, pixelCard(selected = true).apply {
-                    addVehicleArt(this, state.vehicle.vehicleId)
+                    val effectKey = state.vehicle.ownedVehicleId.value.takeIf { confirmedChoice == state.vehicle.vehicleId }
+                    celebration.render(effectKey, RewardCelebrationKind.FIRST_GRANT)
+                    addVehicleArt(this, state.vehicle.vehicleId, celebrate = true)
                     addView(label(state.displayName, 30, bold = true))
                     addView(label(rarity(state.vehicle.rarity), 24, PixelStyle.rarityColor(state.vehicle.rarity), true))
                     addView(label(context.getString(R.string.onboarding_level, state.vehicle.level), 24))
@@ -237,12 +251,13 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         scaleType = ImageView.ScaleType.FIT_CENTER
     }
 
-    private fun addVehicleArt(card: LinearLayout, id: VehicleId) {
+    private fun addVehicleArt(card: LinearLayout, id: VehicleId, celebrate: Boolean = false) {
         val drawable = sprites.drawable(id) ?: return
-        card.addView(artwork(drawable).apply {
+        val art = artwork(drawable).apply {
             tag = "onboarding:vehicle-art:${id.value}"
             setPadding(0, style.dp(8), 0, style.dp(8))
-        }, LayoutParams(-1, style.dp(104)))
+        }
+        card.addView(if (celebrate) celebration.over(art, fillHeight = true) else art, LayoutParams(-1, style.dp(104)))
     }
 
     private fun action(body: LinearLayout, label: Int, enabled: Boolean = true, primary: Boolean = false,

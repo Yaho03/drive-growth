@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.shop
 
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
@@ -8,10 +9,12 @@ import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
+import android.os.SystemClock
 import android.text.TextPaint
 import android.text.TextUtils
 import android.view.View
@@ -40,6 +43,9 @@ internal class ShopSceneView(
         else RectF(100f, 546f, 1450f, 986f)
     private val placed = model.vehicles.zip(townSlots).sortedBy { it.second.second }
     private val bitmaps = placed.associate { (vehicle, _) -> vehicle.id to vehicle.vehicleId?.let(sprites::bitmap) }
+    private val actors = TownActors(context)
+    private val fuelInstalled = model.facilityStates[Facility.FUEL_STATION] == ShopAvailability.INSTALLED
+    private val washInstalled = model.facilityStates[Facility.CAR_WASH] == ShopAvailability.INSTALLED
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = false }
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.create("sans-serif", Typeface.BOLD)
@@ -52,6 +58,47 @@ internal class ShopSceneView(
     private var scale = 1f
     private var offsetX = 0f
     private var offsetY = 0f
+    private var expandedSlots = IntRange.EMPTY
+    private var consumeExpansion: (() -> Boolean)? = null
+    private var expansionStartedAt: Long? = null
+    private val visibleBounds = Rect()
+    private var frameScheduled = false
+    private val nextFrame = Runnable {
+        frameScheduled = false
+        if (canAnimateActors()) invalidate()
+    }
+
+    private fun canAnimateActors() = isAttachedToWindow && isShown && windowVisibility == VISIBLE &&
+        hasWindowFocus() && ValueAnimator.areAnimatorsEnabled()
+
+    internal fun highlightExpansion(slots: IntRange, consume: () -> Boolean) {
+        expandedSlots = slots
+        consumeExpansion = consume
+    }
+
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        if (isVisible) invalidate() else stopMotion()
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (hasWindowFocus) invalidate() else {
+            stopMotion()
+            invalidate()
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        stopMotion()
+        super.onDetachedFromWindow()
+    }
+
+    private fun stopMotion() {
+        removeCallbacks(nextFrame)
+        frameScheduled = false
+        expansionStartedAt = null
+    }
 
     init {
         setWillNotDraw(false)
@@ -121,6 +168,11 @@ internal class ShopSceneView(
         if (model.slots == null) {
             badge(canvas, context.getString(R.string.shop_scene_spaces_unknown), 770f, 652f, 360f)
         }
+        val animate = canAnimateActors()
+        val now = SystemClock.uptimeMillis()
+        drawExpansion(canvas, now, animate)
+        val elapsed = if (animate) (now - animationOrigin) / 1000f else 0f
+        actors.draw(canvas, elapsed, fuelInstalled, washInstalled)
         placed.forEach { (vehicle, slot) -> drawVehicle(canvas, vehicle, slot.first.toFloat(), slot.second.toFloat()) }
         if (mode == ShopMode.OVERALL) {
             val unknown = context.getString(R.string.shop_unknown)
@@ -129,6 +181,39 @@ internal class ShopSceneView(
             badge(canvas, summary, 1360f, 42f, 296f, size = 32f)
         }
         canvas.restore()
+        if (animate && !frameScheduled) {
+            frameScheduled = postDelayed(nextFrame, 50L)
+        }
+    }
+
+    private fun drawExpansion(canvas: Canvas, now: Long, animate: Boolean) {
+        val start = consumeExpansion
+        if (start == null && expansionStartedAt == null) return
+        if (!isAttachedToWindow || !isShown || windowVisibility != VISIBLE || !hasWindowFocus() ||
+            !getLocalVisibleRect(visibleBounds)
+        ) {
+            expansionStartedAt = null
+            return
+        }
+        if (start != null) {
+            consumeExpansion = null
+            if (start() && animate && !expandedSlots.isEmpty()) expansionStartedAt = now
+        }
+        val startedAt = expansionStartedAt ?: return
+        val progress = (now - startedAt) / 900f
+        if (!animate || progress >= 1f) {
+            expansionStartedAt = null
+            return
+        }
+        val alpha = ((1f - progress) * 144).roundToInt()
+        val highlight = (PixelStyle.gold and 0x00ffffff) or (alpha shl 24)
+        for (index in expandedSlots) {
+            val (x, y) = townSlots[index]
+            canvas.save()
+            canvas.translate(x.toFloat(), y.toFloat())
+            polygon(canvas, closedSlot, highlight)
+            canvas.restore()
+        }
     }
 
     private fun drawFacility(canvas: Canvas, facility: Facility, status: ShopAvailability) {
@@ -257,6 +342,7 @@ internal class ShopSceneView(
     }
 
     companion object {
+        private val animationOrigin = SystemClock.uptimeMillis()
         private val fuelCover = floatArrayOf(
             72f, 0f, 536f, 0f, 562f, 102f, 487f, 151f, 487f, 238f, 395f, 292f, 322f, 296f, 80f, 237f,
         )
