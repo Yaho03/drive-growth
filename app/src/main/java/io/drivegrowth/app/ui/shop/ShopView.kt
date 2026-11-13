@@ -83,6 +83,12 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     private var focusStartedAt: Long? = null
     internal var focusManagementPanel: View? = null
     private var panelTarget: MapPanel? = null
+    private var hostOverlayOpen = false
+
+    internal fun setHostOverlayOpen(open: Boolean) {
+        hostOverlayOpen = open
+        descendantFocusability = if (open) ViewGroup.FOCUS_BLOCK_DESCENDANTS else ViewGroup.FOCUS_BEFORE_DESCENDANTS
+    }
     private var activeSheet: MapPanel? = null
     private var mapOverlay: ShopMapOverlayView? = null
     private var dismissedPending: ShopRequest? = null
@@ -246,13 +252,15 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     }
 
     private fun acceptsFocusInput(generation: Long) =
-        sceneGeneration == generation && interaction.controlsEnabled && uiState.pending == null && !managementBusy
+        sceneGeneration == generation && interaction.controlsEnabled && uiState.pending == null &&
+            !managementBusy && !hostOverlayOpen
 
     private fun focusPanel(c: ShopScreenState.Content, selected: ShopVehicle, generation: Long): View {
         val display = withVehicleLabels(c)
-        val vehicles = shopSceneModel(display).vehicles
         val camera = cameraScene(display, generation, onVehicle = { id ->
-            if (acceptsFocusInput(generation) && focusVehicles?.containsKey(id) != false) selectFocusedVehicle(id)
+            if (acceptsFocusInput(generation) && !focusRestRecovery && focusVehicles?.containsKey(id) != false) {
+                selectFocusedVehicle(id)
+            }
         })
         val facts = focusVehicles?.get(selected.id)
         val canManage = facts != null && interaction.state is ShopScreenState.Content && !vehicleActionsBlocked &&
@@ -265,6 +273,8 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         val recovery = facilityPanel?.takeIf { focusRestRecovery }
         if (management != null || recovery != null) {
             vehicleDetail.render(GarageScreenState.Loading, null, false, true)
+            camera.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+            camera.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             val content = management ?: checkNotNull(recovery)
             (content.parent as? ViewGroup)?.removeView(content)
             return FrameLayout(context).apply {
@@ -407,8 +417,10 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                 }
             }
         val display = withVehicleLabels(c)
-        val scene = cameraScene(display, generation, openVehicle) { target ->
-            if (acceptsFocusInput(generation)) showMapPanel(target)
+        val scene = cameraScene(display, generation, onVehicle = { id: OwnedVehicleId ->
+            if (activeSheet == null && mapOverlay == null) openVehicle?.invoke(id) ?: Unit
+        }.takeIf { openVehicle != null }) { target ->
+            if (acceptsFocusInput(generation) && activeSheet == null && mapOverlay == null) showMapPanel(target)
         }
         frame.addView(scene, FrameLayout.LayoutParams(-1, -1))
         val request = committedExpansion
@@ -441,6 +453,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             else -> panelTarget
         }
         if (target != null) {
+            scene.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             scene.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             if (target is MapPanel.Details) {
                 val overlay = ShopMapOverlayView(context,

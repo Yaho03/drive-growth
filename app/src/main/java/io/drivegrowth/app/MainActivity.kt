@@ -844,6 +844,9 @@ open class MainActivity : Activity() {
             setMargins(inset, inset, inset, inset)
         })
         homeSettings = overlay
+        shop.setHostOverlayOpen(true)
+        chrome.visibility = View.GONE
+        body.descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
         body.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
         stage.addView(overlay, FrameLayout.LayoutParams(-1, -1))
         navigationBar?.visibility = View.GONE
@@ -855,6 +858,9 @@ open class MainActivity : Activity() {
         homeSettings = null
         homeSoundButton = null
         stage.removeView(overlay)
+        shop.setHostOverlayOpen(false)
+        chrome.visibility = View.VISIBLE
+        body.descendantFocusability = android.view.ViewGroup.FOCUS_BEFORE_DESCENDANTS
         body.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
         navigationBar?.visibility = View.VISIBLE
         return true
