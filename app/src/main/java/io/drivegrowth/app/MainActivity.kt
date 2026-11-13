@@ -116,6 +116,7 @@ open class MainActivity : Activity() {
     private lateinit var gacha: GachaView
     private var navigationBar: MainNavigationBar? = null
     private var simulationControlsExpanded = false
+    private var simulationControls: View? = null
     private var simulationToggle: Button? = null
     private var simulationDetails: ScrollView? = null
     private var simulationStatus: TextView? = null
@@ -285,7 +286,9 @@ open class MainActivity : Activity() {
             { if (gameControlsAllowed()) management.controller.chooseMaterial(it) },
             { if (gameControlsAllowed()) management.controller.acknowledge() })
         panel = style.column().apply { setBackgroundColor(PixelStyle.background) }
-        if (session.simulation != null) panel.addView(createSimulationControls())
+        if (session.simulation != null) {
+            simulationControls = createSimulationControls().also(panel::addView)
+        }
         chrome = style.column().apply { setPadding(style.dp(16), 0, style.dp(16), 0) }
         body = FrameLayout(this)
         gameHeader = LinearLayout(this).apply {
@@ -905,10 +908,12 @@ open class MainActivity : Activity() {
     }
 
     private fun updatePresentation(enabled: Boolean) {
-        gameHeader.visibility = if (enabled) View.VISIBLE else View.GONE
+        val showingTitle = enabled && titlePending
+        gameHeader.visibility = if (enabled && !showingTitle) View.VISIBLE else View.GONE
+        simulationControls?.visibility = if (showingTitle) View.GONE else View.VISIBLE
         onControlsAvailabilityChanged(enabled && !titlePending)
         val visible = enabled && presentationFocused
-        titleView.setPresentationAllowed(visible && titlePending)
+        titleView.setPresentationAllowed(showingTitle && presentationFocused)
         presentationAudio.setPresentationAllowed(visible)
         presentationAudio.setScene(when {
             titlePending -> PrototypeAudio.Scene.TITLE
@@ -920,7 +925,6 @@ open class MainActivity : Activity() {
         val money = (screen as? HostQueryState.Content)?.snapshot?.balance?.units
         headerBalance.text = money?.let { "● ${java.text.NumberFormat.getIntegerInstance(java.util.Locale.KOREA).format(it)}" }
             ?: "잔액 확인 중"
-        headerBalance.visibility = if (titlePending) View.GONE else View.VISIBLE
         soundButton.text = if (presentationAudio.enabled) "소리 켜짐" else "소리 꺼짐"
         soundButton.contentDescription = if (presentationAudio.enabled) "게임 소리 끄기" else "게임 소리 켜기"
     }

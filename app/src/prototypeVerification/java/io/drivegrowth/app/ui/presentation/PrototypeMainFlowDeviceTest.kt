@@ -47,10 +47,15 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             .setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)) as UnifiedSimulationActivity
         try {
             await { host.window.decorView.findViewWithTag<Button>("presentation:start")?.isEnabled == true && host.hasWindowFocus() }
+            onUi { assertTitleCoversGame(host) }
             capture("main-title")
             touchStart(host)
             await { host.window.decorView.findViewWithTag<View>("presentation:title") == null }
             await { host.window.decorView.findViewWithTag<Button>(io.drivegrowth.app.R.string.onboarding_start)?.isEnabled == true }
+            onUi {
+                assertTrue(host.window.decorView.findViewWithTag<View>("presentation:home-title").isShown)
+                assertTrue(host.window.decorView.findViewWithTag<View>("simulation:controls").isShown)
+            }
             capture("main-game")
             lateinit var previousStart: Button
             onUi {
@@ -59,6 +64,7 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             }
             await { host.window.decorView.findViewWithTag<Button>("presentation:start")?.isEnabled == true }
             onUi {
+                assertTitleCoversGame(host)
                 previousStart.performClick()
                 val start = host.window.decorView.findViewWithTag<Button>("simulation:start")
                 if (start != null) assertFalse(start.isEnabled)
@@ -70,6 +76,21 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             }
         } finally { onUi { host.finish() } }
     }
+    private fun assertTitleCoversGame(host: UnifiedSimulationActivity) {
+        val content = host.findViewById<View>(android.R.id.content)
+        val title = content.findViewWithTag<View>("presentation:title")
+        assertNotNull(title)
+        val appBounds = Rect()
+        val titleBounds = Rect()
+        assertTrue(content.getGlobalVisibleRect(appBounds))
+        assertTrue(title.getGlobalVisibleRect(titleBounds))
+        assertEquals("시작 화면이 앱 콘텐츠 영역 전체를 덮어야 한다", appBounds, titleBounds)
+        for (tag in listOf("presentation:home-title", "presentation:balance", "presentation:sound", "simulation:controls")) {
+            assertFalse("시작 화면에서 $tag 표시됨", content.findViewWithTag<View>(tag)?.isShown == true)
+        }
+        assertFalse(host.window.decorView.mainPage(HostPage.HOME)?.isShown == true)
+    }
+
     fun testStoredFirstGrantSettlementAndGachaCelebrateOnlyOnFirstDisplay() {
         val context = instrumentation.targetContext
         checkIsolatedPackage(context.packageName)
