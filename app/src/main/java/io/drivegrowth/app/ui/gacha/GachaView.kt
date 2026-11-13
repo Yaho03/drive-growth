@@ -1,12 +1,16 @@
 package io.drivegrowth.app.ui.gacha
 
 import android.content.Context
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.garage.VehicleArtwork
+import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.app.ui.presentation.RewardCelebrationKind
 import io.drivegrowth.app.ui.presentation.RewardCelebrationView
 import io.drivegrowth.core.contract.*
@@ -17,6 +21,7 @@ import java.util.Locale
 class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: GachaUiState = GachaUiState()) : LinearLayout(context) {
     private val style = GarageStyle(context, pixelPanel = true)
     private val artwork = VehicleArtwork(context, style)
+    private val sprites = VehicleSprites(context)
     internal var onCelebration: ((RewardCelebrationKind) -> Unit)? = null
     private val celebration = RewardCelebrationView(context).apply {
         onStarted = { onCelebration?.invoke(it) }
@@ -164,22 +169,47 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
     private fun result(parent: LinearLayout, value: GachaConfirmedResult) = with(style) {
         val receipt=value.settlement; val vehicle=receipt.changedVehicle!!
         add(parent,text(s(if(value.origin == GachaOrigin.FIXTURE) R.string.gacha_fixture else R.string.gacha_stored),color=rarityColor(Rarity.LEGEND)))
-        add(parent,card().apply {
-            addView(text(s(R.string.gacha_result),28,bold=true)); addView(text(value.summary))
-            val art = artwork.view(vehicle.vehicleId, vehicle.rarity, 144)
-            val effectKey = receipt.settlementId.value.takeIf {
-                value.origin == GachaOrigin.STORED && receipt.transaction.requestId == submittedRequest
+        val panels = if (wide) row() else column()
+        add(parent, panels)
+        val artHeight = if (height > 0) {
+            (height * .73f / resources.displayMetrics.density).toInt().coerceIn(168, 420)
+        } else 264
+        val sprite = sprites.bitmap(vehicle.vehicleId)
+        val art = if (sprite == null) artwork.view(vehicle.vehicleId, vehicle.rarity, artHeight) else ImageView(context).apply {
+            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+            setImageDrawable(sprites.drawable(vehicle.vehicleId))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(dp(24), dp(22), dp(24), dp(34))
+        }
+        val effectKey = receipt.settlementId.value.takeIf {
+            value.origin == GachaOrigin.STORED && receipt.transaction.requestId == submittedRequest
+        }
+        val tierColor = rarityColor(vehicle.rarity)
+        celebration.render(effectKey, RewardCelebrationKind.GACHA, tierColor, vehicle = sprite)
+        panels.addView(celebration.over(art, fillHeight = true, stage = true),
+            if (wide) LayoutParams(0, dp(artHeight), 1.2f) else LayoutParams(-1, dp(artHeight)))
+        val details = card().apply {
+            background = GradientDrawable().apply {
+                setColor(0xff1c2342.toInt())
+                cornerRadius = dp(18).toFloat()
+                setStroke(dp(2), tierColor)
             }
-            celebration.render(effectKey, RewardCelebrationKind.GACHA, rarityColor(vehicle.rarity))
-            addView(celebration.over(art, fillHeight = true), LayoutParams(-1, dp(144)))
-            addView(text(s(R.string.gacha_vehicle,value.vehicleName ?: s(R.string.gacha_missing),rarity(vehicle.rarity)),30,color=rarityColor(vehicle.rarity),bold=true))
+            addView(text(rarity(vehicle.rarity), 28, color = 0xff111628.toInt(), bold = true).apply {
+                gravity = Gravity.CENTER
+                background = shape(tierColor)
+            })
+            addView(text(s(R.string.gacha_result), 28, bold = true))
+            addView(text(value.summary))
+            addView(text(s(R.string.gacha_vehicle,value.vehicleName ?: s(R.string.gacha_missing),rarity(vehicle.rarity)),30,color=tierColor,bold=true))
             addView(text(vehicle.ownedVehicleId.value,color=muted))
             addView(text(s(R.string.gacha_growth,vehicle.level,vehicle.levelProgressPercent)))
             addView(text(s(R.string.gacha_acquisition,money(vehicle.acquisitionCost))))
             addView(text(s(R.string.gacha_balance,money(receipt.balance))))
             addView(text(s(R.string.gacha_settlement,receipt.settlementId.value),color=muted))
             button(this,s(if(uiState.garagePending == null) R.string.gacha_garage else R.string.gacha_garage_pending),"gacha:garage",uiState.garagePending == null,true) { session.openGarage(); drawScreen() }
-        })
+        }
+        panels.addView(details, if (wide) LayoutParams(0, -2, 1f).apply { marginStart = dp(16) }
+            else LayoutParams(-1, -2).apply { topMargin = dp(12) })
     }
     private fun button(parent: LinearLayout, label: String, tag: String, enabled: Boolean, primary: Boolean=false, action: () -> Unit) {
         val token=generation

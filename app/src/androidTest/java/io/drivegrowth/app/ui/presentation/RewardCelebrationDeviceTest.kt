@@ -4,6 +4,7 @@ import android.animation.ValueAnimator
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.os.SystemClock
 import android.test.InstrumentationTestCase
 import android.view.MotionEvent
@@ -79,6 +80,52 @@ class RewardCelebrationDeviceTest : InstrumentationTestCase() {
             }
         } finally {
             bitmap.recycle()
+        }
+    }
+
+    fun testGachaShutterCoversTheVehicleBeforeDrawingItsActualSprite() = onUi {
+        val sprite = Bitmap.createBitmap(20, 12, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GREEN) }
+        val frame = Bitmap.createBitmap(320, 240, Bitmap.Config.ARGB_8888)
+        try {
+            val canvas = Canvas(frame)
+            val effect = RewardCelebrationView(host)
+            val width = View.MeasureSpec.makeMeasureSpec(320, View.MeasureSpec.EXACTLY)
+            val height = View.MeasureSpec.makeMeasureSpec(240, View.MeasureSpec.EXACTLY)
+            effect.measure(width, height)
+            effect.layout(0, 0, 320, 240)
+            effect.render("saved-gacha", RewardCelebrationKind.GACHA, Color.MAGENTA, sprite)
+            effect.drawGachaFrame(canvas, .15f)
+            assertEquals("닫힌 셔터가 차량 영역을 가려야 한다", 0xff858598.toInt(), frame.getPixel(160, 54))
+            assertEquals(Color.MAGENTA, frame.getPixel(100, 210))
+
+            frame.eraseColor(Color.TRANSPARENT)
+            effect.drawGachaFrame(canvas, .64f)
+            assertEquals("셔터 뒤에는 전달받은 차량을 표시한다", Color.GREEN, frame.getPixel(160, 137))
+            assertEquals("공개된 차량이 작은 중앙 장식에 그치지 않아야 한다", Color.GREEN, frame.getPixel(95, 137))
+        } finally {
+            frame.recycle()
+            sprite.recycle()
+        }
+    }
+
+    fun testGachaStageRemainsWhenResultIsReopenedWithoutAnEffectKey() = onUi {
+        val effect = RewardCelebrationView(host).apply {
+            onStarted = { fail("다시 연 결과가 연출을 시작했습니다") }
+            render(null, RewardCelebrationKind.GACHA)
+        }
+        val content = View(host)
+        val stage = effect.over(content, fillHeight = true, stage = true) as FrameLayout
+        assertEquals(1, stage.childCount)
+        assertSame(content, stage.getChildAt(0))
+        val size = View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY)
+        stage.measure(size, size)
+        stage.layout(0, 0, 200, 200)
+        val frame = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        try {
+            stage.draw(Canvas(frame))
+            assertEquals(0xff151a30.toInt(), frame.getPixel(100, 20))
+        } finally {
+            frame.recycle()
         }
     }
 

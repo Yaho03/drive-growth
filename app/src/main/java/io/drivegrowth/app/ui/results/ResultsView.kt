@@ -190,12 +190,18 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                     money?.direction == MoneyDirection.CREDIT && money.amount.units > 0
             }
             celebration.render(effectKey, RewardCelebrationKind.SETTLEMENT)
-            add(this, celebration.over(card().apply {
-                addView(text(kind(settlement.transaction.kind), 28, bold = true))
+            add(this, celebration.over(card(selected = effectKey != null).apply {
+                addView(text(kind(settlement.transaction.kind), 32, bold = true))
                 addView(text(s(R.string.results_confirmed), color = accent))
-                addView(text(s(R.string.results_money_change), color = muted))
-                addView(text(moneyChange(settlement), 36, amountColor(settlement), bold = true))
-                addView(text(pair(R.string.results_balance, money(settlement.balance)), 24))
+                add(this, card().apply {
+                    background = shape(inset)
+                    addView(text(s(R.string.results_money_change), color = muted))
+                    addView(text(moneyChange(settlement), 48, amountColor(settlement), bold = true))
+                })
+                add(this, card().apply {
+                    background = shape(inset)
+                    addView(text(pair(R.string.results_balance, money(settlement.balance)), 26, bold = true))
+                })
             }))
             add(this, card().apply {
                 addView(text(pair(R.string.results_settlement_id, id.value), color = muted))
