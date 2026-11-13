@@ -33,16 +33,28 @@ h1{font-size:24px;font-weight:900;margin:0;text-wrap:balance}
 .ctrl .auto{background:transparent}
 .ctrl button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
-.screen{border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--panel)}
+.screen{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--panel)}
 .nav{position:relative;aspect-ratio:1100/400;max-width:100%;background:var(--map)}
 .nav svg{position:absolute;inset:0;width:100%;height:100%;display:block}
 .turn{position:absolute;left:14px;top:14px;display:flex;align-items:center;gap:10px;background:#2b6fe0;color:#fff;border-radius:12px;padding:8px 14px;font-weight:700;font-size:clamp(12px,1.6vw,16px)}
 .turn b{font-size:1.4em;font-weight:900}
-.eta{position:absolute;right:14px;bottom:12px;background:rgba(16,19,29,.85);border-radius:10px;padding:6px 12px;font-size:clamp(11px,1.4vw,14px);color:var(--mut)}
+.eta{position:absolute;left:14px;bottom:12px;background:rgba(16,19,29,.85);border-radius:10px;padding:6px 12px;font-size:clamp(11px,1.4vw,14px);color:var(--mut)}
 .eta b{color:var(--fg)}
 .navtag{position:absolute;right:14px;top:12px;font-size:12px;color:var(--mut);background:rgba(16,19,29,.7);padding:3px 8px;border-radius:6px}
 
-.bar{position:relative;display:grid;grid-template-columns:264px minmax(0,1fr) auto;gap:18px;align-items:center;padding:12px 18px;border-top:1px solid var(--line)}
+.bar{position:relative;display:grid;grid-template-columns:264px minmax(0,1fr) auto;gap:18px;align-items:center;padding:22px 18px 12px;border-top:1px solid var(--line);touch-action:pan-x;user-select:none;transition:transform .35s ease,opacity .35s ease}
+/* 아래로 밀면 막대가 내려가 숨고, 오른쪽 아래에 내 차 아이콘만 남는다 */
+.bar.out{transform:translateY(100%);opacity:0}
+.screen.collapsed .barwrap{display:none}
+.grab{position:absolute;left:50%;top:2px;transform:translateX(-50%);width:72px;height:18px;border:0;padding:0;background:transparent;cursor:grab;display:flex;align-items:center;justify-content:center}
+.grab::before{content:"";width:44px;height:4px;border-radius:2px;background:var(--line)}
+.grab:hover::before,.grab:focus-visible::before{background:var(--mut)}
+.grab:focus-visible{outline:2px solid var(--gold);outline-offset:1px;border-radius:6px}
+.carchip{position:absolute;right:14px;bottom:14px;width:64px;height:64px;border-radius:50%;border:2px solid var(--accent);background:rgba(23,28,42,.94);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 4px 0 rgba(0,0,0,.35);transition:transform .25s ease,opacity .25s ease}
+.carchip img{width:40px;height:24px;image-rendering:pixelated;display:block}
+.carchip:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.screen:not(.hide) .carchip{opacity:0;transform:scale(.4);pointer-events:none}
+@media (prefers-reduced-motion: reduce){.bar,.carchip{transition:none}}
 .mini{position:relative;width:264px;max-width:100%;aspect-ratio:2/1;border-radius:12px;overflow:hidden;background:#000;--u:2px}
 .mini canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;display:block}
 .sign{position:absolute;left:33.3%;top:3%;width:33.4%;height:12.2%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:calc(var(--u)*5.2);letter-spacing:.08em}
@@ -98,7 +110,7 @@ h1{font-size:24px;font-weight:900;margin:0;text-wrap:balance}
   <header class="head">
     <div>
       <h1>주행 진행도 막대</h1>
-      <p class="lede">내비 아래 한 줄 막대에 진행도와 작은 효과만 넣은 시안이에요. 네 장면이 이동 순서대로 이어서 재생돼요.</p>
+      <p class="lede">내비 아래 한 줄 막대에 진행도와 작은 효과만 넣은 시안이에요. 네 장면이 이동 순서대로 이어서 재생돼요. 막대를 아래로 밀면 숨겨지고, 오른쪽 아래 내 차를 누르면 다시 나와요.</p>
     </div>
     <div class="ctrl" role="group" aria-label="장면 고르기">
       <button id="b0" data-i="0">1 진행도</button>
@@ -109,7 +121,7 @@ h1{font-size:24px;font-weight:900;margin:0;text-wrap:balance}
     </div>
   </header>
 
-  <section class="screen" aria-label="차 화면 예시">
+  <section class="screen" id="scr" aria-label="차 화면 예시">
     <div class="nav" aria-hidden="true">
       <svg viewBox="0 0 1100 400" preserveAspectRatio="xMidYMid slice">
         <rect width="1100" height="400" fill="var(--map)"/>
@@ -131,7 +143,8 @@ h1{font-size:24px;font-weight:900;margin:0;text-wrap:balance}
       <div class="navtag">내비 (예시)</div>
     </div>
 
-    <div class="bar" id="bar">
+    <div class="barwrap"><div class="bar" id="bar">
+      <button class="grab" id="grab" aria-label="막대를 아래로 내려 숨기기"></button>
       <div class="mini" id="mini">
         <canvas id="cv" width="132" height="66" role="img" aria-label="장면 그림"></canvas>
         <span class="sign" id="sign" hidden>휴게소</span>
@@ -155,7 +168,8 @@ h1{font-size:24px;font-weight:900;margin:0;text-wrap:balance}
       <div class="money" id="money"><img id="mcoin" alt=""><b id="mv">3,000</b></div>
       <div class="fly" id="fly"></div>
       <span class="plus" id="plus" hidden>+120</span>
-    </div>
+    </div></div>
+    <button class="carchip" id="chip2" aria-label="진행도 막대 다시 보기"><img id="chipcar" alt=""></button>
   </section>
 
   <section class="info">
@@ -169,7 +183,7 @@ h1{font-size:24px;font-weight:900;margin:0;text-wrap:balance}
       <ul id="iFx"></ul>
     </div>
   </section>
-  <p class="foot">거리·시간·금액은 예시 값이에요. 운전하는 동안에는 게임 화면을 숨겨야 해서(Pleos 심사 기준) 모든 장면은 주차한 뒤 보여 주는 것을 전제로 했어요. 안전운전 판정 기준과 금액은 팀에서 정해야 해요.</p>
+  <p class="foot">1 진행도는 운전 중 내비 아래에 두는 안이에요. Pleos 심사 기준은 운전 중 게임 화면을 숨기게 해서, 운전 중 표시와 조작은 #81의 공식 답을 받아야 해요. 2~4는 주차한 뒤 보여 줘요. 거리·시간·금액은 예시 값이고, 안전운전 판정 기준과 금액은 팀에서 정해야 해요.</p>
 </div>
 
 <script>
@@ -215,7 +229,41 @@ const CUP = sprite([
   'kpp.kkk.ppk',
   '.kkkkkkkkk.'], { k: K, p: '#c3b8ff', s: '#ffffff', w: '#ffffff' });
 const FLAG = sprite(['kk......', 'krrrrr..', 'krrrrrrr', 'krrrrr..', 'k.......', 'k.......', 'k.......', 'k.......', 'k.......', 'k.......', 'kk......'], { k: '#e7eaf3', r: '#ff6b6b' });
-$('car').src = CARI; $('rmk').src = CUP; $('flag').src = FLAG; $('mcoin').src = COIN;
+$('car').src = CARI; $('rmk').src = CUP; $('flag').src = FLAG; $('mcoin').src = COIN; $('chipcar').src = CARI;
+
+// ── 막대 숨기기: 아래로 밀거나 손잡이를 누르면 숨고, 오른쪽 아래 내 차를 누르면 다시 나온다 ──
+const scr = $('scr'), barEl = $('bar');
+let slideTm = 0;
+function setCollapsed(on, focus) {
+  clearTimeout(slideTm);
+  if (on) {   // 막대가 아래로 내려간 뒤 자리를 비운다
+    scr.classList.add('hide'); barEl.classList.add('out');
+    slideTm = setTimeout(() => scr.classList.add('collapsed'), RM ? 0 : 340);
+  } else {    // 자리를 되살리고 아래에서 올라온다
+    scr.classList.remove('hide', 'collapsed'); void barEl.offsetHeight; barEl.classList.remove('out');
+  }
+  $('chip2').tabIndex = on ? 0 : -1; $('chip2').setAttribute('aria-hidden', String(!on));
+  $('grab').tabIndex = on ? -1 : 0;
+  if (focus) (on ? $('chip2') : $('grab')).focus({ preventScroll: true });
+}
+let drag = null;
+barEl.addEventListener('pointerdown', e => {
+  if (scr.classList.contains('hide')) return;
+  drag = { y: e.clientY, dy: 0, t: e.target }; try { barEl.setPointerCapture(e.pointerId); } catch (_) {} barEl.style.transition = 'none';
+});
+barEl.addEventListener('pointermove', e => {
+  if (!drag) return; drag.dy = Math.max(0, e.clientY - drag.y);
+  barEl.style.transform = `translateY(${drag.dy}px)`; barEl.style.opacity = String(1 - Math.min(drag.dy / 160, .6));
+});
+const endDrag = () => {
+  if (!drag) return; const { dy, t } = drag; drag = null;
+  barEl.style.transition = ''; barEl.style.transform = ''; barEl.style.opacity = '';
+  if (dy > 40 || (dy < 6 && t === $('grab'))) setCollapsed(true, true);
+};
+barEl.addEventListener('pointerup', endDrag); barEl.addEventListener('pointercancel', endDrag);
+$('grab').addEventListener('click', e => { if (e.detail === 0) setCollapsed(true, true); });   // 키보드
+$('chip2').addEventListener('click', () => setCollapsed(false, true));
+setCollapsed(false, false);
 
 const px = (x, y, w, h, c) => { cx.fillStyle = c; cx.fillRect(Math.round(x), Math.round(y), w, h); };
 const clamp = v => Math.max(0, Math.min(1, v));
@@ -290,8 +338,8 @@ function drawCarWindow(t) {
 
 // ── 장면 정보 ──
 const SC = [
-  { dur: 6, when: '주차하고 앱을 열었을 때', note: '막대에는 확인된 운전 거리만 반영해요. 운전하는 동안에는 숨겨요.',
-    fx: ['막대가 확인된 거리만큼 차오름', '작은 차 아이콘이 통통 튀며 앞으로', '왼쪽 창에서 도로가 흘러감'] },
+  { dur: 6, when: '운전 중 내비 아래', note: '거리는 내비가 알려 주는 남은 거리로 채워요. 운전 중 표시와 밀기·누르기 조작은 Pleos 심사 기준(운전 중 사용 불가)과 부딪힐 수 있어 #81의 공식 답을 먼저 받아야 해요.',
+    fx: ['막대가 온 거리만큼 차오르고 작은 차 아이콘이 통통 튀며 앞으로', '왼쪽 창에서 도로가 흘러감', '막대를 아래로 밀면 숨고 오른쪽 아래에 내 차만 남음, 내 차를 누르면 다시 나옴'] },
   { dur: 6, when: '휴게소에 주차했을 때', note: '휴게소로 들어가는 동안은 아직 운전 중이라 보여 주지 않아요.',
     fx: ['차 아이콘이 휴게소 표시까지 이동하고 표시가 반짝', '왼쪽 창: 내 차가 휴게소 주차 칸에 들어와 멈춤', 'P 표시가 톡 튀어나옴'] },
   { dur: 10, when: '휴게소에 주차해 있는 동안', note: 'PRD 휴식 규칙: 직전 1시간 이상 운전 + 휴게소·졸음쉼터 5분 이상 주차(시험값). 보너스는 출발하면 시작돼요. 이 시안은 시간을 40배 빠르게 돌려요.',
@@ -343,7 +391,7 @@ function frame(now) {
     track(32 + 8 * e, true, t, 0);
     set('ttl', 'innerHTML', `학교까지 · <span class="num">${km.toFixed(1)}</span> / 50km`);
     set('chip', 'className', 'chip c-ok'); set('chip', 'textContent', '수익 탁송');
-    set('sub', 'textContent', '막대는 확인된 운전 거리만 반영해요');
+    set('sub', 'textContent', '아래로 밀면 숨겨져요');
   } else if (s === 1) {
     drawRestStop(t);
     const e = RM ? 1 : eio(clamp(t / 1.4));
