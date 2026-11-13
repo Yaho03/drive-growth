@@ -76,6 +76,7 @@
 | 대여 수요와 정산 상세 | 해금 차종과 가게 레벨별 방문 간격으로 가상 고객을 만든다. 원방문에 저장된 도시 특성·용도·희망 차종은 실제 대여 차량과 구분해 정산에 표시한다. 기존 방문·정산의 재생과 시연 범위는 [#41 검증](docs/06_VERIFICATION.md#41-대여-수요와-정산-상세-검증--2026-11-13)에 기록했다. |
 | 렌터카 게임·추가 기능 | 첫 지급·탁송·정산·영업·차량 관리·가게 성장과 채택 진행·랭킹의 실행 근거를 기능별로 관리한다. 미채택 정책·권위와 최종 통합은 각 이슈에서 추적한다. |
 | HTML 프로토타입의 Android 표현 | 시작 화면·마을 인물·확정 보상 연출·음소거를 기존 앱에 연결했다. 별도 격리 APK에서 기존 게임 진입·저장 확정 연출과 표적 계측 47건을 확인했다. 배경음 파일과 실차 검증은 남아 있다. [검증 범위](docs/06_VERIFICATION.md#html-프로토타입의-android-표현-검증--2026-11-13) |
+| 가게 지도 관리·탁송 연출 | Android 통합 [PR #285](https://github.com/Yaho03/drive-growth/pull/285)에서 공식 세로·가로 창의 시작 화면과 가로 창의 차량 관리·Back을 확인했다. 수익 탁송·단일 정산은 격리 앱의 모의 주행에서, 구매 입고·만차 보관 화면은 제어 입력에서 확인했다. [실행 근거와 남은 항목](docs/06_VERIFICATION.md#가게-지도-관리탁송-장면의-android-통합--2026-11-13) |
 | 최종 APK·시연·실차 | 격리 Debug 결합 후보의 화면·모의 Main·SDK 제한 검증을 [06](docs/06_VERIFICATION.md#최종-픽셀-화면-결합의-표시입력-검증--2026-11-13)에 기록했다. 제출 Release APK·영상, 남은 공식 창·시스템 분할/회전·최종 런처 조합과 전원·실차는 각 미완료 조건을 따른다. |
 
 ## 설치용 APK 다운로드
@@ -126,7 +127,7 @@ Debug 산출물 `app/build/outputs/apk/debug/app-debug.apk`은 제품과 별도�
 | [08_PROJECT_PLAN.md](docs/08_PROJECT_PLAN.md) | 프로젝트 진행 계획 | 지금 할 일·선행조건·통합 회의와 M0–M3 단계 안내. 담당·목표일은 회의 후 확정 |
 | [09_UI_UX_SPEC.md](docs/09_UI_UX_SPEC.md) | 화면 흐름·디자인 명세 | 픽셀 화면·공통 탐색·제한과 실제 호스트 연결. 원명령·거래 저장·복원의 실행 범위는 06에서 확인 |
 | [10_SUBMISSION_DRAFT.md](docs/10_SUBMISSION_DRAFT.md) | 공식 양식용 제출 초안 | 심사용 1–8번 항목에 맞춘 문안, 미확정·실제 자료 상태. 최종 제출본 아님 |
-| [11_DESIGN_IMPLEMENTATION_STATUS.md](docs/11_DESIGN_IMPLEMENTATION_STATUS.md) | 디자인 적용 현황 | 계획한 시안·현재 Android 화면·없는 자산·남은 제작 및 연결 작업. 디자인 기준은 09에서 관리. 픽셀 작업 자료는 [pixel-kit](docs/design-assets/pixel-kit/README.md) |
+| [11_DESIGN_IMPLEMENTATION_STATUS.md](docs/11_DESIGN_IMPLEMENTATION_STATUS.md) | 디자인 과거 기록 | 2026-11-10 당시 시안·표시 UI·제작 계획. 최신 Android 화면 기준과 검증은 09·06에서 관리. 픽셀 작업 자료는 [pixel-kit](docs/design-assets/pixel-kit/README.md) |
 | [공모전 자료 안내](docs/contest/README.md) | 공식 공모전 자료 목차 | 일정·심사·접수, Pleos 개발자료, 차량 API와 공식 자료·다운로드 보관 기록 |
 | [OT 전체 요약](docs/contest/05_ORIENTATION_NOTES.md) | 온라인 설명회·질의응답 | 전체 35개 구간의 핵심 내용, 시각별 영상 링크, 기존 안내와의 차이. 기획·제출·SDK 조건 확인 시 참고 |
 | [내비 콜백 진단 도구](navi-diagnostic/README.md) | #80 지원용 별도 APK | 다운로드·설치·내장 모의주행 재현·시험 증거·남은 제한. 제품 앱·전체 오류 해결과 구분 |

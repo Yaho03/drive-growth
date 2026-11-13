@@ -1,15 +1,19 @@
 package io.drivegrowth.app.ui.presentation
 
 import android.animation.ValueAnimator
+import android.app.ActivityOptions
+import android.hardware.display.DisplayManager
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.os.SystemClock
 import android.test.InstrumentationTestCase
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.TextView
 import io.drivegrowth.app.ui.garage.CollectionScrollTestActivity
 import kotlin.math.roundToInt
 
@@ -19,8 +23,12 @@ class RewardCelebrationDeviceTest : InstrumentationTestCase() {
 
     override fun setUp() {
         super.setUp()
-        host = instrumentation.startActivitySync(Intent(instrumentation.targetContext,
-            CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as CollectionScrollTestActivity
+        val context = instrumentation.targetContext
+        val display = context.getSystemService(DisplayManager::class.java).displays
+            .singleOrNull { it.displayId != 0 && it.name == "Emulator 2D Display" }
+        val intent = Intent(context, CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val options = display?.let { ActivityOptions.makeBasic().setLaunchDisplayId(it.displayId).toBundle() }
+        host = instrumentation.startActivitySync(intent, options) as CollectionScrollTestActivity
     }
 
     override fun tearDown() {
@@ -79,6 +87,103 @@ class RewardCelebrationDeviceTest : InstrumentationTestCase() {
             }
         } finally {
             bitmap.recycle()
+        }
+    }
+
+    fun testSettlementCoinsHaveSeparateSpaceFromWrappedAmounts() = onUi {
+        val effect = RewardCelebrationView(host)
+        val amount = TextView(host).apply {
+            textSize = 36f
+            text = "이번 거래의 재화 변화\n+1,000 게임머니\n정산 후 확정 잔액\n2,345 게임머니"
+        }
+        effect.render("saved-settlement", RewardCelebrationKind.SETTLEMENT)
+        val frame = effect.over(amount)
+        for (width in listOf(260, 700)) {
+            frame.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            frame.layout(0, 0, width, frame.measuredHeight)
+            assertTrue("동전 영역은 텍스트가 끝난 뒤에 시작해야 한다", amount.bottom <= effect.top)
+            assertTrue("동전 영역이 화면 밖으로 넘치면 안 된다", effect.bottom <= frame.height)
+            assertTrue("동전을 그릴 영역이 있어야 한다", effect.height > 0)
+        }
+    }
+
+    fun testGachaShutterCoversTheVehicleBeforeDrawingItsActualSprite() = onUi {
+        val sprite = Bitmap.createBitmap(20, 12, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GREEN) }
+        val frame = Bitmap.createBitmap(320, 240, Bitmap.Config.ARGB_8888)
+        try {
+            val canvas = Canvas(frame)
+            val effect = RewardCelebrationView(host)
+            val width = View.MeasureSpec.makeMeasureSpec(320, View.MeasureSpec.EXACTLY)
+            val height = View.MeasureSpec.makeMeasureSpec(240, View.MeasureSpec.EXACTLY)
+            effect.measure(width, height)
+            effect.layout(0, 0, 320, 240)
+            effect.render("saved-gacha", RewardCelebrationKind.GACHA, Color.MAGENTA, sprite)
+            effect.drawGachaFrame(canvas, .15f)
+            assertEquals("닫힌 셔터가 차량 영역을 가려야 한다", 0xff858598.toInt(), frame.getPixel(160, 51))
+            assertEquals(Color.MAGENTA, frame.getPixel(100, 150))
+
+            frame.eraseColor(Color.TRANSPARENT)
+            effect.drawGachaFrame(canvas, .64f)
+            assertEquals("셔터 뒤에는 전달받은 차량을 표시한다", Color.GREEN, frame.getPixel(160, 137))
+            assertEquals("공개된 차량이 작은 중앙 장식에 그치지 않아야 한다", Color.GREEN, frame.getPixel(100, 137))
+        } finally {
+            frame.recycle()
+            sprite.recycle()
+        }
+    }
+
+    fun testGachaRevealWaitsForTapAndAcceptsOnlyOneTap() {
+        if (!ValueAnimator.areAnimatorsEnabled()) return
+        val parent = FrameLayout(host)
+        val effect = RewardCelebrationView(host)
+        var starts = 0
+        var finishes = 0
+        onUi { host.setContentView(parent) }
+        awaitWindowFocus(parent)
+        onUi {
+            effect.onStarted = { starts++ }
+            assertTrue(effect.holdGacha("saved-result", Color.MAGENTA, null) { finishes++ })
+            parent.addView(effect.over(View(host), fillHeight = true), FrameLayout.LayoutParams(-1, -1))
+        }
+        instrumentation.waitForIdleSync()
+        onUi {
+            val bitmap = Bitmap.createBitmap(effect.width, effect.height, Bitmap.Config.ARGB_8888)
+            try {
+                effect.draw(Canvas(bitmap))
+                assertTrue(effect.waitingForReveal)
+                assertEquals(0, starts)
+                assertTrue(effect.openGacha())
+                assertFalse(effect.openGacha())
+                assertEquals(1, starts)
+                effect.onWindowFocusChanged(false)
+                assertFalse(effect.openGacha())
+            } finally {
+                bitmap.recycle()
+            }
+        }
+        instrumentation.waitForIdleSync()
+        onUi { assertEquals(1, finishes) }
+    }
+
+    fun testGachaStageRemainsWhenResultIsReopenedWithoutAnEffectKey() = onUi {
+        val effect = RewardCelebrationView(host).apply {
+            onStarted = { fail("다시 연 결과가 연출을 시작했습니다") }
+            render(null, RewardCelebrationKind.GACHA)
+        }
+        val content = View(host)
+        val stage = effect.over(content, fillHeight = true, stage = true) as FrameLayout
+        assertEquals(1, stage.childCount)
+        assertSame(content, stage.getChildAt(0))
+        val size = View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY)
+        stage.measure(size, size)
+        stage.layout(0, 0, 200, 200)
+        val frame = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        try {
+            stage.draw(Canvas(frame))
+            assertEquals(0xff151a30.toInt(), frame.getPixel(100, 20))
+        } finally {
+            frame.recycle()
         }
     }
 

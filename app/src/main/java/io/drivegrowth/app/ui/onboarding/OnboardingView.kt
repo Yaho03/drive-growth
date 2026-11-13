@@ -157,22 +157,55 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
                 source(body, state.sourceLabel)
                 heading(body, if (state.alreadyGranted) R.string.onboarding_already_granted else R.string.onboarding_complete,
                     R.string.onboarding_completed_note)
-                add(body, pixelCard(selected = true).apply {
-                    val effectKey = state.vehicle.ownedVehicleId.value.takeIf { confirmedChoice == state.vehicle.vehicleId }
-                    celebration.render(effectKey, RewardCelebrationKind.FIRST_GRANT)
-                    addVehicleArt(this, state.vehicle.vehicleId, celebrate = true)
-                    addView(label(state.displayName, 30, bold = true))
-                    addView(label(rarity(state.vehicle.rarity), 24, PixelStyle.rarityColor(state.vehicle.rarity), true))
-                    addView(label(context.getString(R.string.onboarding_level, state.vehicle.level), 24))
-                    addView(label(context.getString(R.string.onboarding_acquisition, state.vehicle.acquisitionCost.units), 24))
-                })
-                if (state.summary.isEmpty()) body.addView(label(s(R.string.onboarding_result_missing), color = PixelStyle.muted))
-                else state.summary.forEach { add(body, label(it, 24)) }
+                completedRewards(body, state)
                 add(body, label(s(R.string.onboarding_next), color = PixelStyle.muted))
                 action(body, R.string.onboarding_to_shop, primary = true) { interaction.goToShop() }
             }
         }
         if (focused != null) findViewWithTag<View>(focused)?.takeIf { it.isEnabled }?.requestFocus()
+    }
+
+    private fun completedRewards(body: LinearLayout, state: OnboardingScreenState.Completed) = with(style) {
+        // 호스트의 확정 표시 문구를 분류하고 금액·공간 값은 문구 그대로 보존한다.
+        val money = state.summary.firstOrNull { it.startsWith("최초 확정 게임머니 ") || it.startsWith("초기 재화 ") }
+        val spaces = state.summary.firstOrNull { it.startsWith("최초 차량 공간 ") || it.startsWith("차고 ") }
+        val rewards = if (wide) row() else column()
+        val vehicle = pixelCard(selected = true).apply {
+            addView(label("첫 차량", color = PixelStyle.muted))
+            val effectKey = state.vehicle.ownedVehicleId.value.takeIf { confirmedChoice == state.vehicle.vehicleId }
+            celebration.render(effectKey, RewardCelebrationKind.FIRST_GRANT, vehicle = sprites.bitmap(state.vehicle.vehicleId))
+            addVehicleArt(this, state.vehicle.vehicleId, celebrate = true)
+            addView(label(state.displayName, 28, bold = true))
+            addView(label(rarity(state.vehicle.rarity), 24, PixelStyle.rarityColor(state.vehicle.rarity), true))
+            addView(label(context.getString(R.string.onboarding_level, state.vehicle.level), 24))
+            addView(label(context.getString(R.string.onboarding_acquisition, state.vehicle.acquisitionCost.units), 24))
+        }
+        val cards = listOf(
+            rewardCard("게임머니", "●", PixelStyle.gold, money),
+            vehicle,
+            rewardCard("주차 칸", "▥", PixelStyle.focus, spaces),
+        )
+        cards.forEachIndexed { index, card ->
+            val params = if (wide) LayoutParams(0, -1, 1f).apply { if (index > 0) marginStart = dp(PixelStyle.gapDp) }
+            else LayoutParams(-1, -2).apply { if (index > 0) topMargin = dp(PixelStyle.gapDp) }
+            rewards.addView(card, params)
+        }
+        add(body, rewards)
+        state.summary.filterNot { it == money || it == spaces }.forEach {
+            add(body, label(it, color = PixelStyle.muted), PixelStyle.gapDp)
+        }
+        if (state.summary.isEmpty()) add(body, label(s(R.string.onboarding_result_missing), color = PixelStyle.muted))
+    }
+
+    private fun rewardCard(title: String, icon: String, color: Int, value: String?) = pixelCard().apply {
+        addView(label(title, color = PixelStyle.muted))
+        addView(label(icon, 48, color).apply {
+            gravity = Gravity.CENTER
+            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+            background = pixelShape(PixelStyle.inset)
+        }, LayoutParams(-1, style.dp(GRANT_ART_HEIGHT_DP)))
+        addView(if (value != null) label(value, 24, bold = true)
+            else label("확정 정보 없음", color = PixelStyle.muted))
     }
 
     private fun intro(body: LinearLayout, state: OnboardingScreenState.Intro) = with(style) {
@@ -257,7 +290,9 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             tag = "onboarding:vehicle-art:${id.value}"
             setPadding(0, style.dp(8), 0, style.dp(8))
         }
-        card.addView(if (celebrate) celebration.over(art, fillHeight = true) else art, LayoutParams(-1, style.dp(104)))
+        if (celebrate) art.background = null
+        card.addView(if (celebrate) celebration.over(art, fillHeight = true, stage = true) else art,
+            LayoutParams(-1, style.dp(if (celebrate) GRANT_ART_HEIGHT_DP else 104)))
     }
 
     private fun action(body: LinearLayout, label: Int, enabled: Boolean = true, primary: Boolean = false,
@@ -273,5 +308,9 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
                 addState(intArrayOf(), pixelShape(fill))
             }
         }, PixelStyle.gapDp)
+    }
+
+    private companion object {
+        const val GRANT_ART_HEIGHT_DP = 132
     }
 }

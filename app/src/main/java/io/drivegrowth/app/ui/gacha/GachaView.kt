@@ -1,12 +1,18 @@
 package io.drivegrowth.app.ui.gacha
 
+import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
 import android.view.View
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.garage.VehicleArtwork
+import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.app.ui.presentation.RewardCelebrationKind
 import io.drivegrowth.app.ui.presentation.RewardCelebrationView
 import io.drivegrowth.core.contract.*
@@ -17,11 +23,13 @@ import java.util.Locale
 class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: GachaUiState = GachaUiState()) : LinearLayout(context) {
     private val style = GarageStyle(context, pixelPanel = true)
     private val artwork = VehicleArtwork(context, style)
+    private val sprites = VehicleSprites(context)
     internal var onCelebration: ((RewardCelebrationKind) -> Unit)? = null
     private val celebration = RewardCelebrationView(context).apply {
         onStarted = { onCelebration?.invoke(it) }
     }
     private var submittedRequest: RequestId? = null
+    private var revealResult: SettlementId? = null
     private val session = GachaInteraction({ event ->
         if (event is GachaEvent.Draw) submittedRequest = event.request.input.option.requestId
         onEvent(event)
@@ -29,6 +37,7 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
     private var wide = false
     private var generation = 0L
     private var scroll: ScrollView? = null
+    private var resultStage: View? = null
     private var savedY = 0
     private var drawnFrame: Long? = null
     val uiState: GachaUiState get() = session.uiState
@@ -38,13 +47,44 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
     fun completeReload(token: String) { session.completeReload(token); drawScreen() }
     fun completeGarageNavigation(request: GachaGarageRequest) { session.completeGarageNavigation(request); drawScreen() }
     fun resolveFailedRequest(key: RequestId): Boolean { val resolved = session.resolveFailedRequest(key); drawScreen(); return resolved }
-    fun handleBack(): Boolean { val closed = session.cancel(); if (closed) drawScreen(); return closed }
+    fun handleBack(): Boolean {
+        if (closeReveal()) return true
+        val closed = session.cancel()
+        if (closed) drawScreen()
+        return closed
+    }
+
+    fun closeReveal(): Boolean {
+        if (revealResult == null || !session.controlsEnabled) return false
+        endReveal()
+        drawScreen()
+        return true
+    }
+
+    private fun endReveal() {
+        revealResult = null
+        celebration.finishGacha()
+    }
     fun release() { session.release(); drawScreen() }
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w,h,oldw,oldh)
         val next = w >= style.dp(900)
         if (next != wide) { wide = next; post { drawScreen() } }
     }
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        resultStage?.let { stage ->
+            val height = resultStageHeight(MeasureSpec.getSize(heightMeasureSpec))
+            if (stage.layoutParams.height != height) {
+                stage.layoutParams = stage.layoutParams.apply { this.height = height }
+            }
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    }
+
+    private fun resultStageHeight(availableHeight: Int): Int =
+        if (availableHeight > 0) (availableHeight * .73f).toInt().coerceIn(style.dp(168), style.dp(420))
+        else style.dp(264)
+
     private fun s(id: Int, vararg args: Any) = context.getString(id,*args)
     private fun money(value: GameMoney?) = value?.let { s(R.string.gacha_money,NumberFormat.getIntegerInstance(Locale.KOREA).format(it.units)) } ?: s(R.string.gacha_missing)
     private fun drawScreen(): Unit = with(style) {
@@ -52,12 +92,26 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
         drawnFrame = session.frame?.generation
         val focused = findFocus()?.tag
         generation++; celebration.rebuildContent { removeAllViews() }; scroll = null; setPadding(dp(24),dp(16),dp(24),dp(16))
+        resultStage = null
         if (!session.controlsEnabled) {
+            endReveal()
             celebration.render(null, RewardCelebrationKind.GACHA)
             submittedRequest = null
             addView(text(s(R.string.gacha_restricted), 28))
             return@with
         }
+        val result = (session.frame?.screen as? GachaScreen.Result)?.value
+        val receipt = result?.settlement
+        if (revealResult != null && (revealResult != receipt?.settlementId || !ValueAnimator.areAnimatorsEnabled())) {
+            endReveal()
+        }
+        if (result?.origin == GachaOrigin.STORED && receipt != null && receipt.transaction.requestId == submittedRequest) {
+            submittedRequest = null
+            if (ValueAnimator.areAnimatorsEnabled() &&
+                receipt.changedVehicle?.vehicleId?.let(sprites::bitmap) != null
+            ) revealResult = receipt.settlementId
+        }
+        if (result != null && revealResult == result.settlement.settlementId && showReveal(result)) return@with
         addView(text(s(R.string.gacha_title),32,bold=true))
         val body = column(); scroll = scroll(body,savedY); addView(scroll,LayoutParams(-1,0,1f))
         if (uiState.pending != null) add(body,text(s(R.string.gacha_pending),color=rarityColor(Rarity.RARE)))
@@ -72,6 +126,54 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
         }
         if (focused != null) findViewWithTag<View>(focused)?.takeIf { it.isEnabled }?.requestFocus()
     }
+    private fun showReveal(result: GachaConfirmedResult) = with(style) {
+        val receipt = result.settlement
+        val vehicle = checkNotNull(receipt.changedVehicle)
+        val id = receipt.settlementId
+        val tierColor = rarityColor(vehicle.rarity)
+        val token = generation
+        val held = celebration.holdGacha(id.value, tierColor, sprites.bitmap(vehicle.vehicleId)) {
+            if (revealResult == id) {
+                endReveal()
+                drawScreen()
+            }
+        }
+        if (!held) {
+            revealResult = null
+            return@with false
+        }
+        setPadding(0, 0, 0, 0)
+        val scene = FrameLayout(context)
+        val stage = celebration.over(View(context), fillHeight = true)
+        scene.addView(stage, FrameLayout.LayoutParams(-1, -1))
+        val reveal = button("화면을 눌러 셔터 올리기", primary = true) {
+            if (token != generation || !session.controlsEnabled || revealResult != id || !hasWindowFocus()) return@button
+            if (!ValueAnimator.areAnimatorsEnabled()) {
+                endReveal()
+                drawScreen()
+            } else if (celebration.openGacha()) {
+                scene.isClickable = false
+                scene.findViewWithTag<View>("gacha:reveal")?.visibility = View.GONE
+            }
+        }.apply {
+            tag = "gacha:reveal"
+            visibility = if (celebration.waitingForReveal) View.VISIBLE else View.GONE
+        }
+        if (celebration.waitingForReveal) scene.setOnClickListener { reveal.performClick() }
+        scene.addView(reveal, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
+            .apply { bottomMargin = dp(12) })
+        val skip = button("건너뛰기") {
+            if (token == generation && session.controlsEnabled && revealResult == id && hasWindowFocus()) {
+                endReveal()
+                drawScreen()
+            }
+        }.apply { tag = "gacha:skip-reveal" }
+        scene.addView(skip, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END)
+            .apply { topMargin = dp(8); marginEnd = dp(8) })
+        addView(scene, LayoutParams(-1, 0, 1f))
+        true
+    }
+
     private fun retry(parent: LinearLayout, allowed: Boolean) {
         if (allowed) button(parent,s(if(uiState.reloadToken == null) R.string.gacha_retry else R.string.gacha_retry_pending),"gacha:reload",uiState.reloadToken == null) { session.reload(); drawScreen() }
     }
@@ -164,22 +266,43 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
     private fun result(parent: LinearLayout, value: GachaConfirmedResult) = with(style) {
         val receipt=value.settlement; val vehicle=receipt.changedVehicle!!
         add(parent,text(s(if(value.origin == GachaOrigin.FIXTURE) R.string.gacha_fixture else R.string.gacha_stored),color=rarityColor(Rarity.LEGEND)))
-        add(parent,card().apply {
-            addView(text(s(R.string.gacha_result),28,bold=true)); addView(text(value.summary))
-            val art = artwork.view(vehicle.vehicleId, vehicle.rarity, 144)
-            val effectKey = receipt.settlementId.value.takeIf {
-                value.origin == GachaOrigin.STORED && receipt.transaction.requestId == submittedRequest
+        val panels = if (wide) row() else column()
+        add(parent, panels)
+        val sprite = sprites.bitmap(vehicle.vehicleId)
+        val art = if (sprite == null) artwork.view(vehicle.vehicleId, vehicle.rarity, 168) else ImageView(context).apply {
+            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+            setImageDrawable(sprites.drawable(vehicle.vehicleId))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(dp(24), dp(22), dp(24), dp(34))
+        }
+        val tierColor = rarityColor(vehicle.rarity)
+        celebration.render(null, RewardCelebrationKind.GACHA, tierColor)
+        val stage = celebration.over(art, fillHeight = true, stage = true).apply { tag = "gacha:result-stage" }
+        resultStage = stage
+        val stageHeight = resultStageHeight(height)
+        panels.addView(stage, if (wide) LayoutParams(0, stageHeight, 1.2f) else LayoutParams(-1, stageHeight))
+        val details = card().apply {
+            background = GradientDrawable().apply {
+                setColor(0xff1c2342.toInt())
+                cornerRadius = dp(18).toFloat()
+                setStroke(dp(2), tierColor)
             }
-            celebration.render(effectKey, RewardCelebrationKind.GACHA, rarityColor(vehicle.rarity))
-            addView(celebration.over(art, fillHeight = true), LayoutParams(-1, dp(144)))
-            addView(text(s(R.string.gacha_vehicle,value.vehicleName ?: s(R.string.gacha_missing),rarity(vehicle.rarity)),30,color=rarityColor(vehicle.rarity),bold=true))
+            addView(text(rarity(vehicle.rarity), 28, color = 0xff111628.toInt(), bold = true).apply {
+                gravity = Gravity.CENTER
+                background = shape(tierColor)
+            })
+            addView(text(s(R.string.gacha_result), 28, bold = true))
+            addView(text(value.summary))
+            addView(text(s(R.string.gacha_vehicle,value.vehicleName ?: s(R.string.gacha_missing),rarity(vehicle.rarity)),30,color=tierColor,bold=true))
             addView(text(vehicle.ownedVehicleId.value,color=muted))
             addView(text(s(R.string.gacha_growth,vehicle.level,vehicle.levelProgressPercent)))
             addView(text(s(R.string.gacha_acquisition,money(vehicle.acquisitionCost))))
             addView(text(s(R.string.gacha_balance,money(receipt.balance))))
             addView(text(s(R.string.gacha_settlement,receipt.settlementId.value),color=muted))
             button(this,s(if(uiState.garagePending == null) R.string.gacha_garage else R.string.gacha_garage_pending),"gacha:garage",uiState.garagePending == null,true) { session.openGarage(); drawScreen() }
-        })
+        }
+        panels.addView(details, if (wide) LayoutParams(0, -2, 1f).apply { marginStart = dp(16) }
+            else LayoutParams(-1, -2).apply { topMargin = dp(12) })
     }
     private fun button(parent: LinearLayout, label: String, tag: String, enabled: Boolean, primary: Boolean=false, action: () -> Unit) {
         val token=generation

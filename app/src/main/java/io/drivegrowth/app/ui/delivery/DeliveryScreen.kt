@@ -76,4 +76,5 @@ data class DeliveryInteractionState(
     val nextSequence: Long = 1,
     val selectedOfferId: DeliveryOfferId? = null,
     val selectedFrameVersion: Long? = null,
+    val presentationKeys: Set<DeliverySceneKey> = emptySet(),
 )

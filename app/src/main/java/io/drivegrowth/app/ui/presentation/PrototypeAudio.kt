@@ -21,7 +21,7 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
         DELIVERY("delivery.mp3"), SETTLE("settle.mp3"),
     }
 
-    enum class Cue { START, FIRST_GRANT, GACHA, SETTLEMENT, EXPAND }
+    enum class Cue { START, FIRST_GRANT, GACHA, SETTLEMENT, EXPAND, DELIVERY_DEPARTURE, DELIVERY_HELD }
 
     private val app = context.applicationContext
     private val preferences = app.getSharedPreferences("presentation_audio", Context.MODE_PRIVATE)
@@ -300,6 +300,8 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
             Cue.FIRST_GRANT -> listOf(1760, 2200, 2640).mapIndexed { i, hz -> Note(hz, i * 60, 140) }
             Cue.GACHA -> listOf(523, 659, 784, 1047).mapIndexed { i, hz -> Note(hz, i * 120, 260, square = true) }
             Cue.SETTLEMENT -> listOf(Note(1047, 0, 80, square = true), Note(1568, 80, 160, square = true))
+            Cue.DELIVERY_DEPARTURE -> listOf(Note(145, 0, 90), Note(170, 85, 260, slide = 330))
+            Cue.DELIVERY_HELD -> listOf(Note(440, 0, 100), Note(330, 110, 150))
             Cue.EXPAND -> listOf(523, 659, 784, 1047, 1319).mapIndexed { i, hz -> Note(hz, i * 70, 160, square = true) }
         }
         val mix = FloatArray(notes.maxOf { it.startMs + it.durationMs } * SAMPLE_RATE / 1_000)
