@@ -269,14 +269,17 @@ class DeliveryView(
             tag = "delivery:highway"
             addView(panel(padding = 8).apply {
                 tag = "delivery:highway-status"
-                addView(text(present(road.details.destinationName, R.string.delivery_destination_missing), 18, bold = true))
+                addView(text(present(road.details.destinationName, R.string.delivery_destination_missing), 18, bold = true).apply {
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                })
                 val progress = present(delivery.progressLabel, R.string.delivery_progress_missing)
                 val kind = s(if (road.details.purchase) R.string.delivery_purchase else R.string.delivery_income)
                 addView(text("$progress · $kind · ${sourceLabel(road.details)}", 14, color = muted))
                 val observed = road.observedMeters
                 val estimated = road.details.estimatedMeters
                 val distance = observed?.let { context.getString(R.string.delivery_scene_observed, it) }
-                    ?: context.getString(R.string.delivery_observed, present(delivery.observedDistanceLabel, R.string.delivery_information_missing))
+                    ?: context.getString(R.string.delivery_observed, s(R.string.delivery_information_missing))
                 addView(text("$distance · ${estimatedDistance(road.details)}", 14))
                 if (observed != null && estimated != null && estimated > 0L) {
                     val progressPercent = ((observed.coerceIn(0L, estimated).toDouble() / estimated) * 100).toInt()
@@ -372,11 +375,11 @@ class DeliveryView(
         heading(summary, R.string.delivery_active)
         destination(summary, value.destinationName, value.active.proposed.estimated.meters, value.active.proposed.estimated.source)
         offerCard(summary, value.active.offer, value.vehicleName, detailed = actions, active = true)
-        style.add(summary, style.panel(fill = PixelStyle.inset).apply {
-            info(this, context.getString(R.string.delivery_observed, present(value.observedDistanceLabel, R.string.delivery_information_missing)))
-            info(this, present(value.progressLabel, R.string.delivery_progress_missing))
-        })
         if (!actions) {
+            style.add(summary, style.panel(fill = PixelStyle.inset).apply {
+                info(this, context.getString(R.string.delivery_observed, present(value.observedDistanceLabel, R.string.delivery_information_missing)))
+                info(this, present(value.progressLabel, R.string.delivery_progress_missing))
+            })
             style.add(parent, summary, gap = 0)
             return
         }

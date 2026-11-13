@@ -178,7 +178,13 @@ class DeliveryViewTest : InstrumentationTestCase() {
             Button(context).apply { tag = destinationControls; text = "시연 목적지 확인" }
         })
         layoutAt(view, 700, 320)
-        val frame = incomeFrame()
+        val original = incomeFrame()
+        val active = (original.screen as DeliveryScreen.Active).delivery
+        val fullDestination = "긴 목적지 이름과 상세 위치 ".repeat(20).trimEnd()
+        val staleDistanceLabel = "출처가 다른 관측값 5000 m"
+        val frame = original.copy(screen = DeliveryScreen.Active(active.copy(
+            destinationName = fullDestination, observedDistanceLabel = staleDistanceLabel,
+        )))
         val missing = Observation.Missing(MissingReason.NO_DATA)
         val observed = Observation.Available(ObservedDistance(5000, InputSource.SIMULATION))
         val nav = DeliveryNavigationSnapshot(null, null, missing, observed, missing, null)
@@ -193,11 +199,19 @@ class DeliveryViewTest : InstrumentationTestCase() {
         assertTrue(bounds(status).bottom <= bounds(road).top)
         assertTrue(bounds(road).bottom <= bounds(host).top)
         assertEquals(40, nodes(status).filterIsInstance<ProgressBar>().single().progress)
+        val shortName = nodes(status).filterIsInstance<TextView>().single { it.text.toString() == fullDestination }
+        assertEquals(1, shortName.lineCount)
+        assertTrue(shortName.layout.getEllipsisCount(0) > 0)
+        val fullName = nodes(view).filterIsInstance<TextView>().single { it !== shortName && it.text.toString() == fullDestination }
+        assertTrue(fullName.lineCount > 1)
         val foreign = Observation.Available(ObservedDistance(5000, InputSource.VEHICLE))
         val foreignRead = read.copy(navigation = nav.copy(observed = foreign))
         view.render(frame.copy(version = frame.version + 1), true, foreignRead)
         val nextStatus = checkNotNull(view.findViewWithTag<View>("delivery:highway-status"))
         assertTrue(nodes(nextStatus).none { it is ProgressBar })
+        val unavailable = context.getString(R.string.delivery_observed, context.getString(R.string.delivery_information_missing))
+        assertTrue(nodes(nextStatus).filterIsInstance<TextView>().any { unavailable in it.text.toString() })
+        assertTrue(nodes(view).filterIsInstance<TextView>().none { staleDistanceLabel in it.text.toString() })
     }
 
     fun testConfirmedIncomeAndCloseAreVisibleWithArrivalArtworkOnFirstLayout() = onUi {
