@@ -585,7 +585,7 @@ macOS ARM64의 JVM 회귀에서 가짜 SDK 포트로 경로·권한·연결 전�
 
 ### 새 가게 UI의 통합 확인 항목 — 2026-11-13
 
-**설계 확정·구현 중. 새 배치의 결합 실행 기록 없음.** 기준은 [09 연결표](09_UI_UX_SPEC.md#새-가게-지도와-기능-연결--2026-11-13)와 [08 분담](08_PROJECT_PLAN.md#새-가게-ui-병렬-구현과-통합-인계--2026-11-13)이다. [#287의 제품 소스·APK·캡처](#차량용-첫-실행과-마을-주민-검증--2026-11-13)와 [이전 지도·Back·탁송 연출](#가게-지도-관리탁송-장면의-android-통합--2026-11-13)은 각각 기존 화면의 기준 비교에 사용한다.
+**구현·부분 통합 검증 완료.** 최신 소스·APK·실행 결과와 미수행 범위는 [새 가게 지도와 공통 탐색 통합 검증](#새-가게-지도와-공통-탐색-통합-검증--2026-11-13)을 따른다. 아래는 전체 확인 항목이며 각 행 전체의 통과를 뜻하지 않는다. 기준은 [09 연결표](09_UI_UX_SPEC.md#새-가게-지도와-기능-연결--2026-11-13)와 [08 분담](08_PROJECT_PLAN.md#새-가게-ui-병렬-구현과-통합-인계--2026-11-13)이다. [#287의 제품 소스·APK·캡처](#차량용-첫-실행과-마을-주민-검증--2026-11-13)와 [이전 지도·Back·탁송 연출](#가게-지도-관리탁송-장면의-android-통합--2026-11-13)은 각각 기존 화면의 기준 비교에 사용한다.
 
 | 결합 시험 | 확인할 동작 |
 |---|---|
@@ -3446,6 +3446,6 @@ Pleos 2.1.0 / API 34 ARM64, 사용자 10의 전용 복제 AVD에서 실행했다
 - 스크롤 필드 수정 전 `e55baade91d3872b50defb1303aa832d3ae64ce4`의 모의 APK(`b76daa1e7fd8d29eac2f9847543036ef7ecb712f7e6a706b6d496d8170bce5d4`)에서 960×720px·220dpi와 840×1184px·160dpi의 새 프로세스로 HOME·하단 다섯 메뉴를 확인했다. 최종 APK의 좁은·세로 HOME 재촬영은 Android 입력·디스플레이 서비스가 재시작해 완료하지 못했다. 이전 화면 크기로 잘린 프레임은 제외했다. [좁은 HOME](evidence/full-map-host/simulation-narrow-home-e55baad.png) · [세로 HOME](evidence/full-map-host/simulation-portrait-home-e55baad.png) · [세로 보험 시설](evidence/full-map-host/simulation-portrait-facility-e55baad.png)
 - 같은 `e55baad` 차량 APK(`04dd14c31a9e1ad6e05db903ae49975d50a93c226b5a1db114a83285c77c6b18`)에서 기본 차량 앱 영역 702×438px의 HOME, 캐스퍼 상세와 잠긴 세차장을 실제 터치로 확인했다. 최종 차량 APK에서는 같은 디스플레이의 Main 실행, `NO_DATA → speed=OK gear=PARK ux=false` 표본과 타이틀까지 다시 확인했다. 최종 APK의 HOME은 안정적으로 재촬영하지 못했다. [차량 HOME](evidence/full-map-host/vehicle-home-e55baad.png) · [차량 상세](evidence/full-map-host/vehicle-detail-e55baad.png) · [차량 세차장](evidence/full-map-host/vehicle-facility-e55baad.png)
 - `e55baad`의 격리 Main 통합 계측 1/1(226.148초). 새 모의 프로필의 지급·정산·뽑기, 지도 차량 관리 확인 화면의 Activity 재생성, 강화와 원결과 확인, 판매 뒤 지도 선택 해제, 탁송 출발·선택 원명령 확인·모의주행 제한·도착 정산 1건과 결과 확인을 원장과 대조했다. `2bf831d` 보험 격리 계측 1/1(54.878초)에서는 누적 고객 99→100의 잠금 해제, 보험 가격 1,500 차감, 기존 원정산 확인 및 체크포인트 해제, 같은 원장의 사고 수익 60→90을 확인했다. 두 결과는 해당 커밋의 실행 근거다.
-- 최종 장치 로그·APK·창 정보는 `/private/tmp/drive-full-map-host.bCa8Vp`에 보존했다. 실제 D 전환, 실차, 물리 회전·분할 및 제출 서명은 #28·#29에서 별도로 관리한다.
+- 공개 재현 근거: [최종 화면 34개](evidence/full-map-host/view-af2118e.txt) · [스크롤 표적](evidence/full-map-host/scroll-af2118e.txt) · [e55baad Main 흐름](evidence/full-map-host/main-flow-e55baad.txt) · [2bf831d 보험](evidence/full-map-host/insurance-2bf831d.txt). 최종 장치 로그·APK·창 정보 전체는 `/private/tmp/drive-full-map-host.bCa8Vp`에 보존했다. 실제 D 전환, 실차, 물리 회전·분할 및 제출 서명은 #28·#29에서 별도로 관리한다.
 
 시험 후 전용 사본의 기존 차량용·모의 APK를 데이터 유지 방식으로 재설치했고, 회수본이 시험 전 파일과 바이트 단위로 일치했다. 활성 계측이 없는 상태에서 보조 창, 전용 브리지와 사본을 종료했다. 공유 ADB 목록과 원본 AVD 데이터 디스크의 파일 식별자·크기·수정 시각을 전후 대조했다. 격리 시험 데이터를 보존했으며 앱 데이터 삭제나 기어·속도·권한 변경은 수행하지 않았다.
