@@ -524,9 +524,10 @@ function Settle({ t, sfx = true, d }) {
 
 
 // ── 시제품용 재생기 ───────────────────────────────────────────────
-const PIECE_DUR = { gacha: null, grant: 1.85, settle: 1.55, expand: 2.3 };
-function MotionPlayer({ kind, d, reduced, onEnd }) {
+const PIECE_DUR = { gacha: null, grant: 1.85, settle: 1.55, expand: 2.3, depart: 2.5, arrive: 2.0, highway: null };   // highway는 반복이라 끝이 없다
+function MotionPlayer({ kind, d, reduced, onEnd, inline }) {
   const [, tick] = React.useState(0);
+  const box = React.useRef(null);
   const st = React.useRef({ t0: performance.now(), offset: 0, tapped: false, waitFrom: null });
   const tier = kind === 'gacha' ? d.tier : null;
   const tm = tier ? gachaTimes(tier, reduced) : null;
@@ -537,16 +538,21 @@ function MotionPlayer({ kind, d, reduced, onEnd }) {
     if (performance.now() - st.current.waitFrom > 3000) { st.current.tapped = true; st.current.offset -= (t - (tm.O - 0.08)); t = tm.O - 0.08; }
     else t = tm.W + ((t - tm.W) % (tm.O - 0.1 - tm.W));
   }
-  if (!tm && reduced) t = PIECE_DUR[kind] + 0.2;
+  if (!tm && reduced && PIECE_DUR[kind]) t = PIECE_DUR[kind] + 0.2;
   React.useEffect(() => { let id; const f = () => { tick(n => n + 1); id = requestAnimationFrame(f); }; id = requestAnimationFrame(f); return () => cancelAnimationFrame(id); }, []);
   React.useEffect(() => { if (kind === 'settle' && t > PIECE_DUR.settle + 0.9 && !st.current.ended) { st.current.ended = true; onEnd && onEnd(); } });
   const tap = () => { if (tm && !st.current.tapped && clockT() > tm.W) { const cur = clockT(); st.current.tapped = true; st.current.offset += (tm.O - 0.08) - cur; } };
-  const skip = () => { if (tm) { st.current.tapped = true; st.current.offset += (tm.C + 0.7) - clockT(); } };
+  const skip = () => { if (tm) { st.current.tapped = true; st.current.offset += (tm.C + 0.7) - clockT(); } else if (PIECE_DUR[kind]) st.current.offset += PIECE_DUR[kind] - clockT(); };
   const dd = Object.assign({}, d, { onSkip: skip });
   const body = kind === 'gacha' ? <Gacha t={t} tier={tier} reduced={reduced} d={dd} sfx={false} />
     : kind === 'grant' ? <FirstGrant t={t} d={dd} sfx={false} />
     : kind === 'settle' ? <Settle t={t} d={dd} sfx={false} />
-    : <Expand t={t} d={dd} sfx={false} />;
+    : kind === 'expand' ? <Expand t={t} d={dd} sfx={false} />
+    : window.DV.PIECES[kind](t, { sfx: false, stripe: C.blue, d: dd });   // 5차 탁송 연출(delivery.jsx)
+  if (inline) {   // 화면 안 카드에 넣을 때: 카드 너비에 맞춰 줄인다
+    const si = (box.current ? box.current.clientWidth : SW) / SW;
+    return <div ref={box} style={{ position: 'relative', width: '100%', aspectRatio: `${SW}/${SH}`, overflow: 'hidden', borderRadius: 22 }}><div style={{ position: 'absolute', left: 0, top: 0, width: SW, height: SH, transform: `scale(${si})`, transformOrigin: '0 0' }}>{body}</div></div>;
+  }
   const s = Math.min(window.innerWidth / SW, window.innerHeight / SH);
   return (
     <div onClick={tap} style={{ position: 'fixed', inset: 0, zIndex: 40, background: C.navy0, overflow: 'hidden' }} role="dialog" aria-modal="true" aria-label="연출">
@@ -554,13 +560,13 @@ function MotionPlayer({ kind, d, reduced, onEnd }) {
     </div>
   );
 }
-let motionRoot = null, motionHost = null;
-window.closeMotion = () => { if (motionRoot) { motionRoot.unmount(); motionRoot = null; } if (motionHost) { motionHost.remove(); motionHost = null; } };
+let motionRoot = null, motionHost = null, motionOwned = false;
+window.closeMotion = () => { if (motionRoot) { motionRoot.unmount(); motionRoot = null; } if (motionHost && motionOwned) motionHost.remove(); motionHost = null; };
 window.playMotion = (kind, d, opts = {}) => {
   window.closeMotion();
   const reduced = opts.reduced ?? (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-  motionHost = document.createElement('div'); document.body.appendChild(motionHost);
+  motionOwned = !opts.host; motionHost = opts.host || document.createElement('div'); if (motionOwned) document.body.appendChild(motionHost);
   motionRoot = ReactDOM.createRoot(motionHost);
-  motionRoot.render(<MotionPlayer kind={kind} d={d} reduced={reduced} onEnd={d.onClose} />);
+  motionRoot.render(<MotionPlayer kind={kind} d={d} reduced={reduced} onEnd={d.onClose} inline={!motionOwned} />);
 };
 window.MOTION_TIMES = { gachaTimes, TIERS };

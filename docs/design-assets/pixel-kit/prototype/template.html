@@ -178,6 +178,8 @@ const MODELS = [
  ["hyundai_ioniq9","아이오닉 9",250,3],["genesis_g90","G90",300,4],["genesis_gv80","GV80",280,4]
 ].map(([id,name,ratio,unlock])=>({id,name,ratio,unlock,price:Math.floor(1000*ratio/100)}));   // 차종마다 전용 그림이라 색 변환은 없앴다
 const M = Object.fromEntries(MODELS.map(m=>[m.id,m]));
+window.DV_SPRITES = Object.fromEntries(MODELS.map(m=>[m.id,[IMG[m.id],SPR[m.id][0],SPR[m.id][1]]]));   // 탁송 연출(delivery.jsx)이 쓰는 차·마을·주차 칸
+window.DV_SLOTS = SLOTS.map(s=>[s.x,s.y]); window.DV_IMG = {town:IMG.town, dest:IMG.dest};
 const RAR = [
  {k:"common",n:"일반",w:747,inc:1.0,cost:100,prog:100},{k:"advanced",n:"고급",w:200,inc:1.1,cost:105,prog:150},
  {k:"rare",n:"희귀",w:50,inc:1.2,cost:110,prog:250},{k:"legend",n:"전설",w:3,inc:1.3,cost:115,prog:400}];
@@ -230,7 +232,7 @@ function closeModal(){ $("#layer").innerHTML=""; }
 function go(v){ view=v; detailId=null; render(); window.scrollTo(0,0); }
 
 function render(){
-  save();
+  save(); if(window.closeMotion) window.closeMotion();   // 화면을 다시 그리면 카드 안 연출(고속도로)도 다시 붙인다
   $("#money").textContent = won(S.money); $("#snd").textContent = AU.on?"🔊":"🔇"; $("#snd").setAttribute("aria-pressed", AU.on);
   bgm(S.started?view:"shop");
   if(!S.started){ $("#nav").hidden=true; $("#scrTitle").textContent="첫 실행"; return renderOnboarding(); }
@@ -322,6 +324,8 @@ function renderShop(){
         <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="grant">첫 지급</button>
         <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="settle">정산 동전</button>
         <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="expand">가게 확장</button>
+        <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="depart">탁송 출발</button>
+        <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="arrive">탁송 도착</button>
         <button class="btn" style="min-height:44px;padding:0 12px" data-act="showTitle">시작화면</button></div>
       <button class="btn danger" data-act="resetAsk">처음부터 다시</button>
       <div class="mut" style="font-size:13px">${S.day}일째 · 오늘 반영 거리 ${S.kmToday} / ${KM_CAP}km</div>
@@ -435,6 +439,7 @@ function renderDelivery(){
   const d=S.delivery;
   if(d){ const o=d.offer;
     $("#screen").innerHTML = `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+     <div id="hwHost" style="grid-column:1/-1"></div>
      <div class="card" style="display:grid;gap:10px">
        <div class="row"><span class="chip st-rent">진행 중</span><span class="chip" style="background:var(--warn-bg);color:var(--warn)">${o.kind==="buy"?"구매 탁송":"수익 탁송"}</span></div>
        <div class="carpic"><span class="ring ${o.rar}"></span>${carImg(o.model)}</div>
@@ -452,6 +457,8 @@ function renderDelivery(){
          <button class="btn danger" data-act="giveup">포기하기</button></div>
        <div class="mut" style="font-size:14px">진행 중인 의뢰는 한 번에 하나예요. 도착은 가게 화면의 시험 도구로 할 수 있어요.</div>
      </div></div>`;
+    const done=Math.min(o.km, Math.round((S.km-(d.km0||0))*10)/10), mode=reduceMotion()?"reduced":done<=0?"wait":S.day>d.day?"due":"run";   // 막대는 확인된 주행 거리만
+    if(canMotion()) window.playMotion("highway", deliveryData(o,{mode, done, due:`${d.day+1}일째까지`}), {host:$("#hwHost")});
     return; }
   const dest = DEST.find(x=>x.k===S.dest) || DEST[1];
   if(!S.offers || S.offers.dest!==dest.k){ S.offers={dest:dest.k, list:makeOffers(dest,false)}; save(); }
@@ -514,6 +521,8 @@ function renderRank(){
 const TIER_OF = {common:"common", advanced:"uncommon", rare:"rare", legend:"legend"};
 const carData = id => ({src:IMG[id], w:SPR[id][0], h:SPR[id][1]});
 const canMotion = () => typeof window.playMotion === "function";
+function deliveryData(o, extra){ const m=M[o.model]; return Object.assign({buy:o.kind==="buy", car:m.id, name:m.name, tier:TIER_OF[o.rar], rarLabel:R[o.rar].n, dest:o.dest, km:o.km, reward:o.reward||0,
+  parked:S.cars.slice(0,cap()).map((c,i)=>[i,c.model]), kindLabel:o.kind==="buy"?"구매 탁송":`수익 탁송 · 보상 +${won(o.reward)}`, money:S.money, onClose:()=>{ window.closeMotion(); render(); }}, extra); }   // 닫으면 화면을 다시 그려 카드 안 고속도로가 붙는다
 function gachaMotion(kind, r, m, isNew, guaranteed, pityBefore){
   window.playMotion("gacha", {tier:TIER_OF[r], name:m.name, car:carData(m.id), isNew, guaranteed, price:kind==="free"?"무료권":String(TICKET),
     pity:`희귀 이상 보장까지 ${PITY-pityBefore}회`, pityAfter:`다음 보장까지 ${PITY-S.pity}회`,
@@ -535,8 +544,8 @@ const SFX = {   // 픽셀 게임풍 짧은 소리. 실제 효과음 파일이 �
   fanfare: ()=>[[523,0],[659,.12],[784,.24],[1047,.36]].forEach(([f,d])=>tone(f,d,.32,"square",.1)),
   levelup: ()=>[523,659,784,1047,1319].forEach((f,i)=>tone(f,i*.07,.16,"square",.1)), ding: ()=>tone(1319,0,.35,"triangle",.1),
   knock: ()=>[0,.09,.18].forEach(d=>tone(150,d,.06,"square",.12)), tick3: ()=>[0,.1,.2].forEach(d=>tone(1200,d,.03,"square",.07)),
-  horn: ()=>{ tone(440,0,.2,"sawtooth",.1); tone(554,0,.2,"sawtooth",.08); }, depart: ()=>tone(120,0,.55,"sawtooth",.12,90), bad: ()=>tone(220,0,.22,"square",.1,-90) };
-const CUE = [[/셔터 쿵/,"shutter"],[/셔터 열림|휘익/,"whoosh"],[/승급 차임 (\d)/,"chime"],[/팡파르|축하/,"fanfare"],[/반짝/,"sparkle"],[/판자/,"knock"],[/띵/,"ding"],[/뿅/,"pop"],[/레벨업/,"levelup"],[/톡톡/,"tick3"],[/톡/,"click"],[/동전/,"coin"],[/경적/,"horn"]];
+  horn: ()=>{ tone(440,0,.2,"sawtooth",.1); tone(554,0,.2,"sawtooth",.08); }, depart: ()=>tone(120,0,.55,"sawtooth",.12,90), brake: ()=>tone(1400,0,.28,"sawtooth",.05,-1000), bad: ()=>tone(220,0,.22,"square",.1,-90) };
+const CUE = [[/끽/,"brake"],[/쿵|쾅/,"shutter"],[/덜컹/,"knock"],[/부릉|엔진/,"depart"],[/스르륵/,"whoosh"],[/^착$|끈 착/,"pop"],[/셔터 쿵/,"shutter"],[/셔터 열림|휘익/,"whoosh"],[/승급 차임 (\d)/,"chime"],[/팡파르|축하/,"fanfare"],[/반짝/,"sparkle"],[/판자/,"knock"],[/띵/,"ding"],[/뿅/,"pop"],[/레벨업/,"levelup"],[/톡톡/,"tick3"],[/톡/,"click"],[/동전/,"coin"],[/경적/,"horn"]];
 function sfx(name){ if(SFX[name]) return SFX[name](); for(const [re,k] of CUE){ const m=re.exec(name); if(m) return SFX[k](m[1]&&+m[1]); } }   // 연출의 SFX 자리 글귀도 받는다
 window.sfx = sfx;
 const BGM = {el:Object.assign(new Audio(),{loop:true,volume:.45}), cur:null,
@@ -567,10 +576,11 @@ const ACT = {
   drive(){ const km=Math.min(30, KM_CAP-S.kmToday); S.km+=30;
     if(km<=0){ toast("오늘은 하루 최대 500km를 넘어서 주행 수익이 더 쌓이지 않아요"); return render(); }
     S.kmToday+=km; const pay=km*KM_PAY; const text=`기본 주행 수익 · ${km}km × ${KM_PAY}`; income("drive",pay,text); S.log.push({text,amount:pay}); sfx("coin"); toast(`+${pay} · 정산에서 확인하세요`); render(); },
-  arrive(){ const d=S.delivery; if(!d) return; const o=d.offer, m=M[o.model];
+  arrive(){ const d=S.delivery; if(!d) return; const o=d.offer, m=M[o.model]; const parkedBefore=S.cars.slice(0,cap()).map((c,i)=>[i,c.model]), moneyBefore=S.money; let where;
     if(o.kind==="profit"){ const text=`${m.name} 수익 탁송 · ${o.dest} 도착 완료`; income("delivery",o.reward,text); S.log.push({text,amount:o.reward}); }
-    else { const where=addCar(o.model,o.rar,d.paid,"구매 탁송"); const text=`${m.name}(${R[o.rar].n}) 구매 탁송 도착 · ${where==="garage"?"차고에 들어갔어요":"차고가 꽉 차서 임시 보관함에 있어요"}`; income("delivery",0,text); S.log.push({text,amount:0}); }
-    S.delivery=null; S.offers=null; sfx("coin"); toast("탁송을 마쳤어요 · 정산에서 확인하세요"); render(); },
+    else { where=addCar(o.model,o.rar,d.paid,"구매 탁송"); const text=`${m.name}(${R[o.rar].n}) 구매 탁송 도착 · ${where==="garage"?"차고에 들어갔어요":"차고가 꽉 차서 임시 보관함에 있어요"}`; income("delivery",0,text); S.log.push({text,amount:0}); }
+    S.delivery=null; S.offers=null; render();
+    if(canMotion()) window.playMotion("arrive", deliveryData(o,{full:where==="hold", slot:S.cars.length-1, parked:parkedBefore, money:moneyBefore})); else { sfx("coin"); toast("탁송을 마쳤어요 · 정산에서 확인하세요"); } },
   nextDay(){ S.day++; S.kmToday=0;
     if(S.delivery && S.day>S.delivery.day+1){ const d=S.delivery; if(d.offer.kind==="buy"){ S.money+=d.paid; S.unread.push({src:"delivery",amount:0,text:`도착 기한이 지나 구매 탁송 결제금 ${won(d.paid)}을 전액 돌려드렸어요`}); }
       else S.unread.push({src:"delivery",amount:0,text:"도착 기한이 지나 수익 탁송이 사라졌어요 · 벌금은 없어요"}); S.delivery=null; }
@@ -626,10 +636,14 @@ const ACT = {
   demoMotion(k){ if(!canMotion()) return toast("연출을 불러오는 중이에요"); const close=()=>window.closeMotion();
     if(k==="grant") window.playMotion("grant",{money:1000, name:"캐스퍼", car:carData("hyundai_casper"), onClose:close});
     if(k==="settle") window.playMotion("settle",{rows:[["기본 주행 수익",300],["탁송 결과",200],["영업 결과",450]], start:3240, onClose:close});
-    if(k==="expand") window.playMotion("expand",{lv:3, from:5, to:7, onClose:close}); },
+    if(k==="expand") window.playMotion("expand",{lv:3, from:5, to:7, onClose:close});
+    const demo={kind:"buy", model:"genesis_g80", rar:"rare", dest:"학교", km:18, reward:0};
+    if(k==="depart") window.playMotion("depart", deliveryData(demo));
+    if(k==="arrive") window.playMotion("arrive", deliveryData(demo,{slot:Math.min(S.cars.length,cap()-1), money:S.money})); },
   dest(k){ S.dest=k; S.offers=null; render(); },
   accept(oid){ const o=S.offers.list.find(x=>x.id===oid); if(o.kind==="buy"){ if(S.money<o.price) return; S.money-=o.price; }
-    S.delivery={offer:o, day:S.day, changed:false, paid:o.price||0}; sfx("depart"); toast(`${o.dest}까지 의뢰를 받았어요 · 출발 전 확인 완료`); render(); },
+    S.delivery={offer:o, day:S.day, changed:false, paid:o.price||0, km0:S.km}; render();
+    if(canMotion()) window.playMotion("depart", deliveryData(o)); else { sfx("depart"); toast(`${o.dest}까지 의뢰를 받았어요 · 출발 전 확인 완료`); } },
   changeAsk(){ const cur=S.delivery; const others=DEST.filter(x=>x.n!==cur.offer.dest);
     modal(`<div style="display:grid;gap:12px"><div class="h2">어디로 바꿀까요?</div><div class="mut">새 거리로 의뢰를 다시 받아요 · 희귀도가 1단계 낮아지고, 변경 기회는 한 번뿐이에요</div>
       ${others.map(x=>`<button class="item" data-act="changeTo" data-arg="${x.k}" style="text-align:left"><div><b>${x.n}</b><div class="mut">${x.km}km · ${x.band}</div></div></button>`).join("")}

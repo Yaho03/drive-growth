@@ -17,9 +17,11 @@ imgs = {"town": "town.png", "guest": "legacy-6b120a461ce7.png", "mechanic": "leg
 uri = lambda p: "data:image/png;base64," + base64.b64encode((TOWN / p).read_bytes()).decode()
 IMG = {k: uri(p) for k, p in imgs.items()}
 IMG["staff"] = IMG["mechanic"]  # 안내 직원은 정비사 그림을 쓴다(2026-11-13 결정)
+IMG["dest"] = "data:image/png;base64," + base64.b64encode((HERE / "dest-town.png").read_bytes()).decode()  # 탁송 목적지(Claude Design 임시 그림)
 SPR = {k: list(Image.open(TOWN / p).size) for k, p in imgs.items()}
 html = (HERE / "template.html").read_text(encoding="utf-8")
 html = html.replace("{{img}}", json.dumps(IMG)).replace("{{spr}}", json.dumps(SPR))
-html = html.replace("{{motion}}", (HERE / "motion.jsx").read_text(encoding="utf-8").replace("</script", "<\\/script"))
+motion = (HERE / "motion.jsx").read_text(encoding="utf-8") + "\n" + (HERE / "delivery.jsx").read_text(encoding="utf-8")
+html = html.replace("{{motion}}", motion.replace("</script", "<\\/script"))
 (HERE / "prototype.html").write_text(html, encoding="utf-8")
 print(len(html) // 1024, "KB")
