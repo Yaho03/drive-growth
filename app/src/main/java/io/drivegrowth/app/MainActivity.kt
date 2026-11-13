@@ -158,6 +158,8 @@ open class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         navigation = restoreNavigation(savedInstanceState)
+        homeVehicleManagement = savedInstanceState?.getBoolean("homeVehicleManagement") == true &&
+            navigation.pendingGarageRequest != null
         simulationControlsExpanded = savedInstanceState?.getBoolean("simulationControlsExpanded") == true
         style = GarageStyle(this)
         titlePending = savedInstanceState?.getBoolean("presentationTitlePending")
@@ -176,6 +178,8 @@ open class MainActivity : Activity() {
             onOpenVehicle = ::openVehicleFromShop
             onFocusedVehicleAction = ::openFocusedVehicleAction
             onFocusedRest = ::onFacilityEvent
+            val previous = savedInstanceState?.getString("homeFocusedVehicle")?.takeIf { it.isNotBlank() }?.let(::OwnedVehicleId)
+            restoreFocusedVehicle(previous ?: navigation.pendingGarageRequest?.id?.takeIf { homeVehicleManagement })
         }
         facilityControls = io.drivegrowth.app.ui.shop.FacilityControlsView(this, ::onFacilityEvent)
         shop.facilityPanel = facilityControls
@@ -240,7 +244,8 @@ open class MainActivity : Activity() {
                 session.delivery.onRequest(request)
             }
         }, session.deliveryUi, navigationControls = ::deliveryNavigationControls, hostStatus = ::deliveryHostStatus,
-            canConfirmOffer = { !session.delivery.isSavingDisplayedOffers })
+            canConfirmOffer = { !session.delivery.isSavingDisplayedOffers },
+            onPresentationCue = ::playDeliveryCue)
         gacha = GachaView(this, ::onGachaEvent, session.gacha.uiState)
         results.restoreUiState(session.results.uiState)
         queries = session.queries
@@ -254,18 +259,22 @@ open class MainActivity : Activity() {
             managementState = state
             if (state == GarageCommandState.Idle) {
                 managementVisible = false
-                homeVehicleManagement = false
+                if (prior is GarageCommandState.Confirmed) {
+                    navigation.pendingGarageRequest = null
+                    garage.completeRequest()
+                    if (homeVehicleManagement && allowed()) {
+                        session.home.refresh()
+                        refreshPendingRoute()
+                    }
+                    homeVehicleManagement = false
+                }
             }
             if (state is GarageCommandState.Review || state is GarageCommandState.Running || state is GarageCommandState.Confirmed)
                 managementVisible = true
-            if ((state is GarageCommandState.Confirmed || state is GarageCommandState.Rejected) && allowed()) {
-                queries.refresh()
-                if (homeVehicleManagement && navigation.page == HostPage.HOME) session.home.refresh()
-            }
-            if (state == GarageCommandState.Idle && prior is GarageCommandState.Confirmed) {
-                navigation.pendingGarageRequest = null
-                managementVisible = false
-                garage.completeRequest()
+            if ((state is GarageCommandState.Confirmed || state is GarageCommandState.Rejected) && allowed()) queries.refresh()
+            if (state is GarageCommandState.Rejected && homeVehicleManagement && allowed()) {
+                session.home.refresh()
+                refreshPendingRoute()
             }
             if (::body.isInitialized) render()
         }
@@ -346,7 +355,7 @@ open class MainActivity : Activity() {
             deliveryFrame = frame
             val receipt = session.delivery.state?.receipt
             if (receipt != null && receipt != deliveryReceipt) { deliveryReceipt = receipt; queries.refresh() }
-            delivery.render(frame, enabled && gameControlsAllowed() && navigation.page == HostPage.DELIVERY)
+            delivery.render(frame, enabled && gameControlsAllowed() && navigation.page == HostPage.DELIVERY, session.delivery.state)
             session.deliveryUi = delivery.saveUiState()
             if (::chrome.isInitialized) render()
         }, { request, frame ->
@@ -565,6 +574,8 @@ open class MainActivity : Activity() {
         outState.putString("page", navigation.page.name)
         if (session.simulation != null) outState.putBoolean("simulationControlsExpanded", simulationControlsExpanded)
         outState.putString("selectedVehicle", navigation.selectedVehicleId?.value)
+        outState.putString("homeFocusedVehicle", shop.focusedVehicleId?.value)
+        outState.putBoolean("homeVehicleManagement", homeVehicleManagement)
         navigation.pendingGarageRequest?.let {
             outState.putString("pendingVehicle", it.id.value)
             outState.putInt("pendingRevision", it.revision.value)
@@ -709,7 +720,7 @@ open class MainActivity : Activity() {
         if (navigation.page == HostPage.RESULTS) { session.results.remember(results.uiState); session.results.refreshHistory() }
         else if (navigation.page == HostPage.PROGRESSION) session.progression.refresh()
         else if (navigation.page == HostPage.DELIVERY) { session.deliveryNavigation.refresh(); session.delivery.refresh() }
-        else if (navigation.page == HostPage.HOME) { session.facility.refresh(); session.home.refresh() }
+        else if (navigation.page == HostPage.HOME) { session.facility.refresh(); session.home.refresh(); queries.refresh() }
         else if (navigation.page == HostPage.GACHA) session.gacha.refresh()
         else if (navigation.page == HostPage.RANKING) session.ranking.refresh()
         else if (screen != HostQueryState.Loading) queries.refresh()
@@ -765,6 +776,7 @@ open class MainActivity : Activity() {
         shop.render(if (shopRestoreFailed) ShopScreenState.Failure("가게 화면 상태를 복원하지 못해 요청을 보존하고 조작을 제한합니다.")
             else session.home.state.screen, homeEnabled, (garageState as? GarageScreenState.Content)?.data?.vehicles,
             focusRest = restActions, focusRestRecovery = facilityEnabled && restRecovery,
+            focusError = (screen as? HostQueryState.Failure)?.let { "차량 정보를 읽지 못했어요. 새로고침으로 다시 확인해 주세요." },
             managementBusy = showHomeManagement,
             vehicleActionsBlocked = managementVisible || navigation.pendingGarageRequest != null ||
                 pendingPage != null || pendingRouteFailed || facility.busy || restRecovery)
@@ -843,13 +855,24 @@ open class MainActivity : Activity() {
         }
         if (navigation.page == HostPage.GACHA && session.gacha.failed)
             chrome.addView(style.button("보관한 미실행 가챠 요청 취소") { if (gameControlsAllowed()) session.gacha.cancelUnstarted() })
-        navigation.pendingGarageRequest?.takeIf { navigation.page == HostPage.GARAGE && !managementVisible }?.let { request ->
+        val showPreparation = navigation.page == HostPage.GARAGE || navigation.page == HostPage.HOME && homeVehicleManagement
+        navigation.pendingGarageRequest?.takeIf { showPreparation && !managementVisible }?.let { request ->
+            val current = (screen as? HostQueryState.Content)?.snapshot?.ownedVehicles?.firstOrNull { it.ownedVehicleId == request.id }
+            val recoverable = managementState != GarageCommandState.Loading && (!homeVehicleManagement || current != null)
             chrome.addView(style.text("이전 관리 준비 요청입니다. 최신 상태와 비용을 다시 확인해 주세요."))
-            chrome.addView(style.button("관리 조건 다시 조회", enabled = managementState != GarageCommandState.Loading) {
-                if (!gameControlsAllowed() || navigation.page != HostPage.GARAGE || navigation.pendingGarageRequest != request ||
-                    managementVisible || managementState == GarageCommandState.Loading) return@button
+            chrome.addView(style.button("관리 조건 다시 조회", enabled = recoverable) {
+                if (!gameControlsAllowed() || navigation.pendingGarageRequest != request || managementVisible ||
+                    managementState == GarageCommandState.Loading) return@button
+                val retry = if (homeVehicleManagement && navigation.page == HostPage.HOME) {
+                    val actual = (screen as? HostQueryState.Content)?.snapshot?.ownedVehicles?.firstOrNull {
+                        it.ownedVehicleId == request.id && it.lifecycle == io.drivegrowth.core.contract.VehicleLifecycle.OWNED
+                    } ?: return@button
+                    shop.restoreFocusedVehicle(actual.ownedVehicleId)
+                    request.copy(revision = actual.revision)
+                } else if (navigation.page == HostPage.GARAGE) request else return@button
+                navigation.pendingGarageRequest = retry
                 managementVisible = true
-                management.controller.open(request)
+                management.controller.open(retry)
             })
             chrome.addView(style.button("준비 요청 닫기") { cancelPreparation() })
         }
@@ -911,6 +934,16 @@ open class MainActivity : Activity() {
         })
     }
 
+    private fun playDeliveryCue(cue: DeliveryPresentationCue) {
+        if (!gameControlsAllowed() || !presentationFocused || navigation.page != HostPage.DELIVERY) return
+        presentationAudio.play(when (cue) {
+            DeliveryPresentationCue.DEPARTURE -> PrototypeAudio.Cue.DELIVERY_DEPARTURE
+            DeliveryPresentationCue.INCOME_ARRIVAL -> PrototypeAudio.Cue.SETTLEMENT
+            DeliveryPresentationCue.VEHICLE_ARRIVAL -> PrototypeAudio.Cue.FIRST_GRANT
+            DeliveryPresentationCue.HELD -> PrototypeAudio.Cue.DELIVERY_HELD
+        })
+    }
+
     private fun renderProgression() {
         if (!::progression.isInitialized) return
         val frame = progressionFrame
@@ -923,7 +956,7 @@ open class MainActivity : Activity() {
     }
 
     private fun renderDelivery(enabled: Boolean) {
-        delivery.render(deliveryFrame, enabled)
+        delivery.render(deliveryFrame, enabled, session.delivery.state)
         session.deliveryUi = delivery.saveUiState()
     }
 
@@ -1199,6 +1232,10 @@ open class MainActivity : Activity() {
             ) {
                 if (managementState is GarageCommandState.Confirmed) management.controller.acknowledge()
                 else cancelPreparation()
+                return
+            }
+            if (navigation.page == HostPage.HOME && homeVehicleManagement && navigation.pendingGarageRequest != null) {
+                cancelPreparation()
                 return
             }
             if (navigation.page == HostPage.HOME && shop.handleBack()) return

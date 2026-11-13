@@ -66,7 +66,7 @@
     <string name="delivery_scene_vehicle_arrival">구매 차량이 차고에 도착했어요</string>
     <string name="delivery_scene_held">구매 차량이 임시 보관함에 도착했어요</string>
     <string name="delivery_scene_held_note">차고가 가득 차 임시 보관 중이에요.</string>
-    <string name="delivery_scene_temporary_art">목적지 그림은 임시 이미지예요.</string>
+    <string name="delivery_scene_temporary_art">목적지 그림은 시연용 일러스트예요.</string>
     <string name="delivery_scene_highway">탁송 진행 중</string>
     <string name="delivery_scene_waiting">이동 확인 대기</string>
     <string name="delivery_scene_observed">관측 이동 거리 · %1$d m</string>
