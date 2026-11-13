@@ -33,7 +33,8 @@ internal class VehicleArtwork(context: Context, private val style: GarageStyle) 
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             val mystery = id == null || state == CollectionState.UNDISCOVERED
             val sprite = id?.takeUnless { mystery }?.let(sprites::drawable)
-            if (rarity != null && !mystery) {
+            // 차량 카드에는 그림만 표시하고 도감 셀의 기존 구분은 유지한다.
+            if (state != null && rarity != null && !mystery) {
                 val width = if (height >= 100) height + 28 else height - 8
                 addView(View(style.context).apply { background = ring(rarity) },
                     FrameLayout.LayoutParams(style.dp(width), style.dp(height / 3), Gravity.CENTER).apply {

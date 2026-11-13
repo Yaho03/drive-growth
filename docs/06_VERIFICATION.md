@@ -3290,3 +3290,41 @@ Back의 추가 재시험 두 번은 권한 복원 직후 SDK가 `NO_DATA`에 머
 | [#55 가게 화면](https://github.com/Yaho03/drive-growth/issues/55) | #203·#211·#258·#269의 실제 거래·새 프로세스 복원·실패 재시도·공식 HOME 두 창 | [#29](https://github.com/Yaho03/drive-growth/issues/29): 채택 자산 권리 또는 중립 대체 적용·APK/화면 재검증 |
 
 #38·#53은 실제 SDK 목적지 변경 입력·새 견적 귀속과 제품 연결이 미지원이므로 유지한다. #24·#25·#28·#29·#81·#82·#171·#172의 남은 정책·통합·제출·플랫폼·자산 요구도 유지한다. 기존 assignee·증거·댓글은 보존하며 이 정리는 전체 앱/제출 완료 판정이 아니다.
+
+## HTML 프로토타입의 Android 표현 검증 — 2026-11-13
+
+사용자 제공 `prototype (1).html`의 시작 화면·마을 인물·보상 연출·음소거를 기존 Android 화면에 연결했다. 원본의 SHA-256은 `083b2c3170f1d759c1afd8372d333c282734afc8ca2b1123d2d98ce112a09b84`다. 마을과 차종 20종은 원본과 기존 앱 자산이 일치했다. 인물 PNG 14개는 HTML 내장본을 사용했다. [자산 출처](../app/src/main/assets/pixel/prototype-actors/README.md) · [화면 명세](09_UI_UX_SPEC.md#2026-11-13-html-프로토타입-표현-적용)
+
+수정 전 격리 APK에서 시작 화면 뒤에 남아 있는 이전 첫 안내 버튼을 누르면 안내가 선택 화면으로 진행해 회귀 시험이 실패했다. 처음 실행한 43건에는 창 포커스를 받기 전에 연출을 단언한 별도 실패도 있었다. 포커스를 실제로 받은 뒤 단언하도록 바꾸고, 타이틀 뒤 입력 차단·카드 링·확장 칸 강조를 함께 확인한 사전 계측은 9/9였다. 그 이전 43/43(34.192초)은 최종 보완 전 소스의 결과다. 당시 표준 앱은 `323855d51bebc635c3286a090a506da7805c3e1e3cad62622f74a1d364de7d2f`, 격리 앱과 계측은 각각 `c6adb08d75168f174db3600074e94e02548c1a988bedbba86cb2c8185f0806e9`, `1b1a66685d93cbbb2b7e2f076d14c138a5caf555a5bc30d410f7681df7ef8eb2`였다.
+
+타이틀·확장까지 반영한 `6abc9c7b93eb0f87766e3f7b8f45983cc6cad09c`의 표준 Debug 빌드는 JDK 17·SDK 35에서 `:core:test` 447/447, `:app:testDebugUnitTest` 843/843, `:app:assembleDebug :app:assembleDebugAndroidTest`, `:app:lintDebug`가 통과했다. lint 오류 0건, 경고 54건이다. 표준 앱과 계측 APK의 SHA-256은 각각 `dae80f00f4198f5db521f7730f4a4a208c2369259945a8d15176124c3f960a16`, `18e8d5675bec3979389289507f1b1685435df0af12df9ffa2be35296af3cd3e2`다. 표준 빌드는 격리 init이나 격리 Main 계측 소스를 포함하지 않는다.
+
+Pleos API 34 ARM64, 사용자 10의 `DriveGrowth_FormFactor_E`에서 별도 격리 앱·계측을 실행했다. 디스플레이는 1080×600px·120dpi다. 격리 앱과 계측은 설치 후 각각 빌드본과 바이트가 일치했다. SHA-256은 앱 `877e3fc9e9e81f5d2156292bf48654f7b638c31fce08034e801abd9f6d70499c`, 계측 `a498990c93e778fb1ed8c585b6e547be8a84cc329b80a486ebdf12856f4f680d`다. 격리판은 모의 입력과 별도 원장을 사용한다.
+
+`6abc9c7` 소스의 표적 계측은 47/47(49.769초)이다. 첫 실제 Main 거래 계측에서는 가챠 결과 확인 단계가 남아 있어 모의주행 시작이 기존 체크포인트 규칙에 따라 거부됐다. 시험에서 결과의 차고 이동을 완료한 뒤 새 격리 패키지로 다시 실행해 아래 결과를 얻었다.
+
+| 실행 범위 | 결과 |
+| --- | --- |
+| 실제 Debug Main | 제목의 버튼 중앙으로 Android 창의 터치 DOWN/UP을 전달해 기존 첫 안내에 진입했다. 제목을 다시 연 뒤 이전 안내 버튼으로는 진행할 수 없었다. 별도 adb 시스템 좌표 탭은 OEM 창 포커스 간섭으로 성공을 확인하지 못했다. [시작 화면](evidence/prototype-native/main-title.png) · [기존 게임 진입](evidence/prototype-native/main-game.png) |
+| 확정 거래와 재표시 | 격리 원장에서 첫 차량과 잔액 1,000, 정산 입금 1,000, 가챠 1대와 차감 뒤 잔액 500을 확인했다. 첫 지급·정산·가챠의 연출 시작을 각 한 번 관측하고, 정산을 닫아 다시 열었을 때와 같은 가챠 결과를 다시 그릴 때 반복되지 않았다. [첫 지급](evidence/prototype-native/main-first-grant.png) · [정산](evidence/prototype-native/main-settlement.png) · [가챠](evidence/prototype-native/main-gacha.png) |
+| Android 화면 회귀 | 좁은/넓은 창 배치, 분리·재부착, 장식 위의 기존 버튼 터치, 일반 카드 링 제거와 발견 도감 링 유지, 확장 전후 저장 상태로 공급한 새 칸의 픽셀 강조와 재조회·제한 시 미반복을 확인했다. 확장 칸 시험에는 제어된 저장 상태와 완료 응답을 공급했다. |
+| 음소거와 제한 | 실제 Debug Main에서 기본 음소거, 켜기·끄기, 모의주행 중 화면·연출·음소거 조작 숨김을 확인했다. 실제 오디오 포커스 경쟁과 효과음 청취, 미제공 MP3의 재생, 실제 SDK D/P·실차 및 두 번째 공식 폼 팩터는 남아 있다. |
+
+13:54 KST의 장치 시작과 14:16 KST의 종료를 대조했다. 종료 시 부팅 정상, 계측 및 DriveGrowth 프로세스 없음, 전경·부팅 횟수·창·차량 상태 동일이다. 제품용 설치 상태 및 기존 모의 시연 APK·권한과 접근 가능한 원장 등 파일 3개의 해시가 일치했다. 계측 전용 패키지와 시험 결과를 보존했다.
+
+독립 검토에서 오디오의 일시 포커스 상실과 모의주행 준비 완료의 지연 응답을 추가 확인했다. 일시 포커스를 잃으면 현재 효과음을 중단하고 요청을 유지한다. 장면을 바꿔도 포커스 회복 전에는 효과음 접수·포커스 재요청을 막는다. 음소거·비활성화·종료는 요청을 해제한다. 일반 모의주행 시작 준비는 현재 요청을 한 번만 사용하며, 제목 열기·관측 종료·조작 제한에서 폐기한다. 이전 동작을 각각 적용하면 동일한 새 단위 시험 2건이 실패하고 수정 상태에서는 2/2 통과했다. 단위 시험은 포커스·준비 응답을 제어한다.
+
+두 경계 수정과 #283의 문서 기록을 합친 `fbb6c2b47fa4c06565f62cb3ee7e662ad9b99d0a`의 빌드 입력으로 표준 core 447/447, 앱 단위 845/845, Debug 앱·계측 APK 조립 및 lint 오류 0건·경고 54건을 확인했다. 표준 앱과 계측 SHA-256은 각각 `58d105a1e52c026febf10e82cbaa00df71b096cbcf62b93c5534d62495e500df`, `18e8d5675bec3979389289507f1b1685435df0af12df9ffa2be35296af3cd3e2`다. 격리 Main 시험 클래스는 격리 계측 DEX에만 있다.
+
+같은 소스의 격리 APK로 47/47(140.158초)을 다시 통과했다. 설치 회수본과 빌드본의 SHA-256은 앱 `8b296c4ffe1418a99ac73bedcab74f01efd8784b1f0f45c9b7faa65431994a4b`, 계측 `262b7d498d9a5e8ca210d56b6af3d8cce0ff70c5b0e46fe8fb872ded3ea24f90`로 일치했다. 위 화면 캡처는 이 실행에서 회수한 파일이다. 14:22~14:25 KST 재검증 후에도 기존 제품 설치·파일 해시·창 설정·차량 상태와 부팅 횟수가 동일했고 DriveGrowth/계측 프로세스가 남지 않았다. 기존 지도·홈 전경에 OEM 주행 보기 Activity가 추가로 관측됐다. 이후 증거 커밋에는 문서·캡처만 포함한다.
+
+재현에는 [격리 Gradle init](../scripts/prototype-isolation.gradle)을 사용한다. 표준 빌드에는 init을 적용하지 않는다. 아래 `SERIAL`은 할당받은 시험 에뮬레이터 시리얼이다. 최초 지급을 다시 시험할 때는 아직 설치한 적 없는 격리 패키지 접미사를 골라 기존 데이터를 보존한다. ADB 포트가 기본값과 다르면 해당 서버 포트를 명시한다.
+
+```sh
+VERIFY_PACKAGE=io.drivegrowth.verify.prototype.local
+./gradlew -I scripts/prototype-isolation.gradle -PprototypeVerificationPackage="$VERIFY_PACKAGE" :app:assembleDebug :app:assembleDebugAndroidTest
+adb -s "$SERIAL" install --user 10 -r app/build/outputs/apk/debug/app-debug.apk
+adb -s "$SERIAL" install --user 10 -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+selectors=io.drivegrowth.app.ui.presentation.PrototypeMainFlowDeviceTest,io.drivegrowth.app.ui.presentation.PrototypePresentationDeviceTest,io.drivegrowth.app.ui.presentation.RewardCelebrationDeviceTest,io.drivegrowth.app.ui.gacha.GachaViewTest,io.drivegrowth.app.ui.onboarding.OnboardingViewTest,io.drivegrowth.app.ui.results.ResultsViewTest,io.drivegrowth.app.ui.shop.ShopViewTest,io.drivegrowth.app.ui.shop.ShopExpansionHighlightDeviceTest
+adb -s "$SERIAL" shell am instrument --user 10 -w -e class "$selectors" "$VERIFY_PACKAGE.test/android.test.InstrumentationTestRunner"
+```

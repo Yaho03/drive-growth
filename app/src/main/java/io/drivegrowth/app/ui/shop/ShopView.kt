@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.pixel.VehicleSprites
+import io.drivegrowth.app.ui.presentation.RewardCelebrationKind
 import io.drivegrowth.app.ui.vehicleDisplayName
 import io.drivegrowth.app.ui.vehicleInstanceLabels
 import io.drivegrowth.core.contract.ContractResult
@@ -22,7 +23,14 @@ import java.util.Locale
 /** 주차 gate·저장·거래는 호스트 책임. 단독 생성해 fixture를 render할 수 있다. */
 class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(context) {
     private val style = ShopStyle(context)
-    private val interaction = ShopInteraction(onEvent)
+    internal var onCelebration: ((RewardCelebrationKind) -> Unit)? = null
+    private var submittedExpansion: ShopRequest? = null
+    private var committedExpansion: ShopRequest? = null
+    private val interaction = ShopInteraction({ event ->
+        if (event is ShopEvent.Submit) rememberExpansion(event.request)
+        onEvent(event)
+    })
+
     private val sprites = VehicleSprites(context)
     private val townBackground by lazy {
         requireNotNull(context.assets.open("pixel/town.png").use { BitmapFactory.decodeStream(it) })
@@ -48,7 +56,23 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         sceneScroll = null; controlsScroll = null
         drawScreen()
     }
-    fun complete(request: ShopRequest, result: ContractResult<Unit>) { interaction.complete(request, result); drawScreen() }
+    private fun rememberExpansion(request: ShopRequest) {
+        val offer = (request.selection.option.command as? ShopCommand.Expand)?.offer ?: return
+        committedExpansion = null
+        val current = interaction.state as? ShopScreenState.Content
+        submittedExpansion = request.takeIf {
+            current?.origin == ShopOrigin.STORED && current.level == offer.fromLevel &&
+                current.capacity == offer.currentCapacity
+        }
+    }
+    fun complete(request: ShopRequest, result: ContractResult<Unit>) {
+        if (request == submittedExpansion && request == uiState.pending) {
+            submittedExpansion = null
+            committedExpansion = request.takeIf { result is ContractResult.Success }
+        }
+        interaction.complete(request, result)
+        drawScreen()
+    }
     fun completeRetry() { interaction.completeRetry(); drawScreen() }
     /** 부모 탐색 전에 미리보기를 닫는다. 처리 중인 요청은 부모 탐색을 차단하지 않는다. */
     fun handleBack(): Boolean { val handled = interaction.cancel(); if (handled) drawScreen(); return handled }
@@ -69,7 +93,12 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         val generation = ++sceneGeneration
         sceneScroll = null; controlsScroll = null; removeAllViews()
         setPadding(dp(24), dp(16), dp(24), dp(16))
-        if (!interaction.controlsEnabled) { addView(text(s(R.string.shop_restricted), 28)); return@with }
+        if (!interaction.controlsEnabled) {
+            submittedExpansion = null
+            committedExpansion = null
+            addView(text(s(R.string.shop_restricted), 28))
+            return@with
+        }
         when (val state = interaction.state) {
             ShopScreenState.Loading -> {
                 val content = column().apply {
@@ -127,7 +156,28 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             val display = if (labels.isEmpty()) c else c.copy(vehicles = c.vehicles.map { vehicle ->
                 vehicle.copy(name = vehicleDisplayName(vehicle.name, labels[vehicle.id]))
             })
-            addView(ShopSceneView(context, display, uiState.mode, townBackground, sprites, openVehicle))
+            val scene = ShopSceneView(context, display, uiState.mode, townBackground, sprites, openVehicle)
+            val request = committedExpansion
+            val offer = (request?.selection?.option?.command as? ShopCommand.Expand)?.offer
+            if (request != null && offer != null && c.origin == ShopOrigin.STORED &&
+                c.revision.value > request.selection.revision.value
+            ) {
+                if (c.level == offer.fromLevel + 1 && c.capacity == offer.nextCapacity) {
+                    scene.highlightExpansion(offer.currentCapacity until minOf(offer.nextCapacity, townSlots.size)) {
+                        if (sceneGeneration != generation || committedExpansion?.requestId != request.requestId ||
+                            !interaction.controlsEnabled
+                        ) return@highlightExpansion false
+                        committedExpansion = null
+                        onCelebration?.invoke(RewardCelebrationKind.EXPANSION)
+                        true
+                    }
+                } else if (c.level != null && c.capacity != null &&
+                    (c.level != offer.fromLevel || c.capacity != offer.currentCapacity)
+                ) {
+                    committedExpansion = null
+                }
+            }
+            addView(scene)
             addView(originLabel(c))
             addView(text(c.name, 30, bold = true))
             addView(text(s(R.string.shop_level, c.level?.toString() ?: s(R.string.shop_unknown)) + " · " +

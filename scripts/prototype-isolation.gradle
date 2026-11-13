@@ -1,0 +1,19 @@
+// 제품 저장소와 분리된 패키지에서만 Main 시작 화면 계측을 빌드한다.
+// 표준 APK에는 이 초기화 스크립트를 적용하지 않는다.
+gradle.beforeProject { project ->
+    if (project.path == ':app') {
+        def packageId = project.providers.gradleProperty('prototypeVerificationPackage')
+            .getOrElse('io.drivegrowth.verify.prototype')
+        if (!(packageId ==~ /io\.drivegrowth\.verify\.prototype(\.[a-z][a-z0-9]*)?/)) {
+            throw new GradleException('격리 계측 패키지 접두사를 확인하세요.')
+        }
+        project.pluginManager.withPlugin('com.android.application') {
+            project.extensions.getByName('androidComponents').finalizeDsl { android ->
+                android.defaultConfig.applicationId = packageId
+                android.defaultConfig.testApplicationId = packageId + ".test"
+                android.sourceSets.getByName('androidTest').java.srcDir('src/prototypeVerification/java')
+                android.buildTypes.getByName('debug').applicationIdSuffix = null
+            }
+        }
+    }
+}

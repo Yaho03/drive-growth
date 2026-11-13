@@ -11,6 +11,8 @@ import io.drivegrowth.app.data.RentalIncomeKind
 import io.drivegrowth.app.runtime.rental.product.RentalCity
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.VehicleSprites
+import io.drivegrowth.app.ui.presentation.RewardCelebrationKind
+import io.drivegrowth.app.ui.presentation.RewardCelebrationView
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.rental.RentalCategory
 import java.text.NumberFormat
@@ -23,6 +25,11 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
     private val style = ResultsStyle(context)
     private val sprites = VehicleSprites(context)
     private val interaction = ResultsInteraction(onEvent)
+    internal var onCelebration: ((RewardCelebrationKind) -> Unit)? = null
+    private val celebration = RewardCelebrationView(context).apply {
+        onStarted = { onCelebration?.invoke(it) }
+    }
+    private var openedResult: SettlementId? = null
     private var wide = false
     private var listScroll: ScrollView? = null
     private var detailScroll: ScrollView? = null
@@ -71,8 +78,10 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
         detailScroll?.takeIf { it.isLaidOut }?.let { detailY = it.scrollY }
         val focusedTag = findFocus()?.tag
         listScroll = null; detailScroll = null
-        removeAllViews(); setPadding(dp(PixelStyle.panelPaddingDp), dp(PixelStyle.gapDp), dp(PixelStyle.panelPaddingDp), dp(PixelStyle.gapDp))
+        celebration.rebuildContent { removeAllViews() }; setPadding(dp(PixelStyle.panelPaddingDp), dp(PixelStyle.gapDp), dp(PixelStyle.panelPaddingDp), dp(PixelStyle.gapDp))
         if (!interaction.controlsEnabled) {
+            celebration.render(null, RewardCelebrationKind.SETTLEMENT)
+            openedResult = null
             addView(scroll(message(s(R.string.results_restricted), s(R.string.results_restricted_body)), 0), LayoutParams(-1, -1))
             return@with
         }
@@ -151,7 +160,9 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                     if (interaction.readState(settlement.settlementId) == ResultsReadState.Done) addView(text(s(R.string.results_mark_done)))
                     add(this, button(s(R.string.results_open), primary = selectedSettlementId == settlement.settlementId) {
                         if (selectedSettlementId != settlement.settlementId) { detailY = 0; detailScroll = null }
-                        interaction.select(settlement.settlementId); drawScreen()
+                        openedResult = settlement.settlementId
+                        interaction.select(settlement.settlementId)
+                        drawScreen()
                     }.apply {
                         tag = "results:open:${settlement.settlementId.value}"
                         contentDescription = context.getString(R.string.results_open_accessibility, kind(settlement.transaction.kind), settlement.settlementId.value)
@@ -172,13 +183,20 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                 return@apply
             }
             val settlement = value.settlement
-            add(this, card().apply {
+            val effectKey = id.value.takeIf {
+                val money = settlement.transaction.money
+                (interaction.state as? ResultsScreenState.Content)?.origin == ResultsOrigin.STORED &&
+                    openedResult == id && interaction.readState(id) == ResultsReadState.Ready &&
+                    money?.direction == MoneyDirection.CREDIT && money.amount.units > 0
+            }
+            celebration.render(effectKey, RewardCelebrationKind.SETTLEMENT)
+            add(this, celebration.over(card().apply {
                 addView(text(kind(settlement.transaction.kind), 28, bold = true))
                 addView(text(s(R.string.results_confirmed), color = accent))
                 addView(text(s(R.string.results_money_change), color = muted))
                 addView(text(moneyChange(settlement), 36, amountColor(settlement), bold = true))
                 addView(text(pair(R.string.results_balance, money(settlement.balance)), 24))
-            })
+            }))
             add(this, card().apply {
                 addView(text(pair(R.string.results_settlement_id, id.value), color = muted))
                 addView(text(pair(R.string.results_transaction_id, settlement.transaction.transactionId.value), color = muted))
