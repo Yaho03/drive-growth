@@ -36,13 +36,16 @@ class PrototypePresentationDeviceTest : InstrumentationTestCase() {
         onUi {
             val button = title.findViewWithTag<Button>("presentation:start")
             button.performClick()
+            title.performClick()
             assertEquals(0, starts)
             title.setPresentationAllowed(true)
             button.performClick()
-            assertEquals(1, starts)
+            title.performClick()
+            assertEquals(2, starts)
             title.setPresentationAllowed(false)
             button.performClick()
-            assertEquals("이전 시작 버튼도 제한 후 동작하지 않아야 한다", 1, starts)
+            title.performClick()
+            assertEquals("시작 버튼과 타이틀 배경 모두 제한 후 동작하지 않아야 한다", 2, starts)
         }
     }
 
@@ -61,17 +64,22 @@ class PrototypePresentationDeviceTest : InstrumentationTestCase() {
                 assertTrue(button.width > 0 && button.height > 0)
                 assertTrue(button.left >= 0 && button.right <= w)
                 assertTrue(button.top >= 0 && button.bottom <= h)
-                val words = title.getChildAt(1) as android.view.ViewGroup
-                for ((index, expected) in listOf("드라이브", "키우기").withIndex()) {
-                    val line = words.getChildAt(index) as TextView
+                val badge = title.findViewWithTag<TextView>("presentation:title-badge")
+                val first = title.findViewWithTag<TextView>("presentation:title-first")
+                val second = title.findViewWithTag<TextView>("presentation:title-second")
+                val ribbon = title.findViewWithTag<TextView>("presentation:title-ribbon")
+                assertTrue(badge.bottom <= first.top)
+                assertTrue(first.left < second.left && first.top < second.top)
+                assertTrue(second.bottom < ribbon.top && ribbon.bottom < button.top)
+                assertEquals("화면을 눌러 시작  ▶", button.text.toString())
+                for ((line, expected) in listOf(first to "드라이브", second to "키우기")) {
                     assertEquals(expected, line.text.toString())
-                    val layout = checkNotNull(line.layout)
                     val glyphs = Rect().also { line.paint.getTextBounds(expected, 0, expected.length, it) }
-                    val top = line.top + line.baseline + glyphs.top
-                    val bottom = line.top + line.baseline + glyphs.bottom
-                    assertTrue("제목 줄 ${index + 1} 글자 영역이 잘립니다 ($widthDp × $heightDp dp)",
-                        !glyphs.isEmpty && top >= line.top && bottom <= line.bottom &&
-                            layout.getEllipsisCount(0) == 0)
+                    val top = line.baseline + glyphs.top
+                    val bottom = line.baseline + glyphs.bottom
+                    assertTrue("제목 글자 영역이 잘립니다 ($widthDp × $heightDp dp)",
+                        !glyphs.isEmpty && top >= 0 && bottom <= line.height &&
+                            glyphs.right <= line.width && line.left >= 0 && line.right <= w)
                 }
             }
         }
