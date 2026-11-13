@@ -184,6 +184,7 @@ open class MainActivity : Activity() {
         shop = ShopView(this, ::onShopEvent).apply {
             onOpenVehicle = ::openVehicleFromShop
             onFocusedVehicleAction = ::openFocusedVehicleAction
+            onFocusedVehicleRetry = { if (gameControlsAllowed() && navigation.page == HostPage.HOME) queries.refresh() }
             onFocusedRest = ::onFacilityEvent
             val previous = savedInstanceState?.getString("homeFocusedVehicle")?.takeIf { it.isNotBlank() }?.let(::OwnedVehicleId)
             restoreFocusedVehicle(previous ?: navigation.pendingGarageRequest?.id?.takeIf { homeVehicleManagement })

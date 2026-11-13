@@ -40,6 +40,9 @@ internal class MapVehicleDetailView(
     }
     private var actionsBlocked = false
     private var showActions = false
+    private var restLabel: String? = null
+    private var restEnabled = false
+    private var onRest: (() -> Unit)? = null
     private var generation = 0L
     private var contentScroll: ScrollView? = null
     private var scrollY = 0
@@ -62,6 +65,14 @@ internal class MapVehicleDetailView(
         interaction.render(state, controlsEnabled)
         this.actionsBlocked = actionsBlocked
         drawPanel()
+    }
+
+    fun updateRest(label: String?, enabled: Boolean, action: () -> Unit) {
+        val changed = label != restLabel || enabled != restEnabled || onRest == null
+        restLabel = label
+        restEnabled = enabled
+        onRest = action
+        if (changed) drawPanel()
     }
 
     /** 준비·확정·취소의 실제 결과를 받은 호스트가 해제한다. */
@@ -120,10 +131,11 @@ internal class MapVehicleDetailView(
         val selected = interaction.selectedVehicle?.takeIf { it.vehicle.lifecycle == VehicleLifecycle.OWNED }
         val content = column()
         when (val state = interaction.state) {
-            GarageScreenState.Loading -> content.addView(text(s(R.string.garage_loading), 18))
+            GarageScreenState.Loading -> content.addView(text(s(R.string.garage_loading), 18)
+                .apply { tag = "shop:focus-query-status" })
             is GarageScreenState.Error -> {
                 content.addView(text(s(R.string.garage_error), 20, bold = true))
-                content.addView(text(state.message, 16, muted))
+                content.addView(text(state.message, 16, muted).apply { tag = "shop:focus-query-status" })
                 add(content, control(s(R.string.garage_retry), "map:vehicle-retry", !interaction.retryPending) {
                     interaction.retry()
                     if (generation == version) drawPanel()
@@ -186,6 +198,8 @@ internal class MapVehicleDetailView(
     private fun showManagement(parent: LinearLayout, selected: VehiclePresentation, version: Long): Unit = with(style) {
         val car = selected.vehicle
         parent.addView(text(vehicleDisplayName(selected.name, selected.instanceLabel), 20, bold = true))
+        if (onRest != null) add(parent, control(restLabel ?: "영업 쉬기 확인 불가", "shop:focus-rest",
+            restLabel != null && restEnabled && !actionsBlocked && !interaction.requestPending) { onRest?.invoke() }, 6)
         for ((action, label) in managementActions) {
             val info = selected.actions[action]
             add(parent, control(s(label), action, info?.enabled == true && !actionsBlocked && !interaction.requestPending) {

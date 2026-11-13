@@ -5,6 +5,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import io.drivegrowth.app.R
 import android.widget.TextView
 import io.drivegrowth.app.ui.garage.ActionPresentation
 import io.drivegrowth.app.ui.garage.GarageEvent
@@ -30,6 +31,7 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
 
         mapButton(view, second).performClick()
         assertEquals(second.vehicle.ownedVehicleId, view.focusedVehicleId)
+        openManagement(view)
         val stale = view.findViewWithTag<Button>(VehicleAction.LEVEL_UP)
         mapButton(view, first).performClick()
         stale.performClick()
@@ -45,6 +47,7 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
         val next = before.copy(revision = Revision(before.revision.value + 1))
         view.render(next, true, focusVehicles = listOf(updated, second))
         assertEquals(first.vehicle.ownedVehicleId, view.focusedVehicleId)
+        openManagement(view)
         view.findViewWithTag<Button>(VehicleAction.LEVEL_UP).performClick()
         assertEquals(listOf(GarageEvent.RequestAction(first.vehicle.ownedVehicleId, updated.vehicle.revision, VehicleAction.LEVEL_UP)), events)
 
@@ -85,6 +88,7 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
         val stale = FacilityControlsEvent.SetResting(4, VehicleRef(id, Revision(first.vehicle.revision.value + 1)), false, true)
         view.render(state, true, listOf(first, second), focusRest = mapOf(id to stale))
         mapButton(view, first).performClick()
+        openManagement(view)
         assertFalse(view.findViewWithTag<Button>("shop:focus-rest").isEnabled)
 
         val current = stale.copy(vehicle = VehicleRef(id, first.vehicle.revision))
@@ -95,25 +99,23 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
         view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
         view.layout(0, 0, width, height)
-        val panel = view.findViewWithTag<ShopVehicleFocusPanel>("shop:focus-panel")
-        val actions = panel.findViewWithTag<ScrollView>("shop:focus-actions")
-        val choose = panel.findViewWithTag<Button>("shop:focus-choose:${second.vehicle.ownedVehicleId.value}")
-        val back = panel.findViewWithTag<Button>("shop:focus-back")
+        val panel = view.findViewWithTag<LinearLayout>("map:vehicle-detail")
+        val actions = panel.findViewWithTag<ScrollView>("map:vehicle-detail-scroll")
+        val back = panel.findViewWithTag<Button>("map:vehicle-close")
         assertTrue(back.width > 0 && back.height > 0)
-        assertTrue(actions.height > 0 && actions.bottom <= panel.height && actions.top >= back.bottom)
+        assertTrue(actions.height > 0 && actions.bottom <= panel.height)
         val actionRows = actions.getChildAt(0) as LinearLayout
         assertTrue(actionRows.height > actions.height)
         val rows = (0 until actionRows.childCount).map(actionRows::getChildAt)
-        assertEquals(1, rows.filterIsInstance<TextView>().count { it.text.toString() == sharedExplanation })
+        assertTrue(rows.filterIsInstance<TextView>().any { it.text.toString().contains(first.name) })
         val repair = panel.findViewWithTag<Button>(VehicleAction.REPAIR)
         assertFalse(repair.isEnabled)
         assertEquals(repairReason, (rows[rows.indexOf(repair) + 1] as TextView).text.toString())
-        assertTrue(rows.indexOf(choose) > rows.indexOf(repair))
-        assertTrue(choose.text.contains(second.name))
         view.findViewWithTag<Button>("shop:focus-rest").performClick()
         assertEquals(listOf(current), rests)
-        choose.performClick()
+        mapButton(view, second).performClick()
         assertEquals(second.vehicle.ownedVehicleId, view.focusedVehicleId)
+        openManagement(view)
         assertFalse(view.findViewWithTag<Button>("shop:focus-rest").isEnabled)
     }
 
@@ -129,6 +131,7 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
         val rest = FacilityControlsEvent.SetResting(4, VehicleRef(id, vehicle.vehicle.revision), false, true)
         view.render(home, true, listOf(vehicle), focusRest = mapOf(id to rest))
         mapButton(view, vehicle).performClick()
+        openManagement(view)
         val oldAction = view.findViewWithTag<Button>(VehicleAction.LEVEL_UP)
         val oldRest = view.findViewWithTag<Button>("shop:focus-rest")
         assertTrue(oldAction.isEnabled)
@@ -138,16 +141,18 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
         assertEquals(id, view.focusedVehicleId)
         assertEquals("차량 정보를 읽지 못했어요", view.findViewWithTag<TextView>("shop:focus-query-status").text.toString())
         assertNull(view.findViewWithTag<Button>(VehicleAction.LEVEL_UP))
-        assertFalse(view.findViewWithTag<Button>("shop:focus-rest").isEnabled)
+        assertNull(view.findViewWithTag<Button>("shop:focus-rest"))
         oldAction.performClick()
         oldRest.performClick()
         assertTrue(actions.isEmpty())
         assertTrue(rests.isEmpty())
 
         view.render(home, true, focusVehicles = null)
-        assertEquals("차량 관리 정보를 확인하고 있어요", view.findViewWithTag<TextView>("shop:focus-query-status").text.toString())
+        assertEquals(view.context.getString(R.string.garage_loading),
+            view.findViewWithTag<TextView>("shop:focus-query-status").text.toString())
         view.render(home, true, listOf(vehicle))
         assertNull(view.findViewWithTag<TextView>("shop:focus-query-status"))
+        openManagement(view)
         assertTrue(view.findViewWithTag<Button>(VehicleAction.LEVEL_UP).isEnabled)
     }
 
@@ -168,6 +173,10 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
         view.render(home.copy(vehicles = emptyList()), true, emptyList())
         assertNull(view.focusedVehicleId)
         assertNull(view.findViewWithTag<View>("shop:focus-panel"))
+    }
+
+    private fun openManagement(view: ShopView) {
+        view.findViewWithTag<Button>("map:vehicle-manage")?.let { assertTrue(it.performClick()) }
     }
 
     private fun mapVehicle(shown: VehiclePresentation) = ShopVehicle(

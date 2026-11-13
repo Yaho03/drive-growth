@@ -11,7 +11,10 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
+import io.drivegrowth.app.ui.garage.GarageContent
 import io.drivegrowth.app.ui.garage.GarageEvent
+import io.drivegrowth.app.ui.garage.GarageScreenState
+import io.drivegrowth.app.ui.garage.MapVehicleDetailView
 import io.drivegrowth.app.ui.garage.VehiclePresentation
 import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.app.ui.presentation.RewardCelebrationKind
@@ -45,13 +48,20 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     internal var facilityPanel: View? = null
     internal var onOpenVehicle: ((OwnedVehicleId, Revision) -> Unit)? = null
     internal var onFocusedVehicleAction: ((GarageEvent.RequestAction) -> Unit)? = null
+    internal var onFocusedVehicleRetry: (() -> Unit)? = null
+    private val vehicleDetail = MapVehicleDetailView(context) { event ->
+        when (event) {
+            GarageEvent.CloseDetail -> selectFocusedVehicle(null)
+            GarageEvent.Retry -> onFocusedVehicleRetry?.invoke()
+            is GarageEvent.RequestAction -> onFocusedVehicleAction?.invoke(event)
+            is GarageEvent.SelectVehicle -> Unit
+        }
+    }
     internal var onFocusedRest: ((FacilityControlsEvent) -> Unit)? = null
     internal var focusedVehicleId: OwnedVehicleId? = null
         private set
     private var focusVehicles: Map<OwnedVehicleId, VehiclePresentation>? = null
     private var focusGarageError: String? = null
-    private var focusActionsScroll: ScrollView? = null
-    private var focusActionsY = 0
     private var focusScene: ShopScreenState.Content? = null
     private var focusRest: Map<OwnedVehicleId, FacilityControlsEvent.SetResting> = emptyMap()
     private var focusRestRecovery = false
@@ -158,8 +168,6 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         focusedVehicleId = id
         if (id != null) panelTarget = null
         focusScene = null
-        focusActionsScroll = null
-        focusActionsY = 0
         focusFrom = null
         focusStartedAt = null
         drawScreen()
@@ -212,7 +220,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             return true
         }
         if (focusedVehicleId == null) return false
-        if (!managementBusy) selectFocusedVehicle(null)
+        if (!managementBusy && !vehicleDetail.handleBack()) selectFocusedVehicle(null)
         return true
     }
 
@@ -222,8 +230,6 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         if (id != null) panelTarget = null
         focusedVehicleId = id
         if (id == null) focusScene = null
-        focusActionsY = 0
-        focusActionsScroll = null
         focusStartedAt = SystemClock.uptimeMillis()
         drawScreen()
     }
@@ -244,38 +250,43 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             onFocusedRest != null && it.vehicle.ownedVehicleId == selected.id &&
                 it.vehicle.revision == facts?.vehicle?.revision
         }
-        val recovery = facilityPanel?.takeIf { focusRestRecovery }
-        (recovery?.parent as? ViewGroup)?.removeView(recovery)
         val management = focusManagementPanel
-        (management?.parent as? ViewGroup)?.removeView(management)
-        return ShopVehicleFocusPanel(context, camera, facts, vehicles, selected, recovery, management,
-            rest?.let { if (it.expected) "영업 쉬기 끄기" else "영업 쉬기 켜기" },
-            !managementBusy && uiState.pending == null, canManage, focusActionsY,
-            queryError = focusGarageError,
-            onBack = { if (acceptsFocusInput(generation)) selectFocusedVehicle(null) },
-            onAction = { action ->
-                if (acceptsFocusInput(generation) && canManage && focusedVehicleId == selected.id &&
-                    facts != null && facts.actions[action]?.enabled == true
-                ) {
-                    onFocusedVehicleAction?.invoke(GarageEvent.RequestAction(selected.id, facts.vehicle.revision, action))
+        val recovery = facilityPanel?.takeIf { focusRestRecovery }
+        if (management != null || recovery != null) {
+            vehicleDetail.render(GarageScreenState.Loading, null, false, true)
+            val content = management ?: checkNotNull(recovery)
+            (content.parent as? ViewGroup)?.removeView(content)
+            return FrameLayout(context).apply {
+                tag = "shop:focus-panel"
+                addView(camera, FrameLayout.LayoutParams(-1, -1))
+                val sheet = ShopMapSheet(context, content, controlsY, !managementBusy) {
+                    if (acceptsFocusInput(generation)) selectFocusedVehicle(null)
                 }
-            },
-            onRest = {
-                if (acceptsFocusInput(generation) && canManage && focusedVehicleId == selected.id && rest != null) {
-                    onFocusedRest?.invoke(rest)
-                }
-            },
-            onSelect = {
-                if (acceptsFocusInput(generation) && focusVehicles?.containsKey(it.id) != false) selectFocusedVehicle(it.id)
-            },
-        ).also { focusActionsScroll = it.actionScroll }
+                controlsScroll = sheet.scroll
+                addView(sheet, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
+        if (!managementBusy) vehicleDetail.completeRequest()
+        val detailState = focusGarageError?.let { GarageScreenState.Error(it) }
+            ?: focusVehicles?.values?.toList()?.let { GarageScreenState.Content(GarageContent(it, null, "")) }
+            ?: GarageScreenState.Loading
+        vehicleDetail.render(detailState, selected.id, interaction.controlsEnabled, !canManage)
+        vehicleDetail.updateRest(rest?.let { if (it.expected) "영업 쉬기 끄기" else "영업 쉬기 켜기" }, canManage) {
+            if (acceptsFocusInput(generation) && canManage && focusedVehicleId == selected.id && rest != null) {
+                onFocusedRest?.invoke(rest)
+            }
+        }
+        (vehicleDetail.parent as? ViewGroup)?.removeView(vehicleDetail)
+        return FrameLayout(context).apply {
+            tag = "shop:focus-panel"
+            addView(camera, FrameLayout.LayoutParams(-1, -1))
+            addView(vehicleDetail, FrameLayout.LayoutParams(-1, -1))
+        }
     }
     private fun s(id: Int, vararg args: Any) = context.getString(id, *args)
     private fun money(value: GameMoney?) = value?.let { s(R.string.shop_money, NumberFormat.getIntegerInstance(Locale.KOREA).format(it.units)) } ?: s(R.string.shop_unknown)
     private fun drawScreen(): Unit = with(style) {
         controlsScroll?.takeIf { it.isLaidOut }?.let { controlsY = it.scrollY }
-        focusActionsScroll?.takeIf { it.isLaidOut }?.let { focusActionsY = it.scrollY }
-        focusActionsScroll = null
         val focus = findFocus()?.tag
         val generation = ++sceneGeneration
         // 교체된 overlay의 버튼도 현재 ShopInteraction으로 명령을 보내지 못하게 한다.
@@ -284,6 +295,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         controlsScroll = null; removeAllViews()
         setPadding(0, 0, 0, 0)
         if (!interaction.controlsEnabled) {
+            vehicleDetail.render(GarageScreenState.Loading, null, false, true)
             focusScene = null
             panelTarget = null
             focusFrom = null
@@ -305,10 +317,10 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             if (focus != null) findViewWithTag<View>(focus)?.takeIf { it.isEnabled }?.requestFocus()
             return@with
         }
+        vehicleDetail.render(GarageScreenState.Loading, null, false, true)
         if (selectedId != null && (state is ShopScreenState.Content || focusVehicles?.containsKey(selectedId) == false)) {
             focusedVehicleId = null
             focusScene = null
-            focusActionsY = 0
             focusFrom = null
             focusStartedAt = null
         }
