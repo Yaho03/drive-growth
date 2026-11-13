@@ -108,6 +108,7 @@ Gradle의 `--version`에 표시되는 내장 Kotlin 2.0.20은 Gradle 자체 스�
 |---|---|---|
 | 배포된 모의 시연 Debug | [릴리스 ba38def와 SHA256SUMS](https://github.com/Yaho03/drive-growth/releases/tag/demo-20261113-ba38def)의 `drive-growth-ba38def-debug.apk`. 비공개 저장소 접근 권한 필요 | `io.drivegrowth.app.simulation`의 모의 입력. 아래 절차는 이 배포본과 해당 조작이 유지되는 로컬 기준 앱에 적용 |
 | 현재 소스의 로컬 Debug | `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` | 모의 입력과 제품과 분리된 시연 원장. 현재 빌드 커밋과 해시는 별도 기록 |
+| 새 가게 UI 로컬 시험 APK | `af2118e`와 `e55baad`의 시험별 빌드. [소스·APK 해시](06_VERIFICATION.md#새-가게-ui의-통합-확인-항목--2026-11-13) | `af2118e` 화면·스크롤 장치 시험과 `e55baad`의 Main 모의 시연에 사용 |
 | #287 로컬 시험 APK | 제품·시험 소스 `5fac471`의 모의 Debug 및 기존 개발용 서명을 사용한 차량용 Release 구성. [빌드·설치 해시](06_VERIFICATION.md#차량용-첫-실행과-마을-주민-검증--2026-11-13) | 모의 APK는 SIMULATION. 차량용 `io.drivegrowth.app`은 Pleos SDK 입력·권한·PARK/UX 허용 사용. 배포 Debug 다운로드는 이 소스의 APK를 제공하지 않음 |
 | 제출용 Release 후보 | #29에서 실제 서명·설치 APK와 동일 소스·해시를 고정 | 실제 실행과 제출 범위를 확인한 뒤에만 제공. App Market 검증·승인은 별도 |
 
