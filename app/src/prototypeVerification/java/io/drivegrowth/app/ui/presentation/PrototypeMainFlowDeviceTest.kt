@@ -1,6 +1,9 @@
 package io.drivegrowth.app.ui.presentation
 
 import android.content.Intent
+import android.app.Activity
+import android.app.Application
+import android.os.Bundle
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.SystemClock
@@ -24,6 +27,10 @@ import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.InputSource
 import io.drivegrowth.core.contract.VehicleId
+import io.drivegrowth.core.contract.TransactionKind
+import io.drivegrowth.core.contract.VehicleLifecycle
+import io.drivegrowth.core.delivery.DeliveryOffer
+import io.drivegrowth.core.progression.VehicleAction
 import io.drivegrowth.core.garage.FirstGrant
 import java.io.File
 
@@ -64,7 +71,7 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         val context = instrumentation.targetContext
         checkIsolatedPackage(context.packageName)
         val games = GameSessionFactory(context, mapOf(InputSource.SIMULATION to "unified-simulation.db"), InputSource.SIMULATION)
-        val host = instrumentation.startActivitySync(Intent(context, UnifiedSimulationActivity::class.java)
+        var host = instrumentation.startActivitySync(Intent(context, UnifiedSimulationActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as UnifiedSimulationActivity
         val starts = mutableListOf<RewardCelebrationKind>()
         val vehicle = VehicleId("hyundai_casper")
@@ -126,23 +133,161 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             await("확정 가챠 결과 확인 후 차고") {
                 host.window.decorView.mainPage(HostPage.GARAGE)?.isSelected == true
             }
+            host = verifyMapManagement(host, games)
+            verifyDeliveryDeparture(host, games)
             val sound = "presentation:sound"
-            onUi { assertEquals("소리 꺼짐", button(host, sound)?.text.toString()) }
+            onUi { assertEquals("소리 꺼짐", (button(host, sound) as? Button)?.text.toString()) }
             click(host, sound)
-            onUi { assertEquals("소리 켜짐", button(host, sound)?.text.toString()) }
+            onUi { assertEquals("소리 켜짐", (button(host, sound) as? Button)?.text.toString()) }
             click(host, sound)
             onUi {
-                assertEquals("소리 꺼짐", button(host, sound)?.text.toString())
+                assertEquals("소리 꺼짐", (button(host, sound) as? Button)?.text.toString())
                 host.window.decorView.showSimulationControls()
             }
             click(host, "simulation:start")
             await("모의주행 조작 제한") {
                 host.window.decorView.findViewWithTag<View>("simulation:blocked") != null &&
                     descendants(host.window.decorView).none { it is RewardCelebrationView } &&
-                    button(host, sound)?.isShown == false
+                    button(host, sound)?.isShown == false &&
+                    host.window.decorView.findViewWithTag<View>("delivery:highway") == null
+            }
+            await("모의주행 후 확정 수익 탁송 도착", timeoutMillis = 100_000) {
+                host.window.decorView.findViewWithTag<View>("delivery:scene:INCOME_ARRIVAL")?.isShown == true
+            }
+            capture("main-delivery-arrival")
+            ok(games.open()).use { game ->
+                val delivered = ok(game.store.listUnviewedSettlements()).filter { it.transaction.kind == TransactionKind.DELIVERY }
+                assertTrue(delivered.single().transaction.money?.amount?.units?.let { it > 0 } == true)
+                assertNull(ok(game.store.delivery.inProgress()))
+            }
+            click(host, "delivery:skip-motion")
+            click(host, "delivery:acknowledge")
+            await("탁송 결과 다시 표시하지 않음") {
+                button(host, "delivery:acknowledge") == null &&
+                    host.window.decorView.findViewWithTag<View>("delivery:scene:INCOME_ARRIVAL") == null
             }
         } finally { onUi { host.finish() } }
     }
+
+    private fun verifyMapManagement(original: UnifiedSimulationActivity, games: GameSessionFactory): UnifiedSimulationActivity {
+        var host: UnifiedSimulationActivity
+        val initial = ok(games.open()).use { game -> ok(game.store.listOwnedVehicles()).single { it.acquisitionCost.units == 0L } }
+        val mapTag = "shop:map-vehicle:${initial.ownedVehicleId.value}"
+        openPage(original, HostPage.HOME)
+        click(original, mapTag)
+        await("HOME 지도 차량 관리") { button(original, VehicleAction.LEVEL_UP)?.isEnabled == true }
+        capture("main-map-focus")
+        click(original, VehicleAction.LEVEL_UP)
+        await("관리 비용 검토") { visibleTextButton(original, "확정")?.isEnabled == true }
+        capture("main-map-review")
+        host = recreate(original)
+        await("재생성 후 HOME 차량 선택") {
+            host.window.decorView.findViewWithTag<View>("shop:focus-panel") != null
+        }
+        clickText(host, "관리 조건 다시 조회")
+        await("새 개체 revision으로 관리 비용 검토") { visibleTextButton(host, "확정")?.isEnabled == true }
+        onUi { host.onBackPressed() }
+        await("Back으로 관리 닫고 차량 지도에 머묾") {
+            button(host, "shop:focus-back")?.isEnabled == true && visibleTextButton(host, "확정") == null
+        }
+        ok(games.open()).use { game ->
+            assertEquals(initial, ok(game.store.listOwnedVehicles()).single { it.ownedVehicleId == initial.ownedVehicleId })
+            assertEquals(GameMoney(500), ok(game.store.balance()))
+        }
+        click(host, VehicleAction.LEVEL_UP)
+        clickText(host, "확정")
+        await("레벨업 확정 원결과") { visibleTextButton(host, "결과 확인")?.isEnabled == true }
+        host = recreate(host)
+        clickText(host, "보관 요청 처리 · 결과 확인")
+        clickText(host, "결과 확인")
+        await("재생성된 관리 원결과 확인 뒤 HOME 재조회") { button(host, VehicleAction.SELL)?.isEnabled == true }
+        ok(games.open()).use { game ->
+            assertEquals(2, ok(game.store.listOwnedVehicles()).single { it.ownedVehicleId == initial.ownedVehicleId }.level)
+            assertEquals(GameMoney(480), ok(game.store.balance()))
+        }
+        click(host, VehicleAction.SELL)
+        clickText(host, "확정")
+        clickText(host, "결과 확인")
+        await("처분한 차량의 지도 선택 해제") {
+            button(host, mapTag) == null &&
+                host.window.decorView.findViewWithTag<View>("shop:focus-panel") == null &&
+                descendants(host.window.decorView).any { it.tag?.toString()?.startsWith("shop:map-vehicle:") == true }
+        }
+        ok(games.open()).use { game ->
+            assertTrue(ok(game.store.listOwnedVehicles()).none { it.ownedVehicleId == initial.ownedVehicleId })
+            val sold = ok(game.store.listUnviewedSettlements()).single {
+                it.changedVehicle?.let { car -> car.ownedVehicleId == initial.ownedVehicleId && car.lifecycle == VehicleLifecycle.SOLD } == true
+            }
+            assertEquals(TransactionKind.GARAGE, sold.transaction.kind)
+            assertNull(ok(game.store.hostCommands.load(game.identity.profileId)))
+        }
+        capture("main-map-after-sale")
+        return host
+    }
+
+    private fun recreate(old: UnifiedSimulationActivity): UnifiedSimulationActivity {
+        var replacement: UnifiedSimulationActivity? = null
+        val callbacks = object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, state: Bundle?) = Unit
+            override fun onActivityStarted(activity: Activity) = Unit
+            override fun onActivityResumed(activity: Activity) {
+                if (activity is UnifiedSimulationActivity && activity !== old) replacement = activity
+            }
+            override fun onActivityPaused(activity: Activity) = Unit
+            override fun onActivityStopped(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        }
+        onUi {
+            old.application.registerActivityLifecycleCallbacks(callbacks)
+            old.recreate()
+        }
+        try {
+            await("Activity 재생성") { replacement != null }
+            return checkNotNull(replacement)
+        } finally { onUi { old.application.unregisterActivityLifecycleCallbacks(callbacks) } }
+    }
+
+    private fun verifyDeliveryDeparture(host: UnifiedSimulationActivity, games: GameSessionFactory) {
+        openPage(host, HostPage.DELIVERY)
+        click(host, "delivery:destination")
+        click(host, "simulation:destination")
+        click(host, "delivery:offer:offer-0")
+        click(host, "delivery:confirm")
+        await("확정 수익 탁송 출발") {
+            host.window.decorView.findViewWithTag<View>("delivery:scene:DEPARTURE")?.isShown == true
+        }
+        capture("main-delivery-departure")
+        onUi { host.onBackPressed() }
+        await("출발 연출 닫고 고속도로 표시") {
+            host.window.decorView.findViewWithTag<View>("delivery:highway")?.isShown == true
+        }
+        click(host, "delivery:review-abandon")
+        await("포기 검토") { button(host, "delivery:abandon")?.isEnabled == true }
+        onUi { host.onBackPressed() }
+        await("포기 검토 취소 후 원 의뢰") {
+            button(host, "delivery:abandon") == null && button(host, "delivery:review-abandon")?.isEnabled == true
+        }
+        ok(games.open()).use { game ->
+            assertTrue(ok(game.store.delivery.inProgress())?.active?.offer is DeliveryOffer.Income)
+        }
+        await("탁송 선택 원명령 확인 후 진행 상태") {
+            host.window.decorView.findViewWithTag<View>("delivery:highway") != null
+        }
+        ok(games.open()).use { game ->
+            assertNull(ok(game.store.hostCommands.load(game.identity.profileId)))
+        }
+        capture("main-delivery-highway")
+    }
+
+    private fun clickText(host: UnifiedSimulationActivity, text: String) {
+        await("버튼 $text") {
+            visibleTextButton(host, text)?.takeIf { it.isEnabled }?.performClick() == true
+        }
+    }
+
+    private fun visibleTextButton(host: UnifiedSimulationActivity, text: String): Button? =
+        descendants(host.window.decorView).filterIsInstance<Button>().firstOrNull { it.isShown && it.text.toString() == text }
 
     private fun awaitCelebration(host: UnifiedSimulationActivity, kind: RewardCelebrationKind, starts: List<RewardCelebrationKind>) {
         await("확정 뒤 연출 표시 $kind") {
@@ -165,16 +310,20 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
     }
 
     private fun openPage(host: UnifiedSimulationActivity, page: HostPage) {
-        await("메뉴 $page") { host.window.decorView.mainPage(page)?.isEnabled == true }
-        onUi { host.window.decorView.openMainPage(page) }
+        await("메뉴 $page") {
+            val destination = host.window.decorView.mainPage(page)
+            if (destination?.isEnabled != true || !destination.isShown) false
+            else { host.window.decorView.openMainPage(page); true }
+        }
     }
 
     private fun click(host: UnifiedSimulationActivity, tag: Any) {
-        await("버튼 $tag") { button(host, tag)?.isEnabled == true }
-        onUi { assertTrue(checkNotNull(button(host, tag)).performClick()) }
+        await("버튼 $tag") {
+            button(host, tag)?.takeIf { it.isEnabled && it.isShown }?.performClick() == true
+        }
     }
 
-    private fun button(host: UnifiedSimulationActivity, tag: Any): Button? = host.window.decorView.findViewWithTag(tag)
+    private fun button(host: UnifiedSimulationActivity, tag: Any): View? = host.window.decorView.findViewWithTag(tag)
 
     private fun descendants(view: View): Sequence<View> = sequence {
         yield(view)
@@ -212,8 +361,8 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             bitmap.recycle()
         }
     }
-    private fun await(label: String = "기대 상태", condition: () -> Boolean) {
-        val end = SystemClock.uptimeMillis() + 15_000
+    private fun await(label: String = "기대 상태", timeoutMillis: Long = 15_000, condition: () -> Boolean) {
+        val end = SystemClock.uptimeMillis() + timeoutMillis
         while (SystemClock.uptimeMillis() < end) {
             var matched = false
             onUi { matched = condition() }
