@@ -181,7 +181,7 @@ class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
                 overlay.render(ShopMapTarget.Expansion, interaction)
                 container.addView(overlay, FrameLayout.LayoutParams(width, height))
             }
-            instrumentation.waitForIdleSync()
+            waitForLayout(overlay)
             val before = android.graphics.Rect()
             onUi {
                 assertTrue(overlay.isAttachedToWindow)
@@ -235,6 +235,24 @@ class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
         is TextView -> view.text.toString()
         is ViewGroup -> (0 until view.childCount).joinToString("\n") { text(view.getChildAt(it)) }
         else -> ""
+    }
+
+    private fun waitForLayout(view: View) {
+        var state = ""
+        repeat(150) {
+            instrumentation.waitForIdleSync()
+            var ready = false
+            onUi {
+                ready = view.isAttachedToWindow && view.isLaidOut && !view.isLayoutRequested &&
+                    view.width > 0 && view.height > 0
+                state = "display=${view.display?.displayId}, attached=${view.isAttachedToWindow}, " +
+                    "laidOut=${view.isLaidOut}, requested=${view.isLayoutRequested}, " +
+                    "size=${view.width}x${view.height}, window=${view.windowVisibility}, focus=${view.hasWindowFocus()}"
+            }
+            if (ready) return
+            Thread.sleep(20)
+        }
+        fail("패널의 실제 배치 대기 실패: $state")
     }
 
     private fun onUi(action: () -> Unit) {
