@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
 import android.test.InstrumentationTestCase
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -31,7 +32,8 @@ class ShopViewTest : InstrumentationTestCase() {
         (0 until view.childCount).flatMap { views(view.getChildAt(it)) } else emptyList()
     private fun text(view: View) = views(view).filterIsInstance<TextView>().joinToString("\n") { it.text.toString() }
     private fun button(view: View, tag: String): Button = view.findViewWithTag(tag)
-    private fun layout(view: View, width: Int, height: Int) = onUi {
+    private fun layout(view: View, width: Int, height: Int) = onUi { measureAndLayout(view, width, height) }
+    private fun measureAndLayout(view: View, width: Int, height: Int) {
         val density = view.resources.displayMetrics.density
         val w = (width * density).toInt(); val h = (height * density).toInt()
         view.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
@@ -46,15 +48,18 @@ class ShopViewTest : InstrumentationTestCase() {
             // 미부착 위젯은 post를 실행하지 않을 수 있어 실제 크기를 적용한 뒤 다시 그린다.
             onUi { view.render(state, true) }; layout(view, w, h)
             onUi {
+                assertTrue(text(view).contains("보유 / 공간 · 2 / 5"))
+                view.showMapPanel(ShopMapTarget.FacilityLot(Facility.CAR_WASH))
+                measureAndLayout(view, w, h)
                 val shown = text(view)
                 assertTrue(shown.contains("세차장")); assertTrue(shown.contains("가게 레벨 3 필요 · 현재 레벨 2"))
-                assertTrue(shown.contains("캐스퍼")); assertTrue(shown.contains("보유 / 공간 · 2 / 5"))
                 assertTrue(shown.contains("조정 가능한 시험값"))
                 assertFalse(shown.contains("규칙 ·"))
                 assertFalse(shown.contains(checkNotNull(state.expansion?.ruleVersion).value))
                 val label = views(view).filterIsInstance<TextView>().single { it.text.contains("가게 레벨 3 필요") }
                 assertTrue(label.width > 0); assertTrue(label.height > 0)
                 assertEquals(0, label.layout.getEllipsisCount(0))
+                assertTrue(view.handleBack())
             }
         }
     }
@@ -69,13 +74,13 @@ class ShopViewTest : InstrumentationTestCase() {
         val view = onUi { ShopView(instrumentation.targetContext, events::add).apply { render(state, true) } }
         for ((width, height) in listOf(620 to 360, 320 to 568)) {
             layout(view, width, height)
-            onUi { view.render(state, true) }
+            onUi { view.render(state, true); view.showMapPanel(ShopMapTarget.FacilityLot(Facility.CAR_WASH)) }
             layout(view, width, height)
             onUi {
                 val scroll = views(view).filterIsInstance<ScrollView>().single()
                 val condition = views(view).filterIsInstance<TextView>().single { it.text.contains("가게 레벨 2/3") }
                 val card = condition.parent as ViewGroup
-                val title = views(card).filterIsInstance<TextView>().single { it.text.toString() == "세차장" }
+                val title = views(card).filterIsInstance<TextView>().first { it.text.toString() == "세차장" }
                 val locked = views(card).filterIsInstance<TextView>().single { it.text.toString() == "잠김" }
                 fun inScroll(child: View): Rect = Rect(0, 0, child.width, child.height).apply {
                     scroll.offsetDescendantRectToMyCoords(child, this)
@@ -105,7 +110,7 @@ class ShopViewTest : InstrumentationTestCase() {
                     assertEquals(description, unclipped, visible)
                     for (line in 0 until label.layout.lineCount) assertEquals(description, 0, label.layout.getEllipsisCount(line))
                 }
-                assertNull(view.findViewWithTag<Button>("shop:preview:facility-CAR_WASH"))
+                assertNull(view.findViewWithTag<Button>("shop:map-confirm"))
                 assertTrue(events.isEmpty())
             }
         }
@@ -121,7 +126,6 @@ class ShopViewTest : InstrumentationTestCase() {
         }
         layout(view, 620, 360)
         val overall = bitmap()
-        val overallText = onUi { text(view) }
         try {
             onUi {
                 assertTrue(button(view, "shop:mode:OVERALL").isSelected)
@@ -137,7 +141,7 @@ class ShopViewTest : InstrumentationTestCase() {
                 assertEquals(ShopMode.VEHICLES, view.uiState.mode)
                 assertTrue(button(view, "shop:mode:VEHICLES").isSelected)
                 assertFalse(button(view, "shop:mode:OVERALL").isSelected)
-                assertEquals(overallText, text(view))
+                assertTrue(text(view).contains("2,400 게임머니"))
                 assertTrue(button(view, "shop:mode:OVERALL").performClick())
             }
             layout(view, 620, 360)
@@ -154,12 +158,13 @@ class ShopViewTest : InstrumentationTestCase() {
         val events = mutableListOf<ShopEvent>()
         val view = onUi { ShopView(instrumentation.targetContext, events::add).apply { render(ShopPreviewStates.normal(), true) } }
         onUi {
-            button(view, "shop:preview:blue-sign").performClick()
+            view.showMapPanel(ShopMapTarget.Decorations)
+            button(view, "shop:map-preview:blue-sign").performClick()
             assertTrue(text(view).contains("변경안 · 파란 가게"))
-            assertTrue(text(view).contains("드라이브 가게"))
             assertTrue(text(view).contains("2,400 게임머니")); assertTrue(events.isEmpty())
-            button(view, "shop:cancel").performClick(); assertFalse(text(view).contains("변경안 · 파란 가게"))
-            button(view, "shop:preview:blue-sign").performClick(); button(view, "shop:confirm").performClick()
+            button(view, "shop:map-close").performClick(); assertFalse(text(view).contains("변경안 · 파란 가게"))
+            view.showMapPanel(ShopMapTarget.Decorations)
+            button(view, "shop:map-preview:blue-sign").performClick(); button(view, "shop:map-confirm").performClick()
             val request = (events.single() as ShopEvent.Submit).request
             view.complete(request, ContractResult.Failure(ContractError.STORAGE_FAILURE))
             assertTrue(text(view).contains("STORAGE_FAILURE")); assertTrue(text(view).contains("2,400 게임머니"))
@@ -171,8 +176,8 @@ class ShopViewTest : InstrumentationTestCase() {
         val events = mutableListOf<ShopEvent>(); val state = ShopPreviewStates.normal()
         val view = onUi { ShopView(instrumentation.targetContext, events::add).apply { render(state, true) } }
         onUi {
-            button(view, "shop:preview:expand").performClick()
-            val oldConfirm = button(view, "shop:confirm")
+            view.showMapPanel(ShopMapTarget.Expansion)
+            val oldConfirm = button(view, "shop:map-confirm")
             view.render(state, false); oldConfirm.performClick()
             assertTrue(events.isEmpty()); assertFalse(text(view).contains("2,400"))
             assertEquals(0, views(view).filterIsInstance<Button>().size)
@@ -185,8 +190,9 @@ class ShopViewTest : InstrumentationTestCase() {
         val events = mutableListOf<ShopEvent>(); val state = ShopPreviewStates.normal()
         val view = onUi { ShopView(instrumentation.targetContext, events::add).apply { render(state, true) } }
         onUi {
-            button(view, "shop:preview:expand").performClick(); button(view, "shop:confirm").performClick()
-            button(view, "shop:confirm").performClick(); view.render(state, true)
+            view.showMapPanel(ShopMapTarget.Expansion)
+            button(view, "shop:map-confirm").performClick()
+            button(view, "shop:map-confirm").performClick(); view.render(state, true)
             assertEquals(1, events.size)
             val restored = ShopView(instrumentation.targetContext, events::add)
             restored.restoreUiState(view.uiState); restored.render(state, true)
@@ -207,6 +213,7 @@ class ShopViewTest : InstrumentationTestCase() {
         onUi {
             view.render(ShopPreviewStates.missing(), true)
             assertTrue(text(view).contains("확정 잔액 · 정보 미제공"))
+            view.showMapPanel(ShopMapTarget.Decorations)
             assertTrue(text(view).contains("승인된 장식·배치 규칙 미제공"))
             assertFalse(text(view).contains("0 게임머니"))
             view.render(ShopScreenState.Loading, true); assertTrue(text(view).contains("불러오는 중"))
@@ -222,11 +229,13 @@ class ShopViewTest : InstrumentationTestCase() {
         val events = mutableListOf<ShopEvent>()
         val view = onUi { ShopView(instrumentation.targetContext, events::add).apply { render(ShopPreviewStates.normal(), true) } }
         onUi {
-            assertFalse(button(view, "shop:preview:fuel").isEnabled)
-            button(view, "shop:preview:fuel").performClick(); assertNull(view.uiState.selection)
+            view.showMapPanel(ShopMapTarget.FacilityLot(Facility.FUEL_STATION))
+            assertNull(view.findViewWithTag<Button>("shop:map-confirm"))
+            assertNull(view.uiState.selection)
+            assertTrue(view.handleBack())
             button(view, "shop:mode:VEHICLES").performClick(); assertEquals(ShopMode.VEHICLES, view.uiState.mode)
-            assertTrue(text(view).contains("캐스퍼")); assertTrue(text(view).contains("세차장"))
-            button(view, "shop:preview:blue-sign").performClick(); assertTrue(view.handleBack()); assertNull(view.uiState.selection)
+            view.showMapPanel(ShopMapTarget.Decorations)
+            button(view, "shop:map-preview:blue-sign").performClick(); assertTrue(view.handleBack()); assertNull(view.uiState.selection)
             assertFalse(view.handleBack()); assertTrue(events.isEmpty())
         }
     }
@@ -236,15 +245,15 @@ class ShopViewTest : InstrumentationTestCase() {
         val latest = old.copy(revision = Revision(5),capacity = 7,balance = GameMoney(900))
         val saved = ShopInteraction({}).apply { render(latest,true) }.uiState
         val view = ShopView(instrumentation.targetContext,events::add)
-        view.render(old,true); button(view,"shop:preview:expand").performClick()
-        val stale = button(view,"shop:confirm")
+        view.render(old,true); view.showMapPanel(ShopMapTarget.Expansion)
+        val stale = button(view,"shop:map-confirm")
         view.restoreUiState(saved)
         assertTrue(text(view).contains("불러오는 중")); assertFalse(text(view).contains("2,400"))
         stale.performClick(); assertTrue(events.isEmpty())
         view.render(old,true); assertFalse(text(view).contains("2,400"))
         view.render(latest,false); assertTrue(views(view).none { it is Button })
         view.render(latest,true); assertTrue(text(view).contains("900 게임머니"))
-        button(view,"shop:preview:expand").performClick(); button(view,"shop:confirm").performClick()
+        view.showMapPanel(ShopMapTarget.Expansion); button(view,"shop:map-confirm").performClick()
         assertEquals(Revision(5),(events.single() as ShopEvent.Submit).request.selection.revision)
     }
 
@@ -270,13 +279,12 @@ class ShopViewTest : InstrumentationTestCase() {
                 }
                 val description = "${width}×${height}dp"
                 val mapBounds = bounds(scene)
-                assertEquals(description, view.paddingTop, mapBounds.top)
-                assertTrue(description, mapBounds.bottom <= view.height - view.paddingBottom)
-                assertTrue(description, mapBounds.contains(bounds(vehicle)))
-                val sceneColumn = scene.parent as ViewGroup
+                assertEquals(description, Rect(0, 0, view.width, view.height), mapBounds)
+                assertTrue(description, mapBounds.intersects(bounds(vehicle).left, bounds(vehicle).top,
+                    bounds(vehicle).right, bounds(vehicle).bottom))
                 val modeRow = button(view, "shop:mode:VEHICLES").parent as View
-                assertSame(description, sceneColumn.getChildAt(sceneColumn.indexOfChild(scene) + 1), modeRow)
-                assertTrue(description, mapBounds.bottom <= bounds(modeRow).top)
+                assertTrue(description, mapBounds.contains(bounds(modeRow)))
+                assertNull(view.findViewWithTag<View>("shop:controls-scroll"))
             }
         }
     }
@@ -289,10 +297,12 @@ class ShopViewTest : InstrumentationTestCase() {
             onUi {
                 val scene = view.findViewWithTag<ShopSceneView>("shop:scene")
                 assertTrue(scene.width > 0);assertTrue(scene.height > 0)
-                if(width>=840) assertTrue("전경은 관리 열보다 넓어야 함",scene.width>view.findViewWithTag<View>("shop:controls-scroll").width)
+                assertEquals(view.width, scene.width)
+                assertEquals(view.height, scene.height)
                 val bitmap=android.graphics.Bitmap.createBitmap(scene.width,scene.height,android.graphics.Bitmap.Config.ARGB_8888)
                 scene.draw(android.graphics.Canvas(bitmap))
-                assertTrue("실제 전경 드로잉",bitmap.getPixel(scene.width/2,scene.height/2)!=bitmap.getPixel(scene.width/2,scene.height-3))
+                assertTrue("실제 전경 드로잉", bitmap.getPixel(scene.width / 2, scene.height / 2) !=
+                    io.drivegrowth.app.ui.pixel.PixelStyle.background)
                 bitmap.recycle()
             }
         }
@@ -314,7 +324,7 @@ class ShopViewTest : InstrumentationTestCase() {
         assertSame(panel, view.findViewWithTag<Button>("facility:ack"))
         view.render(ShopScreenState.Loading, false)
         assertNull(view.findViewWithTag<Button>("facility:ack"))
-        view.render(ShopPreviewStates.normal(), true)
+        view.render(ShopPreviewStates.normal(), true, null, focusRestRecovery = true)
         assertSame(panel, view.findViewWithTag<Button>("facility:ack"))
     }
 
@@ -332,9 +342,11 @@ class ShopViewTest : InstrumentationTestCase() {
         view.render(state, true)
         val firstListTag = "shop:list-vehicle:${id.value}"
         val secondListTag = "shop:list-vehicle:${secondId.value}"
+        button(view, "shop:map-vehicles").performClick()
         assertEquals("캐스퍼 1번", button(view, firstListTag).text.toString())
         assertEquals("캐스퍼 2번", button(view, secondListTag).text.toString())
         assertFalse(text(view).contains(id.value) || text(view).contains(secondId.value))
+        view.handleBack()
         val stale = view.findViewWithTag<View>(tag)
         assertTrue(stale.contentDescription.toString().contains("캐스퍼 1번"))
         val newer = state.copy(revision = Revision(state.revision.value + 1), vehicles = listOf(second, first))
@@ -342,12 +354,37 @@ class ShopViewTest : InstrumentationTestCase() {
         stale.performClick()
         assertTrue(opened.isEmpty())
         assertTrue(view.findViewWithTag<View>(tag).performClick())
+        button(view, "shop:map-vehicles").performClick()
         assertEquals("캐스퍼 2번", button(view, secondListTag).text.toString())
         assertTrue(button(view, secondListTag).performClick())
         assertEquals(listOf(id to newer.revision, secondId to newer.revision), opened)
         view.render(newer.copy(capacity = null), true)
         assertNull(view.findViewWithTag<View>(tag))
+        button(view, "shop:map-vehicles").performClick()
         assertNotNull(view.findViewWithTag<Button>(firstListTag))
+    }
+
+    fun testPanFromVehicleMovesItsHitTargetWithoutSelectingIt() = onUi {
+        val selected = mutableListOf<OwnedVehicleId>()
+        val state = ShopPreviewStates.normal()
+        val view = ShopView(instrumentation.targetContext) { fail("지도 조작에서 거래가 발생했습니다") }
+        view.onOpenVehicle = { id, _ -> selected += id }
+        view.render(state, true)
+        measureAndLayout(view, 440, 680)
+        val map = view.findViewWithTag<ShopSceneView>("shop:scene")
+        val vehicle = map.findViewWithTag<View>("shop:map-vehicle:${state.vehicles.first().id.value}")
+        val x = (vehicle.left + vehicle.right) / 2f
+        val y = (vehicle.top + vehicle.bottom) / 2f
+        val downAt = android.os.SystemClock.uptimeMillis()
+        for ((action, offset) in listOf(MotionEvent.ACTION_DOWN to 0f, MotionEvent.ACTION_MOVE to 90f,
+            MotionEvent.ACTION_UP to 90f)) {
+            val event = MotionEvent.obtain(downAt, android.os.SystemClock.uptimeMillis(), action, x + offset, y, 0)
+            try { map.dispatchTouchEvent(event) } finally { event.recycle() }
+        }
+        assertTrue((vehicle.left + vehicle.right) / 2f > x)
+        assertTrue(selected.isEmpty())
+        assertTrue(vehicle.performClick())
+        assertEquals(listOf(state.vehicles.first().id), selected)
     }
 
     fun testSceneModeAndScrollRestoreDoNotCreateTransactionsOrPreviewSuccess() = onUi {
@@ -355,9 +392,10 @@ class ShopViewTest : InstrumentationTestCase() {
         val view=ShopView(instrumentation.targetContext,events::add)
         view.restoreUiState(ShopUiState(mode=ShopMode.VEHICLES,sceneScrollY=180,controlsScrollY=240));view.render(state,true)
         assertEquals(ShopMode.VEHICLES,view.uiState.mode);assertEquals(180,view.uiState.sceneScrollY);assertEquals(240,view.uiState.controlsScrollY)
-        button(view,"shop:preview:expand").performClick();button(view,"shop:confirm").performClick()
-        assertEquals(1,events.size);assertFalse(button(view,"shop:mode:OVERALL").isEnabled)
-        button(view,"shop:mode:OVERALL").performClick();assertEquals(ShopMode.VEHICLES,view.uiState.mode)
+        val mode = button(view, "shop:mode:OVERALL")
+        view.showMapPanel(ShopMapTarget.Expansion); button(view,"shop:map-confirm").performClick()
+        assertEquals(1,events.size); assertNull(view.findViewWithTag<View>("shop:mode:OVERALL"))
+        mode.performClick();assertEquals(ShopMode.VEHICLES,view.uiState.mode)
         assertEquals(5,view.findViewWithTag<ShopSceneView>("shop:scene").model.slots)
         val saved=view.uiState;val restored=ShopView(instrumentation.targetContext,events::add)
         restored.restoreUiState(saved);restored.render(state,true)

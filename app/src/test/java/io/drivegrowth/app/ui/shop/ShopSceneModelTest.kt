@@ -36,4 +36,24 @@ class ShopSceneModelTest {
         assertEquals(ShopMode.VEHICLES,ui.uiState.mode);assertEquals(pending,ui.uiState.pending)
         assertEquals(180,ui.uiState.sceneScrollY);assertEquals(240,ui.uiState.controlsScrollY)
     }
+
+    @Test
+    fun mapCoversWideAndPortraitWindowsWithoutStretchingOrPanningPastEdges() {
+        for ((width, height) in listOf(1360 to 400, 320 to 600, 936 to 416, 840 to 1184)) {
+            val left = 100f
+            val top = 40f
+            val right = 1500f
+            val bottom = 990f
+            val initial = ShopMapCamera.cover(width, height, left, top, right, bottom, ShopMapOffset())
+            assertEquals(maxOf(width / (right - left), height / (bottom - top)), initial.scale, .001f)
+            for (offset in listOf(ShopMapOffset(), ShopMapOffset(9000f, -9000f), ShopMapOffset(-9000f, 9000f))) {
+                val camera = ShopMapCamera.cover(width, height, left, top, right, bottom, offset)
+                assertEquals(initial.scale, camera.scale, .001f)
+                assertTrue(camera.x + left * camera.scale <= .001f)
+                assertTrue(camera.y + top * camera.scale <= .001f)
+                assertTrue(camera.x + right * camera.scale >= width - .001f)
+                assertTrue(camera.y + bottom * camera.scale >= height - .001f)
+            }
+        }
+    }
 }

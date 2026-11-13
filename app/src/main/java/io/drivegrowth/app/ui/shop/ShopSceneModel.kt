@@ -26,3 +26,23 @@ internal fun shopSceneModel(content: ShopScreenState.Content): ShopSceneModel {
         Facility.entries.associateWith { supplied[it] ?: ShopAvailability.UNKNOWN },
     )
 }
+
+internal data class ShopMapOffset(val x: Float = 0f, val y: Float = 0f)
+
+internal data class ShopMapCamera(val scale: Float, val x: Float, val y: Float) {
+    companion object {
+        /** 지도 픽셀은 같은 비율로 확대하고, 여유가 있는 축에서만 지도를 이동한다. */
+        fun cover(width: Int, height: Int, left: Float, top: Float, right: Float, bottom: Float,
+                  offset: ShopMapOffset): ShopMapCamera {
+            val sceneWidth = right - left
+            val sceneHeight = bottom - top
+            val scale = maxOf(width / sceneWidth, height / sceneHeight)
+            val extraX = (sceneWidth * scale - width).coerceAtLeast(0f)
+            val extraY = (sceneHeight * scale - height).coerceAtLeast(0f)
+            // 세로 창에서 본관과 가까운 주차 공간부터 보이게 한다.
+            val x = (-extraX * .22f + offset.x * scale).coerceIn(-extraX, 0f)
+            val y = (-extraY * .65f + offset.y * scale).coerceIn(-extraY, 0f)
+            return ShopMapCamera(scale, x - left * scale, y - top * scale)
+        }
+    }
+}
