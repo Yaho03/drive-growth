@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>르르르 주행 막대</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Press+Start+2P&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+/* Layout: 차 화면 한 장(위 내비 + 아래 한 줄 막대)을 가운데 두고, 위에 장면 고르기, 아래에 장면 설명 */
+:root{
+  --bg:#10131d; --panel:#171c2a; --card:#1d2335; --line:#2c3349;
+  --fg:#f4f6fb; --mut:#a3adc2; --accent:#3d8bff;
+  --gold:#fcdc64; --ok:#7ee2a6; --okbg:#1f3a2c; --warn:#ffd36b; --warnbg:#3d3216; --rest:#c3b8ff; --restbg:#2c2650;
+  --map:#1c2130; --mapblock:#232a3c; --maproad:#353d55;
+  --f-ui:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-px:"Press Start 2P",ui-monospace,monospace;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-ui);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1100px;margin:0 auto;display:grid;gap:16px}
+.head{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;justify-content:space-between}
+.head>div{min-width:0}
+h1{font-size:24px;font-weight:900;margin:0;text-wrap:balance}
+.lede{margin:4px 0 0;color:var(--mut);font-size:14px;max-width:62ch}
+.ctrl{display:flex;flex-wrap:wrap;gap:6px}
+.ctrl button{font:700 14px var(--f-ui);color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:10px;min-height:40px;padding:0 14px;cursor:pointer}
+.ctrl button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent)}
+.ctrl .auto{background:transparent}
+.ctrl button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+.screen{border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--panel)}
+.nav{position:relative;aspect-ratio:1100/400;max-width:100%;background:var(--map)}
+.nav svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.turn{position:absolute;left:14px;top:14px;display:flex;align-items:center;gap:10px;background:#2b6fe0;color:#fff;border-radius:12px;padding:8px 14px;font-weight:700;font-size:clamp(12px,1.6vw,16px)}
+.turn b{font-size:1.4em;font-weight:900}
+.eta{position:absolute;right:14px;bottom:12px;background:rgba(16,19,29,.85);border-radius:10px;padding:6px 12px;font-size:clamp(11px,1.4vw,14px);color:var(--mut)}
+.eta b{color:var(--fg)}
+.navtag{position:absolute;right:14px;top:12px;font-size:12px;color:var(--mut);background:rgba(16,19,29,.7);padding:3px 8px;border-radius:6px}
+
+.bar{position:relative;display:grid;grid-template-columns:264px minmax(0,1fr) auto;gap:18px;align-items:center;padding:12px 18px;border-top:1px solid var(--line)}
+.mini{position:relative;width:264px;max-width:100%;aspect-ratio:2/1;border-radius:12px;overflow:hidden;background:#000;--u:2px}
+.mini canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;display:block}
+.sign{position:absolute;left:33.3%;top:3%;width:33.4%;height:12.2%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:calc(var(--u)*5.2);letter-spacing:.08em}
+.pbadge{position:absolute;left:44%;top:6%;width:calc(var(--u)*11);height:calc(var(--u)*11);display:flex;align-items:center;justify-content:center;background:#2b6fe0;color:#fff;font:calc(var(--u)*6) var(--f-px);border:calc(var(--u)*1) solid #fff;border-radius:calc(var(--u)*2);box-shadow:0 calc(var(--u)*1) 0 #10131d}
+.z{position:absolute;font-style:normal;font-family:var(--f-px);color:#e9e4ff;text-shadow:0 0 0 #10131d,1px 1px 0 #10131d;pointer-events:none}
+
+.mid{min-width:0;display:grid;gap:8px}
+.row1{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.ttl{font-size:20px;font-weight:900}
+.ttl .num{font-variant-numeric:tabular-nums;color:#8fbaff}
+.chip{font-size:13px;font-weight:700;border-radius:999px;padding:3px 10px}
+.c-ok{background:var(--okbg);color:var(--ok)} .c-warn{background:var(--warnbg);color:var(--warn)} .c-rest{background:var(--restbg);color:var(--rest)}
+.sub{font-size:13px;color:var(--mut)}
+
+.trk{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;font-size:13px;font-weight:700;color:var(--mut);padding-top:22px}
+.rail{position:relative;height:10px;border-radius:5px;background:var(--line)}
+.fill{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--accent)}
+.rfill{background:#9a86ff}
+.rail img{position:absolute;image-rendering:pixelated;display:block}
+.caricon{width:40px;height:24px;top:-26px;margin-left:-38px}
+.rmk{width:20px;height:20px;top:-25px;margin-left:-10px;left:62%}
+.rmk-lab{position:absolute;left:62%;top:14px;transform:translateX(-50%);font-size:11px;color:var(--mut);white-space:nowrap}
+.flag{width:18px;height:22px;top:-24px;left:100%;margin-left:-4px}
+.tick5{position:absolute;right:0;top:-6px;bottom:-6px;width:2px;background:var(--rest)}
+
+.money{display:flex;align-items:center;gap:8px;background:var(--card);border-radius:14px;padding:8px 14px;font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;transform-origin:center}
+.money img{width:20px;height:20px;image-rendering:pixelated}
+.fly{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.fly img{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;image-rendering:pixelated}
+.plus{position:absolute;font:16px var(--f-px);color:var(--gold);text-shadow:2px 2px 0 #10131d;pointer-events:none;white-space:nowrap}
+
+.info{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.info>div{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.info h2{font-size:13px;letter-spacing:.06em;color:var(--mut);margin:0 0 6px;font-weight:700}
+.info p,.info li{font-size:15px;line-height:1.6;margin:0}
+.info ul{margin:0;padding-left:18px;display:grid;gap:2px}
+.when{font-weight:700}
+.note{color:var(--mut);font-size:13px!important;margin-top:6px!important}
+.foot{font-size:13px;color:var(--mut);margin:0;line-height:1.6}
+
+@media (max-width:760px){
+  .bar{grid-template-columns:minmax(0,1fr) auto;gap:12px}
+  .mini{grid-column:1/-1;justify-self:center}
+  .mid{grid-column:1/2}
+  .info{grid-template-columns:minmax(0,1fr)}
+  .ttl{font-size:17px}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="head">
+    <div>
+      <h1>주행 진행도 막대</h1>
+      <p class="lede">내비 아래 한 줄 막대에 진행도와 작은 효과만 넣은 시안이에요. 네 장면이 이동 순서대로 이어서 재생돼요.</p>
+    </div>
+    <div class="ctrl" role="group" aria-label="장면 고르기">
+      <button id="b0" data-i="0">1 진행도</button>
+      <button id="b1" data-i="1">2 휴게소 도착</button>
+      <button id="b2" data-i="2">3 휴게소에서 쉬기</button>
+      <button id="b3" data-i="3">4 안전운전 +머니</button>
+      <button id="bAuto" class="auto" aria-pressed="true">자동 재생</button>
+    </div>
+  </header>
+
+  <section class="screen" aria-label="차 화면 예시">
+    <div class="nav" aria-hidden="true">
+      <svg viewBox="0 0 1100 400" preserveAspectRatio="xMidYMid slice">
+        <rect width="1100" height="400" fill="var(--map)"/>
+        <g fill="var(--mapblock)">
+          <rect x="40" y="40" width="210" height="120" rx="8"/><rect x="290" y="30" width="180" height="150" rx="8"/>
+          <rect x="520" y="20" width="240" height="110" rx="8"/><rect x="800" y="40" width="260" height="140" rx="8"/>
+          <rect x="60" y="220" width="190" height="150" rx="8"/><rect x="300" y="240" width="230" height="130" rx="8"/>
+          <rect x="590" y="190" width="170" height="180" rx="8"/><rect x="810" y="230" width="250" height="140" rx="8"/>
+        </g>
+        <g stroke="var(--maproad)" stroke-width="22" fill="none" stroke-linecap="round">
+          <path d="M0 200 H1100"/><path d="M270 0 V400"/><path d="M780 0 V400"/><path d="M500 0 L560 400"/>
+        </g>
+        <path d="M120 400 L270 200 H560 L780 120 L1100 60" stroke="#3d8bff" stroke-width="12" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="900" cy="94" r="10" fill="#c3b8ff"/><text x="900" y="99" font-size="12" font-weight="900" text-anchor="middle" fill="#2c2650">휴</text>
+        <g transform="translate(270 200)"><circle r="22" fill="#3d8bff" opacity=".25"/><path d="M0 -14 L11 12 L0 6 L-11 12 Z" fill="#fff"/></g>
+      </svg>
+      <div class="turn"><b>↱</b><span>300m 앞 우회전 · 서해안고속도로</span></div>
+      <div class="eta">도착 <b>14:32</b> · 남은 거리 <b>30km</b></div>
+      <div class="navtag">내비 (예시)</div>
+    </div>
+
+    <div class="bar" id="bar">
+      <div class="mini" id="mini">
+        <canvas id="cv" width="132" height="66" role="img" aria-label="장면 그림"></canvas>
+        <span class="sign" id="sign" hidden>휴게소</span>
+        <span class="pbadge" id="pb" hidden>P</span>
+        <i class="z" id="z0" hidden>z</i><i class="z" id="z1" hidden>z</i><i class="z" id="z2" hidden>Z</i>
+      </div>
+      <div class="mid">
+        <div class="row1"><div class="ttl" id="ttl" aria-live="polite"></div><span class="chip" id="chip"></span></div>
+        <div class="trk" id="trk">
+          <span>우리 가게</span>
+          <div class="rail"><div class="fill" id="fill"></div><img class="rmk" id="rmk" alt=""><span class="rmk-lab">휴게소</span><img class="flag" id="flag" alt=""><img class="caricon" id="car" alt=""></div>
+          <span>학교</span>
+        </div>
+        <div class="trk" id="rtrk" hidden>
+          <span>도착</span>
+          <div class="rail"><div class="fill rfill" id="rfill"></div><div class="tick5"></div></div>
+          <span>5분</span>
+        </div>
+        <div class="sub" id="sub"></div>
+      </div>
+      <div class="money" id="money"><img id="mcoin" alt=""><b id="mv">3,000</b></div>
+      <div class="fly" id="fly"></div>
+      <span class="plus" id="plus" hidden>+120</span>
+    </div>
+  </section>
+
+  <section class="info">
+    <div>
+      <h2>보여 주는 때</h2>
+      <p class="when" id="iWhen"></p>
+      <p class="note" id="iNote"></p>
+    </div>
+    <div>
+      <h2>들어간 효과</h2>
+      <ul id="iFx"></ul>
+    </div>
+  </section>
+  <p class="foot">거리·시간·금액은 예시 값이에요. 운전하는 동안에는 게임 화면을 숨겨야 해서(Pleos 심사 기준) 모든 장면은 주차한 뒤 보여 주는 것을 전제로 했어요. 안전운전 판정 기준과 금액은 팀에서 정해야 해요.</p>
+</div>
+
+<script>
+const A = {"casper": "data:image/png;base64,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", "sleep": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAsCAYAAAAjFjtnAAADGElEQVR4nO2ZMWjbQBSGf4dSMmTyUIwxJoQQNIhOokPwlCzCaO7gKVNnUzx46pApgwmeSwdPHjoWY7w0QzAZgqZiigmhGGNC6JDBGBM6VB3qpzwpJ1l3J7sd/IGwTrrTvf/uvac7GdiwQYvMv+q4UDQ9Op+MB+u1o1A0PTpU28/nU28+n3r33zvKzwGAFyqd3wyvAADT0SUsu+6pjOB0dCnbRIi0gDQ7TwMlAbpMxoOMZdf/jxjQiYNZ/5OW/wPAlkojGrFhu6rTdyooCUiTYbuKtWYhkQFGpelnoihjVuXnqQUxT69hKN1SOU0xygIm40HGqDQ9ioOb4VVsenV7ZwCAn4M+yjVoBS5HOQa4qwzbVRwYh4navTJL6DYc1W6foTSVhaLpLXw/cJ1GOQmWXQ+UVd1K2YVm2ZyUwSK6DQflWkcrJqQbFoqmF2d4eGRFdXkdXRFSjch1ZtmcSl8BLLsOt3eGnYd7/Li7VRYhHcRpGA88zYzu86QExC0ddh7u/YND7hL+5ezl92XMCJBYwLLX/Syb8w+O2zvz3YV+RXQbjtKSQtqFLLsuHMU4yGjdrCUicdBEjU4aRvEBkQ1kqfcAjwGj0oRz2odll5amyjC8Pncr2ZkFEs4AT588SElE50PpWZvz3rXwWRfXvwL1w+Ituy41C6msRkmEc9rH0ZuXvqGuexdZH4BQuCypCCDjgaDhlpUX1o8SpoK2gPAouu5dpOEE3e980e1dMo2GX1IilhnP+ZsEngJX1v+BhAIWm5fANaPS9LPS9u6Jlj/Tu0VlLSS9mKNzMt6oNLG9ewIAeBy1/LrOaR/nb7fw/vNv/xqVuVjeduUCiELR9GhXtZffD4ggHkctiPbIB8ahsO5altMcmo1uw4kU8a33Dq/tj5FlQM94QPPzOhcBAOVax78XFsPhrgbofaXQTqO0o+JlACjXWpFtwksJHZQFFIrmEZ3zrwxcDCdu0cefBQCT8eAiqR0q/w8cxd0PudPx4vJXlT6SCFHZ1IcFRBl3HConreezEgHEspnQQcaFUvtGqSNIxuANG1LmDx5CjAvXEo2aAAAAAElFTkSuQmCC"};
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = id => document.getElementById(id);
+const cv = $('cv'), cx = cv.getContext('2d'); cx.imageSmoothingEnabled = false;
+const W = 132, H = 66;
+const IM = {}; for (const k in A) { IM[k] = new Image(); IM[k].src = A[k]; }
+
+// 작은 픽셀 그림(문자 지도 → 그림)
+function sprite(rows, pal, s = 1) {
+  const w = Math.max(...rows.map(r => r.length)), h = rows.length, c = document.createElement('canvas');
+  c.width = w * s; c.height = h * s; const g = c.getContext('2d');
+  rows.forEach((r, y) => [...r].forEach((ch, x) => { if (pal[ch]) { g.fillStyle = pal[ch]; g.fillRect(x * s, y * s, s, s); } }));
+  return c.toDataURL();
+}
+const K = '#1c1e2c';
+const COIN = sprite(['..oooo..', '.oyyyyo.', 'oyhyyyso', 'oyhyyyso', 'oyyyyyso', 'oyyyysso', '.osssso.', '..oooo..'],
+  { o: '#8a5a14', y: '#fcdc64', h: '#fff3b0', s: '#f0b43c' });
+const CARI = sprite([
+  '......kkkkkkk.......',
+  '.....kbbbbbbbk......',
+  '....kbsslbsslbk.....',
+  '...kbbsslbsslbbkk...',
+  '.kkbbbbbbbbbbbbbbk..',
+  'kbbbbbbbbbbbbbbbbbk.',
+  'kbbbbbbbbbbbbbbbbhk.',
+  'kddbbbbbbbbbbbbbbbk.',
+  '.kkbkkkbbbbbbkkkbk..',
+  '...kddk......kddk...',
+  '....kk........kk....'], { k: K, b: '#7cc04a', s: '#aad6f6', l: '#ffffff', h: '#fcdc64', d: '#4f8a2e' });
+const CUP = sprite([
+  '.kkkkkkkkk.',
+  'kpppppppppk',
+  'kp.s..s..pk',
+  'kp..s..s.pk',
+  'kpkkkkkkkpk',
+  'kpkwwwwwkkk',
+  'kpkwwwwwkpk',
+  'kpkwwwwwkkk',
+  'kp.kwwwk.pk',
+  'kpp.kkk.ppk',
+  '.kkkkkkkkk.'], { k: K, p: '#c3b8ff', s: '#ffffff', w: '#ffffff' });
+const FLAG = sprite(['kk......', 'krrrrr..', 'krrrrrrr', 'krrrrr..', 'k.......', 'k.......', 'k.......', 'k.......', 'k.......', 'k.......', 'kk......'], { k: '#e7eaf3', r: '#ff6b6b' });
+$('car').src = CARI; $('rmk').src = CUP; $('flag').src = FLAG; $('mcoin').src = COIN;
+
+const px = (x, y, w, h, c) => { cx.fillStyle = c; cx.fillRect(Math.round(x), Math.round(y), w, h); };
+const clamp = v => Math.max(0, Math.min(1, v));
+const eio = v => v < .5 ? 2 * v * v : 1 - (-2 * v + 2) ** 2 / 2;
+const eout = v => 1 - (1 - v) ** 3;
+
+// ── 장면 그림 ──
+function drawRoad(t) {
+  const o = t * 40;
+  px(0, 0, W, H, '#72a449');
+  for (let i = 0; i < 34; i++) {           // 잔디: 차 반대 방향(왼쪽 위)으로 흘러감
+    const x = (((i * 37) % W - o) % W + W) % W, y = (((i * 53) % H - o / 2) % H + H) % H;
+    px(x, y, 2, 1, '#5e8f3b'); px(x + 1, y - 1, 1, 1, '#8cc25a');
+  }
+  for (let x = 0; x < W; x++) {            // 도로: y = x/2 방향
+    const yc = Math.round(x / 2 + 2);
+    px(x, yc - 11, 1, 22, '#4a4d60'); px(x, yc - 12, 1, 1, '#e8c9b8'); px(x, yc + 11, 1, 1, '#e8c9b8');
+  }
+  for (let k = -1; k < 8; k++) {           // 가운데 점선
+    const xs = ((k * 24 - o) % 192 + 192) % 192 - 24;
+    for (let x = xs; x < xs + 8; x++) if (x >= 0 && x < W) px(x, Math.round(x / 2 + 2), 1, 1, '#fcdc64');
+  }
+  const bob = RM ? 0 : (Math.floor(t * 9) % 2);
+  if (IM.casper.complete) cx.drawImage(IM.casper, 38, -8 - bob);
+}
+function drawShield(t) {
+  if (t < .3) return;
+  const p = clamp((t - .3) / .35), y = Math.round(4 - Math.sin(p * Math.PI) * 4 - (1 - p) * 2);
+  const S = ['..xxxxxxx..', '.xgggggggx.', 'xgggggggggx', 'xgggggggwgx', 'xggggggwwgx', 'xgwgggwwggx', 'xgwwgwwgggx', '.xgwwwgggx.', '.xggwggggx.', '..xgggggx..', '...xgggx...', '....xxx....'];
+  const pal = { x: '#123a26', g: '#5fcf8a', w: '#ffffff' };
+  S.forEach((r, j) => [...r].forEach((c, i) => { if (pal[c]) px(61 + i, y + j, 1, 1, pal[c]); }));
+  const on = Math.floor(t * 4) % 2;        // 반짝이
+  [[52, 6], [76, 4], [56, 18], [80, 16]].forEach(([x, yy], i) => {
+    if ((i + on) % 2) { px(x, yy, 1, 1, '#fff'); px(x - 1, yy, 1, 1, '#fcdc64'); px(x + 1, yy, 1, 1, '#fcdc64'); px(x, yy - 1, 1, 1, '#fcdc64'); px(x, yy + 1, 1, 1, '#fcdc64'); }
+  });
+}
+function drawRestStop(t) {
+  [['#5d4f9a', 0, 8], ['#8d62a8', 8, 8], ['#d9808a', 16, 8], ['#f3ad7a', 24, 8]].forEach(([c, y, h]) => px(0, y, W, h, c));
+  px(8, 12, 116, 20, '#e9dcc4'); px(8, 10, 116, 3, '#c84b4b'); px(8, 10, 116, 1, '#e06a5a'); px(8, 31, 116, 1, '#b9a98e');
+  for (let x = 14; x < 120; x += 13) if (x < 58 || x > 72) px(x, 16, 8, 7, '#ffd36b');
+  px(60, 19, 10, 13, '#5a4a3a'); px(64, 25, 1, 2, '#ffd36b');
+  px(44, 2, 44, 8, '#234573'); px(44, 2, 44, 1, '#3a68a8'); px(44, 9, 44, 1, '#16294a'); px(50, 10, 2, 1, '#16294a'); px(80, 10, 2, 1, '#16294a');
+  px(0, 32, W, 34, '#4b4f63'); px(0, 32, W, 1, '#7d8296');
+  for (const sx of [8, 34, 100, 126]) for (let i = 0; i < 32; i++) px(sx + i / 3, 34 + i, 1, 1, '#d9dce6');
+  px(118, 8, 2, 26, '#2a2d3a'); px(115, 6, 8, 2, '#2a2d3a'); px(116, 8, 6, 1, '#ffe9a8');
+  cx.globalAlpha = .18; px(110, 9, 18, 10, '#ffe9a8'); cx.globalAlpha = 1;
+  const p = RM ? 1 : eout(clamp((t - .2) / 1.4));
+  const x = -60 + 96 * p, y = -22 + 32 * p, brake = (!RM && t > 1.6 && t < 1.85) ? 1 : 0;
+  if (p < 1) for (let i = 0; i < 3; i++) { cx.globalAlpha = .5 - i * .15; px(x + 4 - i * 6, y + 44 - i * 2, 3, 3, '#e8e4d8'); }
+  cx.globalAlpha = 1;
+  if (IM.casper.complete) cx.drawImage(IM.casper, Math.round(x), Math.round(y) + brake);
+}
+const STARS = [[16, 9], [30, 20], [52, 8], [88, 12], [96, 26], [70, 18], [40, 30], [104, 6], [20, 38]];
+function windowPath() {
+  cx.beginPath(); cx.moveTo(13, 6); cx.lineTo(100, 6); cx.lineTo(117, 55); cx.lineTo(10, 55); cx.lineTo(10, 9); cx.closePath();
+}
+function drawCarWindow(t) {
+  px(0, 0, W, H, '#7cc04a'); px(0, 0, W, 2, '#97d468'); px(0, 57, W, 9, '#649f3a'); px(0, 58, W, 1, '#4a7a2a'); px(18, 61, 12, 2, '#cfe8b0');
+  cx.save(); windowPath(); cx.clip();
+  const rows = ['#121733', '#161c3c', '#1b2246', '#212a52', '#28305c', '#2e3666'];
+  rows.forEach((c, i) => px(0, 6 + i * 9, W, 9, c));
+  STARS.forEach(([x, y], i) => { if (RM || ((t * 1.5 + i * .7) % 3) < 2.3) px(x, y, 1, 1, i % 3 ? '#ffffff' : '#fcdc64'); });
+  px(100, 10, 5, 5, '#fff3c4'); px(99, 11, 1, 3, '#fff3c4'); px(105, 11, 1, 3, '#fff3c4'); px(101, 9, 3, 1, '#fff3c4'); px(102, 11, 2, 2, '#121733');
+  px(0, 42, W, 14, '#1a1f3a'); for (let x = 4; x < W; x += 9) px(x, 46, 3, 2, '#ffd36b');
+  px(40, 18, 40, 40, '#3a3f55'); px(42, 16, 36, 2, '#3a3f55'); px(42, 18, 2, 30, '#4a5070');
+  const c = RM ? 0 : t % 2.7, nod = c < 1.8 ? 0 : c < 2.2 ? 2 : 1;
+  if (IM.sleep.complete) cx.drawImage(IM.sleep, 36, 15 + nod);
+  cx.globalAlpha = .1; for (let i = 0; i < 6; i++) { cx.fillStyle = '#ffffff'; cx.fillRect(92 + i, 6, 1, 49); } cx.globalAlpha = 1;
+  cx.restore();
+  cx.strokeStyle = '#1c1e2c'; cx.lineWidth = 1; cx.save(); cx.translate(.5, .5); windowPath(); cx.stroke(); cx.restore();
+}
+
+// ── 장면 정보 ──
+const SC = [
+  { dur: 6, when: '주차하고 앱을 열었을 때', note: '막대에는 확인된 운전 거리만 반영해요. 운전하는 동안에는 숨겨요.',
+    fx: ['막대가 확인된 거리만큼 차오름', '작은 차 아이콘이 통통 튀며 앞으로', '왼쪽 창에서 도로가 흘러감'] },
+  { dur: 6, when: '휴게소에 주차했을 때', note: '휴게소로 들어가는 동안은 아직 운전 중이라 보여 주지 않아요.',
+    fx: ['차 아이콘이 휴게소 표시까지 이동하고 표시가 반짝', '왼쪽 창: 내 차가 휴게소 주차 칸에 들어와 멈춤', 'P 표시가 톡 튀어나옴'] },
+  { dur: 10, when: '휴게소에 주차해 있는 동안', note: 'PRD 휴식 규칙: 직전 1시간 이상 운전 + 휴게소·졸음쉼터 5분 이상 주차(시험값). 보너스는 출발하면 시작돼요. 이 시안은 시간을 40배 빠르게 돌려요.',
+    fx: ['차 안에서 르르르가 꾸벅꾸벅 졸고 Zzz가 떠오름', '쉰 시간 막대가 5분까지 차오름', '5분이 되면 "휴식 보너스 준비됨"으로 바뀜'] },
+  { dur: 6, when: '주차한 뒤 결과를 볼 때', note: '무엇을 안전운전으로 볼지(급가속·급제동 등)와 금액은 아직 정해지지 않았어요.',
+    fx: ['왼쪽 창: 차 위로 안전 방패가 튀어 오르고 반짝', '코인이 금액 칸으로 날아감', '+120이 떠오르고 금액이 올라감'] },
+];
+let si = 0, t0 = performance.now(), auto = !RM, cache = {};
+const set = (id, prop, v) => { const k = id + prop; if (cache[k] !== v) { cache[k] = v; $(id)[prop] = v; } };
+function setScene(i) {
+  si = i; t0 = performance.now(); cache = {};
+  for (let k = 0; k < 4; k++) $('b' + k).setAttribute('aria-pressed', k === i);
+  $('iWhen').textContent = SC[i].when; $('iNote').textContent = SC[i].note;
+  $('iFx').innerHTML = SC[i].fx.map(s => `<li>${s}</li>`).join('');
+  $('fly').innerHTML = ''; coins = [];
+  if (i === 3) for (let k = 0; k < 6; k++) { const im = new Image(); im.src = COIN; im.alt = ''; im.hidden = true; $('fly').appendChild(im); coins.push(im); }
+  $('mv').textContent = '3,000';
+}
+let coins = [];
+for (let k = 0; k < 4; k++) $('b' + k).addEventListener('click', () => setScene(k));
+$('bAuto').addEventListener('click', () => { auto = !auto; $('bAuto').setAttribute('aria-pressed', auto); });
+if (RM) $('bAuto').setAttribute('aria-pressed', 'false');
+function fitMini() { $('mini').style.setProperty('--u', ($('mini').clientWidth / W) + 'px'); }
+addEventListener('resize', fitMini); fitMini();
+
+function track(p, moving, t, mark) {
+  $('fill').style.width = p + '%';
+  $('car').style.left = p + '%';
+  $('car').style.transform = `translateY(${moving && !RM ? -(Math.floor(t * 8) % 2) * 2 : 0}px)`;
+  const pop = mark ? 1 + .35 * Math.max(0, 1 - (t - mark) / .35) : 1;
+  $('rmk').style.transform = `scale(${RM ? 1 : pop})`;
+}
+const fmt = n => n.toLocaleString('ko-KR');
+
+function frame(now) {
+  let t = (now - t0) / 1000;
+  if (auto && t > SC[si].dur) { setScene((si + 1) % 4); t = 0; }
+  if (RM) t = SC[si].dur - .01;
+  const s = si;
+  set('sign', 'hidden', s !== 1); set('pb', 'hidden', !(s === 1 && t > 1.7));
+  set('trk', 'hidden', s === 2); set('rtrk', 'hidden', s !== 2);
+  ['z0', 'z1', 'z2'].forEach(z => set(z, 'hidden', s !== 2));
+  set('plus', 'hidden', true);
+  $('money').style.transform = '';
+
+  if (s === 0) {
+    drawRoad(t);
+    const e = RM ? 1 : eio(clamp(t / 2)), km = 16 + 4 * e;
+    track(32 + 8 * e, true, t, 0);
+    set('ttl', 'innerHTML', `학교까지 · <span class="num">${km.toFixed(1)}</span> / 50km`);
+    set('chip', 'className', 'chip c-ok'); set('chip', 'textContent', '수익 탁송');
+    set('sub', 'textContent', '막대는 확인된 운전 거리만 반영해요');
+  } else if (s === 1) {
+    drawRestStop(t);
+    const e = RM ? 1 : eio(clamp(t / 1.4));
+    track(40 + 22 * e, e < 1, t, t > 1.4 ? 1.4 : 0);
+    set('ttl', 'textContent', '휴게소 도착');
+    set('chip', 'className', 'chip c-rest'); set('chip', 'textContent', '휴게소');
+    set('sub', 'textContent', '휴게소에 주차했어요 · 학교까지 19km 남았어요');
+    if (t > 1.7) { const q = RM ? 1 : clamp((t - 1.7) / .25); $('pb').style.transform = `scale(${q < 1 ? .4 + q * .85 : 1})`; }
+  } else if (s === 2) {
+    drawCarWindow(t);
+    const sec = Math.min(Math.floor(t * 40), 340), done = sec >= 300;
+    $('rfill').style.width = Math.min(100, sec / 3) + '%';
+    set('ttl', 'innerHTML', `쉬는 중 · <span class="num">${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}</span>`);
+    set('chip', 'className', done ? 'chip c-ok' : 'chip c-rest');
+    set('chip', 'textContent', done ? '휴식 보너스 준비됨' : '5분 쉬면 보너스');
+    set('sub', 'textContent', done ? '출발하면 보너스가 시작돼요' : '푹 쉬어요. 르르르도 자는 중이에요');
+    const u = $('mini').clientWidth / W;
+    ['z0', 'z1', 'z2'].forEach((z, k) => {
+      const ph = RM ? [.2, .5, .8][k] : ((t + k * .9) % 2.7) / 2.7, el = $(z);
+      el.style.left = ((76 + ph * 22) / W * 100) + '%'; el.style.top = ((22 - ph * 20) / H * 100) + '%';
+      el.style.fontSize = (u * (4 + ph * 4)) + 'px';
+      el.style.opacity = RM ? 1 : (ph < .15 ? ph / .15 : 1 - (ph - .15) / .85).toFixed(2);
+    });
+  } else {
+    drawRoad(t); drawShield(t);
+    track(62, false, t, 0);
+    set('ttl', 'textContent', '안전운전 구간 인정');
+    set('chip', 'className', 'chip c-warn'); set('chip', 'textContent', '예시 값');
+    set('sub', 'textContent', '급가속·급제동 없이 31km를 달렸어요');
+    const bar = $('bar').getBoundingClientRect(), m = $('mini').getBoundingClientRect(), c = $('mcoin').getBoundingClientRect();
+    const sx = m.left + m.width / 2 - bar.left, sy = m.top + m.height * .25 - bar.top, ex = c.left + c.width / 2 - bar.left, ey = c.top + c.height / 2 - bar.top;
+    let got = 0, last = -9;
+    coins.forEach((im, k) => {
+      const st = .7 + k * .08, p = RM ? 1 : (t - st) / .65;
+      if (p >= 1) { got++; last = Math.max(last, st + .65); im.hidden = true; return; }
+      if (p < 0) { im.hidden = true; return; }
+      im.hidden = false;
+      im.style.left = (sx + (ex - sx) * eio(p)) + 'px';
+      im.style.top = (sy + (ey - sy) * p - Math.sin(Math.PI * p) * 60) + 'px';
+    });
+    set('mv', 'textContent', fmt(3000 + got * 20));
+    $('money').style.transform = `scale(${1 + .08 * Math.max(0, 1 - (t - last) / .18)})`;
+    const q = RM ? .3 : (t - 1.75) / 1.4;
+    if (q >= 0 && q <= 1) {
+      set('plus', 'hidden', false);
+      const pl = $('plus'), mb = $('money').getBoundingClientRect();
+      pl.style.left = (mb.left - bar.left + mb.width / 2 - 36) + 'px';
+      pl.style.top = (mb.top - bar.top - 18 - q * 22) + 'px';
+      pl.style.opacity = (q < .7 ? 1 : 1 - (q - .7) / .3).toFixed(2);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+setScene(0);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
