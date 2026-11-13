@@ -5,6 +5,7 @@ import android.test.InstrumentationTestCase
 import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.TextView
 import io.drivegrowth.app.ui.garage.CollectionScrollTestActivity
 import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.garage.VehicleArtwork
@@ -49,7 +50,7 @@ class PrototypePresentationDeviceTest : InstrumentationTestCase() {
             val title = PrototypeTitleView(host) {}
             title.setPresentationAllowed(true)
             val density = host.resources.displayMetrics.density
-            for ((widthDp, heightDp) in listOf(320 to 210, 320 to 320, 936 to 430)) {
+            for ((widthDp, heightDp) in listOf(320 to 210, 320 to 320, 936 to 430, 840 to 1076, 1360 to 840)) {
                 val w = (widthDp * density).toInt()
                 val h = (heightDp * density).toInt()
                 title.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
@@ -59,6 +60,15 @@ class PrototypePresentationDeviceTest : InstrumentationTestCase() {
                 assertTrue(button.width > 0 && button.height > 0)
                 assertTrue(button.left >= 0 && button.right <= w)
                 assertTrue(button.top >= 0 && button.bottom <= h)
+                val words = title.getChildAt(1) as android.view.ViewGroup
+                for ((index, expected) in listOf("드라이브", "키우기").withIndex()) {
+                    val line = words.getChildAt(index) as TextView
+                    assertEquals(expected, line.text.toString())
+                    assertNotNull(line.layout)
+                    val fm = line.paint.fontMetrics
+                    assertTrue("제목 줄 ${index + 1} 글꼴 영역이 잘립니다 ($widthDp × $heightDp dp)",
+                        line.height >= fm.descent - fm.ascent)
+                }
             }
         }
     }

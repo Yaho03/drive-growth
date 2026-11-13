@@ -82,13 +82,18 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
         updateMotion()
     }
 
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val width = MeasureSpec.getSize(widthMeasureSpec)
+        val height = MeasureSpec.getSize(heightMeasureSpec)
         val metrics = resources.displayMetrics
-        val size = minOf(w / (8 * metrics.scaledDensity), (h - dp(120)).coerceAtLeast(dp(32)) / (2.6f * metrics.scaledDensity))
-            .coerceIn(12f, 74f)
-        gold.setTextSize(TypedValue.COMPLEX_UNIT_SP, size)
-        sky.setTextSize(TypedValue.COMPLEX_UNIT_SP, size)
+        val size = minOf(width / (8 * metrics.scaledDensity),
+            (height - dp(120)).coerceAtLeast(dp(32)) / (2.6f * metrics.scaledDensity)).coerceIn(12f, 74f)
+        val pixels = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, size, metrics)
+        if (gold.textSize != pixels) {
+            gold.setTextSize(TypedValue.COMPLEX_UNIT_PX, pixels)
+            sky.setTextSize(TypedValue.COMPLEX_UNIT_PX, pixels)
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 
     override fun onAttachedToWindow() {

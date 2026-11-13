@@ -126,7 +126,7 @@ Debug 산출물 `app/build/outputs/apk/debug/app-debug.apk`은 제품과 별도�
 | [08_PROJECT_PLAN.md](docs/08_PROJECT_PLAN.md) | 프로젝트 진행 계획 | 지금 할 일·선행조건·통합 회의와 M0–M3 단계 안내. 담당·목표일은 회의 후 확정 |
 | [09_UI_UX_SPEC.md](docs/09_UI_UX_SPEC.md) | 화면 흐름·디자인 명세 | 픽셀 화면·공통 탐색·제한과 실제 호스트 연결. 원명령·거래 저장·복원의 실행 범위는 06에서 확인 |
 | [10_SUBMISSION_DRAFT.md](docs/10_SUBMISSION_DRAFT.md) | 공식 양식용 제출 초안 | 심사용 1–8번 항목에 맞춘 문안, 미확정·실제 자료 상태. 최종 제출본 아님 |
-| [11_DESIGN_IMPLEMENTATION_STATUS.md](docs/11_DESIGN_IMPLEMENTATION_STATUS.md) | 디자인 적용 현황 | 계획한 시안·현재 Android 화면·없는 자산·남은 제작 및 연결 작업. 디자인 기준은 09에서 관리. 픽셀 작업 자료는 [pixel-kit](docs/design-assets/pixel-kit/README.md) |
+| [11_DESIGN_IMPLEMENTATION_STATUS.md](docs/11_DESIGN_IMPLEMENTATION_STATUS.md) | 디자인 과거 기록 | 2026-11-10 당시 시안·표시 UI·제작 계획. 최신 Android 화면 기준과 검증은 09·06에서 관리. 픽셀 작업 자료는 [pixel-kit](docs/design-assets/pixel-kit/README.md) |
 | [공모전 자료 안내](docs/contest/README.md) | 공식 공모전 자료 목차 | 일정·심사·접수, Pleos 개발자료, 차량 API와 공식 자료·다운로드 보관 기록 |
 | [OT 전체 요약](docs/contest/05_ORIENTATION_NOTES.md) | 온라인 설명회·질의응답 | 전체 35개 구간의 핵심 내용, 시각별 영상 링크, 기존 안내와의 차이. 기획·제출·SDK 조건 확인 시 참고 |
 | [내비 콜백 진단 도구](navi-diagnostic/README.md) | #80 지원용 별도 APK | 다운로드·설치·내장 모의주행 재현·시험 증거·남은 제한. 제품 앱·전체 오류 해결과 구분 |
