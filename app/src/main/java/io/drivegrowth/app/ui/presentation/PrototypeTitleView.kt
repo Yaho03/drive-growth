@@ -366,8 +366,11 @@ private class TitleLandscape(context: Context) : View(context) {
         actors.draw(canvas, elapsed, fuelInstalled = true, washInstalled = true)
         val firstX = (200f + elapsed * 150f) % 920f - 100f
         val secondX = (490f + elapsed * 190f) % 920f - 100f
+        canvas.save()
+        canvas.clipRect(scene)
         drawVehicle(canvas, vehicles[0], firstX, 722f + firstX / 2f, flip = false)
         drawVehicle(canvas, vehicles[1], secondX, 800f + secondX / 2f, flip = false)
+        canvas.restore()
         canvas.restore()
 
         canvas.save()
