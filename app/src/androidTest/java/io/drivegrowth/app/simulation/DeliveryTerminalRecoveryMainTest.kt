@@ -1,5 +1,6 @@
 package io.drivegrowth.app.simulation
 
+import io.drivegrowth.app.exposeMainPage
 import io.drivegrowth.app.mainPage
 import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.host.HostPage
@@ -164,7 +165,7 @@ class DeliveryTerminalRecoveryMainTest :
 
         val root = activity.window.decorView
         fun onCollection(): Boolean {
-            val menu = root.mainPage(HostPage.COLLECTION)?.takeIf { it.isShown && it.isEnabled } ?: return false
+            val menu = root.exposeMainPage(HostPage.COLLECTION) ?: return false
             if (!menu.isSelected) root.openMainPage(HostPage.COLLECTION)
             return root.mainPage(HostPage.COLLECTION)?.isSelected == true
         }

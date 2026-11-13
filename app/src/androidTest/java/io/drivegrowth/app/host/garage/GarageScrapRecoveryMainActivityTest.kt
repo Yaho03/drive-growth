@@ -1,5 +1,6 @@
 package io.drivegrowth.app.host.garage
 
+import io.drivegrowth.app.exposeMainPage
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.graphics.Rect
@@ -358,7 +359,7 @@ class GarageScrapRecoveryMainActivityTest :
         val navigation = mainNavigation()
         awaitUi("Main의 $label 라우트 수락") {
             if (navigation.page == page) return@awaitUi true
-            val menu = root.mainPage(page) ?: return@awaitUi false
+            val menu = root.exposeMainPage(page) ?: return@awaitUi false
             if (!menu.isShown || !menu.isEnabled || !menu.isLaidOut || menu.isLayoutRequested) return@awaitUi false
             root.openMainPage(page)
             false

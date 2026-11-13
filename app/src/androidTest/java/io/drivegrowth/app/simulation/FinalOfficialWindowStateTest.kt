@@ -1,5 +1,6 @@
 package io.drivegrowth.app.simulation
 
+import io.drivegrowth.app.exposeMainPage
 import android.app.ActivityOptions
 import android.content.Intent
 import android.graphics.Rect
@@ -285,7 +286,7 @@ class FinalOfficialWindowStateTest : InstrumentationTestCase() {
         .firstOrNull { it.text.toString() == label && it.isShown }
 
     private fun select(activity: UnifiedSimulationActivity, page: HostPage) {
-        if (!ui { activity.root.mainPage(page)?.isSelected == true }) click(activity) { activity.root.mainPage(page) }
+        if (!ui { activity.root.mainPage(page)?.isSelected == true }) click(activity) { activity.root.exposeMainPage(page) }
         await("현재 $page") { activity.root.mainPage(page)?.isSelected == true }
     }
 

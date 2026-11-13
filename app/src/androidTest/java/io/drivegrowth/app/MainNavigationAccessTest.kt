@@ -60,6 +60,7 @@ class MainNavigationAccessTest : ActivityInstrumentationTestCase2<MainActivity>(
 
             gate(Gear.PARK)
             render.invoke(main)
+            root.openMainPage(HostPage.GACHA)
             val beforePageChange = captureButtons()
             root.openMainPage(HostPage.GARAGE)
             controller.javaClass.getDeclaredMethod("show", GarageCommandState::class.java)

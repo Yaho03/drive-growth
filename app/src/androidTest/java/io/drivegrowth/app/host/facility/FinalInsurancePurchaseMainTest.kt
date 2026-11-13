@@ -1,5 +1,6 @@
 package io.drivegrowth.app.host.facility
 
+import io.drivegrowth.app.exposeMainRefresh
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.Process
@@ -163,7 +164,7 @@ class FinalInsurancePurchaseMainTest :
             }
             assertEquals(1, ok(ledger.completedRentalCount()))
         }
-        click(root, "host:refresh")
+        awaitUi("홈 설정의 새로고침") { root.exposeMainRefresh()?.performClick() == true }
         awaitUi("고유 방문 100의 보험 미리보기 해금") {
             cardLabels(root, insuranceTitle).containsAll(listOf(
                 context.getString(R.string.shop_available), conditionLabel(100), effect,

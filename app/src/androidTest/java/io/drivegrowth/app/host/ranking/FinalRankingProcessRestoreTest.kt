@@ -1,5 +1,6 @@
 package io.drivegrowth.app.host.ranking
 
+import io.drivegrowth.app.exposeMainPage
 import android.content.pm.ApplicationInfo
 import android.os.Process
 import android.os.SystemClock
@@ -140,7 +141,7 @@ class FinalRankingProcessRestoreTest :
 
     private fun inspectRanking(privateIds: List<String>): Screens {
         awaitUi("기록·랭킹 탐색") {
-            val tab = activityRoot.mainPage(HostPage.RANKING) ?: return@awaitUi false
+            val tab = activityRoot.exposeMainPage(HostPage.RANKING) ?: return@awaitUi false
             tab.isShown && tab.isEnabled && (tab.isSelected || tab.performClick())
         }
         awaitUi("같은 모의 프로필의 내 기록 조회") { ranking()?.let { view ->

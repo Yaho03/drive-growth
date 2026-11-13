@@ -1,5 +1,6 @@
 package io.drivegrowth.app.simulation
 
+import io.drivegrowth.app.exposeMainPage
 import io.drivegrowth.app.mainNavigation
 import io.drivegrowth.app.mainPage
 import io.drivegrowth.app.openMainPage
@@ -335,7 +336,7 @@ class UnifiedSimulationRestActivityTest :
     private fun choosePage(root: View, page: HostPage, beforeSelection: ((Button) -> Unit)? = null) {
         await("페이지 메뉴가 허용되어야 합니다") { root.mainNavigation()?.isEnabled == true }
         onUi {
-            val menu = checkNotNull(root.mainPage(page))
+            val menu = checkNotNull(root.exposeMainPage(page))
             beforeSelection?.invoke(menu)
             root.openMainPage(page)
         }
