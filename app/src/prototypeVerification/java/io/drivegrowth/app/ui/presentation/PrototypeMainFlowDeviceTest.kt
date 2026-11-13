@@ -68,8 +68,8 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                 previousStart.performClick()
                 val start = host.window.decorView.findViewWithTag<Button>("simulation:start")
                 if (start != null) assertFalse(start.isEnabled)
-                host.window.decorView.findViewWithTag<Button>("presentation:start").performClick()
             }
+            touchStart(host, background = true)
             await { host.window.decorView.findViewWithTag<Button>(io.drivegrowth.app.R.string.onboarding_start)?.isEnabled == true }
             onUi {
                 assertNull(host.window.decorView.findViewWithTag<Button>(io.drivegrowth.app.R.string.onboarding_review))
@@ -389,12 +389,18 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         check(Regex("""io\.drivegrowth\.verify\.prototype(\.[a-z][a-z0-9]*)?""").matches(packageName))
     }
 
-    private fun touchStart(host: UnifiedSimulationActivity) = onUi {
+    private fun touchStart(host: UnifiedSimulationActivity, background: Boolean = false) = onUi {
         val button = host.window.decorView.findViewWithTag<Button>("presentation:start")
         val decor = host.window.decorView
-        val point = IntArray(2).also(button::getLocationInWindow)
-        val x = point[0] + button.width / 2f
-        val y = point[1] + button.height / 2f
+        val target = if (background) decor.findViewWithTag<View>("presentation:title") else button
+        val point = IntArray(2).also(target::getLocationInWindow)
+        val x = point[0] + if (background) 2f else button.width / 2f
+        val y = point[1] + if (background) 2f else button.height / 2f
+        if (background) {
+            val buttonOrigin = IntArray(2).also(button::getLocationInWindow)
+            assertFalse(Rect(buttonOrigin[0], buttonOrigin[1],
+                buttonOrigin[0] + button.width, buttonOrigin[1] + button.height).contains(x.toInt(), y.toInt()))
+        }
         val down = SystemClock.uptimeMillis()
         for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
             val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y, 0)

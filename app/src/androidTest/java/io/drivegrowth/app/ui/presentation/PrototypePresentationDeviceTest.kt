@@ -1,7 +1,9 @@
 package io.drivegrowth.app.ui.presentation
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Rect
+import android.util.TypedValue
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.widget.Button
@@ -83,6 +85,30 @@ class PrototypePresentationDeviceTest : InstrumentationTestCase() {
                 }
             }
         }
+    }
+
+    fun testStartInstructionHonorsEnlargedFontInShortWindow() = onUi {
+        val largeContext = host.createConfigurationContext(Configuration(host.resources.configuration).apply {
+            fontScale = 2f
+        })
+        fun startAtSize(context: android.content.Context): Button {
+            val density = context.resources.displayMetrics.density
+            val width = (320 * density).toInt()
+            val height = (210 * density).toInt()
+            val title = PrototypeTitleView(context) {}
+            title.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+            title.layout(0, 0, width, height)
+            val button = title.findViewWithTag<Button>("presentation:start")
+            val textLayout = checkNotNull(button.layout)
+            val ribbon = title.findViewWithTag<View>("presentation:title-ribbon")
+            assertTrue(button.top >= ribbon.bottom && button.bottom <= height)
+            assertTrue(textLayout.height <= button.height - button.compoundPaddingTop - button.compoundPaddingBottom)
+            assertTrue((0 until textLayout.lineCount).all { textLayout.getEllipsisCount(it) == 0 })
+            assertTrue(button.textSize >= TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 16f, context.resources.displayMetrics))
+            return button
+        }
+        assertTrue(startAtSize(largeContext).textSize > startAtSize(host).textSize)
     }
 
     fun testTitleDetachAndReattachRetainsRestriction() {

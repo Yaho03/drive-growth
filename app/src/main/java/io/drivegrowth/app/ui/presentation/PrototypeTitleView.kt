@@ -34,6 +34,7 @@ import io.drivegrowth.app.ui.shop.TownActors
 import io.drivegrowth.app.ui.shop.townSlots
 import io.drivegrowth.core.contract.VehicleId
 import java.io.IOException
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /** 주차 상태에서만 시작 화면과 장식용 움직임을 제공한다. */
@@ -146,7 +147,6 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
         setMeasuredDimension(width, height)
         val scale = layoutScale(width, height)
         val logoWidth = (560 * scale).roundToInt()
-        val startHeight = minOf(maxOf(dp(48), (60 * scale).roundToInt()), height / 3)
         measureAt(landscape, width, height)
         fitLabel(badge, 15 * scale)
         measureAt(badge, (171 * scale).roundToInt(), (32 * scale).roundToInt())
@@ -160,10 +160,16 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
         fitLabel(prototype, 15 * scale)
         measureAt(trial, (228 * scale).roundToInt(), (22 * scale).roundToInt())
         measureAt(prototype, (48 * scale).roundToInt(), (22 * scale).roundToInt())
-        fitLabel(start, minOf(28 * scale, startHeight * .48f).coerceAtLeast(1f))
+        val startSp = maxOf(16f, 28 * scale / resources.displayMetrics.density)
+        if (start.textSize != TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, startSp, resources.displayMetrics)) {
+            start.setTextSize(TypedValue.COMPLEX_UNIT_SP, startSp)
+        }
         val startWidth = maxOf((292 * scale).roundToInt(),
-            (start.paint.measureText(start.text.toString()) + dp(32)).roundToInt())
-        measureAt(start, minOf(startWidth, width), startHeight)
+            ceil(start.paint.measureText(start.text.toString())).toInt() + dp(32)).coerceAtMost(width)
+        start.measure(MeasureSpec.makeMeasureSpec(startWidth, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
+        val startHeight = maxOf(dp(48), (60 * scale).roundToInt(), start.measuredHeight + dp(12))
+        measureAt(start, startWidth, startHeight.coerceAtMost(height))
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
@@ -180,8 +186,13 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
         place(sky, logoX + (64 * scale).roundToInt(), firstY + (126 * scale).roundToInt())
         place(ribbon, logoX + (40 * scale).roundToInt(), sky.bottom + (18 * scale).roundToInt())
         val bottomGap = (stageY + 74 * scale).roundToInt()
-        place(start, (width - start.measuredWidth) / 2, height - bottomGap - start.measuredHeight)
+        val roomBelowRibbon = (height - ribbon.bottom).coerceAtLeast(0)
+        val startTop = height - minOf(roomBelowRibbon, bottomGap + start.measuredHeight)
+        place(start, (width - start.measuredWidth) / 2, startTop.coerceAtMost(height - start.measuredHeight))
         val footerY = height - (stageY + 22 * scale).roundToInt() - trial.measuredHeight
+        val footerVisibility = if (start.bottom <= footerY) VISIBLE else INVISIBLE
+        trial.visibility = footerVisibility
+        prototype.visibility = footerVisibility
         place(trial, logoX, footerY)
         place(prototype, width - logoX - prototype.measuredWidth, footerY)
     }
