@@ -3270,3 +3270,9 @@ Back의 추가 재시험 두 번은 권한 복원 직후 SDK가 `NO_DATA`에 머
 [지원 조회](evidence/final-pixel-ui/final-regressions/window-boundary/support.txt)는 multiwindow=true, split-screen=false, freeform=false, 보조 디스플레이=true였다. 따라서 공식 세로·가로 보조 창의 기존 4/4 및 task 크기 변경·복원 근거는 유지하되, 이 AVD의 시스템 회전·분할을 제품 화면 검증 통과로 바꾸지 않는다. 설정 앱에서도 같은 잘림이 발생한 근거이며 제품의 모든 방향 전환 동작이 정상이라는 증거는 아니다.
 
 회전을 free·0·자동1, 1080×600px·120dpi로 [원복](evidence/final-pixel-ui/final-regressions/window-boundary/settings-restored.txt)하고 전용 AVD만 종료했다. 공유 AVD·원본 제품 데이터는 수정하지 않았다. 실제 회전·분할 복합 조건은 지원 환경을 확보한 뒤 확인한다.
+
+## 모의 시연 Debug APK 배포 — 2026-11-13
+
+사용자 요청으로 [사전 릴리스](https://github.com/Yaho03/drive-growth/releases/tag/demo-20261113-ba38def)에 표준 Debug APK와 SHA256SUMS를 제공한다. APK는 `ba38def` 제품 소스의 기존 기기 검증본이며 SHA-256은 `bc7df29fc66d96f8fdc9a9536a14131b7ba33f16f15684af743b1ca97a8a3466`이다. 태그 기준 `b11e6ff`와 app/core/빌드 설정 차이가 없음을 확인했다. 이번 작업에서 재빌드·기기 시험을 반복하지 않았으며 기존 실행 범위를 확대하지 않는다. APK ZIP 무결성과 게시 전 해시를 확인했고, 업로드 후 다시 내려받은 APK 및 GitHub asset digest가 같은 SHA-256임을 확인했다.
+
+설치·실행·모의 입력 범위는 릴리스 안내와 기존 개발환경 문서로 연결한다. APK를 Git 소스에 커밋하거나 서명키를 게시하지 않는다. 비공개 저장소 접근 조건은 유지하며 최종 제출용 Release·영상·자산 권리·익명성 확인 및 #29 전체 완료와 구분한다.

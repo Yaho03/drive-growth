@@ -77,6 +77,12 @@
 | 렌터카 게임·추가 기능 | 첫 지급·탁송·정산·영업·차량 관리·가게 성장과 채택 진행·랭킹의 실행 근거를 기능별로 관리한다. 미채택 정책·권위와 최종 통합은 각 이슈에서 추적한다. |
 | 최종 APK·시연·실차 | 격리 Debug 결합 후보의 화면·모의 Main·SDK 제한 검증을 [06](docs/06_VERIFICATION.md#최종-픽셀-화면-결합의-표시입력-검증--2026-11-13)에 기록했다. 제출 Release APK·영상, 남은 공식 창·시스템 분할/회전·최종 런처 조합과 전원·실차는 각 미완료 조건을 따른다. |
 
+## 설치용 APK 다운로드
+
+[모의 시연용 APK 다운로드](https://github.com/Yaho03/drive-growth/releases/download/demo-20261113-ba38def/drive-growth-ba38def-debug.apk) · [버전·해시·설치 안내](https://github.com/Yaho03/drive-growth/releases/tag/demo-20261113-ba38def)
+
+실제 Pleos API 34 ARM64 에뮬레이터에서 확인한 Debug 앱입니다. 패키지는 `io.drivegrowth.app.simulation`이며 런처에서 **드라이브 키우기 · 모의 시연**을 엽니다. 차량 없이 모의 입력으로 게임 흐름을 확인할 수 있습니다. 최종 제출용 Release나 실제 차량 연동 검증 완료본과 구분합니다. 비공개 저장소 접근 권한이 필요합니다. [첫 실행·모의주행 순서](docs/05_DEVELOPMENT_SETUP.md#별도-모의-시연-debug-apk)
+
 ## 개발환경과 실행
 
 공통 적용값은 Kotlin Gradle Plugin **2.2.21**, AGP **8.10.1**, Gradle **8.11.1**, JDK **17**입니다. SDK 설치·환경 변수·Pleos 실행·팀원별 재현 확인은 [개발환경 기준](docs/05_DEVELOPMENT_SETUP.md)에 있습니다. 로컬 SDK·캐시·개인 `local.properties`는 게시하지 않습니다.
