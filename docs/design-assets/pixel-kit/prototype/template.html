@@ -56,9 +56,13 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--info);outline-
 .bar{flex:1;height:10px;border-radius:5px;background:var(--line);overflow:hidden;min-width:60px}
 .bar>div{height:100%;background:#68a0f0}
 /* 지도 */
-.map{position:relative;width:100%;aspect-ratio:640/464;border-radius:22px;overflow:hidden;container-type:inline-size;background:#86c05a;max-width:100%}
+.map{position:relative;width:100%;aspect-ratio:1536/1024;border-radius:22px;overflow:hidden;container-type:inline-size;background:#72a449;max-width:100%;isolation:isolate}  /* z-index가 지도 밖(시작화면 위)으로 새지 않게 */
 .map img{position:absolute;display:block;max-width:none}
-.map .full{inset:0;width:100%;height:100%}
+.map .full{inset:0;width:100%;height:100%;pointer-events:none}
+.map .car{transform:translate(-50%,-50%) scaleX(-1);pointer-events:none}
+.map .slotbtn{width:4.6%;height:7%;transform:translate(-50%,-50%)}
+.map .lock{position:absolute;transform:translateX(-50%);background:rgba(41,55,78,.6);color:#f7faff;border-radius:3px;padding:2px 4px;font-size:clamp(6px,1.1cqw,13px);white-space:nowrap;pointer-events:none}
+.map .actor{image-rendering:pixelated;pointer-events:none}
 .map .sign{position:absolute;color:#fcdc64;font-weight:900;text-align:center;white-space:nowrap;transform-origin:0 0;line-height:1;text-shadow:0 1px 0 #1c1e2c}
 .hud{position:absolute;display:flex;gap:8px;align-items:center;background:rgba(18,22,34,.9);border-radius:14px;padding:6px 12px;font-weight:700;font-size:clamp(12px,1.6cqw,18px)}
 .ring{position:absolute;border-radius:50%;pointer-events:none}
@@ -69,8 +73,8 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--info);outline-
 @media (max-width:900px){.shop{grid-template-columns:1fr}}
 /* 차 그림 */
 .carpic{position:relative;height:120px;display:grid;place-items:center}
-.carpic img{width:168px;height:auto}
-.carpic .ring{width:150px;height:56px;left:50%;top:62%;transform:translate(-50%,-50%)}
+.carpic img{width:auto;height:112px}
+.carpic .ring{display:none}   /* 차 카드의 희귀도 테두리는 차를 가려서 뺐다(2026-11-13). 희귀도는 옆 칩으로 보여 준다 */
 .cars{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
 .slot-empty{border:3px dashed var(--line);border-radius:22px;display:grid;place-items:center;text-align:center;padding:18px;min-height:220px;color:var(--mut)}
 .dex{overflow-x:auto}
@@ -99,11 +103,10 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--info);outline-
 .ts{position:fixed;inset:0;z-index:60;overflow:hidden;background:#86c05a;cursor:pointer;outline:none;transition:opacity .45s ease}
 .ts.go{opacity:0;pointer-events:none}
 .ts-stage{position:absolute;left:0;top:0;width:1280px;height:720px;transform-origin:0 0}
-.ts .map{position:absolute;left:-11px;top:-33px;width:1408px;max-width:none;border-radius:0;transform-origin:62% 34%;animation:tsCam 18s ease-in-out infinite alternate}
+.ts .map{position:absolute;left:0;top:-110px;width:1280px;max-width:none;border-radius:0;transform-origin:50% 62%;animation:tsCam 18s ease-in-out infinite alternate}
 .ts.go .map{animation:none;transform:scale(1.14);transition:transform .5s cubic-bezier(.5,0,.75,0)}
 @keyframes tsCam{from{transform:translate(0,0) scale(1)}to{transform:translate(-26px,-10px) scale(1.04)}}
 .ts-road{position:absolute;inset:0}
-.ts-road img{position:absolute;image-rendering:pixelated}
 .ts-cloud{position:absolute;left:0;image-rendering:pixelated;animation:tsDrift linear infinite}
 @keyframes tsDrift{from{transform:translateX(-360px)}to{transform:translateX(1500px)}}
 .ts-shade{position:absolute;inset:0;pointer-events:none;
@@ -147,7 +150,8 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--info);outline-
 <div class="app" id="app">
   <div class="top">
     <h1 class="title" id="scrTitle">렌터카 가게</h1>
-    <div class="money" aria-label="보유 게임머니"><span class="coin"></span><span id="money">0</span></div>
+    <div class="row" style="gap:8px"><button class="btn" id="snd" data-act="sound" aria-pressed="true" title="소리 켜기/끄기" style="min-height:44px;padding:0 14px">🔊</button>
+    <div class="money" aria-label="보유 게임머니"><span class="coin"></span><span id="money">0</span></div></div>
   </div>
   <main class="screen" id="screen"></main>
   <nav class="nav" id="nav" aria-label="화면 이동"></nav>
@@ -158,23 +162,21 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--info);outline-
 </div>
 
 <script>
-const IMG = {ground:"{{ground}}", cover1:"{{cover_lv1}}", cover2:"{{cover_lv2}}", cover3:"{{cover_lv3}}",
-  b1:"{{main_lv1}}", b2:"{{main_lv2}}", staff:"{{person_staff}}",
-  light:"{{car_light}}", sedan:"{{car_sedan}}", suv:"{{car_suv}}", van:"{{car_van}}", luxury:"{{car_luxury}}"};
-const SPR = {light:[56,51], sedan:[66,46], suv:[69,58], van:[73,64], luxury:[73,48]};
-const SLOTS = {{slots}};
-const BUILD = {{building}};
+const IMG = {{img}};   // 마을 한 장·차 20종·사람·르르르(경민 #229 시안). 층별 키트는 원본이 오면 바꿔 끼운다
+const SPR = {{spr}};   // 그림 원본 크기 [w,h]
+const MW = 1536, MH = 1024;   // 마을 그림 크기. 지도 위 좌표는 전부 이 기준
+const SLOTS = [{x:253,y:635},{x:326,y:672},{x:400,y:709},{x:474,y:745},{x:548,y:781},{x:984,y:758},{x:1063,y:796},{x:1142,y:835},{x:1220,y:873},{x:1299,y:912}]; // 주차 칸 가운데
 
 // ── 콘텐츠(PRD 시험값) ──
 const MODELS = [
- ["hyundai_casper","캐스퍼",100,1,"light",0],["hyundai_venue","베뉴",110,1,"light",95],["hyundai_kona","코나",130,1,"suv",-25],
- ["hyundai_avante","아반떼",120,1,"sedan",0],["hyundai_sonata","쏘나타",150,1,"sedan",200],["hyundai_tucson","투싼",150,1,"suv",0],
- ["hyundai_staria_tourer","스타리아 투어러",170,1,"van",160],["hyundai_casper_electric","캐스퍼 일렉트릭",130,1,"light",170],
- ["hyundai_grandeur","그랜저",200,2,"sedan",120],["hyundai_santafe","싼타페",180,2,"suv",60],["hyundai_staria_lounge","스타리아 라운지",200,2,"van",0],
- ["hyundai_ioniq5","아이오닉 5",180,2,"suv",250],["hyundai_ioniq6","아이오닉 6",180,2,"sedan",300],["hyundai_nexo","넥쏘",220,2,"suv",140],
- ["genesis_g80","G80",240,3,"luxury",0],["hyundai_palisade","팰리세이드",230,3,"suv",320],["genesis_gv70","GV70",240,3,"suv",200],
- ["hyundai_ioniq9","아이오닉 9",250,3,"van",280],["genesis_g90","G90",300,4,"luxury",180],["genesis_gv80","GV80",280,4,"suv",100]
-].map(([id,name,ratio,unlock,type,hue])=>({id,name,ratio,unlock,type,hue,price:Math.floor(1000*ratio/100)}));
+ ["hyundai_casper","캐스퍼",100,1],["hyundai_venue","베뉴",110,1],["hyundai_kona","코나",130,1],
+ ["hyundai_avante","아반떼",120,1],["hyundai_sonata","쏘나타",150,1],["hyundai_tucson","투싼",150,1],
+ ["hyundai_staria_tourer","스타리아 투어러",170,1],["hyundai_casper_electric","캐스퍼 일렉트릭",130,1],
+ ["hyundai_grandeur","그랜저",200,2],["hyundai_santafe","싼타페",180,2],["hyundai_staria_lounge","스타리아 라운지",200,2],
+ ["hyundai_ioniq5","아이오닉 5",180,2],["hyundai_ioniq6","아이오닉 6",180,2],["hyundai_nexo","넥쏘",220,2],
+ ["genesis_g80","G80",240,3],["hyundai_palisade","팰리세이드",230,3],["genesis_gv70","GV70",240,3],
+ ["hyundai_ioniq9","아이오닉 9",250,3],["genesis_g90","G90",300,4],["genesis_gv80","GV80",280,4]
+].map(([id,name,ratio,unlock])=>({id,name,ratio,unlock,price:Math.floor(1000*ratio/100)}));   // 차종마다 전용 그림이라 색 변환은 없앴다
 const M = Object.fromEntries(MODELS.map(m=>[m.id,m]));
 const RAR = [
  {k:"common",n:"일반",w:747,inc:1.0,cost:100,prog:100},{k:"advanced",n:"고급",w:200,inc:1.1,cost:105,prog:150},
@@ -217,7 +219,7 @@ const NAV = [["shop","가게"],["garage","차고"],["dex","도감"],["gacha","�
 let view = "shop", detailId = null;
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
-function carImg(model,cls="px"){ const m=M[model]; return `<img class="${cls}" src="${IMG[m.type]}" alt="${esc(m.name)}" style="filter:hue-rotate(${m.hue}deg)">`; }
+function carImg(model,cls="px"){ return `<img class="${cls}" src="${IMG[model]}" alt="${esc(M[model].name)}">`; }
 function rarChip(k){ return `<span class="chip rar ${k}">${R[k].n}</span>`; }
 function stChip(c){ if(c.st==="repair") return `<span class="chip st-repair">수리 필요</span>`;
   if(c.rest) return `<span class="chip st-rest">영업 쉬기</span>`; return `<span class="chip st-idle">대기</span>`; }
@@ -229,7 +231,8 @@ function go(v){ view=v; detailId=null; render(); window.scrollTo(0,0); }
 
 function render(){
   save();
-  $("#money").textContent = won(S.money);
+  $("#money").textContent = won(S.money); $("#snd").textContent = AU.on?"🔊":"🔇"; $("#snd").setAttribute("aria-pressed", AU.on);
+  bgm(S.started?view:"shop");
   if(!S.started){ $("#nav").hidden=true; $("#scrTitle").textContent="첫 실행"; return renderOnboarding(); }
   $("#nav").hidden=false;
   $("#nav").innerHTML = NAV.map(([k,n])=>`<button data-go="${k}" ${view===k||(view==="detail"&&k==="garage")?'aria-current="page"':""}>${n}${k==="settle"&&S.unread.length?` · ${S.unread.length}`:""}</button>`).join("");
@@ -239,6 +242,7 @@ function render(){
 }
 document.addEventListener("click", e=>{
   const b = e.target.closest("[data-go],[data-act]"); if(!b || b.disabled) return;
+  if(b.dataset.act!=="sound") sfx("click");
   if(b.dataset.go){ go(b.dataset.go); return; }
   ACT[b.dataset.act](b.dataset.arg, b);
 });
@@ -248,7 +252,7 @@ let ob = {step:0, pick:"hyundai_casper"};
 function renderOnboarding(){
   const s=$("#screen");
   if(ob.step===0) s.innerHTML=`<div class="card pop" style="max-width:640px;margin:40px auto;display:grid;gap:16px;justify-items:start">
-    <div class="row"><img class="px" src="${IMG.staff}" alt="안내 직원" style="width:48px"><span class="mut">안내 직원</span></div>
+    <div class="row"><img class="px" src="${IMG.staff}" alt="정비사" style="width:48px"><span class="mut">정비사</span></div>
     <div class="big">어서 오세요, 사장님!</div>
     <p class="mut" style="margin:0;font-size:18px;line-height:1.6">오늘부터 이 렌터카 가게를 맡게 되었어요. 차를 모아 빌려주고, 가게를 조금씩 키워 봐요. 먼저 첫 차를 한 대 골라 볼까요?</p>
     <button class="btn p" data-act="obNext">시작하기</button></div>`;
@@ -274,31 +278,26 @@ function renderOnboarding(){
 
 // ── 가게(지도) ──
 const pct=(v,base)=>v/base*100;
-function mapBase(){
-  const b = S.level===1?BUILD.main_lv1:BUILD.main_lv2, sign = b.sign; // [bl,br,tr,tl]
-  const sw = Math.hypot(sign[1][0]-sign[0][0], sign[1][1]-sign[0][1]), sh = sign[0][1]-sign[3][1];
-  return `<img class="full px" src="${IMG.ground}" alt="">
-    ${S.level<4?`<img class="full px" src="${IMG["cover"+S.level]}" alt="">`:""}
-    <img class="px" src="${S.level===1?IMG.b1:IMG.b2}" alt="가게 본관" style="left:${pct(b.left,640)}%;top:${pct(b.top,464)}%;width:${pct(b.w,640)}%">
-    <div class="sign" style="left:${pct(sign[3][0],640)}%;top:${pct(sign[3][1],464)}%;width:${pct(sw*Math.cos(Math.atan2(sign[1][1]-sign[0][1],sign[1][0]-sign[0][0])),640)}cqw;height:${pct(sh,640)}cqw;font-size:${pct(sh*.9,640)}cqw;transform:skewY(26.565deg)">${esc(S.sign||"렌터카")}</div>`;
+const mx=v=>pct(v,MW)+"%", my=v=>pct(v,MH)+"%";   // 마을 좌표 → 지도 안 %
+function mapBase(locks=true){   // 마을 한 장. 가게 레벨에 따른 본관·주차장 변화는 층별 키트가 오면 넣는다
+  return `<img class="full" src="${IMG.town}" alt="마을. 파란 렌터카 본관, 주유소, 보험사, 세차장">
+    ${locks?SLOTS.map((sl,i)=>i>=cap()?`<span class="lock" style="left:${mx(sl.x)};top:${my(sl.y-35)};z-index:2500">확장 예정</span>`:"").join(""):""}`;
 }
-const parkedCar = (m, sl, extra="") => { const [w,h]=SPR[m.type];
-  return `<img class="px" src="${IMG[m.type]}" alt="${esc(m.name)}" style="left:${pct(sl.x-w*.58,640)}%;top:${pct(sl.y-h+14,464)}%;width:${pct(w,640)}%;transform:scaleX(-1);filter:hue-rotate(${m.hue}deg) ${extra}">`; };
+const parkedCar = (m, sl, extra="") => `<img class="car" src="${IMG[m.id]}" alt="${esc(m.name)}" style="left:${mx(sl.x)};top:${my(sl.y-7)};width:${pct(SPR[m.id][0]*2,MW)}%;z-index:${100+sl.y}${extra?";filter:"+extra:""}">`;
 function renderShop(){
-  const cars = S.cars.slice(0,cap()).map((c,i)=>{ const sl=SLOTS[i], m=M[c.model], [w,h]=SPR[m.type];
-    return {c,sl,m,w,h,y:sl.y}; }).sort((a,b)=>a.y-b.y);
+  const cars = S.cars.slice(0,cap()).map((c,i)=>({c,sl:SLOTS[i],m:M[c.model]}));
   const next = EXPAND[S.level+1];
   const canExp = next && S.customers>=next.cust && S.money>=next.cost;
   $("#screen").innerHTML = `<div class="shop">
-   <div class="map" aria-label="가게 지도. 주차 ${S.cars.length}/${cap()}칸">
+   <div class="map" id="shopMap" aria-label="가게 지도. 주차 ${S.cars.length}/${cap()}칸">
     ${mapBase()}
-    ${cars.map(({c,sl,m,w,h})=>`<span class="ring ${c.rar}" style="left:${pct(sl.x-28,640)}%;top:${pct(sl.y-9,464)}%;width:${pct(56,640)}%;height:${pct(20,464)}%"></span>
-      ${parkedCar(m, sl, c.st==="repair"?"saturate(.4)":"")}
-      ${c.st==="repair"||c.rest?`<span class="hud" style="left:${pct(sl.x-14,640)}%;top:${pct(sl.y-h,464)}%;padding:2px 8px">${c.st==="repair"?"수리":"쉼"}</span>`:""}
-      <button class="slotbtn" data-act="openCar" data-arg="${c.id}" aria-label="${esc(m.name)} 자세히" style="left:${pct(sl.x-34,640)}%;top:${pct(sl.y-h+8,464)}%;width:${pct(68,640)}%;height:${pct(h,464)}%"></button>`).join("")}
-    <div class="hud" style="left:2%;top:3%"><span style="width:10px;height:10px;border-radius:50%;background:var(--ok);display:inline-block"></span>정상 영업 중</div>
-    <div class="hud" style="right:2%;top:3%">P ${S.cars.length} / ${cap()}${S.hold?" · 보관 1":""}</div>
-    <div class="hud" style="left:2%;bottom:3%">가게 Lv${S.level} · 완료 손님 ${S.customers}명</div>
+    ${cars.map(({c,sl,m})=>`${parkedCar(m, sl, c.st==="repair"?"saturate(.4)":"")}
+      ${c.st==="repair"||c.rest?`<span class="hud" style="left:${mx(sl.x)};top:${my(sl.y-62)};padding:2px 8px;z-index:2600;transform:translateX(-50%)">${c.st==="repair"?"수리":"쉼"}</span>`:""}
+      <button class="slotbtn" data-act="openCar" data-arg="${c.id}" aria-label="${esc(m.name)} 자세히" style="left:${mx(sl.x)};top:${my(sl.y-7)};z-index:3000"></button>`).join("")}
+    ${actorsHTML()}
+    <div class="hud" style="left:2%;top:3%;z-index:4000"><span style="width:10px;height:10px;border-radius:50%;background:var(--ok);display:inline-block"></span>정상 영업 중</div>
+    <div class="hud" style="right:2%;top:3%;z-index:4000">P ${S.cars.length} / ${cap()}${S.hold?" · 보관 1":""}</div>
+    <div class="hud" style="left:2%;bottom:3%;z-index:4000">가게 Lv${S.level} · 완료 손님 ${S.customers}명</div>
    </div>
    <div style="display:grid;gap:14px;align-content:start">
     <div class="card" style="display:grid;gap:10px">
@@ -308,7 +307,7 @@ function renderShop(){
         <button class="btn p" data-act="expand" ${canExp?"":"disabled"}>확장하기</button>
         ${canExp?"":`<div class="mut" style="font-size:14px">${S.customers<next.cust?`손님 ${next.cust-S.customers}명을 더 받아야 해요`:`게임머니 ${won(next.cost-S.money)}이 더 필요해요`}</div>`}`
         :`<div class="mut">최고 레벨이에요 · 주차 10칸</div>`}
-      <div class="mut" style="font-size:14px">시설(주유소·보험·세차장)은 그림과 규칙을 준비 중이에요.</div>
+      <div class="mut" style="font-size:14px">시설(주유소·보험·세차장)은 마을 그림에만 있고 규칙은 준비 중이에요. 사람과 르르르는 장식이에요.</div>
     </div>
     <div class="card tools" style="display:grid;gap:10px">
       <div class="h2">시험 도구</div>
@@ -328,6 +327,7 @@ function renderShop(){
       <div class="mut" style="font-size:13px">${S.day}일째 · 오늘 반영 거리 ${S.kmToday} / ${KM_CAP}km</div>
     </div>
    </div></div>`;
+  mountActors($("#shopMap"));
 }
 
 // ── ① 차고 ──
@@ -359,7 +359,7 @@ function renderDetail(){
   $("#screen").innerHTML = `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
    <div class="card" style="display:grid;gap:10px;align-content:start">
      <button class="btn" data-go="garage" style="justify-self:start">← 차고</button>
-     <div class="carpic" style="height:180px"><span class="ring ${c.rar}" style="width:220px;height:80px"></span><img class="px" src="${IMG[m.type]}" alt="${esc(m.name)}" style="width:240px;filter:hue-rotate(${m.hue}deg)"></div>
+     <div class="carpic" style="height:180px"><span class="ring ${c.rar}" style="width:220px;height:80px"></span><img class="px" src="${IMG[m.id]}" alt="${esc(m.name)}" style="width:240px;height:auto"></div>
      <div class="row"><span class="big" style="font-size:30px">${m.name}</span>${rarChip(c.rar)}${stChip(c)}</div>
      <div class="row" style="flex-wrap:nowrap"><b>Lv ${c.lv}</b><div class="bar"><div style="width:${c.prog}%"></div></div><span class="mut">${c.prog}%</span></div>
      <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
@@ -512,7 +512,7 @@ function renderRank(){
 
 // ── 연출(4차 Claude Design) 연결 ──
 const TIER_OF = {common:"common", advanced:"uncommon", rare:"rare", legend:"legend"};
-const carData = id => { const m=M[id]; return {src:IMG[m.type], w:SPR[m.type][0], h:SPR[m.type][1], hue:m.hue}; };
+const carData = id => ({src:IMG[id], w:SPR[id][0], h:SPR[id][1]});
 const canMotion = () => typeof window.playMotion === "function";
 function gachaMotion(kind, r, m, isNew, guaranteed, pityBefore){
   window.playMotion("gacha", {tier:TIER_OF[r], name:m.name, car:carData(m.id), isNew, guaranteed, price:kind==="free"?"무료권":String(TICKET),
@@ -523,8 +523,31 @@ function gachaMotion(kind, r, m, isNew, guaranteed, pityBefore){
     onGarage:()=>{ window.closeMotion(); go("garage"); }});
 }
 
+// ── 소리: 효과음은 WebAudio로 즉석에서 만들고, 브금은 옆 폴더 bgm/의 mp3를 읽는다(없으면 조용히 넘어감) ──
+const AU = {ctx:null, on: localStorage.getItem("rentSound")!=="off"};
+function tone(f, at, dur, type="square", vol=.12, slide=0){ if(!AU.on) return; try{ AU.ctx = AU.ctx || new (window.AudioContext||window.webkitAudioContext)(); if(AU.ctx.state==="suspended") AU.ctx.resume(); }catch(e){ return; }
+  const c=AU.ctx, t0=c.currentTime+at, o=c.createOscillator(), g=c.createGain(); o.type=type; o.frequency.setValueAtTime(f,t0); if(slide) o.frequency.linearRampToValueAtTime(Math.max(30,f+slide),t0+dur);
+  g.gain.setValueAtTime(vol,t0); g.gain.exponentialRampToValueAtTime(.001,t0+dur); o.connect(g).connect(c.destination); o.start(t0); o.stop(t0+dur+.02); }
+const SFX = {   // 픽셀 게임풍 짧은 소리. 실제 효과음 파일이 오면 이 표만 바꾼다
+  click: ()=>tone(880,0,.05,"square",.06), coin: ()=>{ tone(1047,0,.08,"square",.1); tone(1568,.08,.16,"square",.1); },
+  shutter: ()=>tone(110,0,.3,"sawtooth",.18,-70), whoosh: ()=>tone(300,0,.3,"sine",.1,900), pop: ()=>tone(400,0,.12,"square",.12,500),
+  chime: n=>tone(660*Math.pow(1.19,n||0),0,.25,"triangle",.12), sparkle: ()=>[0,.06,.12].forEach((d,i)=>tone(1760+i*440,d,.14,"triangle",.08)),
+  fanfare: ()=>[[523,0],[659,.12],[784,.24],[1047,.36]].forEach(([f,d])=>tone(f,d,.32,"square",.1)),
+  levelup: ()=>[523,659,784,1047,1319].forEach((f,i)=>tone(f,i*.07,.16,"square",.1)), ding: ()=>tone(1319,0,.35,"triangle",.1),
+  knock: ()=>[0,.09,.18].forEach(d=>tone(150,d,.06,"square",.12)), tick3: ()=>[0,.1,.2].forEach(d=>tone(1200,d,.03,"square",.07)),
+  horn: ()=>{ tone(440,0,.2,"sawtooth",.1); tone(554,0,.2,"sawtooth",.08); }, depart: ()=>tone(120,0,.55,"sawtooth",.12,90), bad: ()=>tone(220,0,.22,"square",.1,-90) };
+const CUE = [[/셔터 쿵/,"shutter"],[/셔터 열림|휘익/,"whoosh"],[/승급 차임 (\d)/,"chime"],[/팡파르|축하/,"fanfare"],[/반짝/,"sparkle"],[/판자/,"knock"],[/띵/,"ding"],[/뿅/,"pop"],[/레벨업/,"levelup"],[/톡톡/,"tick3"],[/톡/,"click"],[/동전/,"coin"],[/경적/,"horn"]];
+function sfx(name){ if(SFX[name]) return SFX[name](); for(const [re,k] of CUE){ const m=re.exec(name); if(m) return SFX[k](m[1]&&+m[1]); } }   // 연출의 SFX 자리 글귀도 받는다
+window.sfx = sfx;
+const BGM = {el:Object.assign(new Audio(),{loop:true,volume:.45}), cur:null,
+  of:{title:"title", shop:"shop", garage:"shop", detail:"shop", dex:"shop", rank:"shop", gacha:"gacha", delivery:"delivery", settle:"settle"}};
+BGM.el.addEventListener("error", ()=>{ BGM.cur=null; });   // 파일이 없으면 조용히 넘어간다
+function bgm(view){ const name=BGM.of[view]||"shop"; if(!AU.on){ BGM.el.pause(); BGM.cur=null; return; }
+  if(BGM.cur===name) return; BGM.cur=name; BGM.el.src=`bgm/${name}.mp3`; BGM.el.play().catch(()=>{}); }   // 첫 손길 전엔 play()가 거부돼도 그냥 넘어간다
+
 // ── 동작 ──
 const ACT = {
+  sound(){ AU.on=!AU.on; localStorage.setItem("rentSound", AU.on?"on":"off"); BGM.cur=null; if(AU.on) sfx("pop"); render(); },   // render()가 화면에 맞는 브금을 다시 튼다
   obNext(){ ob.step++; render(); }, obBack(){ ob.step=1; render(); }, obPick(id){ ob.pick=id; render(); },
   obGrant(){ S=fresh(); S.money=1000; S.earned=0; addCar(ob.pick,"common",0,"첫 지급"); ob.step=3; render();
     if(canMotion()) window.playMotion("grant",{money:1000, name:M[ob.pick].name, car:carData(ob.pick), onClose:()=>{ window.closeMotion(); ACT.obDone(); }}); },
@@ -540,14 +563,14 @@ const ACT = {
       if(Math.random()<.03){ fee=Math.round(fee*.5); c.acc++; c.st="repair"; text+=" · 사고: 수익 50%, 수리 필요"; }
       S.customers++; n++; income("rental",fee,text); S.log.push({text,amount:fee});
       if(!S.firstRental){ S.firstRental=true; if(!S.gifted){ S.gifted=true; S.free++; S.unread.push({src:"gift",amount:0,text:"첫 영업을 마쳤어요 · 개업 선물: 무료 뽑기권 1장"}); setTimeout(giftModal,50); } } }
-    toast(n?`손님 ${n}명이 차를 빌려 갔어요 · 정산에서 확인하세요`:"이번 시간엔 손님이 없었어요"); render(); },
+    sfx(n?"coin":"bad"); toast(n?`손님 ${n}명이 차를 빌려 갔어요 · 정산에서 확인하세요`:"이번 시간엔 손님이 없었어요"); render(); },
   drive(){ const km=Math.min(30, KM_CAP-S.kmToday); S.km+=30;
     if(km<=0){ toast("오늘은 하루 최대 500km를 넘어서 주행 수익이 더 쌓이지 않아요"); return render(); }
-    S.kmToday+=km; const pay=km*KM_PAY; const text=`기본 주행 수익 · ${km}km × ${KM_PAY}`; income("drive",pay,text); S.log.push({text,amount:pay}); toast(`+${pay} · 정산에서 확인하세요`); render(); },
+    S.kmToday+=km; const pay=km*KM_PAY; const text=`기본 주행 수익 · ${km}km × ${KM_PAY}`; income("drive",pay,text); S.log.push({text,amount:pay}); sfx("coin"); toast(`+${pay} · 정산에서 확인하세요`); render(); },
   arrive(){ const d=S.delivery; if(!d) return; const o=d.offer, m=M[o.model];
     if(o.kind==="profit"){ const text=`${m.name} 수익 탁송 · ${o.dest} 도착 완료`; income("delivery",o.reward,text); S.log.push({text,amount:o.reward}); }
     else { const where=addCar(o.model,o.rar,d.paid,"구매 탁송"); const text=`${m.name}(${R[o.rar].n}) 구매 탁송 도착 · ${where==="garage"?"차고에 들어갔어요":"차고가 꽉 차서 임시 보관함에 있어요"}`; income("delivery",0,text); S.log.push({text,amount:0}); }
-    S.delivery=null; S.offers=null; toast("탁송을 마쳤어요 · 정산에서 확인하세요"); render(); },
+    S.delivery=null; S.offers=null; sfx("coin"); toast("탁송을 마쳤어요 · 정산에서 확인하세요"); render(); },
   nextDay(){ S.day++; S.kmToday=0;
     if(S.delivery && S.day>S.delivery.day+1){ const d=S.delivery; if(d.offer.kind==="buy"){ S.money+=d.paid; S.unread.push({src:"delivery",amount:0,text:`도착 기한이 지나 구매 탁송 결제금 ${won(d.paid)}을 전액 돌려드렸어요`}); }
       else S.unread.push({src:"delivery",amount:0,text:"도착 기한이 지나 수익 탁송이 사라졌어요 · 벌금은 없어요"}); S.delivery=null; }
@@ -558,7 +581,7 @@ const ACT = {
   reset(){ closeModal(); S=fresh(); seq=0; ob={step:0,pick:"hyundai_casper"}; view="shop"; render(); },
   close(){ closeModal(); },
   unhold(){ if(S.hold && S.cars.length<cap()){ S.cars.push(S.hold.car); S.hold=null; toast("차고로 옮겼어요"); render(); } },
-  levelup(id){ const c=S.cars.find(x=>x.id===id), cost=lvCost(c); if(S.money<cost) return; S.money-=cost; c.lv++; if(c.lv>=20) c.prog=0; toast(`Lv${c.lv}이 되었어요`); render(); },
+  levelup(id){ const c=S.cars.find(x=>x.id===id), cost=lvCost(c); if(S.money<cost) return; S.money-=cost; c.lv++; sfx("levelup"); if(c.lv>=20) c.prog=0; toast(`Lv${c.lv}이 되었어요`); render(); },
   matPick(id){ const c=S.cars.find(x=>x.id===id); const mats=S.cars.filter(x=>x.id!==id&&x.model===c.model&&x.st!=="repair");
     modal(`<div style="display:grid;gap:12px"><div class="h2">재료로 쓸 차를 골라 주세요</div>
       ${mats.map(x=>`<button class="item" data-act="matAsk" data-arg="${id}|${x.id}" style="text-align:left"><div class="row">${carImg(x.model)}<div><b>${M[x.model].name}</b> ${rarChip(x.rar)}<div class="mut">Lv${x.lv} · +${R[x.rar].prog}%</div></div></div></button>`).join("")}
@@ -573,12 +596,12 @@ const ACT = {
       <div class="notice warn">재료로 쓴 차는 차고에서 사라지고 되돌릴 수 없어요</div>
       <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn p" data-act="matDo" data-arg="${arg}">강화하기</button></div></div>`); },
   matDo(arg){ const [tid,mid]=arg.split("|"), t=S.cars.find(x=>x.id===tid), m=S.cars.find(x=>x.id===mid);
-    gainProg(t,R[m.rar].prog); S.cars=S.cars.filter(x=>x.id!==mid); closeModal(); toast(`${M[t.model].name} Lv${t.lv} ${t.prog}%가 되었어요`); render(); },
-  repair(id){ const c=S.cars.find(x=>x.id===id), cost=repairCost(c); if(S.money<cost) return; S.money-=cost; c.st="idle"; toast("수리했어요 · 다시 영업할 수 있어요"); render(); },
+    gainProg(t,R[m.rar].prog); S.cars=S.cars.filter(x=>x.id!==mid); closeModal(); sfx("levelup"); toast(`${M[t.model].name} Lv${t.lv} ${t.prog}%가 되었어요`); render(); },
+  repair(id){ const c=S.cars.find(x=>x.id===id), cost=repairCost(c); if(S.money<cost) return; S.money-=cost; c.st="idle"; sfx("ding"); toast("수리했어요 · 다시 영업할 수 있어요"); render(); },
   sellAsk(id){ const c=S.cars.find(x=>x.id===id); confirmDispose(c,"sell",salePrice(c)); },
   scrapAsk(id){ const c=S.cars.find(x=>x.id===id); confirmDispose(c,"scrap",scrapPrice(c)); },
   dispose(arg){ const [id,kind]=arg.split("|"), c=S.cars.find(x=>x.id===id); const amt=kind==="sell"?salePrice(c):scrapPrice(c);
-    S.cars=S.cars.filter(x=>x.id!==id); if(amt){ S.money+=amt; S.earned+=amt; } closeModal(); view="garage"; toast(`${M[c.model].name}을 ${kind==="sell"?"판매":"폐차"}했어요 · +${won(amt)}`); render(); },
+    S.cars=S.cars.filter(x=>x.id!==id); if(amt){ S.money+=amt; S.earned+=amt; sfx("coin"); } closeModal(); view="garage"; toast(`${M[c.model].name}을 ${kind==="sell"?"판매":"폐차"}했어요 · +${won(amt)}`); render(); },
   rest(id){ const c=S.cars.find(x=>x.id===id); c.rest=!c.rest; render(); },
   pull(kind){ if(S.cars.length>=cap()) return; if(kind==="free"){ if(!S.free) return; S.free--; } else { if(S.money<TICKET) return; S.money-=TICKET; }
     if(canMotion()){ const before=S.pity, guaranteed=before>=PITY-1; const r=rollRar(); const pool=unlocked(); const m=pool[Math.floor(Math.random()*pool.length)];
@@ -589,7 +612,7 @@ const ACT = {
       S.pity = (r==="rare"||r==="legend") ? 0 : S.pity+1; addCar(m.id,r,kind==="free"?0:TICKET,"뽑기");
       modal(`<div class="pop" style="display:grid;gap:14px;justify-items:center;text-align:center;${r==="legend"?"border:3px solid var(--r-legend);border-radius:18px;padding:18px":""}">
         <div class="h2" style="color:var(--r-${r==="advanced"?"adv":r})">${r==="legend"?"★ 전설 등급! ★":R[r].n+" 등급"}</div>
-        <div class="carpic" style="height:170px"><span class="ring ${r}" style="width:220px;height:80px"></span><img class="px" src="${IMG[m.type]}" alt="${esc(m.name)}" style="width:230px;filter:hue-rotate(${m.hue}deg)"></div>
+        <div class="carpic" style="height:170px"><span class="ring ${r}" style="width:220px;height:80px"></span><img class="px" src="${IMG[m.id]}" alt="${esc(m.name)}" style="width:230px;height:auto"></div>
         <div class="row"><span class="h2">${m.name}</span>${rarChip(r)}<span class="chip" style="background:var(--card2)">Lv1</span></div>
         <div class="mut">차고에 들어갔어요 · 차고 ${S.cars.length} / ${cap()}칸${r==="rare"||r==="legend"?" · 보장 횟수는 30회부터 다시 세요":""}</div>
         <div class="row"><button class="btn" data-act="close">닫기</button><button class="btn p" data-act="toGarage">차고에서 보기</button></div></div>`);
@@ -606,7 +629,7 @@ const ACT = {
     if(k==="expand") window.playMotion("expand",{lv:3, from:5, to:7, onClose:close}); },
   dest(k){ S.dest=k; S.offers=null; render(); },
   accept(oid){ const o=S.offers.list.find(x=>x.id===oid); if(o.kind==="buy"){ if(S.money<o.price) return; S.money-=o.price; }
-    S.delivery={offer:o, day:S.day, changed:false, paid:o.price||0}; toast(`${o.dest}까지 의뢰를 받았어요 · 출발 전 확인 완료`); render(); },
+    S.delivery={offer:o, day:S.day, changed:false, paid:o.price||0}; sfx("depart"); toast(`${o.dest}까지 의뢰를 받았어요 · 출발 전 확인 완료`); render(); },
   changeAsk(){ const cur=S.delivery; const others=DEST.filter(x=>x.n!==cur.offer.dest);
     modal(`<div style="display:grid;gap:12px"><div class="h2">어디로 바꿀까요?</div><div class="mut">새 거리로 의뢰를 다시 받아요 · 희귀도가 1단계 낮아지고, 변경 기회는 한 번뿐이에요</div>
       ${others.map(x=>`<button class="item" data-act="changeTo" data-arg="${x.k}" style="text-align:left"><div><b>${x.n}</b><div class="mut">${x.km}km · ${x.band}</div></div></button>`).join("")}
@@ -630,32 +653,54 @@ function confirmDispose(c,kind,amt){ const m=M[c.model];
     <div class="row">${carImg(c.model)}<div>${rarChip(c.rar)} Lv${c.lv} · 사고 ${c.acc}회<div class="row" style="gap:6px;margin-top:6px"><span class="coin s"></span><b>+${won(amt)}</b></div></div></div>
     <div class="notice warn">${kind==="sell"?"판매":"폐차"}한 차는 되돌릴 수 없어요 · 도감의 보유 기록은 남아요</div>
     <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn ${kind==="sell"?"p":"danger"}" data-act="dispose" data-arg="${c.id}|${kind}">${kind==="sell"?"판매하기":"폐차하기"}</button></div></div>`); }
-function giftModal(){ modal(`<div class="pop" style="display:grid;gap:14px;justify-items:center;text-align:center"><span class="mut">첫 영업을 마쳤어요</span><div class="big">개업 선물이 도착했어요!</div>
+function giftModal(){ sfx("sparkle"); modal(`<div class="pop" style="display:grid;gap:14px;justify-items:center;text-align:center"><span class="mut">첫 영업을 마쳤어요</span><div class="big">개업 선물이 도착했어요!</div>
   <img class="px" src="${IMG.staff}" alt="" style="width:40px"><div class="h2">무료 뽑기권 1장</div><div class="mut">뽑기에서 게임머니 대신 쓸 수 있어요</div>
   <div class="row"><button class="btn" data-act="close">나중에</button><button class="btn p" data-act="toGacha">지금 뽑으러 가기</button></div></div>`); }
 ACT.toGacha = ()=>{ closeModal(); go("gacha"); };
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
+
+// ── 마을 사람 (경로는 경민 #229·정원 #235 시안, 그림은 PNG로 교체) ──
+const ACTORS = [
+ {kind:"guest",a:[595,580],b:[825,695],dur:22,off:0},{kind:"guest",a:[745,750],b:[945,850],dur:24,off:8},
+ {kind:"mechanic",a:[1175,660],b:[1285,715],dur:16,off:4},{kind:"fuel",a:[130,318],b:[300,302],dur:18,off:6},
+ {kind:"mechanic",a:[720,595],b:[940,705],dur:21,off:11},   // 렌트카 직원 자리 → 정비사(2026-11-13 결정)
+ {kind:"ruru",a:[670,665],b:[790,725],dur:20,off:2}];
+// ponytail: 서로 비켜 서는 처리는 뺐다. 경로가 겹쳐 보이면 경민 시안의 advanceActors를 가져온다
+const RURU = {walk:[1,2,3,4,5,6,7,8].map(i=>IMG["walk"+i]), idle:[5,5,3,4,5,5].map(i=>IMG["idle"+i])};
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const actorsHTML = () => ACTORS.map((p,i)=>`<img class="actor" data-actor="${i}" alt="" src="${p.kind==="ruru"?RURU.idle[0]:IMG[p.kind]}" style="width:${pct(p.kind==="ruru"?64:32,MW)}%">`).join("");
+function pose(p, clock){ const ph=(clock/p.dur)%1; let t=0, walk=false, flip=false;   // a에서 쉬고 → b로 → 돌아서 쉬고 → a로
+  if(ph<.1) t=0; else if(ph<.45){ t=(ph-.1)/.35; walk=true; } else if(ph<.6){ t=1; flip=ph>.53; } else if(ph<.95){ t=1-(ph-.6)/.35; walk=true; flip=true; }
+  return {x:p.a[0]+(p.b[0]-p.a[0])*t, y:p.a[1]+(p.b[1]-p.a[1])*t, walk, flip}; }
+const actorClock = {};   // 화면을 다시 그려도 걷던 자리에서 이어진다
+function mountActors(map){ if(!map) return; const els=[...map.querySelectorAll("[data-actor]")]; let prev=performance.now();
+  const tick=now=>{ if(!map.isConnected) return; const dt=reduceMotion()?0:Math.min((now-prev)/1000,.1); prev=now;
+    els.forEach(el=>{ const i=+el.dataset.actor, p=ACTORS[i]; actorClock[i]=(actorClock[i]??p.off)+dt; const s=pose(p,actorClock[i]);
+      el.style.left=mx(s.x); el.style.top=my(s.y); el.style.zIndex=100+Math.round(s.y);
+      const bob = s.walk && p.kind!=="ruru" ? Math.floor(actorClock[i]*6)%2 : 0;
+      el.style.transform=`translate(-50%,${-100-bob*2}%) scaleX(${s.flip?-1:1})`;
+      if(p.kind==="ruru"){ const f=s.walk?RURU.walk[Math.floor(actorClock[i]*10)%8]:RURU.idle[Math.floor(actorClock[i]*2)%6]; if(el.src!==f) el.src=f; } });
+    requestAnimationFrame(tick); };
+  requestAnimationFrame(tick); }
 
 // ── 시작화면 ──
 // ponytail: "르르르" 이름 사용은 #19 권리 확인 전이다. 바뀌면 이 한 줄만 고친다.
 const GAME_TITLE = ["르르르", "렌터카"];
 const cloudSVG = (fill, op) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="16" shape-rendering="crispEdges"><path fill="${fill}" fill-opacity="${op}" d="M4 9h2V7h3V5h2V4h3V3h6v1h2v1h1v1h2V5h5v1h2v2h1v2h2v2h1v2H2v-3h2z"/></svg>`);
-const isoXY = (i, j) => [304 + (i - j) * 16, -70 + (i + j) * 8];   // map/make_map.py와 같은 투영
-const LANES = [{j:27.75, v:2.1}, {j:29.25, v:2.7}];                 // 도로 두 차선, 둘 다 ↘ 방향
+const LANES = [{y0:722, v:150}, {y0:800, v:190}];   // 마을 왼쪽 아래 도로. 차선은 y = y0 + x/2, 둘 다 ↘ 방향(마을 px/초)
 const TS = {raf:0, cars:[], last:0, next:0};
-const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 function fitTitle(){ const W=innerWidth, H=innerHeight, s=Math.min(Math.max(W/1280, H/720), W/960);
   $("#tsStage").style.transform = `translate(${(W-1280*s)/2}px,${(H-720*s)/2}px) scale(${s})`; }
-function tsSpawn(lane, i){ const m = MODELS[Math.floor(Math.random()*MODELS.length)], [w,h] = SPR[m.type], img = document.createElement("img");
-  img.src = IMG[m.type]; img.alt = ""; img.style.width = pct(w,640)+"%"; img.style.filter = `hue-rotate(${m.hue}deg)`;
-  $("#tsRoad").appendChild(img); const c = {img, w, h, lane, i}; TS.cars.push(c); tsPlace(c, 0); }
-function tsPlace(c, t){ const [x,y] = isoXY(c.i, LANES[c.lane].j);
-  c.img.style.left = pct(x - c.w*.42, 640)+"%"; c.img.style.top = pct(y - c.h + 14 + Math.sin(t/80 + c.i*3)*.5, 464)+"%"; c.img.style.zIndex = Math.round(y); }
+function tsSpawn(lane, x){ const m = MODELS[Math.floor(Math.random()*MODELS.length)], img = document.createElement("img");
+  img.src = IMG[m.id]; img.alt = ""; img.className = "car"; img.style.width = pct(SPR[m.id][0]*2,MW)+"%"; img.style.transform = "translate(-50%,-50%)";   // ↘ 진행이라 뒤집지 않는다
+  $("#tsRoad").appendChild(img); const c = {img, lane, x}; TS.cars.push(c); tsPlace(c, 0); }
+function tsPlace(c, t){ const y = LANES[c.lane].y0 + c.x/2;
+  c.img.style.left = mx(c.x); c.img.style.top = my(y - 7 + Math.sin(t/80 + c.x)); c.img.style.zIndex = 100 + Math.round(y); }
 function tsTick(t){ const dt = Math.min(.05, (t - (TS.last || t))/1000); TS.last = t;
-  if(t > TS.next){ const lane = Math.random() < .5 ? 0 : 1, back = TS.cars.filter(c=>c.lane===lane).reduce((a,c)=>Math.min(a,c.i), 99);
-    if(back > 11) tsSpawn(lane, 5); TS.next = t + 1400 + Math.random()*2400; }
-  TS.cars = TS.cars.filter(c=>{ c.i += LANES[c.lane].v*dt; tsPlace(c, t); if(c.i > 50){ c.img.remove(); return false; } return true; });
+  if(t > TS.next){ const lane = Math.random() < .5 ? 0 : 1, back = TS.cars.filter(c=>c.lane===lane).reduce((a,c)=>Math.min(a,c.x), 9999);
+    if(back > 160) tsSpawn(lane, -120); TS.next = t + 1400 + Math.random()*2400; }
+  TS.cars = TS.cars.filter(c=>{ c.x += LANES[c.lane].v*dt; tsPlace(c, t); if(c.x > 720){ c.img.remove(); return false; } return true; });
   TS.raf = requestAnimationFrame(tsTick); }
 function showTitle(){
   const el = $("#title"), st = $("#tsStage");
@@ -664,7 +709,7 @@ function showTitle(){
   const word = (t, cls) => `<div class="ts-word ${cls}"><span class="bk">${t}</span><span class="fg">${t}</span><span class="sh">${t}</span></div>`;
   const clouds = [[70,0,48],[250,-18,60],[150,-34,54]].map(([y,d,dur])=>{ const a = `animation-duration:${dur}s;animation-delay:${d}s`;
     return `<img class="ts-cloud" src="${cloudSVG("#1c1e2c",.12)}" alt="" style="left:70px;top:${y+170}px;width:260px;${a}"><img class="ts-cloud" src="${cloudSVG("#ffffff",.92)}" alt="" style="top:${y}px;width:260px;${a}">`; }).join("");
-  st.innerHTML = `<div class="map">${mapBase()}${parked.map(([m,sl])=>parkedCar(m,sl)).join("")}<div class="ts-road" id="tsRoad"></div></div>
+  st.innerHTML = `<div class="map">${mapBase(false)}${parked.map(([m,sl])=>parkedCar(m,sl)).join("")}${actorsHTML()}<div class="ts-road" id="tsRoad"></div></div>
     ${clouds}<div class="ts-shade"></div>
     <div class="ts-logo"><div class="ts-float" style="display:flex;flex-direction:column;align-items:flex-start">
       <div class="ts-badge"><span class="coin" style="width:18px;height:18px"></span>RENT-A-CAR</div>
@@ -675,11 +720,12 @@ function showTitle(){
     <div class="ts-foot" style="left:172px">주행·영업 수치는 시험값이에요</div>
     <div class="ts-foot" style="right:172px">시제품</div>
     <div class="ts-flash"></div>`;
-  el.hidden = false; document.body.style.overflow = "hidden"; fitTitle(); el.focus();
-  TS.cars = []; TS.last = 0; TS.next = 0; tsSpawn(0, 16); tsSpawn(1, 30);
+  el.hidden = false; document.body.style.overflow = "hidden"; fitTitle(); el.focus(); mountActors($("#tsStage .map"));
+  TS.cars = []; TS.last = 0; TS.next = 0; tsSpawn(0, 200); tsSpawn(1, 420);
   if(!reduceMotion()) TS.raf = requestAnimationFrame(tsTick);
+  BGM.cur=null; bgm("title");
 }
-function startGame(){ const el = $("#title"); if(el.hidden || el.classList.contains("go")) return; el.classList.add("go");
+function startGame(){ const el = $("#title"); if(el.hidden || el.classList.contains("go")) return; el.classList.add("go"); sfx("whoosh"); BGM.cur=null; bgm(S.started?view:"shop");
   setTimeout(()=>{ cancelAnimationFrame(TS.raf); TS.cars = []; $("#tsStage").innerHTML = ""; el.hidden = true; el.classList.remove("go"); document.body.style.overflow = ""; }, 480); }
 ACT.showTitle = showTitle;
 $("#title").addEventListener("click", startGame);

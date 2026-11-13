@@ -1,29 +1,25 @@
-"""template.html에 지도·본관·차 그림(data URI)과 좌표를 넣어 prototype.html을 만든다."""
-import base64, csv, io, json
+"""template.html에 마을·차·사람 그림(data URI)과 크기를 넣어 prototype.html을 만든다.
+
+그림은 경민의 마을 시안(docs/design-assets/town-preview/assets)을 그대로 쓴다. 마을 한 장을 층별 키트로
+나누는 일은 #229 댓글로 원본을 요청해 둔 상태라, 오면 여기서 바꿔 끼운다.
+"""
+import base64, json
 from pathlib import Path
-HERE = Path(__file__).parent; KIT = HERE.parent
-SHADOW = {(52, 110, 72, 255), (78, 146, 72, 255), (40, 78, 64, 255)}  # 그림자 + 잔디 가장자리
-def uri(p):
-    data = (KIT / p).read_bytes()
-    if "/car_" in p:  # 2차 시안에서 잘라낸 차 밑 바닥 그림자(진초록)를 지운다
-        from PIL import Image
-        im = Image.open(io.BytesIO(data)).convert("RGBA")
-        im.putdata([(0, 0, 0, 0) if px in SHADOW else px for px in im.getdata()])
-        buf = io.BytesIO(); im.save(buf, "PNG"); data = buf.getvalue()
-    return "data:image/png;base64," + base64.b64encode(data).decode()
-imgs = {"ground": "map/ground.png", "cover_lv1": "map/cover_lv1.png", "cover_lv2": "map/cover_lv2.png", "cover_lv3": "map/cover_lv3.png",
-        "main_lv1": "building/main_lv1.png", "main_lv2": "building/main_lv2.png", "person_staff": "ref-sprites/person_staff_se_ref.png",
-        **{f"car_{n}": f"ref-sprites/car_{n}_se_ref.png" for n in ("light", "sedan", "suv", "van", "luxury")}}
-slots = [{"x": int(r["x"]), "y": int(r["y"])} for r in csv.DictReader(open(KIT / "map/slots.csv"))]
-build = {}
-for r in csv.DictReader(open(KIT / "building/building.csv")):
-    v = {k: int(x) for k, x in r.items() if k != "sprite"}
-    build[r["sprite"]] = {"left": v["left"], "top": v["top"], "w": v["width"], "h": v["height"],
-        "sign": [[v["sign_bl_x"], v["sign_bl_y"]], [v["sign_br_x"], v["sign_br_y"]], [v["sign_tr_x"], v["sign_tr_y"]], [v["sign_tl_x"], v["sign_tl_y"]]]}
+from PIL import Image
+HERE = Path(__file__).parent
+TOWN = HERE.parent.parent / "town-preview/assets"
+CARS = ["hyundai_casper", "hyundai_casper_electric", "hyundai_venue", "hyundai_kona", "hyundai_avante", "hyundai_sonata", "hyundai_grandeur",
+        "hyundai_ioniq5", "hyundai_ioniq6", "hyundai_ioniq9", "hyundai_nexo", "hyundai_tucson", "hyundai_santafe", "hyundai_palisade",
+        "hyundai_staria_tourer", "hyundai_staria_lounge", "genesis_g80", "genesis_g90", "genesis_gv70", "genesis_gv80"]
+imgs = {"town": "town.png", "guest": "legacy-6b120a461ce7.png", "mechanic": "legacy-c64134e8756b.png", "fuel": "legacy-c64e341a7d95.png",
+        **{c: f"{c}_se.png" for c in CARS},
+        **{f"walk{i}": f"rururu_se_walk{i}.png" for i in range(1, 9)}, **{f"idle{i}": f"rururu_se_idle{i}.png" for i in (3, 4, 5)}}
+uri = lambda p: "data:image/png;base64," + base64.b64encode((TOWN / p).read_bytes()).decode()
+IMG = {k: uri(p) for k, p in imgs.items()}
+IMG["staff"] = IMG["mechanic"]  # 안내 직원은 정비사 그림을 쓴다(2026-11-13 결정)
+SPR = {k: list(Image.open(TOWN / p).size) for k, p in imgs.items()}
 html = (HERE / "template.html").read_text(encoding="utf-8")
-for k, p in imgs.items(): html = html.replace("{{" + k + "}}", uri(p))
-html = html.replace("{{slots}}", json.dumps(slots)).replace("{{building}}", json.dumps(build))
+html = html.replace("{{img}}", json.dumps(IMG)).replace("{{spr}}", json.dumps(SPR))
 html = html.replace("{{motion}}", (HERE / "motion.jsx").read_text(encoding="utf-8").replace("</script", "<\\/script"))
-assert "{{" not in html.split("<script>")[1][:400] or True
 (HERE / "prototype.html").write_text(html, encoding="utf-8")
 print(len(html) // 1024, "KB")

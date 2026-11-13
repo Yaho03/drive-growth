@@ -189,6 +189,9 @@ const Btn = ({ label, primary, coin, style, sc = 1, o = 1, onClick, disabled }) 
     coin ? <span style={{ display: 'flex', alignItems: 'center', gap: 6, font: `400 20px ${FPX}`, color: C.gold2 }}><Coin s={2} />{coin}</span> : null);
 const Chip = ({ label, bg, fg, sc = 1, o = 1, border }) => <div style={{ padding: '6px 14px', borderRadius: 10, background: bg, color: fg, font: `400 18px ${FPX}`, transform: `scale(${sc})`, opacity: o, boxShadow: border ? `inset 0 0 0 2px ${border}` : undefined }}>{label}</div>;
 const Sfx = ({ t, cues, on }) => {
+  const fired = React.useRef({ t: -1, done: new Set() });   // 큐를 지날 때 한 번씩 window.sfx(글귀)를 부른다. 시제품이 글귀를 소리로 바꾼다
+  if (t < fired.current.t) fired.current.done = new Set(); fired.current.t = t;
+  cues.forEach((c, i) => { if (t >= c[0] && !fired.current.done.has(i)) { fired.current.done.add(i); if (window.sfx) window.sfx(c[1]); } });
   if (!on) return null; let a = null; cues.forEach(c => { if (t >= c[0] && t < c[0] + 0.9) a = c; });
   return a ? <div style={{ position: 'absolute', left: 28, bottom: 24, padding: '6px 12px', borderRadius: 8, background: 'rgba(11,14,31,.8)', boxShadow: `inset 0 0 0 2px ${C.slate}`, color: C.mist2, font: `400 16px ${FPX}`, opacity: 1 - seg(t, a[0] + 0.7, a[0] + 0.9) }}>♪ SFX 자리 · {a[1]}</div> : null;
 };
