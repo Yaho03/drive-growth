@@ -3426,3 +3426,26 @@ Pleos 2.1.0 / API 34 ARM64, 사용자 10의 전용 복제 AVD에서 실행했다
 - 최종 차량용 APK SHA-256 `b2ebcf1e7d984f210227065a88953a68298ea91a81c98aab5aee10a3866ddec9`, 모의 APK `0149dff4b30f5daab5f3da2e6f86764ef5d4eec1dfa86e866d75d4add27314d4`, 격리 앱 `b3a80cb2900e1418fe0923a6875350c57064ecdcf43d293db025973b380554db`, 격리 계측 `1687b099188d7cf21bf8a0e5caa8b809ca3a844100e9c9b3ef4e84b28ccb8783`. 차량용 최종 APK와 격리 앱·계측의 설치 회수본은 각각 빌드 바이트와 일치했다. 최종 차량용을 기존 프로필 위에 설치하고 새 PID에서 `NO_DATA → PARK·ux=false`를 받은 뒤 타이틀을 터치해 가게로 갔다. 같은 1,000 게임머니와 캐스퍼·3칸을 확인했다. [차량용 재실행](evidence/vehicle-first-play/vehicle-restored-shop.png)
 
 보조 창 전환 뒤 시스템 권한 창과 AppGrid가 검게 표시돼 전용 AVD만 디스크 보존으로 한 번 다시 켰고 기본 화면을 복구했다. 공식 창을 한 번에 하나씩 실행하고 제거했다. 시험 종료 시 속도 권한과 선택 플래그를 시작 상태로 복원했으며 Bridge와 `emulator-5580`을 종료했다. 시작·종료 공유 ADB 목록과 원본 데이터 디스크의 식별자·크기·수정 시각을 대조했다. 공유 `emulator-5556`과 원본 데이터는 보존했다. 실차, 실제 차량 D 전환, 물리 창 회전·분할, App Market 및 제출용 서명은 이번 실행에서 확인하지 않았다.
+
+## 새 가게 지도와 공통 탐색 통합 검증 — 2026-11-13
+
+기준 main은 `30224653f60348943552f4e60177c0f45e3e70b8`, 최종 코드·시험은 `af2118ea0b54ae9b40265dc7b7d1a8c4dc7b9278`이다. Pleos Connect API 34 ARM64의 전용 복제 AVD 사용자 10에서 실행했다. 차량용은 기존 개발 키로 Release 구성에 시험 서명했고 모의 시연은 Debug 구성으로 실행했다.
+
+| 최종 APK | 패키지 | SHA-256 |
+| --- | --- | --- |
+| 차량용 | `io.drivegrowth.app` | `2149d9174d0d7a60aaf2f0ef6eb81fcdb71f15343be8b38a07060f06f20d4055` |
+| 모의 시연 | `io.drivegrowth.app.simulation` | `9ee8df19c33ff37e961f40b7790acfcf88915d7b0a9d5deebadc5c1476e14c4d` |
+| 격리 계측 앱 | `io.drivegrowth.verify.prototype.fullmap` | `ee45c0dd3fbb85026ebd9d2b7afe26697b04c766c1be7a56c0f685feeee3448f` |
+| 격리 계측 시험 | `io.drivegrowth.verify.prototype.fullmap.test` | `cbf97a136c170aafd7414e7c21bdd2b7b9ada5db4d77f7b2484ef8e4cb862c52` |
+
+네 APK의 설치 회수본은 표의 빌드본과 바이트가 일치했다. 표준 계측 APK도 조립했다.
+
+- `./gradlew --offline --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process :core:test :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest :app:lintDebug` 통과. 코어 XML 447/447(최종 실행에서 `UP-TO-DATE`), 앱 863/863, 실패·오류·생략 0건. Lint 오류 0건·경고 81건. 저장소 검사와 `git diff --check`도 통과했다.
+- 최종 격리 앱에서 지도·시설·차량 상세·공통 탐색 계측 34/34(21.212초). 320dp 메뉴 순서와 버튼 범위, 차고의 도감 및 기록 하위 탭, 제한 또는 화면 교체 전에 만든 콜백의 무효화, 차량 상세 버튼의 실제 보이는 범위, 시설 재조회·보관 요청·꾸미기 취소를 확인했다. 같은 시설 내용을 다시 그릴 때 스크롤이 722px에서 0으로 돌아갔다. 패널이 보관한 좌표를 사용하도록 수정했고 같은 단언을 표적 시험 1/1(9.230초)과 전체 34건에서 통과했다.
+- 표준 최종 모의 APK를 가로 보조 화면(1700×1185px·200dpi)에서 실행했다. 첫 지급을 마친 저장 프로필의 잔액 1,000 게임머니, 차량 1대와 공간 3칸, 미확인 정산 1건, 차량 스프라이트와 공통 메뉴를 확인했다. 실제 터치로 차량 상세와 잠긴 세차장을 열었다. [가로 HOME](evidence/full-map-host/simulation-wide-home.png) · [차량 상세](evidence/full-map-host/simulation-wide-vehicle.png) · [세차장](evidence/full-map-host/simulation-wide-facility.png)
+- 스크롤 필드 수정 전 `e55baade91d3872b50defb1303aa832d3ae64ce4`의 모의 APK(`b76daa1e7fd8d29eac2f9847543036ef7ecb712f7e6a706b6d496d8170bce5d4`)에서 960×720px·220dpi와 840×1184px·160dpi의 새 프로세스로 HOME·하단 다섯 메뉴를 확인했다. 최종 APK의 좁은·세로 HOME 재촬영은 Android 입력·디스플레이 서비스가 재시작해 완료하지 못했다. 이전 화면 크기로 잘린 프레임은 제외했다. [좁은 HOME](evidence/full-map-host/simulation-narrow-home-e55baad.png) · [세로 HOME](evidence/full-map-host/simulation-portrait-home-e55baad.png) · [세로 보험 시설](evidence/full-map-host/simulation-portrait-facility-e55baad.png)
+- 같은 `e55baad` 차량 APK(`04dd14c31a9e1ad6e05db903ae49975d50a93c226b5a1db114a83285c77c6b18`)에서 기본 차량 앱 영역 702×438px의 HOME, 캐스퍼 상세와 잠긴 세차장을 실제 터치로 확인했다. 최종 차량 APK에서는 같은 디스플레이의 Main 실행, `NO_DATA → speed=OK gear=PARK ux=false` 표본과 타이틀까지 다시 확인했다. 최종 APK의 HOME은 안정적으로 재촬영하지 못했다. [차량 HOME](evidence/full-map-host/vehicle-home-e55baad.png) · [차량 상세](evidence/full-map-host/vehicle-detail-e55baad.png) · [차량 세차장](evidence/full-map-host/vehicle-facility-e55baad.png)
+- `e55baad`의 격리 Main 통합 계측 1/1(226.148초). 새 모의 프로필의 지급·정산·뽑기, 지도 차량 관리 확인 화면의 Activity 재생성, 강화와 원결과 확인, 판매 뒤 지도 선택 해제, 탁송 출발·선택 원명령 확인·모의주행 제한·도착 정산 1건과 결과 확인을 원장과 대조했다. `2bf831d` 보험 격리 계측 1/1(54.878초)에서는 누적 고객 99→100의 잠금 해제, 보험 가격 1,500 차감, 기존 원정산 확인 및 체크포인트 해제, 같은 원장의 사고 수익 60→90을 확인했다. 두 결과는 해당 커밋의 실행 근거다.
+- 최종 장치 로그·APK·창 정보는 `/private/tmp/drive-full-map-host.bCa8Vp`에 보존했다. 실제 D 전환, 실차, 물리 회전·분할 및 제출 서명은 #28·#29에서 별도로 관리한다.
+
+시험 후 전용 사본의 기존 차량용·모의 APK를 데이터 유지 방식으로 재설치했고, 회수본이 시험 전 파일과 바이트 단위로 일치했다. 활성 계측이 없는 상태에서 보조 창, 전용 브리지와 사본을 종료했다. 공유 ADB 목록과 원본 AVD 데이터 디스크의 파일 식별자·크기·수정 시각을 전후 대조했다. 격리 시험 데이터를 보존했으며 앱 데이터 삭제나 기어·속도·권한 변경은 수행하지 않았다.
