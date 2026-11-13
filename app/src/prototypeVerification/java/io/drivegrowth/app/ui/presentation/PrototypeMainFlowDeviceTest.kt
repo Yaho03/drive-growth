@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.presentation
 
+import android.animation.ValueAnimator
 import android.content.Intent
 import android.app.Activity
 import android.app.Application
@@ -143,11 +144,27 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             }
             click(host, "gacha:option:paid")
             click(host, "gacha:confirm")
+            if (ValueAnimator.areAnimatorsEnabled()) {
+                await("확정 결과의 닫힌 셔터") {
+                    button(host, "gacha:reveal")?.isShown == true && host.hasWindowFocus()
+                }
+                onUi {
+                    assertNull(button(host, "gacha:garage"))
+                    assertEquals(0, starts.count { it == RewardCelebrationKind.GACHA })
+                }
+                capture("main-gacha-shutter")
+                click(host, "gacha:reveal")
+                awaitCelebration(host, RewardCelebrationKind.GACHA, starts)
+                SystemClock.sleep(510)
+                capture("main-gacha-reveal")
+            }
             await { button(host, "gacha:garage")?.isEnabled == true }
-            awaitCelebration(host, RewardCelebrationKind.GACHA, starts)
             capture("main-gacha")
-            drawCelebration(host)
-            onUi { assertEquals(1, starts.count { it == RewardCelebrationKind.GACHA }) }
+            onUi {
+                assertNull(button(host, "gacha:reveal"))
+                assertEquals(if (ValueAnimator.areAnimatorsEnabled()) 1 else 0,
+                    starts.count { it == RewardCelebrationKind.GACHA })
+            }
             ok(games.open()).use { game ->
                 assertEquals(GameMoney(500), ok(game.store.balance()))
                 assertEquals(2, ok(game.store.listOwnedVehicles()).size)

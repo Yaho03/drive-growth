@@ -10,6 +10,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
+import android.os.Handler
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
@@ -35,12 +36,16 @@ internal class RewardCelebrationView(context: Context) : View(context) {
     private val vehicleBounds = RectF()
     private var vehicle: Bitmap? = null
     private val visibleBounds = Rect()
+    private val main = Handler(context.mainLooper)
     private val displayedKeys = mutableSetOf<String>()
     private var key: String? = null
     private var kind = RewardCelebrationKind.GACHA
     private var accent = PixelStyle.gold
     private var startedAt: Long? = null
     private var rebuilding = false
+    var waitingForReveal = false
+        private set
+    private var onRevealFinished: (() -> Unit)? = null
     var onStarted: ((RewardCelebrationKind) -> Unit)? = null
 
     init {
@@ -59,6 +64,38 @@ internal class RewardCelebrationView(context: Context) : View(context) {
         this.vehicle = vehicle
         invalidate()
     }
+
+    fun holdGacha(key: String, accent: Int, vehicle: Bitmap?, onFinished: () -> Unit): Boolean {
+        if (onRevealFinished == null && key in displayedKeys) return false
+        if (this.key != key || onRevealFinished == null) waitingForReveal = true
+        render(key, RewardCelebrationKind.GACHA, accent, vehicle)
+        onRevealFinished = onFinished
+        return true
+    }
+
+    fun openGacha(): Boolean {
+        if (!waitingForReveal || !canShowEffect() || !ValueAnimator.areAnimatorsEnabled()) return false
+        val result = key ?: return false
+        if (!displayedKeys.add(result)) return false
+        waitingForReveal = false
+        startedAt = SystemClock.uptimeMillis()
+        onStarted?.invoke(RewardCelebrationKind.GACHA)
+        invalidate()
+        return true
+    }
+
+    fun finishGacha() {
+        val finished = onRevealFinished ?: return
+        key?.let(displayedKeys::add)
+        onRevealFinished = null
+        waitingForReveal = false
+        startedAt = null
+        key = null
+        main.post { finished() }
+    }
+
+    private fun canShowEffect() =
+        isAttachedToWindow && isShown && hasWindowFocus() && getLocalVisibleRect(visibleBounds)
 
     fun rebuildContent(rebuild: () -> Unit) {
         rebuilding = true
@@ -88,24 +125,34 @@ internal class RewardCelebrationView(context: Context) : View(context) {
     }
 
     override fun onDetachedFromWindow() {
-        if (!rebuilding) startedAt = null
+        if (!rebuilding) { finishGacha(); startedAt = null }
         super.onDetachedFromWindow()
     }
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
-        if (isVisible) invalidate() else if (!rebuilding) startedAt = null
+        if (isVisible) invalidate() else if (!rebuilding) { finishGacha(); startedAt = null }
     }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
-        if (hasWindowFocus) invalidate() else if (!rebuilding) startedAt = null
+        if (hasWindowFocus) invalidate() else if (!rebuilding) { finishGacha(); startedAt = null }
     }
 
     override fun onDraw(canvas: Canvas) {
         val result = key ?: return
-        if (!isAttachedToWindow || !isShown || !hasWindowFocus() || !getLocalVisibleRect(visibleBounds)) {
+        if (!canShowEffect()) {
+            if (isAttachedToWindow && !hasWindowFocus()) finishGacha()
             startedAt = null
+            return
+        }
+        if (onRevealFinished != null && !ValueAnimator.areAnimatorsEnabled()) {
+            finishGacha()
+            return
+        }
+        if (waitingForReveal) {
+            drawGachaFrame(canvas, 0f)
+            postInvalidateDelayed(250L)
             return
         }
         val now = SystemClock.uptimeMillis()
@@ -115,8 +162,10 @@ internal class RewardCelebrationView(context: Context) : View(context) {
             if (!ValueAnimator.areAnimatorsEnabled()) return
             now.also { startedAt = it }
         }
-        val progress = (now - begin).toFloat() / kind.durationMillis
+        val progress = if (onRevealFinished != null) .28f + (now - begin) / 1700f
+            else (now - begin).toFloat() / kind.durationMillis
         if (progress >= 1f || !ValueAnimator.areAnimatorsEnabled()) {
+            finishGacha()
             startedAt = null
             return
         }
@@ -177,12 +226,12 @@ internal class RewardCelebrationView(context: Context) : View(context) {
         val span = minOf(w, h)
         val opening = ((progress - .28f) / .24f).coerceIn(0f, 1f)
         if (opening < 1f) {
-            val left = w * .08f
+            val left = (w - minOf(w * .78f, h * .68f)) / 2
             val right = w - left
-            val top = h * .06f
-            val threshold = h * .88f
-            val rail = span * .055f
-            val fascia = h * .14f
+            val top = h * .12f
+            val threshold = h * .63f
+            val rail = span * .038f
+            val fascia = h * .075f
             val doorTop = top + fascia
             val slatHeight = (threshold - doorTop) / 12
             val visibleBottom = threshold - opening * (threshold - doorTop)
@@ -215,7 +264,8 @@ internal class RewardCelebrationView(context: Context) : View(context) {
             ink(0xff858598.toInt(), 255)
             canvas.drawRect(left - rail * .4f, top, right + rail * .4f, doorTop, paint)
             ink(PixelStyle.primary, 255)
-            canvas.drawRect(w * .36f, top + fascia * .19f, w * .64f, top + fascia * .81f, paint)
+            val badgeHalf = (right - left) * .15f
+            canvas.drawRect(w / 2 - badgeHalf, top + fascia * .19f, w / 2 + badgeHalf, top + fascia * .81f, paint)
             ink(Color.WHITE, 255)
             paint.textAlign = Paint.Align.CENTER
             paint.textSize = fascia * .46f
@@ -250,7 +300,7 @@ internal class RewardCelebrationView(context: Context) : View(context) {
         canvas.restore()
         if (sprite != null) {
             val revealScale = .74f + .26f * (reveal * 3f).coerceAtMost(1f)
-            val scale = minOf(w * .68f / sprite.width, h * .68f / sprite.height) * revealScale
+            val scale = minOf(w * .57f / sprite.width, h * .54f / sprite.height) * revealScale
             drawVehicle(canvas, sprite, x, y, scale)
         }
         drawBurst(canvas, x, y, reveal, span)

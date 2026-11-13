@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.gacha
 
+import android.animation.ValueAnimator
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
@@ -76,6 +77,36 @@ class GachaViewTest : InstrumentationTestCase() {
         button(view,"gacha:garage").performClick();button(view,"gacha:garage").performClick();assertEquals(1,events.size)
         assertEquals(OwnedVehicleId("fixture-gacha-owned"),(events.single() as GachaEvent.OpenGarage).request.ownedVehicleId)
     }
+    fun testBackSkipsOnlyTheLocalRevealAndRestoredResultIsStatic() = onUi {
+        if (!ValueAnimator.areAnimatorsEnabled()) return@onUi
+        val events = mutableListOf<GachaEvent>()
+        val view = make(events)
+        view.render(GachaPreviewStates.ready(), true)
+        button(view, "gacha:option:paid").performClick()
+        button(view, "gacha:confirm").performClick()
+        assertEquals(1, events.size)
+
+        val supplied = GachaPreviewStates.result()
+        val result = (supplied.screen as GachaScreen.Result).value.copy(origin = GachaOrigin.STORED)
+        val frame = supplied.copy(screen = GachaScreen.Result(result))
+        view.render(frame, true)
+        assertNotNull(view.findViewWithTag<View>("gacha:reveal"))
+        assertNull(view.findViewWithTag<View>("gacha:garage"))
+
+        val restored = GachaView(instrumentation.targetContext, events::add, view.uiState)
+        restored.render(frame, true)
+        assertNull(restored.findViewWithTag<View>("gacha:reveal"))
+        assertTrue(button(restored, "gacha:garage").isEnabled)
+
+        assertTrue(view.handleBack())
+        assertNull(view.findViewWithTag<View>("gacha:reveal"))
+        assertTrue(button(view, "gacha:garage").isEnabled)
+        view.render(frame, false)
+        view.render(frame, true)
+        assertNull(view.findViewWithTag<View>("gacha:reveal"))
+        assertEquals("표시와 Back은 원 요청 이외의 이벤트를 보내지 않는다", 1, events.size)
+    }
+
     fun testUnresolvedEconomicKeyCannotMoveToAnotherOptionAcrossNewView()=onUi {
         val events=mutableListOf<GachaEvent>();val view=make(events);val ready=GachaPreviewStates.ready()
         view.render(ready,true);button(view,"gacha:option:paid").performClick();button(view,"gacha:confirm").performClick()

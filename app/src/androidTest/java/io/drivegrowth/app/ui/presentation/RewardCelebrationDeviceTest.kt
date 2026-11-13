@@ -95,17 +95,49 @@ class RewardCelebrationDeviceTest : InstrumentationTestCase() {
             effect.layout(0, 0, 320, 240)
             effect.render("saved-gacha", RewardCelebrationKind.GACHA, Color.MAGENTA, sprite)
             effect.drawGachaFrame(canvas, .15f)
-            assertEquals("닫힌 셔터가 차량 영역을 가려야 한다", 0xff858598.toInt(), frame.getPixel(160, 54))
-            assertEquals(Color.MAGENTA, frame.getPixel(100, 210))
+            assertEquals("닫힌 셔터가 차량 영역을 가려야 한다", 0xff858598.toInt(), frame.getPixel(160, 51))
+            assertEquals(Color.MAGENTA, frame.getPixel(100, 150))
 
             frame.eraseColor(Color.TRANSPARENT)
             effect.drawGachaFrame(canvas, .64f)
             assertEquals("셔터 뒤에는 전달받은 차량을 표시한다", Color.GREEN, frame.getPixel(160, 137))
-            assertEquals("공개된 차량이 작은 중앙 장식에 그치지 않아야 한다", Color.GREEN, frame.getPixel(95, 137))
+            assertEquals("공개된 차량이 작은 중앙 장식에 그치지 않아야 한다", Color.GREEN, frame.getPixel(100, 137))
         } finally {
             frame.recycle()
             sprite.recycle()
         }
+    }
+
+    fun testGachaRevealWaitsForTapAndAcceptsOnlyOneTap() {
+        if (!ValueAnimator.areAnimatorsEnabled()) return
+        val parent = FrameLayout(host)
+        val effect = RewardCelebrationView(host)
+        var starts = 0
+        var finishes = 0
+        onUi {
+            host.setContentView(parent)
+            effect.onStarted = { starts++ }
+            effect.holdGacha("saved-result", Color.MAGENTA, null) { finishes++ }
+            parent.addView(effect.over(View(host), fillHeight = true), FrameLayout.LayoutParams(-1, -1))
+        }
+        awaitWindowFocus(parent)
+        onUi {
+            val bitmap = Bitmap.createBitmap(effect.width, effect.height, Bitmap.Config.ARGB_8888)
+            try {
+                effect.draw(Canvas(bitmap))
+                assertTrue(effect.waitingForReveal)
+                assertEquals(0, starts)
+                assertTrue(effect.openGacha())
+                assertFalse(effect.openGacha())
+                assertEquals(1, starts)
+                effect.onWindowFocusChanged(false)
+                assertFalse(effect.openGacha())
+            } finally {
+                bitmap.recycle()
+            }
+        }
+        instrumentation.waitForIdleSync()
+        onUi { assertEquals(1, finishes) }
     }
 
     fun testGachaStageRemainsWhenResultIsReopenedWithoutAnEffectKey() = onUi {
