@@ -3328,3 +3328,19 @@ adb -s "$SERIAL" install --user 10 -r -t app/build/outputs/apk/androidTest/debug
 selectors=io.drivegrowth.app.ui.presentation.PrototypeMainFlowDeviceTest,io.drivegrowth.app.ui.presentation.PrototypePresentationDeviceTest,io.drivegrowth.app.ui.presentation.RewardCelebrationDeviceTest,io.drivegrowth.app.ui.gacha.GachaViewTest,io.drivegrowth.app.ui.onboarding.OnboardingViewTest,io.drivegrowth.app.ui.results.ResultsViewTest,io.drivegrowth.app.ui.shop.ShopViewTest,io.drivegrowth.app.ui.shop.ShopExpansionHighlightDeviceTest
 adb -s "$SERIAL" shell am instrument --user 10 -w -e class "$selectors" "$VERIFY_PACKAGE.test/android.test.InstrumentationTestRunner"
 ```
+
+## 가게 지도 관리·탁송 장면의 Android 통합 — 2026-11-13
+
+[#280 가게 지도](https://github.com/Yaho03/drive-growth/pull/280)와 [#282 탁송 시안](https://github.com/Yaho03/drive-growth/pull/282)을 제품 Android Views에 연결했다. [화면 기준](09_UI_UX_SPEC.md#2026-11-13-가게-지도-관리와-탁송-연출)에 관리·정산 원결과, Back 및 조작 제한을 정리했다. 주행 중 연출은 숨기고 기존 차고·탁송 명령과 공용 원장을 사용한다. 무작위 옆 차선 교통과 배경음은 포함하지 않았다.
+
+표준 APK는 `31ffdc06f37136ad4a086be6cf7abb3b829bb185`에서 JDK 17·SDK 35로 빌드했다. 코어 단위 447/447, 앱 단위 855/855, Debug 앱·계측 조립 및 lint 오류 0건·경고 58건을 확인했다. 표준 앱 SHA-256은 `995d181ca9b8a24e2a482ca568996279d8a6581c747b4f1df82225e22a93f2a4`다. 뒤따르는 계측 개선은 제품 소스를 바꾸지 않는다.
+
+격리 계측 소스는 `97a857b13cd0b82c93a6fe4caad5bd2bd4681e35`다. 전용 `DriveGrowth_Design_Final`의 Pleos API34 ARM64/user10에서 실행했다. 설치 회수본과 빌드본의 앱 `5271712214e6bbada56f46ad76a9e9de39852d3f52541d5547f38bca6ad2109c`, 계측 `b7cc9f2d25d1d89feacf9d74f63f914f93096740dfa0d347f41a49e0ff722fce` SHA-256이 일치했다.
+
+- 실제 격리 Main 단독 시험 1/1(72.405초)에서 첫 지급·가챠 → HOME 차량 지도 → 준비 전후 재생성 → 기존 원명령 결과 확인 → 판매 뒤 선택 해제 → 수익 탁송 출발 → 포기 검토 후 Back → 모의주행 제한 → 확정 도착·단일 정산과 비반복을 확인했다. [지도](evidence/prototype-design-integration/main-map-focus.png) · [기존 관리 확인](evidence/prototype-design-integration/main-map-review.png) · [판매 뒤 지도](evidence/prototype-design-integration/main-map-after-sale.png) · [출발](evidence/prototype-design-integration/main-delivery-departure.png) · [경로](evidence/prototype-design-integration/main-delivery-highway.png) · [확정 도착](evidence/prototype-design-integration/main-delivery-arrival.png)
+- 같은 격리 앱·계측 APK로 Android View 회귀 58/58(36.555초)을 별도 실행했다. 좁은 창 및 세로·가로 크기의 제목 글자 범위, 지도 개체·revision·조회 실패, 연출 닫기 및 늦은 응답을 확인했다. 가득 찬 차고는 제어된 원결과 단위 시험에서 보관과 소유를 구분했다.
+- 공식 Host Display Bridge의 Portrait 840×1184·160dpi에서 수정 전 제목의 두 줄이 잘리는 것을 확인했다. 글꼴 크기를 자식 레이아웃 측정 전에 설정한 뒤 같은 창에서 두 줄과 시작 버튼을 확인했다. 설치된 표준 APK와 빌드 해시가 일치했다. 실제 시작 버튼을 누르고 첫 지급 후 지도에서 차량을 선택해 관리 확정·취소 버튼까지 확인했다. [수정 타이틀](evidence/prototype-design-integration/31ffdc0-portrait-title-840x1184.png) · [같은 표준 APK의 첫 안내](evidence/prototype-design-integration/31ffdc0-portrait-intro-840x1184.png) · [지도 관리 확인](evidence/prototype-design-integration/31ffdc0-portrait-management-840x1184.png)
+
+중간 시험에서 동적 View 재렌더와 초기 안내 조회의 입력 시점, 최초 목적지 확인과 변경 동작의 순서가 시험 진행에 영향을 주었다. 창 제거 시 OEM 입력기 예외와 계측 창 포커스 상실도 관측했다. 중간 실패 로그를 보존하고 공식 창과 Android 계측을 순차로 실행했다. 이 실행은 모의 시연의 화면·원장 검증이다. 실제 SDK 도착·실차·효과음 청취와 최종 영상·서명 APK·자산 권리 검증은 별도다.
+
+- 공식 Landscape 1700×1185·200dpi는 DISPLAY2 생성과 같은 표준 앱 시작까지 확인했다. 캡처 직전 호스트 QEMU 루프·CPU 스레드가 응답을 멈추고 AVD가 종료됐다. 데이터를 유지한 한 차례 재기동도 ADB 연결 전 멈췄다. 가로 관리 화면의 최종 캡처와 새 프로필의 타이틀 계측 재실행은 남는다. 타이틀 단독 시험을 이미 지급한 프로필에서 재실행했을 때는 첫 안내 전제를 충족하지 못했다.
