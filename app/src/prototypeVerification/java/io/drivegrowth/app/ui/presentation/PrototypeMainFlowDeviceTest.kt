@@ -3,6 +3,8 @@ package io.drivegrowth.app.ui.presentation
 import android.animation.ValueAnimator
 import android.content.Intent
 import android.app.Activity
+import android.app.ActivityOptions
+import android.hardware.display.DisplayManager
 import android.app.Application
 import android.os.Bundle
 import android.graphics.Bitmap
@@ -43,11 +45,13 @@ import java.io.File
 class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
     fun testLauncherTitleStartsExistingGameAndCanReopen() {
         checkIsolatedPackage(instrumentation.targetContext.packageName)
-        val host = instrumentation.startActivitySync(Intent(instrumentation.targetContext,
+        val host = launchActivity(Intent(instrumentation.targetContext,
             UnifiedSimulationActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            .setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)) as UnifiedSimulationActivity
+            .setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER))
         try {
-            await { host.window.decorView.findViewWithTag<Button>("presentation:start")?.isEnabled == true && host.hasWindowFocus() }
+            await("포커스를 받은 런처 시작 버튼", timeoutMillis = 30_000) {
+                host.window.decorView.findViewWithTag<Button>("presentation:start")?.isEnabled == true && host.hasWindowFocus()
+            }
             onUi { assertTitleCoversGame(host) }
             capture("main-title")
             touchStart(host)
@@ -97,8 +101,8 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         checkIsolatedPackage(context.packageName)
         check(ValueAnimator.areAnimatorsEnabled())
         val games = GameSessionFactory(context, mapOf(InputSource.SIMULATION to "unified-simulation.db"), InputSource.SIMULATION)
-        val host = instrumentation.startActivitySync(Intent(context, UnifiedSimulationActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as UnifiedSimulationActivity
+        val host = launchActivity(Intent(context, UnifiedSimulationActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         try {
             await("새 격리 프로필의 첫 안내", timeoutMillis = 30_000) {
                 button(host, R.string.onboarding_start)?.isEnabled == true
@@ -143,8 +147,8 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         val context = instrumentation.targetContext
         checkIsolatedPackage(context.packageName)
         val games = GameSessionFactory(context, mapOf(InputSource.SIMULATION to "unified-simulation.db"), InputSource.SIMULATION)
-        var host = instrumentation.startActivitySync(Intent(context, UnifiedSimulationActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as UnifiedSimulationActivity
+        var host = launchActivity(Intent(context, UnifiedSimulationActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         val starts = mutableListOf<RewardCelebrationKind>()
         val vehicle = VehicleId("hyundai_casper")
         try {
@@ -451,6 +455,15 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
 
     private fun checkIsolatedPackage(packageName: String) {
         check(Regex("""io\.drivegrowth\.verify\.prototype(\.[a-z][a-z0-9]*)?""").matches(packageName))
+    }
+
+    private fun launchActivity(intent: Intent): UnifiedSimulationActivity {
+        val displays = instrumentation.targetContext.getSystemService(DisplayManager::class.java)
+        val display = displays.displays.singleOrNull { it.displayId != 0 && it.name == "Emulator 2D Display" }
+        val options = display?.let { ActivityOptions.makeBasic().setLaunchDisplayId(it.displayId).toBundle() }
+        val host = instrumentation.startActivitySync(intent, options) as UnifiedSimulationActivity
+        if (display != null) assertEquals(display.displayId, host.display?.displayId)
+        return host
     }
 
     private fun touchStart(host: UnifiedSimulationActivity, background: Boolean = false) = onUi {
