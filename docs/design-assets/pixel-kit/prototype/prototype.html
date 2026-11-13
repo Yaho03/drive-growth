@@ -25,7 +25,7 @@ body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px
 button{font:inherit;color:inherit;border:0;cursor:pointer;background:none}
 button:focus-visible,select:focus-visible{outline:3px solid var(--info);outline-offset:2px}
 .px{image-rendering:pixelated}
-.app{max-width:1360px;margin:0 auto;padding-block:12px 16px;display:flex;flex-direction:column;gap:12px;min-height:100%}
+.app{max-width:1360px;margin:0 auto;padding-block:12px 16px;display:flex;flex-direction:column;gap:12px;min-height:100vh}
 .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .title{font-size:clamp(22px,2.4vw,30px);font-weight:900;margin:0}
 .money{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:18px;padding:10px 18px;font-size:clamp(20px,2.2vw,28px);font-weight:900;font-variant-numeric:tabular-nums}
@@ -48,7 +48,7 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--info);outline-
 .rar.advanced{border:2px solid var(--r-adv);color:var(--info)}
 .rar.rare{border:4px double var(--r-rare);color:var(--r-rare)}
 .rar.legend{border:3px solid var(--r-legend);color:var(--r-legend);box-shadow:0 0 10px rgba(252,220,100,.45)}
-.nav{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;background:var(--card);border-radius:20px;padding:8px}
+.nav{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;background:#121622;border-radius:20px;padding:8px;position:sticky;bottom:8px;z-index:10;box-shadow:0 -6px 18px rgba(5,8,15,.55)}   /* 스크롤해도 항상 아래에 */
 .nav button{min-height:56px;border-radius:14px;font-weight:700;font-size:16px;color:var(--mut)}
 .nav button[aria-current="page"]{background:var(--accent);color:#fff}
 .notice{border-radius:16px;padding:12px 16px;font-weight:700}
@@ -61,7 +61,7 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--info);outline-
 .map .full{inset:0;width:100%;height:100%;pointer-events:none}
 .map .car{transform:translate(-50%,-50%) scaleX(-1);pointer-events:none}
 .map .slotbtn{width:4.6%;height:7%;transform:translate(-50%,-50%)}
-.map .lock{position:absolute;transform:translateX(-50%);background:rgba(41,55,78,.6);color:#f7faff;border-radius:3px;padding:2px 4px;font-size:clamp(6px,1.1cqw,13px);white-space:nowrap;pointer-events:none}
+.map .lock{position:absolute;transform:translateX(-50%);background:rgba(18,22,34,.55);border-radius:50%;width:2.2cqw;height:2.2cqw;display:grid;place-items:center;font-size:1.1cqw;line-height:1;pointer-events:none}
 .map .actor{image-rendering:pixelated;pointer-events:none}
 .map .sign{position:absolute;color:#fcdc64;font-weight:900;text-align:center;white-space:nowrap;transform-origin:0 0;line-height:1;text-shadow:0 1px 0 #1c1e2c}
 .hud{position:absolute;display:flex;gap:8px;align-items:center;background:rgba(18,22,34,.9);border-radius:14px;padding:6px 12px;font-weight:700;font-size:clamp(12px,1.6cqw,18px)}
@@ -78,10 +78,10 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--info);outline-
 .cars{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
 .slot-empty{border:3px dashed var(--line);border-radius:22px;display:grid;place-items:center;text-align:center;padding:18px;min-height:220px;color:var(--mut)}
 .dex{overflow-x:auto}
-.dex table{border-collapse:separate;border-spacing:6px;min-width:620px}
+.dex table{border-collapse:separate;border-spacing:6px;min-width:620px;width:100%}
 .dex td,.dex th{text-align:center}
 .dex th{font-size:14px;color:var(--mut);font-weight:700}
-.dexcell{width:110px;height:70px;border-radius:12px;background:var(--card2);display:grid;place-items:center;position:relative}
+.dexcell{width:100%;min-width:110px;height:70px;border-radius:12px;background:var(--card2);display:grid;place-items:center;position:relative}
 .dexcell img{width:84px}
 .dexcell.unseen img{filter:brightness(0);opacity:.55}
 .dexcell.seen img{filter:grayscale(1) brightness(.85);opacity:.7}
@@ -150,7 +150,7 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--info);outline-
 <div class="app" id="app">
   <div class="top">
     <h1 class="title" id="scrTitle">렌터카 가게</h1>
-    <div class="row" style="gap:8px"><button class="btn" id="snd" data-act="sound" aria-pressed="true" title="소리 켜기/끄기" style="min-height:44px;padding:0 14px">🔊</button>
+    <div class="row" style="gap:8px"><button class="btn" id="snd" data-act="sound" aria-pressed="true" title="소리 켜기/끄기" style="min-height:48px;min-width:52px;padding:0 12px;font-size:22px;border-radius:16px">🔊</button>
     <div class="money" aria-label="보유 게임머니"><span class="coin"></span><span id="money">0</span></div></div>
   </div>
   <main class="screen" id="screen"></main>
@@ -283,9 +283,9 @@ const pct=(v,base)=>v/base*100;
 const mx=v=>pct(v,MW)+"%", my=v=>pct(v,MH)+"%";   // 마을 좌표 → 지도 안 %
 function mapBase(locks=true){   // 마을 한 장. 가게 레벨에 따른 본관·주차장 변화는 층별 키트가 오면 넣는다
   return `<img class="full" src="${IMG.town}" alt="마을. 파란 렌터카 본관, 주유소, 보험사, 세차장">
-    ${locks?SLOTS.map((sl,i)=>i>=cap()?`<span class="lock" style="left:${mx(sl.x)};top:${my(sl.y-35)};z-index:2500">확장 예정</span>`:"").join(""):""}`;
+    ${locks?SLOTS.map((sl,i)=>i>=cap()?`<span class="lock" style="left:${mx(sl.x)};top:${my(sl.y-18)};z-index:2500" title="가게를 확장하면 열리는 칸">🔒</span>`:"").join(""):""}`;
 }
-const parkedCar = (m, sl, extra="") => `<img class="car" src="${IMG[m.id]}" alt="${esc(m.name)}" style="left:${mx(sl.x)};top:${my(sl.y-7)};width:${pct(SPR[m.id][0]*2,MW)}%;z-index:${100+sl.y}${extra?";filter:"+extra:""}">`;
+const parkedCar = (m, sl, extra="") => `<img class="car" src="${IMG[m.id]}" alt="${esc(m.name)}" style="left:${mx(sl.x)};top:${my(sl.y-7)};width:${pct(SPR[m.id][0]*1.8,MW)}%;z-index:${100+sl.y}${extra?";filter:"+extra:""}">`;
 function renderShop(){
   const cars = S.cars.slice(0,cap()).map((c,i)=>({c,sl:SLOTS[i],m:M[c.model]}));
   const next = EXPAND[S.level+1];
@@ -314,20 +314,21 @@ function renderShop(){
     <div class="card tools" style="display:grid;gap:10px">
       <div class="h2">시험 도구</div>
       <div class="mut" style="font-size:14px">실제 앱의 주행·시간 흐름을 대신하는 버튼이에요. 결과는 정산 화면에 모여요.</div>
-      <button class="btn" data-act="hour">영업 1시간 흘려보내기</button>
-      <button class="btn" data-act="drive">30km 주행 후 주차</button>
-      <button class="btn" data-act="arrive" ${S.delivery?"":"disabled"}>탁송 목적지에 도착</button>
-      <button class="btn" data-act="nextDay">다음 날로</button>
-      <div class="h2" style="font-size:16px;margin-top:6px">연출 다시 보기 (게임 상태는 안 바뀜)</div>
-      <div class="row" style="gap:6px">${["common","advanced","rare","legend"].map(k=>`<button class="btn" style="min-height:44px;padding:0 12px" data-act="demoGacha" data-arg="${k}">뽑기 ${R[k].n}</button>`).join("")}
+      <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+      <button class="btn" data-act="hour">영업 1시간</button>
+      <button class="btn" data-act="drive">30km 주행</button>
+      <button class="btn" data-act="arrive" ${S.delivery?"":"disabled"}>탁송 도착</button>
+      <button class="btn" data-act="nextDay">다음 날로</button></div>
+      <details><summary style="cursor:pointer;font-weight:900;padding:6px 0">연출 다시 보기 (게임 상태는 안 바뀜)</summary>
+      <div class="row" style="gap:6px;margin-top:8px">${["common","advanced","rare","legend"].map(k=>`<button class="btn" style="min-height:44px;padding:0 12px" data-act="demoGacha" data-arg="${k}">뽑기 ${R[k].n}</button>`).join("")}
         <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoGacha" data-arg="reduced">움직임 줄이기</button>
         <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="grant">첫 지급</button>
         <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="settle">정산 동전</button>
         <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="expand">가게 확장</button>
         <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="depart">탁송 출발</button>
         <button class="btn" style="min-height:44px;padding:0 12px" data-act="demoMotion" data-arg="arrive">탁송 도착</button>
-        <button class="btn" style="min-height:44px;padding:0 12px" data-act="showTitle">시작화면</button></div>
-      <button class="btn danger" data-act="resetAsk">처음부터 다시</button>
+        <button class="btn" style="min-height:44px;padding:0 12px" data-act="showTitle">시작화면</button></div></details>
+      <button class="btn danger" data-act="resetAsk" style="min-height:44px">처음부터 다시</button>
       <div class="mut" style="font-size:13px">${S.day}일째 · 오늘 반영 거리 ${S.kmToday} / ${KM_CAP}km</div>
     </div>
    </div></div>`;
@@ -407,8 +408,9 @@ function renderDex(){
 function renderGacha(){
   const full=S.cars.length>=cap(), left=PITY-S.pity;
   $("#screen").innerHTML = `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
-   <div class="card" style="display:grid;gap:14px">
+   <div class="card" style="display:grid;gap:14px;align-content:start">
      <div class="h2">어떤 차가 나올까요?</div>
+     <div class="carpic" style="height:150px;background:var(--card2);border-radius:16px"><img class="px" src="${IMG[unlocked()[S.pity%unlocked().length].id]}" alt="" style="height:120px;filter:brightness(0);opacity:.45"><span style="position:absolute;font-size:56px;font-weight:900;color:var(--r-legend)">?</span></div>
      <div class="item"><span>30회 안에 희귀 이상 1대 보장 · 남은 횟수 <b>${left}</b>회</span><div class="bar"><div style="width:${S.pity/PITY*100}%;background:var(--r-rare)"></div></div></div>
      <div class="row"><span class="mut">뽑기 1회</span><span class="coin s"></span><b>${TICKET}</b><span class="chip" style="background:var(--info-bg);color:var(--info)">무료 뽑기권 ${S.free}장</span></div>
      ${full?`<div class="notice warn">차고 공간이 부족해요 · 차고 ${S.cars.length} / ${cap()}칸 · 차를 팔거나 재료로 쓰면 다시 뽑을 수 있어요</div>`:""}
@@ -420,7 +422,7 @@ function renderGacha(){
      <div class="h2">등급별 확률</div>
      ${RAR.map(r=>`<div class="row" style="flex-wrap:nowrap"><span class="chip rar ${r.k}" style="min-width:64px;justify-content:center">${r.n}</span><div class="bar"><div style="width:${r.w/10}%"></div></div><b style="min-width:56px;text-align:right">${(r.w/10).toLocaleString("ko-KR")}%</b></div>`).join("")}
      <div class="h2" style="font-size:18px">지금 나올 수 있는 차종 · 가게 Lv${S.level} · ${unlocked().length}종</div>
-     <div class="row" style="gap:6px">${unlocked().map(m=>`<span class="chip" style="background:var(--card2)">${m.name}</span>`).join("")}</div>
+     <div class="row" style="gap:6px">${unlocked().map(m=>`<span class="chip" style="background:var(--card2);padding:4px 12px 4px 6px"><img class="px" src="${IMG[m.id]}" alt="" style="height:26px">${m.name}</span>`).join("")}</div>
    </div></div>`;
 }
 
@@ -439,7 +441,7 @@ function renderDelivery(){
   const d=S.delivery;
   if(d){ const o=d.offer;
     $("#screen").innerHTML = `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
-     <div id="hwHost" style="grid-column:1/-1"></div>
+     <div id="hwHost" style="grid-column:1/-1;width:100%;max-width:860px;justify-self:center"></div>
      <div class="card" style="display:grid;gap:10px">
        <div class="row"><span class="chip st-rent">진행 중</span><span class="chip" style="background:var(--warn-bg);color:var(--warn)">${o.kind==="buy"?"구매 탁송":"수익 탁송"}</span></div>
        <div class="carpic"><span class="ring ${o.rar}"></span>${carImg(o.model)}</div>
@@ -466,13 +468,13 @@ function renderDelivery(){
    <div class="card list"><div class="h2">1. 목적지 고르기</div>
      ${DEST.map(x=>`<button class="item" data-act="dest" data-arg="${x.k}" aria-pressed="${x.k===dest.k}" style="border:2px solid ${x.k===dest.k?"var(--accent)":"transparent"};text-align:left"><div><b>${x.n}</b><div class="mut">${x.km}km · ${x.band}</div></div></button>`).join("")}
      <div class="mut" style="font-size:14px">출발 전에 고르고, 도착해서 주차하면 결과를 볼 수 있어요.</div></div>
-   <div class="card" style="display:grid;gap:12px"><div class="h2">2. ${dest.n}까지 의뢰 · ${dest.band}</div>
-     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+   <div class="card" style="display:grid;gap:12px"><div class="row" style="justify-content:space-between"><div class="h2">2. ${dest.n}까지 의뢰 · ${dest.band}</div><span class="mut" style="font-size:14px">금액은 예시 값 · 구매 탁송은 확정할 때 전액을 내요</span></div>
+     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
      ${S.offers.list.map(o=>{ const can = o.kind==="profit" || S.money>=o.price;
-       return `<div class="item" style="display:grid;gap:6px;align-items:start"><div class="carpic" style="height:96px"><span class="ring ${o.rar}"></span>${carImg(o.model)}</div>
+       return `<div class="item" style="display:grid;gap:8px;grid-template-rows:96px auto 1fr auto;align-items:start"><div class="carpic" style="height:96px"><span class="ring ${o.rar}"></span>${carImg(o.model)}</div>
        <div class="row"><b>${M[o.model].name}</b>${rarChip(o.rar)}<span class="chip" style="background:${o.kind==="buy"?"var(--warn-bg)":"var(--ok-bg)"};color:${o.kind==="buy"?"var(--warn)":"var(--ok)"}">${o.kind==="buy"?"구매 탁송":"수익 탁송"}</span></div>
-       <div class="row" style="justify-content:space-between"><span class="mut">${o.kind==="buy"?"가격 · 확정할 때 전액(예시 값)":"완료 보상(예시 값)"}</span><b>${o.kind==="buy"?won(o.price):"+"+won(o.reward)}</b></div>
-       <button class="btn ${can?"p":""}" data-act="accept" data-arg="${o.id}" ${can?"":"disabled"}>${can?"이 의뢰 받기":"게임머니 부족"}</button></div>`}).join("")}
+       <div class="row" style="justify-content:space-between"><span class="mut">${o.kind==="buy"?"가격":"완료 보상"}</span><b>${o.kind==="buy"?won(o.price):"+"+won(o.reward)}</b></div>
+       <button class="btn ${can?"p":""}" style="width:100%" data-act="accept" data-arg="${o.id}" ${can?"":"disabled"}>${can?"이 의뢰 받기":"게임머니 부족"}</button></div>`}).join("")}
      </div></div></div>`;
   if(innerWidth<760) $("#dgrid").style.gridTemplateColumns="1fr";
 }
@@ -707,7 +709,7 @@ const TS = {raf:0, cars:[], last:0, next:0};
 function fitTitle(){ const W=innerWidth, H=innerHeight, s=Math.min(Math.max(W/1280, H/720), W/960);
   $("#tsStage").style.transform = `translate(${(W-1280*s)/2}px,${(H-720*s)/2}px) scale(${s})`; }
 function tsSpawn(lane, x){ const m = MODELS[Math.floor(Math.random()*MODELS.length)], img = document.createElement("img");
-  img.src = IMG[m.id]; img.alt = ""; img.className = "car"; img.style.width = pct(SPR[m.id][0]*2,MW)+"%"; img.style.transform = "translate(-50%,-50%)";   // ↘ 진행이라 뒤집지 않는다
+  img.src = IMG[m.id]; img.alt = ""; img.className = "car"; img.style.width = pct(SPR[m.id][0]*1.8,MW)+"%"; img.style.transform = "translate(-50%,-50%)";   // ↘ 진행이라 뒤집지 않는다
   $("#tsRoad").appendChild(img); const c = {img, lane, x}; TS.cars.push(c); tsPlace(c, 0); }
 function tsPlace(c, t){ const y = LANES[c.lane].y0 + c.x/2;
   c.img.style.left = mx(c.x); c.img.style.top = my(y - 7 + Math.sin(t/80 + c.x)); c.img.style.zIndex = 100 + Math.round(y); }
