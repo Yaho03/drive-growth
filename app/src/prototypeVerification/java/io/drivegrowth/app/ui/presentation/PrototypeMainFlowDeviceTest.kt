@@ -101,7 +101,7 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as UnifiedSimulationActivity
         try {
             await("새 격리 프로필의 첫 안내", timeoutMillis = 30_000) {
-                button(host, R.string.onboarding_start)?.isEnabled == true && host.hasWindowFocus()
+                button(host, R.string.onboarding_start)?.isEnabled == true
             }
             for (tag in listOf(R.string.onboarding_start, VehicleId("hyundai_casper"),
                 R.string.onboarding_review, R.string.onboarding_confirm)) clickOnboarding(host, tag)
@@ -109,7 +109,7 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             openPage(host, HostPage.GACHA)
             click(host, "gacha:option:paid")
             click(host, "gacha:confirm")
-            await("가챠 확정 셔터") { button(host, "gacha:reveal")?.isShown == true }
+            await("가챠 확정 셔터") { button(host, "gacha:reveal")?.isShown == true && host.hasWindowFocus() }
             val original = ok(games.open()).use { game ->
                 assertEquals(GameMoney(500), ok(game.store.balance()))
                 assertEquals(2, ok(game.store.listOwnedVehicles()).size)
@@ -124,6 +124,15 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             onUi { assertNull(button(host, "gacha:reveal")) }
             ok(games.open()).use { game ->
                 assertEquals(original, ok(game.store.hostCommands.load(game.identity.profileId)))
+                assertEquals(GameMoney(500), ok(game.store.balance()))
+                assertEquals(2, ok(game.store.listOwnedVehicles()).size)
+            }
+            onUi { touchView(host, checkNotNull(button(host, "host:refresh"))) }
+            await("다음 새로고침은 기존 원결과 확인과 후보 재조회") {
+                button(host, "gacha:option:paid")?.isEnabled == true
+            }
+            ok(games.open()).use { game ->
+                assertNull(ok(game.store.hostCommands.load(game.identity.profileId)))
                 assertEquals(GameMoney(500), ok(game.store.balance()))
                 assertEquals(2, ok(game.store.listOwnedVehicles()).size)
             }
