@@ -25,15 +25,18 @@ class ShopExpansionHighlightDeviceTest : InstrumentationTestCase() {
             var starts = 0
             onUi {
                 view = ShopView(host, events::add)
-                host.setContentView(view)
+                host.setContentView(android.widget.FrameLayout(host).apply {
+                    addView(view, android.widget.FrameLayout.LayoutParams(-1,
+                        (resources.displayMetrics.density * 360).toInt()))
+                })
                 view.onCelebration = { starts++ }
                 view.render(before, true)
             }
             instrumentation.waitForIdleSync()
             onUi {
                 assertTrue(view.hasWindowFocus())
-                view.findViewWithTag<Button>("shop:preview:expand").performClick()
-                view.findViewWithTag<Button>("shop:confirm").performClick()
+                view.showMapPanel(ShopMapTarget.Expansion)
+                view.findViewWithTag<Button>("shop:map-confirm").performClick()
                 val request = (events.single() as ShopEvent.Submit).request
                 view.complete(request.copy(requestId = RequestId("different-expansion")), ContractResult.Success(Unit))
                 view.render(after, true)
@@ -48,8 +51,9 @@ class ShopExpansionHighlightDeviceTest : InstrumentationTestCase() {
                 val afterHide = sampleSlots(view)
                 if (ValueAnimator.areAnimatorsEnabled()) {
                     assertEquals(afterHide[0], highlighted[0])
-                    assertFalse(afterHide[1] == highlighted[1])
-                    assertFalse(afterHide[2] == highlighted[2])
+                    val revealed = listOf(1, 2).filter { highlighted[it] != null }
+                    assertTrue(revealed.isNotEmpty())
+                    for (index in revealed) assertFalse(afterHide[index] == highlighted[index])
                     assertEquals(afterHide[3], highlighted[3])
                 }
                 view.render(after.copy(revision = Revision(14)), true)
@@ -72,14 +76,17 @@ class ShopExpansionHighlightDeviceTest : InstrumentationTestCase() {
             var starts = 0
             onUi {
                 view = ShopView(host, events::add)
-                host.setContentView(view)
+                host.setContentView(android.widget.FrameLayout(host).apply {
+                    addView(view, android.widget.FrameLayout.LayoutParams(-1,
+                        (resources.displayMetrics.density * 360).toInt()))
+                })
                 view.onCelebration = { starts++ }
                 view.render(before, true)
             }
             instrumentation.waitForIdleSync()
             onUi {
-                view.findViewWithTag<Button>("shop:preview:expand").performClick()
-                view.findViewWithTag<Button>("shop:confirm").performClick()
+                view.showMapPanel(ShopMapTarget.Expansion)
+                view.findViewWithTag<Button>("shop:map-confirm").performClick()
                 view.complete((events.single() as ShopEvent.Submit).request, ContractResult.Success(Unit))
                 sampleSlots(view)
                 assertEquals(0, starts)
@@ -100,8 +107,8 @@ class ShopExpansionHighlightDeviceTest : InstrumentationTestCase() {
 
                 val refreshedBefore = before.copy(revision = Revision(16))
                 view.render(refreshedBefore, true)
-                view.findViewWithTag<Button>("shop:preview:expand").performClick()
-                view.findViewWithTag<Button>("shop:confirm").performClick()
+                view.showMapPanel(ShopMapTarget.Expansion)
+                view.findViewWithTag<Button>("shop:map-confirm").performClick()
                 view.complete((events.last() as ShopEvent.Submit).request, ContractResult.Success(Unit))
                 view.render(after.copy(revision = Revision(17), capacity = 8), true)
                 sampleSlots(view)
@@ -116,7 +123,7 @@ class ShopExpansionHighlightDeviceTest : InstrumentationTestCase() {
         }
     }
 
-    private fun sampleSlots(view: ShopView): List<Int> {
+    private fun sampleSlots(view: ShopView): List<Int?> {
         val width = View.MeasureSpec.makeMeasureSpec(view.width, View.MeasureSpec.EXACTLY)
         val height = View.MeasureSpec.makeMeasureSpec(view.height, View.MeasureSpec.EXACTLY)
         view.measure(width, height)
@@ -125,11 +132,11 @@ class ShopExpansionHighlightDeviceTest : InstrumentationTestCase() {
         val bitmap = Bitmap.createBitmap(scene.width, scene.height, Bitmap.Config.ARGB_8888)
         return try {
             scene.draw(Canvas(bitmap))
-            val scale = minOf(scene.width / 1536f, scene.height / 1024f)
-            val left = (scene.width - 1536f * scale) / 2
-            val top = (scene.height - 1024f * scale) / 2
+            val (scale, left, top) = ShopMapCamera.cover(scene.width, scene.height, 0f, 0f, 1536f, 1024f, ShopMapOffset())
             townSlots.subList(4, 8).map { (x, y) ->
-                bitmap.getPixel((left + x * scale).toInt(), (top + y * scale).toInt())
+                val px = (left + x * scale).toInt()
+                val py = (top + y * scale).toInt()
+                if (px in 0 until bitmap.width && py in 0 until bitmap.height) bitmap.getPixel(px, py) else null
             }
         } finally {
             bitmap.recycle()

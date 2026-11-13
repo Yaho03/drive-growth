@@ -78,7 +78,7 @@ GitHub 제출 안내:
 - 이미 접수한 GitHub 제출의 최종 커밋 해시만 보완할 때는 최초 발신 주소에서 해시만 회신할 수 있습니다.
 - 제출 안내 일부에 ‘제출 페이지에 입력’이라는 표현이 있지만, 접수 절차 및 양식의 경로는 이메일입니다. 링크·APK 경로를 접수자료에 명확히 기재합니다.
 
-2026-11-13 KST에 [제출 안내](https://appdevchallenge.auto-hmg.io/guide/submission), [비공개 저장소 제출 추가 공지](https://appdevchallenge.auto-hmg.io/notice/c0a1a000-2026-4923-8000-000000000007), [FAQ](https://appdevchallenge.auto-hmg.io/faq)를 다시 확인했습니다.
+2026-11-13 KST에 [공식 일정](https://appdevchallenge.auto-hmg.io/guide/schedule), [접수양식 원본](https://appdevchallenge.auto-hmg.io/downloads/contest-application-consent.docx), [제출 안내](https://appdevchallenge.auto-hmg.io/guide/submission), [비공개 저장소 제출 추가 공지](https://appdevchallenge.auto-hmg.io/notice/c0a1a000-2026-4923-8000-000000000007), [FAQ](https://appdevchallenge.auto-hmg.io/faq)를 다시 확인했습니다.
 
 ## 5. 실제 접수양식의 구성
 

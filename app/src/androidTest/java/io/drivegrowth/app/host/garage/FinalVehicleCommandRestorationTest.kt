@@ -1,5 +1,6 @@
 package io.drivegrowth.app.host.garage
 
+import io.drivegrowth.app.exposeMainPage
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.Process
@@ -318,7 +319,7 @@ class FinalVehicleCommandRestorationTest :
     private fun selectPage(page: HostPage) {
         val view = root
         awaitUi("Main의 $page 라우트") {
-            val button = view.mainPage(page) ?: return@awaitUi false
+            val button = view.exposeMainPage(page) ?: return@awaitUi false
             if (!button.isShown || !button.isEnabled) return@awaitUi false
             if (button.isSelected) return@awaitUi true
             assertTrue(button.performClick())

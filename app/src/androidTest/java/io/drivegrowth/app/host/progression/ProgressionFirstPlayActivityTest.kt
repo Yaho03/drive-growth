@@ -1,5 +1,7 @@
 package io.drivegrowth.app.host.progression
 
+import io.drivegrowth.app.exposeMainRefresh
+import io.drivegrowth.app.exposeMainPage
 import io.drivegrowth.app.mainNavigation
 import io.drivegrowth.app.mainPage
 import io.drivegrowth.app.openMainPage
@@ -61,7 +63,7 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
     }
     private fun refresh(a:MainActivity) {
         gate(a);instrumentation.runOnMainSync {
-            val b=checkNotNull(a.window.decorView.findViewWithTag<Button>("host:refresh"))
+            val b=checkNotNull(a.window.decorView.exposeMainRefresh())
             assertTrue(b.isEnabled);b.performClick()
         }
     }
@@ -223,7 +225,7 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
     private fun chooseGatePage(a: MainActivity, name: HostPage, ready: () -> Boolean) {
         await(a, "actual destination $name") {
             if (ready()) return@await true
-            if (a.window.decorView.mainPage(name)?.let { it.isEnabled && it.isLaidOut && !it.isLayoutRequested } != true) return@await false
+            if (a.window.decorView.exposeMainPage(name)?.let { it.isEnabled && it.isLaidOut && !it.isLayoutRequested } != true) return@await false
             a.window.decorView.openMainPage(name)
             false
         }

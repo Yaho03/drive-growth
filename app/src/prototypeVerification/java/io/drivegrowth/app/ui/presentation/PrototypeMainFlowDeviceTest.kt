@@ -271,8 +271,9 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         val mapTag = "shop:map-vehicle:${initial.ownedVehicleId.value}"
         openPage(original, HostPage.HOME)
         click(original, mapTag)
-        await("HOME 지도 차량 관리") { button(original, VehicleAction.LEVEL_UP)?.isEnabled == true }
+        await("HOME 지도 차량 상세") { button(original, "map:vehicle-manage")?.isEnabled == true }
         capture("main-map-focus")
+        click(original, "map:vehicle-manage")
         click(original, VehicleAction.LEVEL_UP)
         await("관리 비용 검토") { visibleTextButton(original, "확정")?.isEnabled == true }
         capture("main-map-review")
@@ -284,23 +285,25 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         await("새 개체 revision으로 관리 비용 검토") { visibleTextButton(host, "확정")?.isEnabled == true }
         onUi { host.onBackPressed() }
         await("Back으로 관리 닫고 차량 지도에 머묾") {
-            button(host, "shop:focus-back")?.isEnabled == true && visibleTextButton(host, "확정") == null
+            button(host, "map:vehicle-close")?.isEnabled == true && visibleTextButton(host, "확정") == null
         }
         ok(games.open()).use { game ->
             assertEquals(initial, ok(game.store.listOwnedVehicles()).single { it.ownedVehicleId == initial.ownedVehicleId })
             assertEquals(GameMoney(500), ok(game.store.balance()))
         }
+        click(host, "map:vehicle-manage")
         click(host, VehicleAction.LEVEL_UP)
         clickText(host, "확정")
         await("레벨업 확정 원결과") { visibleTextButton(host, "결과 확인")?.isEnabled == true }
         host = recreate(host)
         clickText(host, "보관 요청 처리 · 결과 확인")
         clickText(host, "결과 확인")
-        await("재생성된 관리 원결과 확인 뒤 HOME 재조회") { button(host, VehicleAction.SELL)?.isEnabled == true }
+        await("재생성된 관리 원결과 확인 뒤 HOME 재조회") { button(host, "map:vehicle-manage")?.isEnabled == true }
         ok(games.open()).use { game ->
             assertEquals(2, ok(game.store.listOwnedVehicles()).single { it.ownedVehicleId == initial.ownedVehicleId }.level)
             assertEquals(GameMoney(480), ok(game.store.balance()))
         }
+        click(host, "map:vehicle-manage")
         click(host, VehicleAction.SELL)
         clickText(host, "확정")
         clickText(host, "결과 확인")

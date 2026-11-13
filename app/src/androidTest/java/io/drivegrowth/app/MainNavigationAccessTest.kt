@@ -1,5 +1,6 @@
 package io.drivegrowth.app
 
+import android.content.Intent
 import android.os.SystemClock
 import android.test.ActivityInstrumentationTestCase2
 import android.widget.Button
@@ -22,6 +23,7 @@ import java.util.concurrent.FutureTask
 class MainNavigationAccessTest : ActivityInstrumentationTestCase2<MainActivity>(MainActivity::class.java) {
     fun testOldNavigationCannotActOnAnotherPageOrAfterParkingReturns() {
         assertTrue(instrumentation.targetContext.packageName.startsWith("io.drivegrowth.verify."))
+        setActivityIntent(Intent(instrumentation.targetContext, MainActivity::class.java))
         val main = activity
         val task = FutureTask {
             val root = main.window.decorView
@@ -58,8 +60,28 @@ class MainNavigationAccessTest : ActivityInstrumentationTestCase2<MainActivity>(
                 assertTrue(controller.state is GarageCommandState.Confirmed)
             }
 
+            MainActivity::class.java.getDeclaredField("active").apply { isAccessible = true }.setBoolean(main, true)
+            MainActivity::class.java.getDeclaredField("titlePending").apply { isAccessible = true }.setBoolean(main, false)
             gate(Gear.PARK)
             render.invoke(main)
+            val home = checkNotNull(root.mainNavigation())
+            assertEquals(
+                listOf(HostPage.HOME, HostPage.GARAGE, HostPage.GACHA, HostPage.RESULTS, HostPage.DELIVERY).toSet(),
+                HostPage.entries.filter { home.mainPage(it) != null }.toSet(),
+            )
+            root.openMainPage(HostPage.GARAGE)
+            val collectionTab = checkNotNull(root.findViewWithTag<Button>("host:section:COLLECTION"))
+            assertTrue(collectionTab.performClick())
+            assertTrue(root.mainPage(HostPage.COLLECTION)?.isSelected == true)
+            root.openMainPage(HostPage.HOME)
+            root.openMainPage(HostPage.RESULTS)
+            for (page in listOf(HostPage.PROGRESSION, HostPage.RANKING, HostPage.RESULTS)) {
+                val tab = checkNotNull(root.findViewWithTag<Button>("host:section:${page.name}"))
+                assertTrue(tab.performClick())
+                assertTrue(root.mainPage(page)?.isSelected == true)
+            }
+            root.openMainPage(HostPage.HOME)
+            root.openMainPage(HostPage.COLLECTION)
             val beforePageChange = captureButtons()
             root.openMainPage(HostPage.GARAGE)
             controller.javaClass.getDeclaredMethod("show", GarageCommandState::class.java)

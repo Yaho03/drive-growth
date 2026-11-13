@@ -1,5 +1,6 @@
 package io.drivegrowth.app.host.progression
 
+import io.drivegrowth.app.exposeMainPage
 import io.drivegrowth.app.mainPage
 import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.host.HostPage
@@ -190,7 +191,7 @@ class RemainingAchievementsMainTest :
             if (shown != null && targets.all { shown.findViewWithTag<Button>(achievementKey(it.metric))?.isShown == true }) {
                 return@awaitUi true
             }
-            val menu = root.mainPage(HostPage.PROGRESSION) ?: return@awaitUi false
+            val menu = root.exposeMainPage(HostPage.PROGRESSION) ?: return@awaitUi false
             if (!menu.isShown || !menu.isEnabled || !menu.isLaidOut || menu.isLayoutRequested) return@awaitUi false
             root.openMainPage(HostPage.PROGRESSION)
             false

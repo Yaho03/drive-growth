@@ -51,4 +51,7 @@
     <string name="garage_discovered">발견 · 보유 이력 없음</string>
     <string name="garage_ever_owned">보유 이력 있음</string>
     <string name="garage_unlock_missing">해금 정보 확인 불가</string>
+    <string name="garage_map_manage">차량 관리</string>
+    <string name="garage_map_back">차량 상세로</string>
+    <string name="garage_map_max_level">최대 레벨</string>
 </resources>

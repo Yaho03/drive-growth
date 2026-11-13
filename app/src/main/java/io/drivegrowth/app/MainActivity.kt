@@ -54,6 +54,7 @@ import io.drivegrowth.app.host.SimulationInputState
 import io.drivegrowth.app.host.ResultsHostMapper
 import io.drivegrowth.app.host.ResultsStateBundle
 import io.drivegrowth.app.ui.results.ResultsEvent
+import io.drivegrowth.app.ui.results.ResultsScope
 import io.drivegrowth.app.ui.results.ResultsView
 import io.drivegrowth.app.ui.onboarding.OnboardingEvent
 import io.drivegrowth.app.ui.onboarding.OnboardingScreenState
@@ -115,7 +116,12 @@ open class MainActivity : Activity() {
     private var deliveryReceipt: DeliveryHostReceipt? = null
     private var deliveryFrame = DeliveryFrame(0, DeliveryScreen.Loading)
     private lateinit var gacha: GachaView
-    private var navigationBar: MainNavigationBar? = null
+    private var navigationBar: View? = null
+    private var navigationBarPage: HostPage? = null
+    private lateinit var sectionTabs: LinearLayout
+    private lateinit var pageActions: LinearLayout
+    private var homeSettings: FrameLayout? = null
+    private var homeSoundButton: Button? = null
     private var simulationControlsExpanded = false
     private var simulationControls: View? = null
     private var simulationToggle: Button? = null
@@ -123,8 +129,6 @@ open class MainActivity : Activity() {
     private var simulationStatus: TextView? = null
     private var simulationStart: Button? = null
     private var simulationRetry: Button? = null
-    private val destinations = listOf(HostPage.HOME to "가게", HostPage.GARAGE to "보유 차량", HostPage.COLLECTION to "도감",
-        HostPage.GACHA to "가챠", HostPage.PROGRESSION to "퀘스트·진행", HostPage.DELIVERY to "탁송", HostPage.RANKING to "기록·랭킹", HostPage.RESULTS to "미확인 정산", HostPage.ONBOARDING to "첫 차량 안내")
     private val mapper = GarageHostMapper()
     private val resultsMapper = ResultsHostMapper()
     private lateinit var results: ResultsView
@@ -138,6 +142,7 @@ open class MainActivity : Activity() {
     private lateinit var garage: GarageView
     private lateinit var collection: CollectionView
     private lateinit var body: FrameLayout
+    private lateinit var stage: FrameLayout
     private lateinit var chrome: LinearLayout
     private lateinit var titleView: PrototypeTitleView
     private lateinit var presentationAudio: PrototypeAudio
@@ -179,6 +184,7 @@ open class MainActivity : Activity() {
         shop = ShopView(this, ::onShopEvent).apply {
             onOpenVehicle = ::openVehicleFromShop
             onFocusedVehicleAction = ::openFocusedVehicleAction
+            onFocusedVehicleRetry = { if (gameControlsAllowed() && navigation.page == HostPage.HOME) queries.refresh() }
             onFocusedRest = ::onFacilityEvent
             val previous = savedInstanceState?.getString("homeFocusedVehicle")?.takeIf { it.isNotBlank() }?.let(::OwnedVehicleId)
             restoreFocusedVehicle(previous ?: navigation.pendingGarageRequest?.id?.takeIf { homeVehicleManagement })
@@ -313,8 +319,13 @@ open class MainActivity : Activity() {
             addView(soundButton)
         }
         panel.addView(gameHeader)
+        sectionTabs = style.row().apply { visibility = View.GONE }
+        pageActions = style.row().apply { visibility = View.GONE }
+        panel.addView(pageActions)
+        panel.addView(sectionTabs)
         panel.addView(chrome)
-        panel.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
+        stage = FrameLayout(this).apply { addView(body, FrameLayout.LayoutParams(-1, -1)) }
+        panel.addView(stage, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(panel)
         gacha.onCelebration = ::playCelebration
         results.onCelebration = ::playCelebration
@@ -751,20 +762,109 @@ open class MainActivity : Activity() {
     private fun updateNavigationBar(enabled: Boolean) {
         val page = navigation.page
         val previous = navigationBar
-        if (enabled && previous?.selectedPage == page) return
+        if (enabled && previous != null && navigationBarPage == page) return
+        closeHomeSettings()
         navigationBar = null
+        navigationBarPage = null
         previous?.let(panel::removeView)
+        sectionTabs.removeAllViews()
+        sectionTabs.visibility = View.GONE
+        pageActions.removeAllViews()
+        pageActions.visibility = View.GONE
         if (!enabled) return
 
-        lateinit var bar: MainNavigationBar
-        fun isCurrent() = navigationBar === bar && navigation.page == page && allowed() && !titlePending
-        bar = MainNavigationBar(this, destinations,
-            { target -> if (isCurrent() && target != page) select(target) },
-            { if (isCurrent()) onBackPressed() },
-            { if (isCurrent()) refresh() })
-        bar.showSelected(page)
+        lateinit var bar: View
+        fun isCurrent() = navigationBar === bar && navigation.page == page &&
+            homeSettings == null && gameControlsAllowed()
+        val choose: (HostPage) -> Unit = { target -> if (isCurrent() && target != page) select(target) }
+        bar = MainNavigationBar(this, page, choose)
         navigationBar = bar
+        navigationBarPage = page
         panel.addView(bar, LinearLayout.LayoutParams(-1, -2))
+        if (page != HostPage.HOME) {
+            for ((label, tag, action) in listOf(
+                Triple("뒤로", "host:back", ::onBackPressed),
+                Triple("새로고침", "host:refresh", ::refresh),
+            )) {
+                pageActions.addView(style.button(label) { if (isCurrent()) action() }.apply {
+                    this.tag = tag
+                    compact(style)
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+            }
+            pageActions.visibility = View.VISIBLE
+        }
+
+        val sections = when (page) {
+            HostPage.GARAGE, HostPage.COLLECTION -> listOf(HostPage.GARAGE to "보유 차량", HostPage.COLLECTION to "도감")
+            HostPage.RESULTS, HostPage.PROGRESSION, HostPage.RANKING -> listOf(
+                HostPage.RESULTS to "정산·내 기록",
+                HostPage.PROGRESSION to "퀘스트·업적·휴식",
+                HostPage.RANKING to "시연 랭킹",
+            )
+            else -> emptyList()
+        }
+        sections.forEach { (target, label) ->
+            sectionTabs.addView(style.button(label, primary = target == page) { choose(target) }.apply {
+                tag = "host:section:${target.name}"
+                isSelected = target == page
+                compact(style)
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = style.dp(4) })
+        }
+        if (sections.isNotEmpty()) sectionTabs.visibility = View.VISIBLE
+    }
+
+    private fun openHomeSettings() {
+        if (!gameControlsAllowed() || navigation.page != HostPage.HOME || homeSettings != null) return
+        val overlay = FrameLayout(this).apply {
+            tag = "host:settings-panel"
+            isClickable = true
+            setBackgroundColor(0x990b101e.toInt())
+        }
+        fun isCurrent() = homeSettings === overlay && navigation.page == HostPage.HOME && gameControlsAllowed()
+        val items = style.column().apply { setPadding(style.dp(12), style.dp(8), style.dp(12), style.dp(8)) }
+        fun action(label: String, key: String, onClick: () -> Unit) = style.button(label) {
+            if (isCurrent()) onClick()
+        }.apply {
+            tag = key
+            compact(style)
+            items.addView(this, LinearLayout.LayoutParams(-1, -2))
+        }
+        action("설정 닫기", "host:settings-close") { closeHomeSettings() }
+        homeSoundButton = action(soundButton.text.toString(), "presentation:sound") {
+            presentationAudio.enabled = !presentationAudio.enabled
+            updatePresentation(allowed())
+        }
+        action("첫 차량 안내", "host:page:ONBOARDING") { select(HostPage.ONBOARDING) }
+        action("시작 화면", "presentation:home-title") { showPresentationTitle(true) }
+        action("새로고침", "host:refresh") { closeHomeSettings(); refresh() }
+        overlay.addView(ScrollView(this).apply {
+            background = style.shape(style.panel)
+            addView(items)
+        }, FrameLayout.LayoutParams(-1, -1).apply {
+            val inset = style.dp(12)
+            setMargins(inset, inset, inset, inset)
+        })
+        homeSettings = overlay
+        shop.setHostOverlayOpen(true)
+        chrome.visibility = View.GONE
+        body.descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        body.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        stage.addView(overlay, FrameLayout.LayoutParams(-1, -1))
+        navigationBar?.visibility = View.GONE
+        items.getChildAt(0).requestFocus()
+    }
+
+    private fun closeHomeSettings(): Boolean {
+        val overlay = homeSettings ?: return false
+        homeSettings = null
+        homeSoundButton = null
+        stage.removeView(overlay)
+        shop.setHostOverlayOpen(false)
+        chrome.visibility = View.VISIBLE
+        body.descendantFocusability = android.view.ViewGroup.FOCUS_BEFORE_DESCENDANTS
+        body.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+        navigationBar?.visibility = View.VISIBLE
+        return true
     }
 
     private fun render() {
@@ -795,6 +895,48 @@ open class MainActivity : Activity() {
                 row.vehicle.ownedVehicleId to FacilityControlsEvent.SetResting(facility.version, row.vehicle, row.resting, !row.resting)
             }
         } else emptyMap()
+        val unviewed = (screen as? HostQueryState.Content)?.snapshot?.let { snapshot ->
+            snapshot.unviewedSettlements.asSequence().filter { it.transaction.source == snapshot.source }
+                .map { it.settlementId }.distinct().count()
+        }
+        val homeContent = session.home.state.screen as? ShopScreenState.Content
+        val operatingStatus = homeContent?.let { content ->
+            val activities = content.vehicles.mapNotNull { it.activity }
+            if (activities.size != content.ownedCount) "영업 상태 확인 불가"
+            else {
+                val rented = activities.count { it == io.drivegrowth.core.progression.VehicleActivity.RENTED }
+                val returning = activities.count { it == io.drivegrowth.core.progression.VehicleActivity.RETURNING }
+                "대여 중 ${rented}대 · 반납 중 ${returning}대"
+            }
+        }
+        val projected = homeContent?.takeIf { it.origin == io.drivegrowth.app.ui.shop.ShopOrigin.STORED }?.let { content ->
+            val balance = content.balance ?: return@let emptyMap()
+            (listOfNotNull(content.expansion) + content.facilities.map { it.option } + content.decorations)
+                .mapNotNull { option ->
+                    val price = option.price ?: return@mapNotNull null
+                    if (option.availability != io.drivegrowth.app.ui.shop.ShopAvailability.AVAILABLE ||
+                        price.units > balance.units
+                    ) null else option.id to io.drivegrowth.core.contract.GameMoney(balance.units - price.units)
+                }.toMap()
+        }.orEmpty()
+        shop.updateMapProjectedBalance(projected)
+        shop.updateMapHud(
+            unviewedCount = unviewed,
+            operatingStatus = operatingStatus,
+            onResults = {
+                if (homeSettings == null && navigation.page == HostPage.HOME && gameControlsAllowed()) {
+                    results.restoreUiState(results.uiState.copy(selectedId = null, scope = ResultsScope.UNVIEWED))
+                    session.results.remember(results.uiState)
+                    select(HostPage.RESULTS)
+                }
+            },
+            onSettings = ::openHomeSettings,
+        )
+        shop.onActivateDecoration = {
+            if (gameControlsAllowed() && navigation.page == HostPage.HOME && !shopRestoreFailed &&
+                session.home.state.activationRequired
+            ) session.home.activateDecoration()
+        }.takeIf { homeEnabled && session.home.state.activationRequired }
         shop.render(if (shopRestoreFailed) ShopScreenState.Failure("가게 화면 상태를 복원하지 못해 요청을 보존하고 조작을 제한합니다.")
             else session.home.state.screen, homeEnabled, (garageState as? GarageScreenState.Content)?.data?.vehicles,
             focusRest = restActions, focusRestRecovery = facilityEnabled && restRecovery,
@@ -812,6 +954,12 @@ open class MainActivity : Activity() {
         onboarding.render(onboardingState, gameEnabled)
         renderDelivery(gameEnabled && navigation.page == HostPage.DELIVERY)
         chrome.removeAllViews()
+        if (gameEnabled && navigation.page == HostPage.HOME && (shopRestoreFailed || homeContent == null)) {
+            chrome.addView(style.button("설정", onClick = ::openHomeSettings).apply {
+                tag = "host:home-settings-fallback"
+                compact(style)
+            }, LinearLayout.LayoutParams(-1, -2))
+        }
         renderSimulationControls(enabled)
         if (!enabled) {
             val simulation = session.simulation
@@ -832,9 +980,6 @@ open class MainActivity : Activity() {
         if (session.simulation == null) drivingStatus?.let { chrome.addView(style.text(it)) }
         if (navigation.page == HostPage.HOME && homeEnabled) {
             val home = session.home.state
-            if (home.activationRequired) chrome.addView(style.button("꾸미기 기능 사용 시작") {
-                if (gameControlsAllowed() && navigation.page == HostPage.HOME && !shopRestoreFailed) session.home.activateDecoration()
-            }.apply { tag = "decoration:activate"; isEnabled = homeEnabled })
             (home.decoration?.receipt ?: (home.original as? io.drivegrowth.app.data.HostCheckpointResult.Decoration)?.value)?.let { receipt ->
                 val cost = if (receipt.settlement == null) "비용 없음" else "사용한 게임머니 ${receipt.command.expectedPrice.units}"
                 chrome.addView(style.text("꾸미기 적용 완료 · $cost · 적용 당시 잔액 ${receipt.state.balance.units}")
@@ -928,7 +1073,7 @@ open class MainActivity : Activity() {
 
     private fun updatePresentation(enabled: Boolean) {
         val showingTitle = enabled && titlePending
-        gameHeader.visibility = if (enabled && !showingTitle) View.VISIBLE else View.GONE
+        gameHeader.visibility = if (enabled && !showingTitle && navigation.page != HostPage.HOME) View.VISIBLE else View.GONE
         simulationControls?.visibility = if (showingTitle) View.GONE else View.VISIBLE
         onControlsAvailabilityChanged(enabled && !titlePending)
         val visible = enabled && presentationFocused
@@ -946,6 +1091,10 @@ open class MainActivity : Activity() {
             ?: "잔액 확인 중"
         soundButton.text = if (presentationAudio.enabled) "소리 켜짐" else "소리 꺼짐"
         soundButton.contentDescription = if (presentationAudio.enabled) "게임 소리 끄기" else "게임 소리 켜기"
+        homeSoundButton?.apply {
+            text = soundButton.text
+            contentDescription = soundButton.contentDescription
+        }
     }
 
     private fun playCelebration(kind: RewardCelebrationKind) {
@@ -1251,6 +1400,7 @@ open class MainActivity : Activity() {
         if (titlePending && allowed()) { showPresentationTitle(false); return }
         automaticIntroAllowed = false
         if (allowed()) {
+            if (closeHomeSettings()) return
             if ((navigation.page == HostPage.GARAGE || navigation.page == HostPage.HOME && homeVehicleManagement) &&
                 managementVisible && managementState != GarageCommandState.Idle
             ) {

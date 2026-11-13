@@ -61,14 +61,24 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
         for(name in listOf("game-ledger-vehicle.db","game-ledger-simulation.db","unified-simulation.db"))
             assertFalse("각 selector용 fresh package가 필요하며 기존 DB를 삭제하지 않는다: $name",context.getDatabasePath(name).exists())
     }
+    private fun openDecorations(a: MainActivity) {
+        val alreadyOpen = onMain { a.window.decorView.findViewWithTag<View>("shop:map-decorations")?.isShown == true }
+        if (!alreadyOpen) click(a, "shop:map-facilities")
+        click(a, "shop:map-decorations")
+    }
+
+    private fun preview(a: MainActivity, id: String) {
+        openDecorations(a)
+        click(a, "shop:map-preview:decoration:$id")
+    }
+
     private fun counts(game: GameSession)=ok(game.store.read { db ->
         listOf("decoration_requests","settlements").map { table -> db.rawQuery("SELECT COUNT(*) FROM $table",null).use{it.moveToFirst();it.getLong(0)} }
     })
     private fun currentShopShown(a: MainActivity, id: String): Boolean {
         val children=tree(shop(a))
         val sign=when(id) { "neutral-sign"->"기본 간판 · 시연"; "blue-sign"->"간판 색상 · 시연"; else->error("시험 기대 외 품목") }
-        return children.any { it is ShopSceneView && it.isShown } &&
-            children.filterIsInstance<TextView>().any { it.text.toString()==sign }
+        return children.any { it is ShopSceneView && it.isShown && sign in it.contentDescription?.toString().orEmpty() }
     }
     private fun awaitState(a: MainActivity,id:String) {
         val end=SystemClock.uptimeMillis()+30_000;var found=false
@@ -82,12 +92,14 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
     }
     private fun previewWithoutWrite(a:MainActivity,id:String) {
         val before=read { game -> Triple(ok(game.store.balance()),ok(game.store.decorations.state(game.identity.profileId)),counts(game)) }
-        click(a,"shop:preview:decoration:$id")
+        preview(a,id)
         assertEquals(before,read { game -> Triple(ok(game.store.balance()),ok(game.store.decorations.state(game.identity.profileId)),counts(game)) })
         instrumentation.runOnMainSync { a.onBackPressed() }
         await(a,"Back은 미리보기만 닫음") { shop(a).uiState.selection==null && menu(a)?.isEnabled==true }
         assertEquals(before,read { game -> Triple(ok(game.store.balance()),ok(game.store.decorations.state(game.identity.profileId)),counts(game)) })
-        click(a,"shop:preview:decoration:$id");click(a,"shop:cancel")
+        click(a,"shop:map-preview:decoration:$id")
+        click(a,"shop:map-close")
+        click(a,"shop:map-close")
         assertEquals(before,read { game -> Triple(ok(game.store.balance()),ok(game.store.decorations.state(game.identity.profileId)),counts(game)) })
     }
     private fun recreateAndCompare(a:MainActivity,expected:Pair<GameIdentity,io.drivegrowth.core.decoration.DecorationState>) {
@@ -111,6 +123,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
         fresh();val first=activity
         click(first,R.string.onboarding_start);click(first,VehicleId("hyundai_casper"));click(first,R.string.onboarding_review)
         click(first,R.string.onboarding_confirm);click(first,R.string.onboarding_to_shop)
+        click(first, "shop:map-facilities")
         await(first,"명시 활성화 조작") { first.window.decorView.findViewWithTag<Button>("decoration:activate")?.isEnabled==true }
         val original=read { game ->
             assertEquals(InputSource.VEHICLE,game.identity.source);assertEquals(GameMoney(1000),ok(game.store.balance()))
@@ -118,20 +131,28 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
             game.identity to counts(game)
         }
         click(first,"decoration:activate")
-        await(first,"무료 품목 선택 가능") { first.window.decorView.findViewWithTag<Button>("shop:preview:decoration:neutral-sign")?.isEnabled==true }
+        openDecorations(first)
+        await(first,"무료 품목 선택 가능") { first.window.decorView.findViewWithTag<Button>("shop:map-preview:decoration:neutral-sign")?.isEnabled==true }
+        click(first, "shop:map-close")
         read { game ->
             val state=ok(game.store.decorations.state(game.identity.profileId));assertEquals(Revision(0),state.revision)
             assertTrue(state.ownedIds.isEmpty());assertNull(state.selectedId);assertEquals(original.second,counts(game))
         }
         previewWithoutWrite(first,"neutral-sign")
-        click(first,"shop:preview:decoration:neutral-sign");click(first,"shop:confirm");awaitState(first,"neutral-sign")
+        preview(first,"neutral-sign");click(first,"shop:map-confirm");awaitState(first,"neutral-sign")
         val stored=read { game ->
             assertEquals(original.first,game.identity);val state=ok(game.store.decorations.state(game.identity.profileId))
             assertEquals(GameMoney(1000),state.balance);assertEquals(setOf("neutral-sign"),state.ownedIds)
             assertEquals(listOf(original.second[0]+1,original.second[1]),counts(game))
             game.identity to state
         }
-        await(first,"Lv1 유료 항목 잠김") { first.window.decorView.findViewWithTag<Button>("shop:preview:decoration:blue-sign")?.isEnabled==false }
+        openDecorations(first)
+        await(first,"Lv1 유료 항목 잠김") {
+            val overlay = first.window.decorView.findViewWithTag<View>("shop:map-overlay")
+            overlay != null && tree(overlay).filterIsInstance<TextView>().any { it.text == context.getString(R.string.shop_locked) } &&
+                first.window.decorView.findViewWithTag<Button>("shop:map-preview:decoration:blue-sign") == null
+        }
+        click(first, "shop:map-close")
         recreateAndCompare(first,stored)
     }
     fun testExplicitSimulationPublicLedgerPaidPurchaseAndFreeOwnedReapplyInActualMain() {
@@ -158,17 +179,20 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
             game.identity to ok(game.store.balance())
         }
         val first=activity
+        click(first, "shop:map-facilities")
         await(first,"실제 Main의 SIMULATION 프로필 HOME") { first.window.decorView.findViewWithTag<Button>("decoration:activate")?.isEnabled==true }
         click(first,"decoration:activate")
-        await(first,"시연 Lv2 유료 선택") { first.window.decorView.findViewWithTag<Button>("shop:preview:decoration:blue-sign")?.isEnabled==true }
+        openDecorations(first)
+        await(first,"시연 Lv2 유료 선택") { first.window.decorView.findViewWithTag<Button>("shop:map-preview:decoration:blue-sign")?.isEnabled==true }
+        click(first, "shop:map-close")
         previewWithoutWrite(first,"blue-sign")
-        click(first,"shop:preview:decoration:neutral-sign");click(first,"shop:confirm");awaitState(first,"neutral-sign")
+        preview(first,"neutral-sign");click(first,"shop:map-confirm");awaitState(first,"neutral-sign")
         val beforePaid=read{ok(it.store.balance())};assertEquals(initial.second,beforePaid)
-        click(first,"shop:preview:decoration:blue-sign");click(first,"shop:confirm");awaitState(first,"blue-sign")
+        preview(first,"blue-sign");click(first,"shop:map-confirm");awaitState(first,"blue-sign")
         read { game ->assertEquals(GameMoney(beforePaid.units-100),ok(game.store.balance()));assertEquals(initial.first,game.identity) }
         val paidCounts=read{counts(it)}
         previewWithoutWrite(first,"neutral-sign")
-        click(first,"shop:preview:decoration:neutral-sign");click(first,"shop:confirm");awaitState(first,"neutral-sign")
+        preview(first,"neutral-sign");click(first,"shop:map-confirm");awaitState(first,"neutral-sign")
         val stored=read { game ->
             val state=ok(game.store.decorations.state(game.identity.profileId));assertEquals(Revision(3),state.revision)
             assertEquals(setOf("neutral-sign","blue-sign"),state.ownedIds);assertEquals(GameMoney(beforePaid.units-100),state.balance)
@@ -228,9 +252,15 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
         }
         fun assertRestricted(a: MainActivity, label: String) {
             await(a, label) { menu(a)?.let { it.isShown && it.isEnabled } == true && restricted(a) }
+            click(a, "host:home-settings-fallback")
+            await(a, "손상 원본을 보존하면서 안내와 소리 설정 접근") {
+                a.window.decorView.findViewWithTag<Button>("host:page:ONBOARDING")?.isShown == true &&
+                    a.window.decorView.findViewWithTag<Button>("presentation:sound")?.isShown == true
+            }
+            click(a, "host:settings-close")
             assertFalse(onMain { tree(a.window.decorView).filterIsInstance<Button>().any {
                 it.isShown && it.isEnabled && it.tag?.toString()?.let { tag ->
-                    tag.startsWith("shop:preview:") || tag == "shop:confirm" || tag == "decoration:activate"
+                    tag.startsWith("shop:map-preview:") || tag == "shop:map-confirm" || tag == "decoration:activate"
                 } == true
             } })
         }
