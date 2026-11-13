@@ -1,0 +1,11 @@
+slot,x,y,opens_at_level,row,car_facing
+0,240,178,1,building_side,sw
+1,288,202,1,building_side,sw
+2,336,226,1,building_side,sw
+3,384,250,2,building_side,sw
+4,432,274,2,building_side,sw
+5,160,218,3,road_side,ne
+6,208,242,3,road_side,ne
+7,256,266,4,road_side,ne
+8,304,290,4,road_side,ne
+9,352,314,4,road_side,ne

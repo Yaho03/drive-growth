@@ -1,0 +1,5 @@
+lot,x,y,tiles_i,tiles_j
+building,448,178,10,6
+fuel_station,448,378,5,5
+insurance,192,106,5,5
+car_wash,384,98,4,4
