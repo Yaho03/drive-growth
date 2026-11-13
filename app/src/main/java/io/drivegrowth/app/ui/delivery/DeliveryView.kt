@@ -7,6 +7,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
+import io.drivegrowth.app.host.delivery.DeliveryHostRead
 import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.VehicleSprites
@@ -23,11 +24,19 @@ class DeliveryView(
     private val navigationControls: () -> View? = { null },
     private val hostStatus: () -> View? = { null },
     private val canConfirmOffer: () -> Boolean = { true },
+    private val onPresentationCue: (DeliveryPresentationCue) -> Unit = {},
 ) : LinearLayout(context) {
     private val style = DeliveryStyle(context)
     private val vehicleLabels = GarageStyle(context)
     private val sprites = VehicleSprites(context)
     private val session = DeliveryInteraction(restored)
+    private val presentation = DeliveryPresentation(restored.presentationKeys, (restored.frame?.screen as? DeliveryScreen.Active)?.delivery)
+    private val artwork = DeliveryArtwork(context, sprites)
+    private val motion = DeliveryMotionView(context, artwork, { session.controlsEnabled }) { key, cue ->
+        if (session.controlsEnabled && presentation.scene?.key == key) onPresentationCue(cue)
+    }
+    private var readVersion: Long? = null
+    private var presentationRead: DeliveryHostRead? = null
     private var selectedOfferId = restored.selectedOfferId
     private var selectedFrameVersion = restored.selectedFrameVersion
     private var drawGeneration = 0L
@@ -44,8 +53,19 @@ class DeliveryView(
         if (next != wide) { wide = next; post { drawScreen() } }
     }
 
-    fun render(frame: DeliveryFrame, controlsEnabled: Boolean): Boolean {
+    fun render(frame: DeliveryFrame, controlsEnabled: Boolean): Boolean =
+        render(frame, controlsEnabled, null)
+
+    /** 호스트 render가 받은 같은 프레임의 원결과를 전달한다. 일반 다시 그리기는 기존 결과를 재사용한다. */
+    fun render(frame: DeliveryFrame, controlsEnabled: Boolean, read: DeliveryHostRead?): Boolean {
         val accepted = session.render(frame, controlsEnabled)
+        if (accepted && (readVersion != frame.version || read != null)) {
+            readVersion = frame.version
+            presentationRead = read?.takeIf { it.screen == frame.screen }
+        }
+        if (accepted || !session.controlsEnabled) {
+            session.frame?.let { presentation.accept(it, presentationRead.takeIf { _ -> readVersion == it.version }, session.controlsEnabled) }
+        }
         validateSelection()
         drawScreen()
         return accepted
@@ -53,18 +73,23 @@ class DeliveryView(
 
     fun complete(request: DeliveryRequest, frame: DeliveryFrame): Boolean {
         val accepted = session.complete(request, frame)
+        if (accepted) presentation.accept(frame, null, session.controlsEnabled)
         validateSelection()
         drawScreen()
         return accepted
     }
 
     fun saveUiState() = session.save().copy(
-        selectedOfferId = selectedOfferId, selectedFrameVersion = selectedFrameVersion,
+        selectedOfferId = selectedOfferId, selectedFrameVersion = selectedFrameVersion, presentationKeys = presentation.save(),
     )
 
     /** 상세 닫기는 로컬 선택만 닫는다. 검토 이탈은 거래 취소와 다른 요청이다. */
     fun handleBack(): Boolean {
         if (!session.controlsEnabled || session.pending != null) return false
+        if (presentation.scene != null) {
+            dismissScene()
+            return true
+        }
         if (session.frame?.screen is DeliveryScreen.Offers && selectedOfferId != null) {
             closeDetail()
             return true
@@ -77,6 +102,8 @@ class DeliveryView(
 
     fun release() {
         session.release()
+        presentation.dismiss()
+        presentationRead = null
         selectedOfferId = null
         selectedFrameVersion = null
         drawScreen()
@@ -99,11 +126,13 @@ class DeliveryView(
         val focused = if (sameFrame) findFocus()?.tag else null
         drawnVersion = version
         drawGeneration++
+        (motion.parent as? LinearLayout)?.removeView(motion)
         removeAllViews()
         scroll = null
         val horizontalPadding = dp(if (wide) 22 else 14)
         setPadding(horizontalPadding, dp(10), horizontalPadding, dp(10))
         if (!session.controlsEnabled) {
+            motion.clear()
             addView(text(s(R.string.delivery_restricted), 28, bold = true))
             addView(text(s(R.string.delivery_restricted_body), color = muted))
             return@with
@@ -112,6 +141,10 @@ class DeliveryView(
         val body = column()
         scroll = style.scroll(body, savedY)
         addView(scroll, LayoutParams(-1, 0, 1f))
+        presentation.scene?.let {
+            add(body, scenePanel(it))
+            return@with
+        }
         if (session.pending != null) add(body, panel(fill = PixelStyle.inset).apply {
             note(this, R.string.delivery_pending)
         })
@@ -138,7 +171,10 @@ class DeliveryView(
                 if (!state.chooseAllowed) info(this, present(state.reason, R.string.delivery_action_unavailable), muted = true)
             })
             is DeliveryScreen.Offers -> offers(body, state.proposal)
-            is DeliveryScreen.Active -> active(body, state.delivery, actions = true)
+            is DeliveryScreen.Active -> {
+                presentation.highway?.let { add(body, highwayPanel(it)) }
+                active(body, state.delivery, actions = true)
+            }
             is DeliveryScreen.ChangeReview -> changeReview(body, state)
             is DeliveryScreen.AbandonReview -> abandonReview(body, state)
             is DeliveryScreen.AwaitingResult -> {
@@ -151,7 +187,70 @@ class DeliveryView(
             }
         }
         if (state is DeliveryScreen.Offers && canConfirmOffer()) addNavigationControls(body)
+        if (motion.parent == null) motion.clear()
         if (focused != null) findViewWithTag<View>(focused)?.takeIf { it.isEnabled }?.requestFocus()
+    }
+
+    private fun scenePanel(scene: DeliveryScene): View = with(style) {
+        panel(padding = 12).apply {
+            tag = "delivery:scene:${scene.kind.name}"
+            heading(this, when (scene.kind) {
+                DeliverySceneKind.DEPARTURE -> R.string.delivery_scene_departure
+                DeliverySceneKind.INCOME_ARRIVAL -> R.string.delivery_scene_income_arrival
+                DeliverySceneKind.VEHICLE_ARRIVAL -> R.string.delivery_scene_vehicle_arrival
+                DeliverySceneKind.HELD -> R.string.delivery_scene_held
+            })
+            motion.showScene(scene)
+            addMotion(this)
+            if (scene.kind == DeliverySceneKind.INCOME_ARRIVAL) note(this, R.string.delivery_scene_temporary_art)
+            motionDetails(this, scene.details)
+            if (scene.kind == DeliverySceneKind.HELD) note(this, R.string.delivery_scene_held_note)
+            val key = scene.key
+            localAction(this, R.string.delivery_scene_skip, "delivery:skip-motion") {
+                if (presentation.scene?.key == key) dismissScene()
+            }
+        }
+    }
+
+    private fun highwayPanel(road: DeliveryHighway): View = with(style) {
+        panel(padding = 12).apply {
+            tag = "delivery:highway"
+            heading(this, if (road.moving) R.string.delivery_scene_highway else R.string.delivery_scene_waiting)
+            motion.showHighway(road)
+            addMotion(this)
+            motionDetails(this, road.details)
+            road.observedMeters?.let { info(this, context.getString(R.string.delivery_scene_observed, it)) }
+        }
+    }
+
+    private fun addMotion(parent: LinearLayout) {
+        // 진행 화면의 일러스트는 넓은 창에서도 본문 너비 안에 둔다.
+        parent.addView(motion, LayoutParams(-1, style.dp(if (wide) 198 else 152)).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            topMargin = style.dp(6)
+        })
+    }
+
+    private fun motionDetails(parent: LinearLayout, details: DeliverySceneDetails) = with(style) {
+        val name = present(details.vehicleName, R.string.delivery_vehicle_missing)
+        add(parent, text(name, 18, bold = true), gap = 8)
+        details.rarity?.let { add(parent, text(vehicleLabels.rarity(it), 14, color = PixelStyle.rarityColor(it), bold = true), gap = 2) }
+        info(parent, s(if (details.purchase) R.string.delivery_purchase else R.string.delivery_income), muted = true)
+        info(parent, present(details.destinationName, R.string.delivery_destination_missing))
+        info(parent, details.estimatedMeters?.let { context.getString(R.string.delivery_estimated, it) } ?: s(R.string.delivery_distance_missing))
+        info(parent, s(if (details.source == InputSource.SIMULATION) R.string.delivery_simulation else R.string.delivery_vehicle_source), muted = true)
+        val reward = details.confirmedReward ?: details.expectedReward
+        if (reward != null) {
+            val label = if (details.confirmedReward != null) R.string.delivery_scene_reward else R.string.delivery_completion_reward
+            add(parent, text(context.getString(R.string.delivery_money, s(label), reward.units),
+                18, color = PixelStyle.gold, bold = true), gap = 2)
+        }
+    }
+
+    private fun dismissScene() {
+        presentation.dismiss()
+        motion.clear()
+        drawScreen()
     }
 
     private fun addNavigationControls(parent: LinearLayout) {
@@ -179,17 +278,27 @@ class DeliveryView(
         listOf(true, false).forEach { income ->
             val group = value.proposed.offers.filter { (it is DeliveryOffer.Income) == income }
             if (group.isNotEmpty()) heading(parent, if (income) R.string.delivery_income else R.string.delivery_purchase)
-            group.forEach { offer ->
-                offerCard(parent, offer, value.vehicleNames[offer.vehicleId])
-                localAction(parent, R.string.delivery_details, "delivery:offer:${offer.id.value}",
-                    enabled = value.proposed.offers.count { it.id == offer.id } == 1) {
-                    selectedOfferId = offer.id
-                    selectedFrameVersion = session.frame?.version
-                    resetScroll()
-                    drawScreen()
+            group.chunked(if (wide) 2 else 1).forEach { batch ->
+                val row = style.row().apply { isBaselineAligned = false }
+                batch.forEachIndexed { index, offer ->
+                    val card = style.panel(padding = 12)
+                    offerCard(card, offer, value.vehicleNames[offer.vehicleId], tile = true) {
+                        val permission = value.availability[offer.id]
+                        if (permission?.allowed != true) info(this, present(permission?.reason, R.string.delivery_action_unavailable), muted = true)
+                        localAction(this, R.string.delivery_details, "delivery:offer:${offer.id.value}",
+                            enabled = value.proposed.offers.count { it.id == offer.id } == 1) {
+                            selectedOfferId = offer.id
+                            selectedFrameVersion = session.frame?.version
+                            resetScroll()
+                            drawScreen()
+                        }
+                    }
+                    row.addView(card, LayoutParams(0, if (wide) -1 else -2, 1f).apply { if (index != 0) marginStart = style.dp(PixelStyle.gapDp) })
                 }
-                val permission = value.availability[offer.id]
-                if (permission?.allowed != true) info(parent, present(permission?.reason, R.string.delivery_action_unavailable), muted = true)
+                if (wide && batch.size == 1) row.addView(View(context), LayoutParams(0, 0, 1f).apply {
+                    marginStart = style.dp(PixelStyle.gapDp)
+                })
+                style.add(parent, row)
             }
         }
     }
@@ -274,7 +383,9 @@ class DeliveryView(
         })
     }
 
-    private fun offerCard(parent: LinearLayout, offer: DeliveryOffer, name: String?, detailed: Boolean = false, active: Boolean = false) = with(style) {
+    private fun offerCard(parent: LinearLayout, offer: DeliveryOffer, name: String?, detailed: Boolean = false,
+        active: Boolean = false, tile: Boolean = false, footer: (LinearLayout.() -> Unit)? = null,
+    ) = with(style) {
         val content = column().apply {
             addView(text(s(if (offer is DeliveryOffer.Income) R.string.delivery_income else R.string.delivery_purchase),
                 14, color = PixelStyle.focus, bold = true))
@@ -283,23 +394,23 @@ class DeliveryView(
                 is DeliveryOffer.Income -> {
                     addView(text(context.getString(R.string.delivery_money, s(R.string.delivery_completion_reward), offer.reward.units),
                         18, color = PixelStyle.gold, bold = true))
-                    addView(text(s(R.string.delivery_income_note), 14, color = muted))
+                    if (!tile) addView(text(s(R.string.delivery_income_note), 14, color = muted))
                 }
                 is DeliveryOffer.Purchase -> {
                     addView(text(vehicleLabels.rarity(offer.rarity), 14, color = PixelStyle.rarityColor(offer.rarity), bold = true))
                     addView(text(context.getString(R.string.delivery_money,
                         s(if (active) R.string.delivery_selected_purchase_amount else R.string.delivery_purchase_payment), offer.price.units),
                         18, color = PixelStyle.gold, bold = true))
-                    addView(text(s(if (active) R.string.delivery_active_purchase_note else R.string.delivery_purchase_note), 14, color = muted))
+                    if (!tile) addView(text(s(if (active) R.string.delivery_active_purchase_note else R.string.delivery_purchase_note), 14, color = muted))
                 }
             }
         }
-        val card = panel(padding = 12, border = if (detailed) PixelStyle.focus else PixelStyle.outline)
+        val card = if (tile) parent else panel(padding = 12, border = if (detailed) PixelStyle.focus else PixelStyle.outline)
         val sprite = sprites.drawable(offer.vehicleId)
-        if (sprite == null) {
+        if (sprite == null && !tile) {
             card.addView(content)
         } else {
-            val scale = if (detailed) 2 else 1
+            val scale = if (detailed || tile) 2 else 1
             val art = panel(padding = 6, fill = PixelStyle.inset).apply {
                 gravity = Gravity.CENTER
                 val image = ImageView(context).apply {
@@ -307,11 +418,13 @@ class DeliveryView(
                     scaleType = ImageView.ScaleType.FIT_CENTER
                     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 }
-                addView(image, LayoutParams(sprite.intrinsicWidth * scale, sprite.intrinsicHeight * scale))
+                if (tile) addView(image, LayoutParams(-1, dp(82)))
+                else if (sprite != null) addView(image, LayoutParams(sprite.intrinsicWidth * scale, sprite.intrinsicHeight * scale))
             }
-            if (detailed && !wide) {
+            if (tile || detailed && !wide) {
                 card.addView(art, LayoutParams(-1, -2))
-                add(card, content, gap = 8)
+                if (tile && wide) card.addView(content, LayoutParams(-1, -2, 1f).apply { topMargin = dp(8) })
+                else add(card, content, gap = 8)
             } else {
                 val line = row().apply { gravity = Gravity.CENTER_VERTICAL }
                 line.addView(art, LayoutParams(-2, -2))
@@ -319,7 +432,8 @@ class DeliveryView(
                 card.addView(line)
             }
         }
-        add(parent, card)
+        footer?.invoke(card)
+        if (!tile) add(parent, card)
     }
 
     private fun money(parent: LinearLayout, label: Int, amount: Long) = with(style) {

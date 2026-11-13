@@ -6,6 +6,14 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
+import io.drivegrowth.app.data.DeliveryCommit
+import io.drivegrowth.app.host.GameIdentity
+import io.drivegrowth.app.host.delivery.DeliveryHostOperation
+import io.drivegrowth.app.host.delivery.DeliveryHostRead
+import io.drivegrowth.app.host.delivery.DeliveryHostReceipt
+import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.delivery.DeliveryOffer
+import io.drivegrowth.core.delivery.DeliverySelected
 
 @Suppress("DEPRECATION")
 class DeliveryViewTest : InstrumentationTestCase() {
@@ -111,6 +119,63 @@ class DeliveryViewTest : InstrumentationTestCase() {
         assertTrue(view.handleBack())
         assertEquals(DeliveryCommand.ExitReview, requests.single().command)
         assertTrue(requests.none { it.command is DeliveryCommand.Abandon })
+    }
+
+    fun testConfirmedDepartureSkipShowsHighwayWithoutSubmittingAndRedrawDoesNotReplay() = onUi {
+        val requests = mutableListOf<DeliveryRequest>()
+        val cues = mutableListOf<DeliveryPresentationCue>()
+        val view = DeliveryView(instrumentation.targetContext, requests::add, onPresentationCue = cues::add)
+        val frame = incomeFrame()
+        val read = selectionRead(frame)
+        view.render(frame, true, read)
+        assertNotNull(view.findViewWithTag<View>("delivery:scene:DEPARTURE"))
+        val width = (320 * view.resources.displayMetrics.density).toInt()
+        val height = (440 * view.resources.displayMetrics.density).toInt()
+        view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+        view.layout(0, 0, width, height)
+        assertTrue(nodes(view).all { it.width <= width })
+        view.findViewWithTag<Button>("delivery:skip-motion").performClick()
+        assertNull(view.findViewWithTag<View>("delivery:scene:DEPARTURE"))
+        assertNotNull(view.findViewWithTag<View>("delivery:highway"))
+        view.render(frame.copy(version = frame.version + 1), true, read)
+        assertNull(view.findViewWithTag<View>("delivery:scene:DEPARTURE"))
+        assertTrue(requests.isEmpty())
+        assertTrue(cues.isEmpty()) // 분리된 View에서는 효과음도 시작하지 않는다.
+    }
+
+    fun testRestrictionRemovesSceneAndHighwayAndLateReceiptCannotReplay() = onUi {
+        val view = DeliveryView(instrumentation.targetContext, onRequest = {})
+        val frame = incomeFrame()
+        val read = selectionRead(frame)
+        view.render(frame, true, read)
+        assertNotNull(view.findViewWithTag<View>("delivery:scene:DEPARTURE"))
+        val staleSkip = view.findViewWithTag<Button>("delivery:skip-motion")
+        view.render(frame.copy(version = frame.version + 1), false, read)
+        staleSkip.performClick()
+        assertNull(view.findViewWithTag<View>("delivery:scene:DEPARTURE"))
+        assertNull(view.findViewWithTag<View>("delivery:highway"))
+        assertFalse(view.render(frame, true, read))
+        assertNull(view.findViewWithTag<View>("delivery:highway"))
+        view.render(frame.copy(version = frame.version + 2), true, read)
+        assertNull(view.findViewWithTag<View>("delivery:scene:DEPARTURE"))
+        assertNotNull(view.findViewWithTag<View>("delivery:highway"))
+    }
+
+    private fun incomeFrame(): DeliveryFrame {
+        val data = DeliveryPreviewStates
+        return data.activeFrame.copy(screen = DeliveryScreen.Active(data.active.copy(
+            active = data.active.active.copy(offer = data.income),
+            vehicleName = data.proposal.vehicleNames[data.income.vehicleId],
+        )))
+    }
+
+    private fun selectionRead(frame: DeliveryFrame): DeliveryHostRead {
+        val order = (frame.screen as DeliveryScreen.Active).delivery.active
+        check(order.offer is DeliveryOffer.Income)
+        return DeliveryHostRead(GameIdentity(ProfileId("fixture"), InputSource.SIMULATION), frame.screen,
+            pending = DeliveryHostOperation.Select(order.proposed, order.offer.id, order.requestId, RouteId("fixture-route"), EpochMillis(1)),
+            receipt = DeliveryHostReceipt.Selected(DeliveryCommit(DeliverySelected(order, null), null)))
     }
 
     fun testPreviewStatesLargeTextAndManyItemsNeverExceedNarrowRoot() = onUi {
