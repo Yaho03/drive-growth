@@ -175,7 +175,7 @@ def main():
         built[level] = (im, mask, bb, inner)
         rows.append([f"main_{name}", bb[0], bb[1], im.width, im.height] + [round(v) for p in inner for v in p])
     with open(HERE / "building.csv", "w", newline="") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator="\n")
         w.writerow(["sprite", "left", "top", "width", "height",
                     "sign_bl_x", "sign_bl_y", "sign_br_x", "sign_br_y", "sign_tr_x", "sign_tr_y", "sign_tl_x", "sign_tl_y"])
         w.writerows(rows)

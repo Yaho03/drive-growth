@@ -1,0 +1,12 @@
+Commands and raw results, in order:
+am supports-multiwindow
+am supports-split-screen-multi-window
+pm has-feature android.software.freeform_window_management
+pm has-feature android.software.activities_on_secondary_displays
+getprop ro.build.version.sdk
+
+true
+false
+false
+true
+34
