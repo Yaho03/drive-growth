@@ -3249,3 +3249,13 @@ Back의 추가 재시험 두 번은 권한 복원 직후 SDK가 `NO_DATA`에 머
 [APK 식별](evidence/issue51-back-return/metadata.json)의 표준 Debug와 로깅 전용 VEHICLE APK는 다르다. SDK 이벤트 추적을 표준 APK에서 직접 계측한 것으로 표시하지 않는다. 시험은 Pleos API 34 ARM64 격리 AVD에서 수행했다. Back은 Android `KEYCODE_BACK` 주입이며 실제 차량 버튼이나 CCP의 직접 입력 시험이 아니다. P·속도 0 복원, 격리 패키지·포워드 제거 후 해당 AVD만 종료했고 원래 공유 AVD·제품 데이터는 수정하지 않았다.
 
 대상 환경에서 실제 onResume 없는 최근 Task 복귀를 확인했다. 다만 Back 전 이미 top=false이고 Back 뒤 새로운 false 없이 정당한 true만 오는 다른 OEM 순서는 검증하지 않았다. 현재 경계는 그 경우 일반 onResume을 기다리므로 Android 전체 환경의 복귀 보장을 주장하지 않는다. 공식 회전·분할 창·실차 등 #28·#51의 잔여 조건은 계속 열어 둔다.
+
+## 표준 Debug 앱 로컬 시연과 모의주행 조작 제한 — 2026-11-13
+
+[#275](https://github.com/Yaho03/drive-growth/pull/275)에 반영된 제품 변경을 포함한 표준 Debug `io.drivegrowth.app.simulation`을 Pleos API 34 ARM64 전용 AVD(1080×600px·120dpi)에서 실행했다. 촬영 기기에서 회수한 APK 해시는 [Back 수정의 표준 Debug](evidence/issue51-back-return/metadata.json)와 일치했다. [실행 식별·영상 해시·상태 발췌](evidence/final-pixel-ui/final-regressions/local-demo/result.json)
+
+새 설치에서 화면으로 캐스퍼를 첫 지급받고, 같은 프로필에서 가게·차고·상세·도감 → 시연 목적지와 수익 탁송 선택 → 모의주행 → 탁송 보상·결과 → 퀘스트·업적 목표와 내 기록을 확인했다. 별도 시험 데이터로 잔액·차량·DB를 준비하지 않았다. 첫 시도에서는 선택 결과를 열람하기 전에 모의주행을 눌러 `STATE_CONFLICT`로 거절됐고, 결과를 읽은 뒤 같은 의뢰로 이어갔다.
+
+[#28](https://github.com/Yaho03/drive-growth/issues/28)의 모의주행 중 화면 제한을 같은 실행에서 확인했다. 보유 차량·탁송 탭과 명령 버튼이 있던 좌표를 눌렀을 때 전후 모두 게임 본문·탐색·명령이 숨겨져 있었다. 앱의 읽기 전용 시연 상태에서 모의 D 구간의 44/65단계와 같은 프로필·요청·경로의 종료 65/65단계, 모의 P 관측을 대조했다. 종료 뒤 탁송 보상이 확정되고 게임 탐색이 복귀했다. 터치별 원장 행 비교는 미수행이며 실제 차량 SDK·실차 검증은 별도다.
+
+실제 앱의 `시연 · 모의 입력` 표시를 유지한 원본 녹화 두 편과 대기·조작 구간을 줄인 70.648초 편집본을 로컬에 보존했다. 영상은 화면 속 자산 권리와 익명성 확인 전 내부 검토용이다.
