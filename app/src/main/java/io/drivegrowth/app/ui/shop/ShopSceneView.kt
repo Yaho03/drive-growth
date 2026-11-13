@@ -19,6 +19,7 @@ import android.text.TextPaint
 import android.text.TextUtils
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.PathInterpolator
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.VehicleSprites
@@ -62,14 +63,38 @@ internal class ShopSceneView(
     private var consumeExpansion: (() -> Boolean)? = null
     private var expansionStartedAt: Long? = null
     private val visibleBounds = Rect()
+    private var selectedId: OwnedVehicleId? = null
+    private var previousId: OwnedVehicleId? = null
+    private var cameraStart: Long? = null
+    private var movingCamera = false
+    private var acceptsVehicleTap: () -> Boolean = { true }
     private var frameScheduled = false
     private val nextFrame = Runnable {
         frameScheduled = false
-        if (canAnimateActors()) invalidate()
+        if (canAnimateActors() || movingCamera) {
+            if (movingCamera) {
+                updateCamera()
+                placeVehicleTargets()
+            }
+            invalidate()
+        }
     }
 
     private fun canAnimateActors() = isAttachedToWindow && isShown && windowVisibility == VISIBLE &&
         hasWindowFocus() && ValueAnimator.areAnimatorsEnabled()
+
+    internal fun focus(
+        selected: OwnedVehicleId?,
+        previous: OwnedVehicleId?,
+        startedAt: Long?,
+        acceptsTap: () -> Boolean,
+    ) {
+        selectedId = selected
+        previousId = previous
+        cameraStart = startedAt?.takeIf { SystemClock.uptimeMillis() - it < 720L && ValueAnimator.areAnimatorsEnabled() }
+        movingCamera = cameraStart != null
+        acceptsVehicleTap = acceptsTap
+    }
 
     internal fun highlightExpansion(slots: IntRange, consume: () -> Boolean) {
         expandedSlots = slots
@@ -98,6 +123,13 @@ internal class ShopSceneView(
         removeCallbacks(nextFrame)
         frameScheduled = false
         expansionStartedAt = null
+        cameraStart = null
+        if (movingCamera) {
+            movingCamera = false
+            updateCamera()
+            placeVehicleTargets()
+            invalidate()
+        }
     }
 
     init {
@@ -125,7 +157,7 @@ internal class ShopSceneView(
                     })
                     addState(intArrayOf(android.R.attr.state_pressed), GradientDrawable().apply { setColor(0x449cc2ff) })
                 }
-                setOnClickListener { onVehicle(vehicle.id) }
+                setOnClickListener { if (acceptsVehicleTap()) onVehicle(vehicle.id) }
             })
         }
     }
@@ -134,31 +166,69 @@ internal class ShopSceneView(
         val width = resolveSize(MeasureSpec.getSize(widthMeasureSpec), widthMeasureSpec)
         val height = resolveSize((width * scene.height() / scene.width()).roundToInt(), heightMeasureSpec)
         setMeasuredDimension(width, height)
-        scale = minOf(width / scene.width(), height / scene.height())
-        offsetX = (width - scene.width() * scale) / 2 - scene.left * scale
-        offsetY = (height - scene.height() * scale) / 2 - scene.top * scale
-        val hitWidth = MeasureSpec.makeMeasureSpec((70.656f * scale).roundToInt(), MeasureSpec.EXACTLY)
-        val hitHeight = MeasureSpec.makeMeasureSpec((71.68f * scale).roundToInt(), MeasureSpec.EXACTLY)
-        for (index in 0 until childCount) getChildAt(index).measure(hitWidth, hitHeight)
+        val hitSize = (70f * camera(selectedId, width, height).scale).roundToInt()
+        val hitSpec = MeasureSpec.makeMeasureSpec(hitSize, MeasureSpec.EXACTLY)
+        for (index in 0 until childCount) getChildAt(index).measure(hitSpec, hitSpec)
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        updateCamera()
+        placeVehicleTargets()
+    }
+
+    private fun placeVehicleTargets() {
         for (index in 0 until childCount) {
-            val (_, slot) = placed[index]
+            val (vehicle, slot) = placed[index]
             val child = getChildAt(index)
+            child.isSelected = vehicle.id == selectedId
             val x = (offsetX + slot.first * scale - child.measuredWidth / 2f).roundToInt()
             val y = (offsetY + (slot.second - 7) * scale - child.measuredHeight / 2f).roundToInt()
             child.layout(x, y, x + child.measuredWidth, y + child.measuredHeight)
+            child.visibility = if (x + child.measuredWidth > 0 && x < width &&
+                y + child.measuredHeight > 0 && y < height) VISIBLE else INVISIBLE
         }
     }
+
+    private fun updateCamera() {
+        val target = camera(selectedId)
+        val elapsed = cameraStart?.let { SystemClock.uptimeMillis() - it } ?: 720L
+        if (movingCamera && (!ValueAnimator.areAnimatorsEnabled() || elapsed >= 720L)) movingCamera = false
+        if (!movingCamera) {
+            scale = target.scale
+            offsetX = target.x
+            offsetY = target.y
+            return
+        }
+        val start = camera(previousId)
+        val t = cameraEasing.getInterpolation((elapsed / 720f).coerceIn(0f, 1f))
+        scale = start.scale + (target.scale - start.scale) * t
+        offsetX = start.x + (target.x - start.x) * t
+        offsetY = start.y + (target.y - start.y) * t
+    }
+
+    private fun camera(id: OwnedVehicleId?, width: Int = this.width, height: Int = this.height): Camera {
+        val slot = placed.firstOrNull { it.first.id == id }?.second
+        val fit = minOf(width / scene.width(), height / scene.height())
+        if (slot == null) return Camera(fit, (width - scene.width() * fit) / 2 - scene.left * fit,
+            (height - scene.height() * fit) / 2 - scene.top * fit)
+        val zoom = maxOf(width / fullTown.width(), height / fullTown.height(), fit * 2.6f)
+        val centerX = width * if (width >= 720 * resources.displayMetrics.density) .29f else .50f
+        val centerY = height * .60f
+        return Camera(zoom, (centerX - slot.first * zoom).coerceIn(minOf(0f, width - fullTown.width() * zoom), 0f),
+            (centerY - slot.second * zoom).coerceIn(minOf(0f, height - fullTown.height() * zoom), 0f))
+    }
+
+    private data class Camera(val scale: Float, val x: Float, val y: Float)
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawColor(PixelStyle.background)
+        val now = SystemClock.uptimeMillis()
+        val animate = canAnimateActors()
         canvas.save()
         canvas.translate(offsetX, offsetY)
         canvas.scale(scale, scale)
-        canvas.clipRect(scene)
+        canvas.clipRect(if (selectedId != null || movingCamera) fullTown else scene)
         canvas.drawBitmap(background, null, fullTown, paint)
         model.facilityStates.forEach { (facility, status) -> drawFacility(canvas, facility, status) }
         drawSign(canvas)
@@ -168,13 +238,11 @@ internal class ShopSceneView(
         if (model.slots == null) {
             badge(canvas, context.getString(R.string.shop_scene_spaces_unknown), 770f, 652f, 360f)
         }
-        val animate = canAnimateActors()
-        val now = SystemClock.uptimeMillis()
         drawExpansion(canvas, now, animate)
         val elapsed = if (animate) (now - animationOrigin) / 1000f else 0f
         actors.draw(canvas, elapsed, fuelInstalled, washInstalled)
         placed.forEach { (vehicle, slot) -> drawVehicle(canvas, vehicle, slot.first.toFloat(), slot.second.toFloat()) }
-        if (mode == ShopMode.OVERALL) {
+        if (selectedId == null && mode == ShopMode.OVERALL) {
             val unknown = context.getString(R.string.shop_unknown)
             val summary = context.getString(R.string.shop_scene_summary, content.level?.toString() ?: unknown,
                 content.ownedCount?.toString() ?: unknown, content.capacity?.toString() ?: unknown)
@@ -182,7 +250,7 @@ internal class ShopSceneView(
         }
         canvas.restore()
         if (animate && !frameScheduled) {
-            frameScheduled = postDelayed(nextFrame, 50L)
+            frameScheduled = postDelayed(nextFrame, if (movingCamera) 16L else 50L)
         }
     }
 
@@ -285,11 +353,39 @@ internal class ShopSceneView(
             canvas.save()
             canvas.scale(-1f, 1f, x, y)
             canvas.drawBitmap(bitmap, null, area, paint)
+            val start = cameraStart
+            if (vehicle.id == selectedId && start != null && canAnimateActors()) {
+                drawHeadlights(vehicle.rarity, canvas, SystemClock.uptimeMillis() - start)
+            }
             canvas.restore()
         }
         val label = if (vehicle.activity == VehicleActivity.IDLE && bitmap != null) vehicle.name
             else "${vehicle.name} · ${vehicle.status}"
         badge(canvas, label, x - 36f, y + 25f, 155f)
+    }
+
+    private fun drawHeadlights(rarity: Rarity?, canvas: Canvas, elapsed: Long) {
+        if (rarity == null || elapsed !in 0L until 600L) return
+        val tint = when (rarity) {
+            Rarity.COMMON -> 0xfff6f6f2.toInt()
+            Rarity.ADVANCED -> 0xff68a0f0.toInt()
+            Rarity.RARE -> 0xfff68068.toInt()
+            Rarity.LEGEND -> 0xfff6aa3c.toInt()
+        }
+        val alpha = ((1f - elapsed / 600f) * 255).roundToInt()
+        val radius = 3f + 7f * alpha / 255f
+        val left = area.left + area.width() * .66f
+        val right = area.left + area.width() * .95f
+        fun light(x: Float, y: Float) {
+            paint.color = (tint and 0x00ffffff) or (alpha shl 24)
+            canvas.drawRect(x - radius, y - 2f, x + radius, y + 2f, paint)
+            canvas.drawRect(x - 2f, y - radius, x + 2f, y + radius, paint)
+            paint.color = 0x00ffffff or (alpha shl 24)
+            canvas.drawRect(x - 2f, y - 2f, x + 2f, y + 2f, paint)
+        }
+        light(left, area.top + area.height() * .70f)
+        light(right, area.top + area.height() * .58f)
+        paint.color = Color.WHITE
     }
 
     private fun drawRarity(canvas: Canvas, rarity: Rarity, x: Float, y: Float) {
@@ -342,6 +438,7 @@ internal class ShopSceneView(
     }
 
     companion object {
+        private val cameraEasing = PathInterpolator(.4f, 0f, .2f, 1f)
         private val animationOrigin = SystemClock.uptimeMillis()
         private val fuelCover = floatArrayOf(
             72f, 0f, 536f, 0f, 562f, 102f, 487f, 151f, 487f, 238f, 395f, 292f, 322f, 296f, 80f, 237f,
