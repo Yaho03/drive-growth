@@ -268,8 +268,7 @@ function townFocusCar(id){
  townBusy=true;
  const fast=reduceMotion(),oldWorld=world.getBoundingClientRect(),oldMap=map.getBoundingClientRect();
  townFocus=id;townFocusAnim=true;render();townFocusAnim=false;
- if(!fast)flipTo(oldWorld,oldMap,focusTransform(id));
- flashCar(id);
+ if(!fast){flipTo(oldWorld,oldMap,focusTransform(id));flashCar(id);}
  setTimeout(()=>{townBusy=false;},fast?0:CAM_MS);
 }
 let townFocusH=0;
