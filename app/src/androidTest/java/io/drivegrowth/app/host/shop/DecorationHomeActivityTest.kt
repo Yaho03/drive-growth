@@ -249,6 +249,12 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
         }
         fun assertRestricted(a: MainActivity, label: String) {
             await(a, label) { menu(a)?.let { it.isShown && it.isEnabled } == true && restricted(a) }
+            click(a, "host:home-settings-fallback")
+            await(a, "손상 원본을 보존하면서 안내와 소리 설정 접근") {
+                a.window.decorView.findViewWithTag<Button>("host:page:ONBOARDING")?.isShown == true &&
+                    a.window.decorView.findViewWithTag<Button>("presentation:sound")?.isShown == true
+            }
+            click(a, "host:settings-close")
             assertFalse(onMain { tree(a.window.decorView).filterIsInstance<Button>().any {
                 it.isShown && it.isEnabled && it.tag?.toString()?.let { tag ->
                     tag.startsWith("shop:map-preview:") || tag == "shop:map-confirm" || tag == "decoration:activate"

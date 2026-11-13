@@ -949,7 +949,7 @@ open class MainActivity : Activity() {
         onboarding.render(onboardingState, gameEnabled)
         renderDelivery(gameEnabled && navigation.page == HostPage.DELIVERY)
         chrome.removeAllViews()
-        if (homeEnabled && homeContent == null) {
+        if (gameEnabled && navigation.page == HostPage.HOME && (shopRestoreFailed || homeContent == null)) {
             chrome.addView(style.button("설정", onClick = ::openHomeSettings).apply {
                 tag = "host:home-settings-fallback"
                 compact(style)
