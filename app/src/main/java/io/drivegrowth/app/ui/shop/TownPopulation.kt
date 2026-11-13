@@ -53,10 +53,14 @@ internal class TownPopulation(
     private fun chooseRoute(resident: Resident) {
         val role = resident.role
         if (role.repairs && repairs.isNotEmpty()) {
-            for (car in repairs) for (offset in repairOffsets) {
-                val target = TownPoint(car.x + offset.x, car.y + offset.y)
-                if (route(resident, target, Activity.WORKING)) return
+            val component = map.component(resident.point)
+            if (component != null) {
+                for (car in repairs) for (target in map.repairApproaches(car, component)) {
+                    if (route(resident, target, Activity.WORKING)) return
+                }
             }
+            resident.pause(Activity.IDLE, 2f)
+            return
         }
         if (role.entryChance > 0f && random.nextFloat() < role.entryChance && route(resident, door, Activity.ENTERING)) return
         if (role.inspects && parked.isNotEmpty() && random.nextFloat() < .35f) {
@@ -166,10 +170,6 @@ internal class TownPopulation(
 
     companion object {
         private val door = TownPoint(806f, 568f)
-        private val repairOffsets = listOf(
-            TownPoint(16f, 42f), TownPoint(48f, 35f), TownPoint(0f, 48f), TownPoint(-35f, 35f),
-            TownPoint(0f, -32f), TownPoint(16f, -32f), TownPoint(32f, -28f), TownPoint(-16f, -32f),
-        )
         private val roles = listOf(
             Role("guest", TownPoint(595f, 580f), listOf(TownZone.LOT, TownZone.PLAZA), 36f, entryChance = .06f),
             Role("guest", TownPoint(745f, 750f), listOf(TownZone.LOT, TownZone.RIGHT), 34f),

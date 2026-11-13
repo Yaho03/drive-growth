@@ -78,6 +78,23 @@ internal class TownWalkMap(parked: List<TownPoint>) {
 
     fun destinations(zone: TownZone): List<TownPoint> = destinations.getValue(zone)
 
+    fun repairApproaches(car: TownPoint, component: Int): List<TownPoint> {
+        val radius = 85f
+        val left = maxOf(0, ((car.x - radius) / CELL).toInt())
+        val right = minOf(COLUMNS - 1, ((car.x + radius) / CELL).toInt())
+        val top = maxOf(0, ((car.y - radius) / CELL).toInt())
+        val bottom = minOf(ROWS - 1, ((car.y + radius) / CELL).toInt())
+        val nearby = mutableListOf<Pair<TownPoint, Float>>()
+        for (row in top..bottom) for (column in left..right) {
+            val index = row * COLUMNS + column
+            if (components[index] != component) continue
+            val point = points[index]
+            val distance = point.distanceTo(car)
+            if (distance <= radius) nearby.add(point to distance)
+        }
+        return nearby.sortedBy { it.second }.map { it.first }
+    }
+
     fun allows(point: TownPoint): Boolean = allows(point, 0f)
 
     private fun allows(point: TownPoint, clearance: Float): Boolean =

@@ -37,6 +37,35 @@ class TownPopulationTest {
         assertTrue("정비사가 주차 슬롯 안으로 들어가지 않고 근처에 도달해야 한다", worked)
     }
 
+    @Test fun mechanicUsesReachablePerimeterAndWaitsWhenFirstSlotIsIsolated() {
+        val slots = townSlots.map { (x, y) -> TownPoint(x.toFloat(), y.toFloat()) }
+        for (count in 4..slots.size) {
+            val parked = slots.take(count)
+            val map = TownWalkMap(parked)
+            for ((index, car) in parked.withIndex()) {
+                val people = TownPopulation(parked, listOf(car), true, true, Random(14))
+                val mechanic = people.residents.single { it.role.repairs }
+                val start = mechanic.point
+                var worked = false
+                for (step in 0 until 2000) {
+                    people.step(.05f)
+                    assertTrue(map.allows(mechanic.point))
+                    if (mechanic.activity == TownPopulation.Activity.WORKING) {
+                        assertTrue(mechanic.point.distanceTo(car) <= 85f)
+                        worked = true
+                        break
+                    }
+                }
+                if (index == 0) {
+                    assertFalse("첫 슬롯과 연결된 접근점이 없으면 정비 연출을 시작하지 않는다", worked)
+                    assertEquals(start, mechanic.point)
+                } else {
+                    assertTrue("$count 대 주차 배치의 ${index + 1}번 차량에 접근해야 한다", worked)
+                }
+            }
+        }
+    }
+
     @Test fun visitorsEnterAndExitWithoutLeavingWalkableMap() {
         val people = TownPopulation(emptyList(), emptyList(), false, false, Random(3))
         val map = TownWalkMap(emptyList())
