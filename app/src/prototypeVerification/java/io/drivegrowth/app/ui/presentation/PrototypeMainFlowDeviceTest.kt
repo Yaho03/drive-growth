@@ -15,6 +15,8 @@ import android.widget.Button
 import io.drivegrowth.app.R
 import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.host.HostPage
+import io.drivegrowth.app.host.HostSession
+import io.drivegrowth.app.host.onboarding.OnboardingHostController
 import io.drivegrowth.app.mainPage
 import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.showSimulationControls
@@ -84,11 +86,10 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                 val prior = onboarding.onCelebration
                 onboarding.onCelebration = { starts.add(it); prior?.invoke(it) }
             }
-            click(host, R.string.onboarding_start)
-            click(host, vehicle)
-            click(host, R.string.onboarding_review)
-            click(host, R.string.onboarding_confirm)
-            await { button(host, R.string.onboarding_to_shop)?.isEnabled == true }
+            for (tag in listOf(R.string.onboarding_start, vehicle, R.string.onboarding_review, R.string.onboarding_confirm)) {
+                clickOnboarding(host, tag)
+            }
+            await("첫 지급 원결과", timeoutMillis = 30_000) { button(host, R.string.onboarding_to_shop)?.isEnabled == true }
             awaitCelebration(host, RewardCelebrationKind.FIRST_GRANT, starts)
             capture("main-first-grant")
             val first = ok(games.open()).use { game ->
@@ -96,7 +97,7 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                 assertEquals(vehicle, ok(game.store.listOwnedVehicles()).single().vehicleId)
                 ok(game.store.listUnviewedSettlements()).single().settlementId
             }
-            click(host, R.string.onboarding_to_shop)
+            clickOnboarding(host, R.string.onboarding_to_shop)
             await { descendants(host.window.decorView).any { it is ShopView } }
             openPage(host, HostPage.RESULTS)
             onUi {
@@ -314,6 +315,16 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             val destination = host.window.decorView.mainPage(page)
             if (destination?.isEnabled != true || !destination.isShown) false
             else { host.window.decorView.openMainPage(page); true }
+        }
+    }
+
+    private fun clickOnboarding(host: UnifiedSimulationActivity, tag: Any) {
+        // A retained main refresh can briefly be in flight while the prior button is still drawn.
+        val controller = (host.onRetainNonConfigurationInstance() as HostSession).onboarding
+        val inFlight = OnboardingHostController::class.java.getDeclaredField("inFlight").apply { isAccessible = true }
+        await("첫 안내 버튼 $tag", timeoutMillis = 30_000) {
+            !inFlight.getBoolean(controller) &&
+                button(host, tag)?.takeIf { it.isEnabled && it.isShown }?.performClick() == true
         }
     }
 
