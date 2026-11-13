@@ -107,6 +107,7 @@ open class MainActivity : Activity() {
     private lateinit var delivery: DeliveryView
     private var deliveryAccessEnabled = false
     private var restStartTicket: Any? = null
+    private val simulationStartBoundary = SimulationStartBoundary()
     private var deliveryReceipt: DeliveryHostReceipt? = null
     private var deliveryFrame = DeliveryFrame(0, DeliveryScreen.Loading)
     private lateinit var gacha: GachaView
@@ -465,6 +466,7 @@ open class MainActivity : Activity() {
     }
 
     private fun stopObserving() {
+        simulationStartBoundary.cancel()
         restStartTicket = null
         session.simulation?.stop()
         session.simulation?.changed = null
@@ -565,6 +567,7 @@ open class MainActivity : Activity() {
 
     private fun showPresentationTitle(show: Boolean) {
         if (titlePending == show) return
+        if (show) simulationStartBoundary.cancel()
         titlePending = show
         updateAccess()
         render()
@@ -603,8 +606,9 @@ open class MainActivity : Activity() {
         val content = style.column()
         simulationStatus = style.text("", 16).apply { tag = "simulation:status"; content.addView(this) }
         simulationStart = style.button("모의주행 시작") {
-            if (allowed() && !titlePending && navigation.page != HostPage.ONBOARDING) session.prepareSimulation { result ->
-                if (allowed() && !titlePending) when (result) {
+            if (!gameControlsAllowed() || navigation.page == HostPage.ONBOARDING) return@button
+            simulationStartBoundary.prepare({ session.prepareSimulation(done = it) }) { result ->
+                if (gameControlsAllowed() && navigation.page != HostPage.ONBOARDING) when (result) {
                     is ContractResult.Failure -> simulation.rejected(result.error)
                     is ContractResult.Success -> { collapseSimulationControls(); simulation.begin() }
                 }
@@ -660,6 +664,7 @@ open class MainActivity : Activity() {
 
     private fun updateAccess() {
         val enabled = allowed()
+        if (!enabled) simulationStartBoundary.cancel()
         val gameEnabled = enabled && !titlePending
         updateNavigationBar(gameEnabled)
         updatePresentation(enabled)

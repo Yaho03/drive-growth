@@ -143,7 +143,10 @@
 | `assets/pixel/town.png` · HOME과 첫 실행 | #229의 마을 합성 PNG. 첫 실행에서 합성 그림을 직접 표시하고 HOME도 같은 배경을 사용한다. PNG에 주유소·본관·보험 시설의 간판과 표지가 포함돼 있다. 원래 제작·합성 자료와 간판·표지의 이용 조건 및 필요한 표시를 확인한다. |
 | `assets/pixel/vehicles/<차종 ID>_se.png` 20개 · HOME 및 차고·도감 등 | #229의 동일 파일명 원본을 #267에서 반입했다. 차종 ID 20개는 앱 카탈로그와 일치한다. 파일별 제작·참고 원본, 해당 참고물과 차량 외형·차명·상표의 사용 및 수정/표기 조건은 미확인이다. #172의 참고 사진 기준과 #189의 캐스퍼 참고 링크는 이 20개 PNG의 이용 허가를 직접 입증하지 않는다. |
 | `garage_vehicle_placeholder.xml`, `shop_vehicle.xml` · 자체 중립 벡터 | 저장소의 자체 차량 도형이다. 현재 차고의 미발견·이미지 미제공 상태에서는 `garage_vehicle_placeholder.xml`을 쓰며 `shop_vehicle.xml`은 현재 Kotlin 참조가 없다. 현재 제공되는 20종 외형을 모두 중립 도형으로 대체한 상태는 아니다. |
-| 브라우저 시안에만 있는 르르르 캐릭터 PNG·GIF·웹 글꼴, 분리 NPC/시설 후보, NE·희귀도 테두리 후보 | 이 APK의 채택 이미지 목록에 없다. 브라우저 시안·그 화면을 보여주는 영상을 실제 제출에 사용할 경우 해당 파일과 의존성을 별도로 확인한다. APK 합성 배경의 간판·표지는 위 `town.png` 항목에 포함한다. |
+| `e824452` APK에 포함되지 않았던 브라우저 시안 자산 | 르르르 캐릭터 PNG·GIF·웹 글꼴, 분리 NPC/시설 후보, NE·희귀도 테두리 후보가 해당한다. 브라우저 시안·그 화면을 보여주는 영상을 실제 제출에 사용할 경우 해당 파일과 의존성을 별도로 확인한다. APK 합성 배경의 간판·표지는 위 `town.png` 항목에 포함한다. |
+| 후속 HTML 표현 적용의 `assets/pixel/prototype-actors/` PNG 14개 · 시작 화면과 HOME 마을 | 사용자 제공 `prototype (1).html`의 내장 PNG를 파일명만 바꿔 추출했다. 손님·정비·주유 인물 3개와 르르르 걷기·대기 프레임 11개의 바이트는 #229 시안 파일 및 별도 [PR #281 게시 HTML](design-assets/pixel-kit/prototype/prototype.html)의 내장 PNG와 각각 일치한다. 화면 배치·크기·좌우 반전은 Android에서 그릴 때 적용한다. 파일별 원본 대응과 SHA-256은 [자산 README 목록](../app/src/main/assets/pixel/prototype-actors/README.md)을 따른다. 르르르를 포함한 인물의 배포·출품 사용권과 필요한 표기는 #29에서 확인한다. |
+
+HTML의 배경음 5개는 파일을 확보하지 못해 APK 포함과 재생 확인이 남아 있다.
 
 [공모전 이용약관 제7조](https://appdevchallenge.auto-hmg.io/terms#terms-article-7)와 [출품 유의사항](https://appdevchallenge.auto-hmg.io/notice/c0a1a000-2026-4923-8000-000000000006)을 2026-11-13에 확인했다. 출품자는 사용 구성요소의 권한을 확보하고 적용되는 오픈소스 조건·출처를 확인한다. 채택 파일의 실제 허가 기록을 확보해 공개 저장소·APK·심사 영상·전시 중 선택한 사용 범위에 대응시키거나, 근거가 없는 부분의 중립 표현 대체를 결정한다. 외부 사용 판단과 최종 표기는 [#29](https://github.com/Yaho03/drive-growth/issues/29), 현재 HOME의 자산 처리 조건은 [#55](https://github.com/Yaho03/drive-growth/issues/55)에서 추적한다.
 

@@ -40,7 +40,7 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
     // 아래 재생 상태와 포커스 콜백은 모두 오디오 스레드에서 접근한다.
     private var focus: AudioFocusRequest? = null
     private var focusGain = 0
-    private var paused = false
+    private val focusState = PrototypeAudioFocus()
     private var music: MediaPlayer? = null
     private var musicReady = false
     private var musicScene: Scene? = null
@@ -73,9 +73,9 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
     }
 
     fun play(cue: Cue) {
-        if (!canPlay()) return
         val expected = revision
         val expectedFocus = focusLossRevision
+        if (!canPlay(expected) || focusState.paused) return
         audioHandler().post {
             if (canPlay(expected) && focusLossRevision == expectedFocus) playEffect(cue, expected)
         }
@@ -145,7 +145,7 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
                 }
                 musicReady = true
                 applyMusicVolume()
-                if (!paused) runCatching { player.start() }
+                if (!focusState.paused) runCatching { player.start() }
             }
             player.setOnErrorListener { _, _, _ ->
                 if (music === player) {
@@ -165,7 +165,7 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
     }
 
     private fun playEffect(cue: Cue, expected: Long) {
-        if (paused) return
+        if (focusState.paused) return
         val samples = pcm(cue)
         if (!canPlay(expected)) return
         stopEffect()
@@ -194,8 +194,10 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
         }
     }
 
-    private fun requestFocus(gain: Int): Boolean {
-        if (focus != null && (focusGain == gain || focusGain == AudioManager.AUDIOFOCUS_GAIN)) return !paused
+    private fun requestFocus(gain: Int): Boolean = focusState.request { acquireFocus(gain) }
+
+    private fun acquireFocus(gain: Int): Boolean {
+        if (focus != null && (focusGain == gain || focusGain == AudioManager.AUDIOFOCUS_GAIN)) return true
         abandonFocus()
         val audioManager = manager ?: return false
         val callbackHandler = handler ?: return false
@@ -221,20 +223,23 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
                 stopPlayback()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                focusState.pause()
                 focusLossRevision++
-                paused = true
                 stopEffect()
                 if (musicReady) runCatching { music?.pause() }
-                abandonIdleFocus()
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
                 if (!canPlay()) {
                     stopPlayback()
                     return
                 }
-                paused = false
-                applyMusicVolume()
-                if (musicReady && musicScene == scene && musicRevision == revision) runCatching { music?.start() }
+                focusState.reset()
+                if (musicScene == scene && musicRevision == revision) {
+                    applyMusicVolume()
+                    if (musicReady) runCatching { music?.start() }
+                } else {
+                    updateMusic(revision)
+                }
             }
         }
     }
@@ -263,14 +268,14 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
     }
 
     private fun abandonIdleFocus() {
-        if (music == null && effect == null) abandonFocus()
+        focusState.releaseIfIdle(music == null && effect == null, ::abandonFocus)
     }
 
     private fun abandonFocus() {
         val previous = focus
         focus = null
         focusGain = 0
-        paused = false
+        focusState.reset()
         if (previous != null) runCatching { manager?.abandonAudioFocusRequest(previous) }
     }
 
