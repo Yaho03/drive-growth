@@ -146,7 +146,7 @@
 | `e824452` APK에 포함되지 않았던 브라우저 시안 자산 | 르르르 캐릭터 PNG·GIF·웹 글꼴, 분리 NPC/시설 후보, NE·희귀도 테두리 후보가 해당한다. 브라우저 시안·그 화면을 보여주는 영상을 실제 제출에 사용할 경우 해당 파일과 의존성을 별도로 확인한다. APK 합성 배경의 간판·표지는 위 `town.png` 항목에 포함한다. |
 | 후속 HTML 표현 적용의 `assets/pixel/prototype-actors/` PNG 14개 · 시작 화면과 HOME 마을 | 사용자 제공 `prototype (1).html`의 내장 PNG를 파일명만 바꿔 추출했다. 손님·정비·주유 인물 3개와 르르르 걷기·대기 프레임 11개의 바이트는 #229 시안 파일 및 별도 [PR #281 게시 HTML](design-assets/pixel-kit/prototype/prototype.html)의 내장 PNG와 각각 일치한다. 화면 배치·크기·좌우 반전은 Android에서 그릴 때 적용한다. 파일별 원본 대응과 SHA-256은 [자산 README 목록](../app/src/main/assets/pixel/prototype-actors/README.md)을 따른다. 르르르를 포함한 인물의 배포·출품 사용권과 필요한 표기는 #29에서 확인한다. |
 
-HTML의 배경음 5개는 파일을 확보하지 못해 APK 포함과 재생 확인이 남아 있다.
+사용자 첨부 HTML의 SHA-256은 `083b2c3170f1d759c1afd8372d333c282734afc8ca2b1123d2d98ce112a09b84`, PR #281 게시 HTML은 `9d89a58a430fd6cb10c182ffa0a7f29c2e00f8283cd37395582473457312362e`다. 두 파일은 카드 장식 링을 숨기는 CSS 한 줄에서 차이가 있으며, Android 카드 링은 게시본 기준을 따른다. HTML의 배경음 5개는 파일을 확보하지 못해 APK 포함과 재생 확인이 남아 있다.
 
 [공모전 이용약관 제7조](https://appdevchallenge.auto-hmg.io/terms#terms-article-7)와 [출품 유의사항](https://appdevchallenge.auto-hmg.io/notice/c0a1a000-2026-4923-8000-000000000006)을 2026-11-13에 확인했다. 출품자는 사용 구성요소의 권한을 확보하고 적용되는 오픈소스 조건·출처를 확인한다. 채택 파일의 실제 허가 기록을 확보해 공개 저장소·APK·심사 영상·전시 중 선택한 사용 범위에 대응시키거나, 근거가 없는 부분의 중립 표현 대체를 결정한다. 외부 사용 판단과 최종 표기는 [#29](https://github.com/Yaho03/drive-growth/issues/29), 현재 HOME의 자산 처리 조건은 [#55](https://github.com/Yaho03/drive-growth/issues/55)에서 추적한다.
 
