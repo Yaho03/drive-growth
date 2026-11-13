@@ -594,7 +594,8 @@ function mountActors(vp,world){
   if(cancelTownPress===cancelPress)cancelTownPress=null;
   if(vp.hasPointerCapture(id))vp.releasePointerCapture(id);
   if(held){
-   if(!completed||!freeAt(a.x,a.y)){[a.x,a.y]=a.home;}
+   // 원래 위치로 돌아갈 길이 있는 구역에만 내려놓는다.
+   if(!completed||!findPath(a.x,a.y,...a.home)){[a.x,a.y]=a.home;}
    a.state=completed?'drop':'idle';a.t=completed ? .18 : .5;
    if(!completed)a.lift=0;
    a.path=null;
