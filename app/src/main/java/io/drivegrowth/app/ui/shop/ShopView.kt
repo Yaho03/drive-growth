@@ -46,6 +46,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     }
     private var sceneGeneration = 0L
     internal var facilityPanel: View? = null
+    internal var decorationActivation: View? = null
     internal var onOpenVehicle: ((OwnedVehicleId, Revision) -> Unit)? = null
     internal var onFocusedVehicleAction: ((GarageEvent.RequestAction) -> Unit)? = null
     internal var onFocusedVehicleRetry: (() -> Unit)? = null
@@ -594,6 +595,10 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         }
     }
     private fun facilityMenu() = style.column().apply {
+        decorationActivation?.let { activation ->
+            (activation.parent as? ViewGroup)?.removeView(activation)
+            style.add(this, activation)
+        }
         style.add(this, mapButton("가게 확장", "shop:menu-expansion") { showMapPanel(ShopMapTarget.Expansion) })
         for (facility in Facility.entries) {
             val title = s(when (facility) {

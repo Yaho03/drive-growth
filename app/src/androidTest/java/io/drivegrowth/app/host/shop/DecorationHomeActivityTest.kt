@@ -62,7 +62,8 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
             assertFalse("각 selector용 fresh package가 필요하며 기존 DB를 삭제하지 않는다: $name",context.getDatabasePath(name).exists())
     }
     private fun openDecorations(a: MainActivity) {
-        click(a, "shop:map-facilities")
+        val alreadyOpen = onMain { a.window.decorView.findViewWithTag<View>("shop:map-decorations")?.isShown == true }
+        if (!alreadyOpen) click(a, "shop:map-facilities")
         click(a, "shop:map-decorations")
     }
 
@@ -122,6 +123,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
         fresh();val first=activity
         click(first,R.string.onboarding_start);click(first,VehicleId("hyundai_casper"));click(first,R.string.onboarding_review)
         click(first,R.string.onboarding_confirm);click(first,R.string.onboarding_to_shop)
+        click(first, "shop:map-facilities")
         await(first,"명시 활성화 조작") { first.window.decorView.findViewWithTag<Button>("decoration:activate")?.isEnabled==true }
         val original=read { game ->
             assertEquals(InputSource.VEHICLE,game.identity.source);assertEquals(GameMoney(1000),ok(game.store.balance()))
@@ -177,6 +179,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
             game.identity to ok(game.store.balance())
         }
         val first=activity
+        click(first, "shop:map-facilities")
         await(first,"실제 Main의 SIMULATION 프로필 HOME") { first.window.decorView.findViewWithTag<Button>("decoration:activate")?.isEnabled==true }
         click(first,"decoration:activate")
         openDecorations(first)

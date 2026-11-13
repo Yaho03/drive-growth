@@ -932,6 +932,13 @@ open class MainActivity : Activity() {
             },
             onSettings = ::openHomeSettings,
         )
+        shop.decorationActivation = if (homeEnabled && session.home.state.activationRequired) {
+            style.button("꾸미기 기능 사용 시작") {
+                if (gameControlsAllowed() && navigation.page == HostPage.HOME && !shopRestoreFailed &&
+                    session.home.state.activationRequired
+                ) session.home.activateDecoration()
+            }.apply { tag = "decoration:activate" }
+        } else null
         shop.render(if (shopRestoreFailed) ShopScreenState.Failure("가게 화면 상태를 복원하지 못해 요청을 보존하고 조작을 제한합니다.")
             else session.home.state.screen, homeEnabled, (garageState as? GarageScreenState.Content)?.data?.vehicles,
             focusRest = restActions, focusRestRecovery = facilityEnabled && restRecovery,
@@ -975,9 +982,6 @@ open class MainActivity : Activity() {
         if (session.simulation == null) drivingStatus?.let { chrome.addView(style.text(it)) }
         if (navigation.page == HostPage.HOME && homeEnabled) {
             val home = session.home.state
-            if (home.activationRequired) chrome.addView(style.button("꾸미기 기능 사용 시작") {
-                if (gameControlsAllowed() && navigation.page == HostPage.HOME && !shopRestoreFailed) session.home.activateDecoration()
-            }.apply { tag = "decoration:activate"; isEnabled = homeEnabled })
             (home.decoration?.receipt ?: (home.original as? io.drivegrowth.app.data.HostCheckpointResult.Decoration)?.value)?.let { receipt ->
                 val cost = if (receipt.settlement == null) "비용 없음" else "사용한 게임머니 ${receipt.command.expectedPrice.units}"
                 chrome.addView(style.text("꾸미기 적용 완료 · $cost · 적용 당시 잔액 ${receipt.state.balance.units}")

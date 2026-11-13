@@ -60,6 +60,8 @@ class MainNavigationAccessTest : ActivityInstrumentationTestCase2<MainActivity>(
                 assertTrue(controller.state is GarageCommandState.Confirmed)
             }
 
+            MainActivity::class.java.getDeclaredField("active").apply { isAccessible = true }.setBoolean(main, true)
+            MainActivity::class.java.getDeclaredField("titlePending").apply { isAccessible = true }.setBoolean(main, false)
             gate(Gear.PARK)
             render.invoke(main)
             val home = checkNotNull(root.mainNavigation())

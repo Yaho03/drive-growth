@@ -141,8 +141,13 @@ internal class ShopMapOverlayView(
         }
         val panel = column().apply {
             background = shape(style.panel)
-            addView(scroll(body, scrollY).apply { tag = "shop:map-scroll" }
-                .also { this@ShopMapOverlayView.scroll = it }, LinearLayout.LayoutParams(-1, 0, 1f))
+            val restore = scrollY
+            val contentScroll = scroll(body, restore).apply {
+                tag = "shop:map-scroll"
+                if (restore > 0) post { if (current()) scrollTo(0, restore) }
+            }
+            this@ShopMapOverlayView.scroll = contentScroll
+            addView(contentScroll, LinearLayout.LayoutParams(-1, 0, 1f))
             addView(button(if (!pending && interaction.uiState.selection != null) s(R.string.shop_cancel) else "닫기") {
                 if (current()) handleBack()
             }.apply { tag = "shop:map-close" }, LinearLayout.LayoutParams(-1, -2))
