@@ -81,7 +81,7 @@ Back 수정 이후 설치용 Debug의 식별과 새 프로필 시연은 [로컬 
 
 | 자료 | 현재 준비 상태 | 제출 반영 조건 |
 |---|---|---|
-| [최신 마을 시안](design-assets/town-preview/README.md)·[화면 명세](09_UI_UX_SPEC.md) | Android에 적용한 화면 기준. 시안 자체는 실제 앱 캡처가 아님 | [실제 Android 화면 근거](06_VERIFICATION.md#가게-표시-정리확장-경계설치용-debug-산출물)와 구분하고 공식 창·권리 조건 확인 |
+| [#229 당시 마을 시안](design-assets/town-preview/README.md) · [새 지도 설계](09_UI_UX_SPEC.md#새-가게-지도와-기능-연결--2026-11-13) · [#287 실제 Android 가게 캡처](evidence/vehicle-first-play/vehicle-restored-shop.png) | 기존 시안은 Android 적용의 참고 자료다. 새 지도는 구현 중이며, #287 캡처는 Pleos 차량용 에뮬레이터의 재실행 화면이다 | [#287 실행 근거](06_VERIFICATION.md#차량용-첫-실행과-마을-주민-검증--2026-11-13)를 확인하고 제출 버전의 공식 창·권리 조건을 대조 |
 | [제품 기준](01_PRD.md)·[구조 문서](02_SYSTEM_ARCHITECTURE.md) | 기획·기술 계약 문서 | 최종 기능별 구현·검증 상태와 대조 |
 | [Android 채택 자산과 사용 조건](04_VEHICLE_RESEARCH.md#android-채택-픽셀-자산과-사용-조건-확인--2026-11-13) | 마을 합성 PNG 1개와 차량 SE 20개의 반입·패키징 확인 | 합성 배경의 간판과 차량 외형 등 실제 제출에 들어가는 자산의 사용 근거·표기를 #29에서 대조 |
 | [실행 검증 기록](06_VERIFICATION.md) | 선행 실험·최신 검사·미검증을 구분 | 수행한 결과만 제출 설명에 인용 |
