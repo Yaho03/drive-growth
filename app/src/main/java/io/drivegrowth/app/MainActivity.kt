@@ -884,7 +884,7 @@ open class MainActivity : Activity() {
             unviewedCount = unviewed,
             operatingStatus = (session.home.state.screen as? ShopScreenState.Content)?.vehicles
                 ?.count { it.activity == io.drivegrowth.core.progression.VehicleActivity.RENTED }
-                ?.takeIf { it > 0 }?.let { "대여 중 $it대" },
+                ?.takeIf { it > 0 }?.let { "대여 중 ${it}대" },
             onResults = {
                 if (homeSettings == null && navigation.page == HostPage.HOME && gameControlsAllowed()) {
                     select(HostPage.RESULTS)
