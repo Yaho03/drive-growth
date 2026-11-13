@@ -3449,3 +3449,27 @@ Pleos 2.1.0 / API 34 ARM64, 사용자 10의 전용 복제 AVD에서 실행했다
 - 공개 재현 근거: [최종 화면 34개](evidence/full-map-host/view-af2118e.txt) · [스크롤 표적](evidence/full-map-host/scroll-af2118e.txt) · [e55baad Main 흐름](evidence/full-map-host/main-flow-e55baad.txt) · [2bf831d 보험](evidence/full-map-host/insurance-2bf831d.txt). 최종 장치 로그·APK·창 정보 전체는 `/private/tmp/drive-full-map-host.bCa8Vp`에 보존했다. 실제 D 전환, 실차, 물리 회전·분할 및 제출 서명은 #28·#29에서 별도로 관리한다.
 
 시험 후 전용 사본의 기존 차량용·모의 APK를 데이터 유지 방식으로 재설치했고, 회수본이 시험 전 파일과 바이트 단위로 일치했다. 활성 계측이 없는 상태에서 보조 창, 전용 브리지와 사본을 종료했다. 공유 ADB 목록과 원본 AVD 데이터 디스크의 파일 식별자·크기·수정 시각을 전후 대조했다. 격리 시험 데이터를 보존했으며 앱 데이터 삭제나 기어·속도·권한 변경은 수행하지 않았다.
+
+### 최종 모의 APK의 좁은 가로·세로 지도 패널 — 2026-11-13
+
+로컬 기준 `0487dd4a5885a12c8a845c0dcf97a85e65e48274`에서 앱·코어 소스가 같은 `af2118e` 표준 Debug 모의 APK(`9ee8df19c33ff37e961f40b7790acfcf88915d7b0a9d5deebadc5c1476e14c4d`)로 재현했다. 세로 시설 목록과 좁은 가로 확장 패널이 오른쪽으로 치우쳤고, 세로 확장도 폭을 다 쓰지 못했다. [수정 전 세로 시설](evidence/full-map-responsive/baseline-portrait-facility-menu.png) · [수정 전 좁은 확장](evidence/full-map-responsive/baseline-narrow-expansion.png)
+
+수정 소스 `3358574e6974d22b9636796e01972ba0f0501143`의 표준 Debug 모의 APK(`io.drivegrowth.app.simulation`)를 같은 Pleos 사본에 설치했다. 빌드·설치 회수본 SHA-256은 `dad5c85fee54bd9649c4a75c22834acbf2dd001badfcff27b7f3137c270e244c`로 일치했다. 각 DISPLAY2를 제거하고 새 크기로 만들었으며 표준 앱의 새 프로세스를 띄워 좌표 터치로 확인했다.
+
+| 창과 실제 픽셀 | 확인 내용 |
+| --- | --- |
+| 좁은 가로 960×720px · 220dpi | [HOME](evidence/full-map-responsive/narrow-home.png)의 HUD와 하단 다섯 버튼, [시설 목록](evidence/full-map-responsive/narrow-facility-scrolled.png) 내부 스크롤과 닫기, [잠긴 확장](evidence/full-map-responsive/narrow-expansion-scrolled.png) 내부 스크롤·고정 닫기 및 Back, 캐스퍼 상세·관리와 Back |
+| 세로 840×1184px · 160dpi | [HOME](evidence/full-map-responsive/portrait-home.png)의 HUD·하단 다섯 버튼, 지도 이동, [시설 목록](evidence/full-map-responsive/portrait-facility.png)과 [잠긴 확장](evidence/full-map-responsive/portrait-expansion.png)의 대칭 여백·닫기·Back, [차량 상세](evidence/full-map-responsive/portrait-detail.png)와 [차량 관리](evidence/full-map-responsive/portrait-management.png) |
+| 넓은 가로 1700×1185px · 200dpi | 같은 APK로 [HOME](evidence/full-map-responsive/wide-home.png) 복귀, 세차장과 [차량 상세](evidence/full-map-responsive/wide-detail.png)의 오른쪽 패널 유지 |
+
+세로 지도는 원본 비율을 유지하며 창 밖으로 이어진 영역을 드래그해 볼 수 있었다. 차량 카메라는 하단 패널일 때 중앙을 향해 이동하며 지도 경계에서 멈춘다. 짧은 확장 설명이 들어가는 세로 패널에는 빈 세로 공간이 남는다. 세로 타이틀의 위아래 여백은 기존 타이틀 배치다.
+
+별도 창과 공식 Bridge는 시작했으나 Android 셸과 Bridge 응답이 함께 끊겼다. 표의 결과는 headless Pleos 사본과 Bridge로 만든 DISPLAY2의 실제 실행이다. 세로 크기는 공식 프리셋과 동일하다. 공식 FormFactorConsole 프리셋 실행, 물리 회전·분할, 차량용 APK의 UI, 실제 차량 신호는 이 결과에서 미검증으로 둔다.
+
+`./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:lintDebug` 통과. 코어 447건의 기존 통과 결과를 사용했고 작업은 `UP-TO-DATE`였다. 앱 단위 시험 863/863, Lint 오류 0건·경고 81건. 저장소 검사와 `git diff --check`도 통과했다.
+
+좁은 가로 하단 메뉴를 터치한 연속 캡처에서 실제로 활성 표시와 본문이 함께 확인된 탭은 [차고](evidence/full-map-responsive/narrow-garage.png) · [탁송](evidence/full-map-responsive/narrow-delivery.png) · [기록](evidence/full-map-responsive/narrow-records.png)이다. 뽑기 진입과 기록에서 가게로 돌아가는 마지막 전환은 저장된 프레임에서 확인하지 못했다. 가게 HOME의 최초 표시와 패널에서 Back·닫기로 돌아오는 동작은 별도로 확인했다.
+
+같은 계측 시험 APK(`a0c6eecfb7ee03fe7823ef8a688fed1e7021b61b0be230168e19e7bb6d37d0a1`)를 설치해 수정 전 격리 앱(`3db696ef9d9224bc833af3460b96958f3aac313f57f34090740a45ffabdd7d66`)과 수정 후 격리 앱(`394dbab17c1da8c056d6760045ff9112d8bf0dd1262593b14adb6c3c98881485`)을 대조했다. 세로 시설 목록과 좁은 가로 확장 패널의 왼쪽 여백 단언은 각각 수정 전 실패했고 수정 후 두 시험 모두 통과했다. 관련 계측 16건 중 14건이 통과했다. 기본 디스플레이에 Activity를 붙여 닫기 버튼의 `getGlobalVisibleRect`를 확인하는 기존 두 시험은 양쪽 앱에서 같은 단언으로 실패했다. 실제 DISPLAY2에서 닫기·Back을 확인한 범위는 위 표에 기록했다. [수정 전 시설](evidence/full-map-responsive/red-facility.txt) · [수정 전 확장](evidence/full-map-responsive/red-expansion.txt) · [수정 후 16건](evidence/full-map-responsive/green-instrumentation.txt) · [부착형 수정 전](evidence/full-map-responsive/red-attached-only.txt) · [부착형 수정 후](evidence/full-map-responsive/green-attached-only.txt)
+
+시험 뒤 기존 모의 APK를 데이터 유지 방식으로 복원했고 회수 APK가 기존 파일과 바이트 단위로 일치했다. 보조 화면과 전용 Bridge·사본을 종료했고 공유 ADB 목록과 원본 AVD 데이터 디스크의 파일 식별자·크기·수정 시각은 전후 일치했다.
