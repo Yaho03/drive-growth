@@ -370,7 +370,7 @@ val vehicles = store.listOwnedVehicles() // Garage.owned/find의 입력
 
 #### #34 저장 확장의 연결점과 기존 데이터 조건
 
-**도입 범위와 현재 연결(2026-11-11 확인):** PR #104가 개체 필드·단일 변경·원래 정산 재생을 공급했고, PR #116의 처분 포함 이력·발견 저장, PR #140의 `Garage.collection(history)`, PR #149의 저장 조회 소비도 main에 반영됐다. 아래 표는 현재 코드의 연결점을 가리킨다. 새 필드가 없는 legacy JSON의 근거 기반 복구와 제품 앱 재실행·실제 표시 이벤트 검증은 이 공급과 구분한다. 이후 스키마 확장은 각 저장 공급 절을 따르며, 테이블 이전만으로 누락된 취득 정보를 복원했다고 간주하지 않는다.
+PR #104가 개체 필드·단일 변경·원래 정산 재생을 공급했고, PR #116의 처분 포함 이력·발견 저장, PR #140의 `Garage.collection(history)`, PR #149의 저장 조회 소비도 main에 반영됐다. [#46 완료 기록](06_VERIFICATION.md#기능-이슈-완료와-후속-조건-이관--2026-11-13)에 실제 발견·도감 복원과 지원 구버전 이전 근거를 연결했다. 희귀도·취득액·진행량이 원본에 없는 개체·명령·정산의 복구 방침은 [#24](https://github.com/Yaho03/drive-growth/issues/24)에서 결정한다.
 
 PR #104 당시 SQLite 변경은 새 필드를 손실시키지 않는 `LedgerJson.vehicle` 양방향, Update 명령 JSON·copy, 처분 성장값 보존 조건에 한정했고 테이블·DB 이름·스키마 버전1·원자성·revision 책임을 유지했다. 현재 `LedgerJson`도 별도 파일이 아니라 `app/src/main/java/io/drivegrowth/app/data/SqliteGameChangeStore.kt` 안에 있다. 이 문서 확인은 SQLite 구현 변경이나 새 장치 시험이 아니다. 과거 실제 SQLite 검증은 [PR #104 검증 기록](06_VERIFICATION.md#pr-104-차량-숫자-decoder-수정--2026-11-07), 이번 최신 조합의 자동 검사는 [최신 재확인](06_VERIFICATION.md#46-공통-차량-계약의-최신-main-재확인--2026-11-11)을 따른다.
 
