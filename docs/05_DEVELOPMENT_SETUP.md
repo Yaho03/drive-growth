@@ -106,8 +106,8 @@ Gradle의 `--version`에 표시되는 내장 Kotlin 2.0.20은 Gradle 자체 스�
 
 | APK | 소스·위치 | 입력과 사용 |
 |---|---|---|
-| 배포된 모의 시연 Debug | [릴리스 ba38def와 SHA256SUMS](https://github.com/Yaho03/drive-growth/releases/tag/demo-20261113-ba38def)의 `drive-growth-ba38def-debug.apk`. 비공개 저장소 접근 권한 필요 | `io.drivegrowth.app.simulation`의 모의 입력. 아래 절차는 이 배포본과 해당 조작이 유지되는 로컬 기준 앱에 적용 |
-| 현재 소스의 로컬 Debug | `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` | 모의 입력과 제품과 분리된 시연 원장. 현재 빌드 커밋과 해시는 별도 기록 |
+| 배포된 모의 시연 Debug | [릴리스 ba38def와 SHA256SUMS](https://github.com/Yaho03/drive-growth/releases/tag/demo-20261113-ba38def)의 `drive-growth-ba38def-debug.apk`. 비공개 저장소 접근 권한 필요 | `io.drivegrowth.app.simulation`의 모의 입력. 아래 번호 절차의 앱과 메뉴 이름은 이 배포본 기준 |
+| 현재 소스의 로컬 Debug | `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` | **르르르 렌터카 · 모의 시연**. 모의 입력과 별도 시연 원장을 사용하며 현재 빌드 커밋과 해시는 별도 기록 |
 | 새 가게 UI 로컬 시험 APK | `af2118e`와 `e55baad`의 시험별 빌드. [소스·APK 해시](06_VERIFICATION.md#새-가게-ui의-통합-확인-항목--2026-11-13) | `af2118e` 화면·스크롤 장치 시험과 `e55baad`의 Main 모의 시연에 사용 |
 | #287 로컬 시험 APK | 제품·시험 소스 `5fac471`의 모의 Debug 및 기존 개발용 서명을 사용한 차량용 Release 구성. [빌드·설치 해시](06_VERIFICATION.md#차량용-첫-실행과-마을-주민-검증--2026-11-13) | 모의 APK는 SIMULATION. 차량용 `io.drivegrowth.app`은 Pleos SDK 입력·권한·PARK/UX 허용 사용. 배포 Debug 다운로드는 이 소스의 APK를 제공하지 않음 |
 | 제출용 Release 후보 | #29에서 실제 서명·설치 APK와 동일 소스·해시를 고정 | 실제 실행과 제출 범위를 확인한 뒤에만 제공. App Market 검증·승인은 별도 |
@@ -117,6 +117,8 @@ Gradle의 `--version`에 표시되는 내장 Kotlin 2.0.20은 Gradle 자체 스�
 JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌드한다. 기본 Debug 산출물은 `app/build/outputs/apk/debug/app-debug.apk`, 패키지는 `io.drivegrowth.app.simulation`이다. 시연 원장 `unified-simulation.db`와 진행 기록은 이 패키지에 저장된다. Release는 `io.drivegrowth.app` 패키지와 차량 입력을 사용한다.
 
 시연 화면의 **시연 · 모의 입력**과 **SIMULATION** 표시는 게임에 공급하는 모의 차량·내비 입력을 뜻한다. 시연 중 발생한 게임 기록은 시연 원장에만 남으며 차량을 조작하지 않는다. 이 절차는 고정 시연 목적지의 도착을 재현한다. 실제 SDK로 주행 후 목적지를 변경하는 경로는 현재 시연에서 지원하지 않는다.
+
+아래 번호와 메뉴 이름은 배포된 `ba38def` APK 기준이다. 최신 로컬 Debug는 명령을 공유하며 앱 이름과 화면 경로는 다음 절을 따른다.
 
 1. Pleos 시험 장치 사용 시간을 조율하고 `SERIAL`에 시험 장치 시리얼을 지정한다. 아래 `APK_PATH`는 로컬 빌드 예시다. 배포본은 내려받은 파일의 실제 경로를 넣고 릴리스의 해시와 대조한다. 기존 설치본과 서명이 다르면 같은 데이터에 덮어쓰지 말고 승인된 별도 시험 환경을 사용한다. 설치한 뒤 런처의 **드라이브 키우기 · 모의 시연**을 연다.
 
@@ -138,7 +140,11 @@ JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌�
 
 재실행 로그를 대조할 때는 `DriveGrowthSimulation`의 `simulation_input`과 `simulation_terminal_restored`를 같은 논리 시각으로 비교한다. 각 시험의 범위는 [시연 검증 기록](06_VERIFICATION.md#통합-모의주행-debug-검증--2026-11-11)을 따른다.
 
-위 시연의 배포 기준은 `ba38def`다. 새 가게 UI의 로컬 Debug에서는 지도에서 차량·시설을 누르거나 가게의 **차량 목록**·**시설**을 이용한다. 꾸미기를 처음 열 때는 **가게 → 시설 → 꾸미기 기능 사용 시작**을 사용한다. **차고**에는 보유 차량과 도감, **기록**에는 정산·내 기록, 퀘스트·업적·휴식, 시연 랭킹이 있다. 가게 상단의 **미확인 정산**은 미확인 목록을 연다. 새 배치의 시험 APK와 실행 범위는 [가게 UI 통합 검증](06_VERIFICATION.md#새-가게-ui의-통합-확인-항목--2026-11-13)을 따른다. 실차 시험은 [#82](https://github.com/Yaho03/drive-growth/issues/82)에서 확인한다.
+#### 현재 소스의 로컬 Debug 화면 경로
+
+설치 후 **르르르 렌터카 · 모의 시연**을 연다. 가게 지도 하단에서 **차고·도감·뽑기·탁송·정산·기록**을 각각 열 수 있다. 지도에서 차량과 시설을 직접 누를 수 있으며 **설정 → 가게와 기록**에서 **시설과 지도**와 **퀘스트·업적·휴식**으로 이동한다. 미확인 정산은 **정산**의 미확인 목록에서 확인한다.
+
+고정 모의 목적지는 **탁송 → 목적지 확인**에서 확인한다. 예상 거리를 가져오지 못한 경우 **모의 목적지 다시 확인**을 사용한다. 탁송 선택 결과를 확인한 뒤 가게의 **설정 → 시연 → 모의 입력 모드**에서 **모의주행 시작**을 누른다. 화면별 시험 범위와 APK 해시는 통합 검증 기록을 따른다. [로컬 Debug 화면과 검증 기록](06_VERIFICATION.md#pr-300-타이틀기능-창도감-선택-적용--2026-11-14) · [#82 실차 시험](https://github.com/Yaho03/drive-growth/issues/82)
 
 ## 기존 설치 상태
 

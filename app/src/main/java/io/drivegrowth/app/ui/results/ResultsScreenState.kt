@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.results
 
+import io.drivegrowth.app.data.SettlementHistoryCause
 import io.drivegrowth.app.runtime.rental.product.RentalCity
 import io.drivegrowth.core.contract.ContractError
 import io.drivegrowth.core.contract.ContractResult
@@ -16,7 +17,8 @@ data class ResultPresentation(val settlement: Settlement, val vehicleName: Strin
     val rentalVehicleName: String? = null,
     val rentalBasis: io.drivegrowth.core.contract.Observation<io.drivegrowth.app.data.RentalResultBasis> =
         Observation.Missing(MissingReason.NO_DATA),
-    val rentalDemand: Observation<RentalDemandPresentation> = Observation.Missing(MissingReason.NO_DATA))
+    val rentalDemand: Observation<RentalDemandPresentation> = Observation.Missing(MissingReason.NO_DATA),
+    val cause: SettlementHistoryCause? = null)
 
 data class RentalDemandPresentation(
     val desiredVehicleName: String,

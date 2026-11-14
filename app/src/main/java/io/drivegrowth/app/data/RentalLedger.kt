@@ -359,16 +359,24 @@ class RentalLedger internal constructor(private val store: SqliteGameChangeStore
         }
     }
 
-    fun finishReturn(id: RequestId, now: EpochMillis) = store.atomic { db ->
-        db.rawQuery("SELECT return_end,accident,phase FROM rentals WHERE id=?", arrayOf(id.value)).use {
+    fun finishReturn(id: RequestId, now: EpochMillis): ContractResult<VehicleActivity> =
+        when (val result = finishReturnWithCommit(id, now)) {
+            is ContractResult.Failure -> result
+            is ContractResult.Success -> ContractResult.Success(result.value.activity)
+        }
+
+    internal data class ReturnCommit(val activity: VehicleActivity, val newlyReturned: OwnedVehicleId?)
+
+    internal fun finishReturnWithCommit(id: RequestId, now: EpochMillis): ContractResult<ReturnCommit> = store.atomic { db ->
+        db.rawQuery("SELECT return_end,accident,phase,owned_id FROM rentals WHERE id=?", arrayOf(id.value)).use {
             if (!it.moveToFirst()) return@atomic missing()
             val phase = VehicleActivity.valueOf(it.getString(2))
             if (phase == VehicleActivity.RENTED || now.value < it.getLong(0)) return@atomic conflict()
-            if (phase != VehicleActivity.RETURNING) return@atomic ContractResult.Success(phase)
+            if (phase != VehicleActivity.RETURNING) return@atomic ContractResult.Success(ReturnCommit(phase, null))
             val next = if (it.getInt(1) == 1) VehicleActivity.NEEDS_REPAIR else VehicleActivity.IDLE
             if(db.update("rentals",android.content.ContentValues().apply{put("phase",next.name)},"id=? AND phase='RETURNING'",arrayOf(id.value))!=1)throw SQLiteException("대여 반납 무갱신")
             db.rawQuery("SELECT phase FROM rentals WHERE id=?",arrayOf(id.value)).use{r->if(!r.moveToFirst()||r.text(0)!=next.name)throw SQLiteException("대여 반납 실제 상태 쓰기 불일치")}
-            ContractResult.Success(next)
+            ContractResult.Success(ReturnCommit(next, OwnedVehicleId(it.text(3))))
         }
     }
 

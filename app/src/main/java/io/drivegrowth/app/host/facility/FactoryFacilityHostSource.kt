@@ -13,6 +13,11 @@ interface FacilityDurablePort {
     fun pending(game:GameSession):ContractResult<FacilityPending>
     fun save(game:GameSession,command:FacilityCommand):ContractResult<Unit>
     fun execute(game:GameSession,command:FacilityCommand):ContractResult<FacilityReceipt>
+    fun executeForInstallation(game: GameSession, command: FacilityCommand.Buy): ContractResult<FacilityPurchaseExecution> =
+        when (val result = execute(game, command)) {
+            is ContractResult.Failure -> result
+            is ContractResult.Success -> ContractResult.Success(FacilityPurchaseExecution(result.value, false))
+        }
     fun finish(game:GameSession,command:FacilityCommand):ContractResult<Unit>
     fun cancelSaved(game:GameSession,command:FacilityCommand):ContractResult<Unit>
 }
@@ -59,6 +64,9 @@ class FactoryFacilityHostSource(
         durable.save(game,command)
     }
     override fun execute(command:FacilityCommand)=use(command){game->journal?.execute(game,command)?:ContractResult.Failure(ContractError.DATA_UNAVAILABLE)}
+    override fun executeForInstallation(command: FacilityCommand.Buy) = use(command) { game ->
+        journal?.executeForInstallation(game, command) ?: ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+    }
     override fun finish(command:FacilityCommand)=use(command){game->journal?.finish(game,command)?:ContractResult.Failure(ContractError.DATA_UNAVAILABLE)}
     override fun cancelSaved(command:FacilityCommand)=use(command){game->journal?.cancelSaved(game,command)?:ContractResult.Failure(ContractError.DATA_UNAVAILABLE)}
 }

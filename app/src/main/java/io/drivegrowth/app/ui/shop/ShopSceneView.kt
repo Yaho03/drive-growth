@@ -95,6 +95,74 @@ internal class ShopSceneView(
     private var expandedSlots = IntRange.EMPTY
     private var consumeExpansion: (() -> Boolean)? = null
     private var expansionStartedAt: Long? = null
+    private var facilityInstallation: FacilityInstallationScene? = null
+    private var facilityMotionEligible: (() -> Boolean)? = null
+    private var facilityEffect: InstalledFacilityEffect? = null
+    private data class RentalAnimation(val effect: RentalMapEffect, val art: RentalMapMotionScene,
+        val eligible: () -> Boolean, val offeredAt: Long, var startedAt: Long? = null)
+    private var rentalAnimation: RentalAnimation? = null
+    private val rentalGuest by lazy(LazyThreadSafetyMode.NONE) {
+        context.assets.open("pixel/prototype-actors/guest.png").use { android.graphics.BitmapFactory.decodeStream(it) }
+    }
+
+    internal fun visibleRentalSlot(vehicle: OwnedVehicleId): Pair<Int, Int>? {
+        val slot = placed.firstOrNull { it.first.id == vehicle }?.second ?: return null
+        if (!canAnimateActors() || movingCamera || focusRegion != null || bitmaps[vehicle] == null || !slotVisible(slot)) return null
+        return slot
+    }
+
+    internal data class RentalMotionFrame(val effect: RentalMapEffect, val offeredAt: Long, val startedAt: Long?)
+
+    internal fun rentalMotionFrame(): RentalMotionFrame? = rentalAnimation?.let {
+        val now = SystemClock.uptimeMillis()
+        if (!it.eligible() || now - it.offeredAt > 2_250L ||
+            (it.startedAt?.let { start -> now - start >= 2_000L } == true)) null
+        else RentalMotionFrame(it.effect, it.offeredAt, it.startedAt)
+    }
+
+    internal fun animateRentalMapMotion(effect: RentalMapEffect, eligible: () -> Boolean) =
+        animateRentalMapMotion(RentalMotionFrame(effect, SystemClock.uptimeMillis(), null), eligible)
+
+    internal fun animateRentalMapMotion(frame: RentalMotionFrame, eligible: () -> Boolean) {
+        val now = SystemClock.uptimeMillis()
+        if (now - frame.offeredAt > 2_250L || frame.startedAt?.let { now - it >= 2_000L } == true) return
+        val effect = frame.effect
+        val vehicle = placed.firstOrNull { it.first.id == effect.event.vehicle && it.second == effect.slot }?.first ?: return
+        if (vehicle.activity != effect.event.activity) return
+        val bitmap = bitmaps[vehicle.id] ?: return
+        val guest = rentalGuest ?: return
+        rentalAnimation = RentalAnimation(effect, RentalMapMotionScene(effect, bitmap, guest), eligible, frame.offeredAt, frame.startedAt)
+        invalidate()
+    }
+
+    internal val showingRentalMapMotion: Boolean get() = rentalAnimation != null
+
+    internal fun stopRentalMapMotion() {
+        if (rentalAnimation == null) return
+        rentalAnimation = null
+        invalidate()
+    }
+
+    private fun slotVisible(slot: Pair<Int, Int>): Boolean = getLocalVisibleRect(visibleBounds) &&
+        offsetX + slot.first * scale in visibleBounds.left.toFloat()..visibleBounds.right.toFloat() &&
+        offsetY + slot.second * scale in visibleBounds.top.toFloat()..visibleBounds.bottom.toFloat()
+    internal val showingFacilityInstallation: Boolean get() = facilityEffect != null
+
+    internal fun animateFacilityInstallation(effect: InstalledFacilityEffect, eligible: () -> Boolean) {
+        if (model.facilityStates[effect.facility] != ShopAvailability.INSTALLED) return
+        facilityInstallation = FacilityInstallationScene(context, background, effect.facility)
+        facilityEffect = effect
+        facilityMotionEligible = eligible
+        invalidate()
+    }
+
+    internal fun stopFacilityInstallation() {
+        if (facilityInstallation == null) return
+        facilityInstallation = null
+        facilityMotionEligible = null
+        facilityEffect = null
+        invalidate()
+    }
     private val visibleBounds = Rect()
     private var selectedId: OwnedVehicleId? = null
     private var previousId: OwnedVehicleId? = null
@@ -184,12 +252,16 @@ internal class ShopSceneView(
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
-        if (isVisible) invalidate() else stopMotion()
+        if (isVisible) invalidate() else {
+            stopFacilityInstallation()
+            stopMotion()
+        }
     }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
         if (hasWindowFocus) invalidate() else {
+            stopFacilityInstallation()
             stopMotion()
             invalidate()
         }
@@ -205,12 +277,16 @@ internal class ShopSceneView(
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
-        if (visibility == VISIBLE) invalidate() else stopMotion()
+        if (visibility == VISIBLE) invalidate() else {
+            stopFacilityInstallation()
+            stopMotion()
+        }
     }
 
     override fun onDetachedFromWindow() {
         viewTreeObserver.removeOnScrollChangedListener(scrollChanged)
         context.contentResolver.unregisterContentObserver(motionSetting)
+        stopFacilityInstallation()
         stopMotion()
         super.onDetachedFromWindow()
     }
@@ -219,6 +295,7 @@ internal class ShopSceneView(
         removeCallbacks(nextFrame)
         frameScheduled = false
         expansionStartedAt = null
+        stopRentalMapMotion()
         cancelResidentTouch()
         if (cancelPan) resetPanGesture()
         if (actorsDelegate.isInitialized()) actors.stop()
@@ -550,6 +627,7 @@ internal class ShopSceneView(
         canvas.scale(scale, scale)
         canvas.clipRect(if (selectedId != null || focusRegion != null || movingCamera) fullTown else scene)
         canvas.drawBitmap(background, null, fullTown, paint)
+        drawFacilityInstallation(canvas, now)
         if (!defaultSign) drawSign(canvas)
         if (growthArt == null) model.slots?.let { slots ->
             for (index in slots until townSlots.size) {
@@ -562,7 +640,19 @@ internal class ShopSceneView(
             badge(canvas, context.getString(R.string.shop_scene_spaces_unknown), 770f, 652f, 360f)
         }
         drawExpansion(canvas, now, animate)
-        placed.forEach { (vehicle, slot) -> drawVehicle(canvas, vehicle, slot.first.toFloat(), slot.second.toFloat()) }
+        val rental = rentalAnimation?.let { animation ->
+            val start = animation.startedAt ?: now.also { animation.startedAt = it }
+            if (!animation.eligible() || !slotVisible(animation.effect.slot) || now - animation.offeredAt > 2_250L ||
+                now - start >= 2_000L || movingCamera) {
+                stopRentalMapMotion()
+                null
+            } else animation to (now - start) / 2_000f
+        }
+        placed.forEach { (vehicle, slot) ->
+            val moving = vehicle.id == rental?.first?.effect?.event?.vehicle
+            drawVehicle(canvas, vehicle, slot.first.toFloat(), slot.second.toFloat(), drawParkedSprite = !moving)
+        }
+        rental?.let { (animation, time) -> animation.art.draw(canvas, time) }
         actors.draw(canvas, animate)
         if (!fillViewport && selectedId == null && mode == ShopMode.OVERALL) {
             val unknown = context.getString(R.string.shop_unknown)
@@ -572,7 +662,7 @@ internal class ShopSceneView(
         }
         canvas.restore()
         if (animate && !frameScheduled) {
-            frameScheduled = postDelayed(nextFrame, if (movingCamera) 16L else 50L)
+            frameScheduled = postDelayed(nextFrame, if (movingCamera || facilityEffect != null || rentalAnimation != null) 16L else 50L)
         }
     }
 
@@ -588,6 +678,16 @@ internal class ShopSceneView(
             canvas.drawRect(x - density, y - 8f * density, x + density, y + 6f * density, paint)
         }
         super.dispatchDraw(canvas)
+    }
+
+    private fun drawFacilityInstallation(canvas: Canvas, now: Long) {
+        val effect = facilityEffect ?: return
+        if (!effect.canDraw(now) || !canAnimateActors() || facilityMotionEligible?.invoke() != true) {
+            stopFacilityInstallation()
+            return
+        }
+        if (movingCamera) return
+        facilityInstallation?.draw(canvas, effect.progress(now))
     }
 
     private fun drawExpansion(canvas: Canvas, now: Long, animate: Boolean) {
@@ -667,10 +767,10 @@ internal class ShopSceneView(
         canvas.drawRoundRect(x - 9f, y - 23f, x + 9f, y - 9f, 2f, 2f, paint)
     }
 
-    private fun drawVehicle(canvas: Canvas, vehicle: ShopVehicle, x: Float, y: Float) {
+    private fun drawVehicle(canvas: Canvas, vehicle: ShopVehicle, x: Float, y: Float, drawParkedSprite: Boolean) {
         val bitmap = bitmaps[vehicle.id]
         val parked = vehicle.activity == VehicleActivity.IDLE || vehicle.activity == VehicleActivity.NEEDS_REPAIR
-        if (bitmap != null && parked) {
+        if (bitmap != null && parked && drawParkedSprite) {
             if (vehicle.id == selectedId) drawVehicleSelection(canvas, x, y + 13f)
             val drawWidth = bitmap.width * 1.8f
             val drawHeight = drawWidth * bitmap.height / bitmap.width

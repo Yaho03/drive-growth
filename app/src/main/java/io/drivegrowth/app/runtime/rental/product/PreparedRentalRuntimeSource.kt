@@ -7,7 +7,9 @@ import io.drivegrowth.core.contract.*
 /** 기존 RentalRuntime.visit/advance/read의 소비 어댑터. 배정은 E의 원문 저널, 관측 정산은 기존 source다. */
 class PreparedRentalRuntimeSource(private val identity: () -> ContractResult<GameIdentity>,
     private val journal: RentalProductJournal, private val observed: RentalRuntimeSource) : RentalRuntimeSource {
-    override fun visit(input: ContractResult<RentalVisit>): ContractResult<OwnedVehicleId?> {
+    override fun visit(input: ContractResult<RentalVisit>): ContractResult<OwnedVehicleId?> = visitWith(input, journal::execute)
+
+    internal fun <T> visitWith(input: ContractResult<RentalVisit>, execute: (PreparedRentalVisit) -> ContractResult<T>): ContractResult<T> {
         val visit = when (input) { is ContractResult.Failure -> return input; is ContractResult.Success -> input.value }
         val actual = when (val r = identity()) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
         if (visit.source != actual.source) return ContractResult.Failure(ContractError.STATE_CONFLICT)
@@ -15,16 +17,19 @@ class PreparedRentalRuntimeSource(private val identity: () -> ContractResult<Gam
             ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         if (original.identity != actual || original.copy(visit = visit) != original)
             return ContractResult.Failure(ContractError.STATE_CONFLICT)
-        val result = when (val r = journal.execute(original)) { is ContractResult.Failure -> return r; is ContractResult.Success -> r }
+        val result = when (val r = execute(original)) { is ContractResult.Failure -> return r; is ContractResult.Success -> r }
         return when (val finished = journal.finish(original)) {
             is ContractResult.Failure -> finished // 원결과가 불명이면 새 visit으로 대체하지 않고 같은 pending 복구.
             is ContractResult.Success -> result
         }
     }
-    override fun advance(tick: RentalTick): ContractResult<RentalRuntimeSnapshot> {
+    override fun advance(tick: RentalTick): ContractResult<RentalRuntimeSnapshot> = advanceWith(tick, observed::advance)
+
+    internal fun advanceWith(tick: RentalTick, advance: (RentalTick) -> ContractResult<RentalRuntimeSnapshot>):
+        ContractResult<RentalRuntimeSnapshot> {
         val actual = when (val r = identity()) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
         if (tick.source != actual.source) return ContractResult.Failure(ContractError.STATE_CONFLICT)
-        return observed.advance(tick)
+        return advance(tick)
     }
     override fun read(): ContractResult<RentalRuntimeSnapshot> = when (val r = identity()) {
         is ContractResult.Failure -> r

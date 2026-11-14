@@ -70,6 +70,23 @@ class RentalProductJournalTest:InstrumentationTestCase() {
         ok(reopened.finish(p));assertNull(ok(reopened.pending(identity)));assertEquals(car.ownedVehicleId,ok(reopened.execute(p)))
         assertEquals(Revision(1),ok(store.listOwnedVehicles()).single().revision)
     }
+    fun testFreshAssignmentProofIsSingleAfterRollbackAndReopen() {
+        val prepared = prepare("motion-visit")
+        val car = add(prepared.visit.request.desired)
+        val journal = journal()
+        ok(journal.save(prepared))
+        val saved = rows()
+        raw { it.execSQL("CREATE TRIGGER fail_motion_visit BEFORE INSERT ON rentals BEGIN SELECT RAISE(ABORT, 'visit fault'); END") }
+        assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), journal.executeVisit(prepared))
+        assertEquals(saved, rows())
+        raw { it.execSQL("DROP TRIGGER fail_motion_visit") }
+        assertEquals(SqliteRentalProductJournal.VisitCommit(car.ownedVehicleId, true), ok(journal.executeVisit(prepared)))
+        val applied = rows()
+        assertEquals(SqliteRentalProductJournal.VisitCommit(car.ownedVehicleId, false), ok(journal().executeVisit(prepared)))
+        assertEquals(applied, rows())
+        assertEquals(Revision(1), ok(store.listOwnedVehicles()).single().revision)
+    }
+
     fun testCityDraftSurvivesLevelChangeAndPersistsTheOriginalCommand() {
         val trial = ok(AssetTrialDefinitionProvider(context.assets).load())
         fun authority(game: GameSession): RentalPreparationInputs {

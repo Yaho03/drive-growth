@@ -22,6 +22,9 @@ class OnboardingHostController(private val source: OnboardingHostSource, private
     private var refreshRequested = false
     private var bound: GameIdentity? = null
     private var snapshot: OnboardingSnapshot? = null
+    // 이 화면의 최초 확인 직후에만 축하를 유지한다. Bundle·저장 계약에는 넣지 않는다.
+    private var newlyConfirmed: InitializationSettlement? = null
+    private data class Loaded(val snapshot: OnboardingSnapshot, val newGrant: InitializationSettlement? = null)
     private var screen: OnboardingScreenState = OnboardingScreenState.Loading
     private var listener: ((OnboardingScreenState, Boolean) -> Unit)? = null
     private var goToShop: (() -> Unit)? = null
@@ -32,17 +35,29 @@ class OnboardingHostController(private val source: OnboardingHostSource, private
         detach(); this.listener = listener; this.goToShop = goToShop; this.changed = changed
         publish()
     }
-    fun detach() { enabled = false; generation++; refreshRequested = false; listener = null; goToShop = null; changed = null }
+    fun detach() {
+        enabled = false; generation++; refreshRequested = false
+        clearNewlyConfirmed()
+        listener = null; goToShop = null; changed = null
+    }
     fun release() { detach(); released = true }
     fun setControlsEnabled(value: Boolean) {
         if (released || enabled == value) return
         enabled = value; generation++
-        if (value) refresh() else { refreshRequested = false; publish() }
+        if (value) refresh() else { refreshRequested = false; clearNewlyConfirmed(); publish() }
     }
     fun refresh() {
         if (!enabled || released || listener == null) return
         refreshRequested = true
-        if (!inFlight) { refreshRequested = false; launch(null) { source.read() } }
+        if (!inFlight) {
+            refreshRequested = false
+            launch(null) {
+                when (val read = source.read()) {
+                    is ContractResult.Failure -> read
+                    is ContractResult.Success -> ContractResult.Success(Loaded(read.value))
+                }
+            }
+        }
     }
     fun onEvent(event: OnboardingEvent) {
         if (!enabled || released || listener == null || inFlight) return
@@ -53,35 +68,50 @@ class OnboardingHostController(private val source: OnboardingHostSource, private
             }
             is OnboardingEvent.ReviewSelection -> if (screen is OnboardingScreenState.Choosing && uiState.selected == event.vehicleId && candidates().any { it.vehicle.vehicleId == event.vehicleId && it.selectable })
                 updateStep(OnboardingStep.CONFIRMING)
-            is OnboardingEvent.ConfirmSelection -> if (screen is OnboardingScreenState.Confirming && uiState.selected == event.vehicleId) submit(event.vehicleId)
+            is OnboardingEvent.ConfirmSelection -> if (screen is OnboardingScreenState.Confirming && uiState.selected == event.vehicleId) submit(event.vehicleId, firstConfirmation = true)
             is OnboardingEvent.Retry -> if (event.vehicleId == null) refresh()
-                else if (screen is OnboardingScreenState.GrantError && uiState.selected == event.vehicleId) submit(event.vehicleId)
+                else if (screen is OnboardingScreenState.GrantError && uiState.selected == event.vehicleId) submit(event.vehicleId, firstConfirmation = false)
             OnboardingEvent.Previous -> when (screen) {
                 is OnboardingScreenState.Choosing -> updateStep(OnboardingStep.INTRO)
                 is OnboardingScreenState.Confirming -> updateStep(OnboardingStep.CHOOSING)
                 else -> Unit
             }
-            OnboardingEvent.GoToShop -> if (screen is OnboardingScreenState.Completed) goToShop?.invoke()
+            OnboardingEvent.GoToShop -> if (screen is OnboardingScreenState.Completed) {
+                clearNewlyConfirmed()
+                publish()
+                goToShop?.invoke()
+            }
         }
     }
     private fun updateStep(step: OnboardingStep) { uiState = uiState.copy(step = step); snapshot?.let(::show); publish() }
-    private fun submit(choice: VehicleId) {
+    private fun clearNewlyConfirmed() {
+        newlyConfirmed = null
+        val completed = screen as? OnboardingScreenState.Completed ?: return
+        if (!completed.alreadyGranted) screen = completed.copy(alreadyGranted = true)
+    }
+
+    private fun submit(choice: VehicleId, firstConfirmation: Boolean) {
         val identity = bound ?: return
         uiState = uiState.copy(pending = choice)
         screen = OnboardingScreenState.Submitting(choice, candidates().find { it.vehicle.vehicleId == choice }?.vehicle?.displayName, label(identity.source))
         launch(choice) {
-            when (val committed = source.choose(identity, choice)) {
+            when (val committed = source.chooseWithOutcome(identity, choice)) {
                 is ContractResult.Failure -> committed
                 is ContractResult.Success -> when (val read = source.read()) {
                     is ContractResult.Failure -> read
-                    is ContractResult.Success -> if (read.value.identity != identity ||
-                        (read.value.initialization.status as? ProfileInitializationStatus.Existing)?.original != committed.value)
-                        ContractResult.Failure(ContractError.STORAGE_FAILURE) else read
+                    is ContractResult.Success -> {
+                        val original = committed.value.settlement
+                        if (read.value.identity != identity ||
+                            (read.value.initialization.status as? ProfileInitializationStatus.Existing)?.original != original ||
+                            original.grant.changedVehicle?.vehicleId != choice) ContractResult.Failure(ContractError.STORAGE_FAILURE)
+                        else ContractResult.Success(Loaded(read.value,
+                            original.takeIf { firstConfirmation && committed.value.newlyCommitted }))
+                    }
                 }
             }
         }
     }
-    private fun launch(choice: VehicleId?, action: () -> ContractResult<OnboardingSnapshot>) {
+    private fun launch(choice: VehicleId?, action: () -> ContractResult<Loaded>) {
         inFlight = true
         val started = generation
         val expected = bound
@@ -94,14 +124,21 @@ class OnboardingHostController(private val source: OnboardingHostSource, private
                     when (val loaded = action()) {
                         is ContractResult.Failure -> loaded
                         is ContractResult.Success -> {
-                            val gift = (loaded.value.gift as? ContractResult.Success)?.value
-                            if (!valid(loaded.value) || (expected != null && expected != loaded.value.identity)) return@guarded ContractResult.Failure(ContractError.INVALID_INPUT)
-                            val initialized = (loaded.value.initialization.status as? ProfileInitializationStatus.Existing)?.original
+                            val snapshot = loaded.value.snapshot
+                            val gift = (snapshot.gift as? ContractResult.Success)?.value
+                            if (!valid(snapshot) || (expected != null && expected != snapshot.identity)) return@guarded ContractResult.Failure(ContractError.INVALID_INPUT)
+                            val initialized = (snapshot.initialization.status as? ProfileInitializationStatus.Existing)?.original
                             if (active(started) && initialized?.grant?.changedVehicle != null &&
                                 gift != null && gift.granted == null && gift.firstCompletedRental != null) {
-                                when (val claimed = source.claimGift(loaded.value.identity)) {
-                                    is ContractResult.Failure -> ContractResult.Success(loaded.value.copy(gift = claimed))
-                                    is ContractResult.Success -> { stored = true; source.read() }
+                                when (val claimed = source.claimGift(snapshot.identity)) {
+                                    is ContractResult.Failure -> ContractResult.Success(loaded.value.copy(snapshot = snapshot.copy(gift = claimed)))
+                                    is ContractResult.Success -> {
+                                        stored = true
+                                        when (val refreshed = source.read()) {
+                                            is ContractResult.Failure -> refreshed
+                                            is ContractResult.Success -> ContractResult.Success(loaded.value.copy(snapshot = refreshed.value))
+                                        }
+                                    }
                                 }
                             } else loaded
                         }
@@ -113,10 +150,13 @@ class OnboardingHostController(private val source: OnboardingHostSource, private
                         when (result) {
                             is ContractResult.Failure -> fail(result.error, choice)
                             is ContractResult.Success -> {
-                                if (!valid(result.value) || (bound != null && bound != result.value.identity)) fail(ContractError.INVALID_INPUT, choice)
+                                val loaded = result.value.snapshot
+                                if (!valid(loaded) || (bound != null && bound != loaded.identity)) fail(ContractError.INVALID_INPUT, choice)
                                 else {
-                                    if (uiState.identity != result.value.identity) uiState = OnboardingHostUiState(result.value.identity)
-                                    bound = result.value.identity; snapshot = result.value; show(result.value)
+                                    if (uiState.identity != loaded.identity) uiState = OnboardingHostUiState(loaded.identity)
+                                    bound = loaded.identity; snapshot = loaded
+                                    result.value.newGrant?.let { newlyConfirmed = it }
+                                    show(loaded)
                                     if (stored) changed?.invoke()
                                 }
                             }
@@ -163,8 +203,8 @@ class OnboardingHostController(private val source: OnboardingHostSource, private
                 else {
                     val name = (value.content as? ContractResult.Success)?.value?.catalog?.vehicles?.find { it.vehicleId == car.vehicleId }?.displayName ?: "저장된 첫 차량"
                     OnboardingScreenState.Completed(car, name,
-                        listOf("첫 차량 지급 당시의 기록입니다", "최초 확정 게임머니 ${saved.grant.balance.units}", "최초 차량 공간 ${saved.garageCapacity}칸") + giftSummary(value.gift),
-                        true, source)
+                        giftSummary(value.gift), saved != newlyConfirmed, source,
+                        initialMoney = saved.grant.balance, initialParkingSpaces = saved.garageCapacity)
                 }
             }
             is ProfileInitializationStatus.New -> {
@@ -186,10 +226,10 @@ class OnboardingHostController(private val source: OnboardingHostSource, private
         }
     }
     private fun giftSummary(gift: ContractResult<FirstRentalGiftState>?): List<String> = when (gift) {
-        null -> listOf("개업 선물은 첫 영업 완료 뒤 확인합니다")
-        is ContractResult.Failure -> listOf("개업 선물 확인 대기 · ${errorText(gift.error)}")
+        null -> listOf("개업 선물은 첫 영업을 마치면 받을 수 있어요.")
+        is ContractResult.Failure -> listOf("개업 선물을 확인하지 못했어요. ${errorText(gift.error)}")
         is ContractResult.Success -> listOf(
-            if (gift.value.granted != null) "개업 선물 1장 지급 기록을 확인했습니다" else "첫 영업 완료를 기다리고 있습니다",
+            if (gift.value.granted != null) "개업 선물로 무료 뽑기권을 받았어요." else "개업 선물은 첫 영업을 마치면 받을 수 있어요.",
             "현재 무료 뽑기권 ${gift.value.progress.freeTickets}장")
     }
     private fun errorText(error: ContractError) = when (error) {

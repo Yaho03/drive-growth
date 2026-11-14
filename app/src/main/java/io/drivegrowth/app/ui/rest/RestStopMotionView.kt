@@ -16,7 +16,7 @@ import android.widget.TextView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 
-/** #295의 담요판 타임라인. 장면 시간은 게임 상태와 무관하다. */
+/** #295의 휴게소 타임라인. 장면 시간은 게임 상태와 무관하다. */
 internal class RestStopMotionView(
     context: Context,
     private val onPartChanged: (Part?) -> Unit = {},
@@ -118,7 +118,7 @@ internal class RestStopMotionView(
         part = next
         if (next == Part.INTRO) introConsumed = true
         val image = runCatching {
-            ImageDecoder.decodeDrawable(ImageDecoder.createSource(context.assets, "pixel/rest/blanket-${next.asset}.webp"))
+            ImageDecoder.decodeDrawable(ImageDecoder.createSource(context.assets, imageAsset(next)))
         }.getOrNull() as? AnimatedImageDrawable
         drawable = image
         val intro = next == Part.INTRO && image != null
@@ -200,7 +200,8 @@ internal class RestStopMotionView(
 
     private fun dp(value: Int) = style.dp(value)
 
-    private companion object {
+    companion object {
+        internal fun imageAsset(part: Part): String = "pixel/rest/rururu-${part.asset}.webp"
         const val CARD_AT_MS = 5000L
     }
 }

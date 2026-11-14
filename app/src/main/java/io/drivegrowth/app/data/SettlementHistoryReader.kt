@@ -14,10 +14,13 @@ import org.json.JSONObject
 import org.json.JSONTokener
 import java.util.Collections
 
+enum class SettlementHistoryCause { INITIAL_GRANT, GACHA }
+
 data class SettlementHistoryEntry(val settlement:Settlement,val viewed:Boolean,
     val rental:CompletedRental?=null,val rentalVehicleId:VehicleId?=null,
     val rentalBasis:Observation<RentalResultBasis> = Observation.Missing(MissingReason.NO_DATA),
-    val rentalDemand: Observation<RentalDemandHistory> = Observation.Missing(MissingReason.NO_DATA))
+    val rentalDemand: Observation<RentalDemandHistory> = Observation.Missing(MissingReason.NO_DATA),
+    val cause: SettlementHistoryCause? = null)
 data class RentalDemandHistory(
     val identity: GameIdentity,
     val rental: CompletedRental,
@@ -63,7 +66,8 @@ class SettlementHistoryReader(private val store:SqliteGameChangeStore) {
                     if (rows.field("history_profile") != profile.value ||
                         rows.field("history_profile_source") != store.source.name ||
                         rows.field("history_account_source") != store.source.name) bad("정산 원장 프로필·출처 불일치")
-                    val rental=checkCommand(db,profile,rows.field("history_command"),receipt,rows)
+                    val checked = checkCommand(db,profile,rows.field("history_command"),receipt,rows)
+                    val rental = checked.rental
                     val car=rental?.let {
                         val col = rows.getColumnIndexOrThrow("history_car")
                         if (rows.isNull(col)) null else LedgerJson.vehicle(JSONObject(rows.text(col)))
@@ -74,7 +78,7 @@ class SettlementHistoryReader(private val store:SqliteGameChangeStore) {
                     val demand = rental?.let { readRentalDemand(rows, identity, it) }
                         ?: Observation.Missing(MissingReason.NO_DATA)
                     add(SettlementHistoryEntry(receipt,rows.flag(rows.getColumnIndexOrThrow("history_viewed")),
-                        rental,car?.vehicleId,basis,demand))
+                        rental,car?.vehicleId,basis,demand,checked.cause))
                 }
             } }
             ContractResult.Success(SettlementHistorySnapshot(identity,Collections.unmodifiableList(entries)))
@@ -123,9 +127,11 @@ class SettlementHistoryReader(private val store:SqliteGameChangeStore) {
         if(LedgerJson.settlement(receipt).toString()!=raw)bad("정산 원문 형식 불일치")
         return receipt
     }
-    private fun checkCommand(db:SQLiteDatabase,profile:ProfileId,raw:String,s:Settlement,row: Cursor):CompletedRental? {
+    private data class CheckedCommand(val rental: CompletedRental? = null, val cause: SettlementHistoryCause? = null)
+
+    private fun checkCommand(db:SQLiteDatabase,profile:ProfileId,raw:String,s:Settlement,row: Cursor): CheckedCommand {
         return when(val json=JSONTokener(raw).nextValue()) {
-            is JSONArray->checkArray(json,raw,s,row)
+            is JSONArray->CheckedCommand(rental = checkArray(json,raw,s,row))
             is JSONObject->{
                 when(json.optString("type")) {
                     ""->{
@@ -157,6 +163,7 @@ class SettlementHistoryReader(private val store:SqliteGameChangeStore) {
                         if(state.profileId!=profile || state.source!=store.source || original.command!=command || original.grant!=s ||
                             original.marker.profileId!=profile || original.marker.requestId!=s.transaction.requestId ||
                             original.marker.evidence!=command.evidence)bad("초기 지급 원결과·마커 연결 불일치")
+                        return CheckedCommand(cause = SettlementHistoryCause.INITIAL_GRANT)
                     }
                     "gacha-v1"->{
                         typed(json,s,"rules")
@@ -178,6 +185,7 @@ class SettlementHistoryReader(private val store:SqliteGameChangeStore) {
                                 it.integer(3,0,Int.MAX_VALUE.toLong())!=LedgerJson.integer(json,"next",0,Int.MAX_VALUE.toLong()))bad("가챠 원래 행 연결 불일치")
                             it.integer(4,0,Long.MAX_VALUE)
                         }
+                        return CheckedCommand(cause = SettlementHistoryCause.GACHA)
                     }
                     "material-v1"->{
                         val command=MaterialJson.command(json);typed(json,s,"rule")
@@ -219,7 +227,8 @@ class SettlementHistoryReader(private val store:SqliteGameChangeStore) {
                             AchievementJson.command(original.command).toString() != raw) bad("업적 원결과 연결 불일치")
                     }
                     else->bad("미지원 정산 명령 원문")
-                };null
+                }
+                CheckedCommand()
             }
             else->bad("정산 명령 형식 오류")
         }

@@ -1,6 +1,7 @@
 package io.drivegrowth.app.ui.presentation
 
 import android.animation.ValueAnimator
+import android.content.Context
 import android.content.Intent
 import android.app.Activity
 import android.app.ActivityOptions
@@ -26,12 +27,14 @@ import io.drivegrowth.app.exposeMainPage
 import io.drivegrowth.app.openMainSettings
 import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.showSimulationControls
+import io.drivegrowth.app.simulation.SimulationTimeline
 import io.drivegrowth.app.simulation.UnifiedSimulationActivity
 import io.drivegrowth.app.ui.delivery.DeliveryScreen
 import io.drivegrowth.app.ui.delivery.DeliveryView
 import io.drivegrowth.app.ui.delivery.DeliveryPreviewStates
 import io.drivegrowth.app.ui.gacha.GachaView
 import io.drivegrowth.app.ui.gacha.GachaEvent
+import io.drivegrowth.app.ui.gacha.GachaOptionKind
 import io.drivegrowth.app.ui.gacha.GachaPreviewStates
 import io.drivegrowth.app.ui.gacha.GachaScreen
 import io.drivegrowth.app.ui.gacha.GachaOrigin
@@ -40,7 +43,10 @@ import io.drivegrowth.app.ui.onboarding.OnboardingView
 import io.drivegrowth.app.ui.results.ResultsView
 import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.core.contract.ContractResult
+import io.drivegrowth.core.contract.EpochMillis
+import io.drivegrowth.core.contract.RequestId
 import io.drivegrowth.core.contract.GameMoney
+import io.drivegrowth.core.contract.GachaTicketUse
 import io.drivegrowth.core.contract.InputSource
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.contract.Rarity
@@ -49,6 +55,7 @@ import io.drivegrowth.core.contract.VehicleLifecycle
 import io.drivegrowth.core.delivery.DeliveryOffer
 import io.drivegrowth.core.progression.VehicleAction
 import io.drivegrowth.core.garage.FirstGrant
+import io.drivegrowth.core.garage.GachaPull
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -124,6 +131,268 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         }
     }
 
+    fun testConfirmedPurchaseAndHeldScenesWithSoundEnabled() {
+        val context = instrumentation.targetContext
+        checkIsolatedPackage(context.packageName)
+        val display = context.getSystemService(DisplayManager::class.java).displays
+            .singleOrNull { it.displayId != 0 && it.name == "Emulator 2D Display" }
+        val options = display?.let { ActivityOptions.makeBasic().setLaunchDisplayId(it.displayId).toBundle() }
+        val host = instrumentation.startActivitySync(Intent(context, CollectionScrollTestActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options)
+        val audio = PrototypeAudio(context)
+        val originalSound = audio.enabled
+        try {
+            assertTrue(ValueAnimator.areAnimatorsEnabled())
+            val fixture = DeliveryPreviewStates
+            val order = fixture.active.active
+            val route = io.drivegrowth.core.contract.RouteId("audio-fixture-route")
+            val now = io.drivegrowth.core.contract.EpochMillis(1)
+            val rules = io.drivegrowth.core.delivery.DeliverySettlementRules(order.proposed.list.ruleVersion, 100, 100, 5)
+            val evidence = io.drivegrowth.core.contract.Observation.Available(
+                io.drivegrowth.core.contract.DeliveryArrivalEvidence(route, InputSource.SIMULATION, now),
+            )
+            onUi {
+                audio.enabled = true
+                audio.setScene(PrototypeAudio.Scene.DELIVERY)
+                audio.setPresentationAllowed(true)
+            }
+            for (slots in listOf(1, 0)) {
+                val resolved = ok(io.drivegrowth.core.delivery.DeliverySettlement(rules).resolve(
+                    io.drivegrowth.core.delivery.DeliveryInProgress(order, route, now), evidence, now, slots,
+                ))
+                val scene = if (slots == 0) "HELD" else "VEHICLE_ARRIVAL"
+                val received = resolved as? io.drivegrowth.core.delivery.DeliveryOutcome.VehicleDelivered
+                val receipt = received?.change?.let { change ->
+                    io.drivegrowth.core.contract.Settlement(
+                        io.drivegrowth.core.contract.SettlementId("audio-fixture-receipt"),
+                        io.drivegrowth.core.contract.Transaction(
+                            io.drivegrowth.core.contract.TransactionId("audio-fixture-transaction"),
+                            change.requestId, change.kind, change.source, change.ruleVersion, change.money,
+                        ),
+                        GameMoney(200), (change.vehicle as? io.drivegrowth.core.contract.VehicleWrite.Add)?.vehicle, now,
+                    )
+                }
+                val frame = fixture.empty.copy(version = 3)
+                val read = io.drivegrowth.app.host.delivery.DeliveryHostRead(
+                    io.drivegrowth.app.host.GameIdentity(io.drivegrowth.core.contract.ProfileId("audio-fixture"), InputSource.SIMULATION),
+                    frame.screen,
+                    pending = io.drivegrowth.app.host.delivery.DeliveryHostOperation.Arrival(
+                        rules, order.requestId, evidence, now, order.proposed.list, order.proposed.list,
+                    ),
+                    receipt = io.drivegrowth.app.host.delivery.DeliveryHostReceipt.Arrived(
+                        io.drivegrowth.app.data.ArrivalCommit(resolved, receipt),
+                    ),
+                )
+                var starts = 0
+                val view = DeliveryView(host, {}, onPresentationCue = {
+                    starts++
+                    audio.play(if (slots == 0) PrototypeAudio.Cue.DELIVERY_HELD else PrototypeAudio.Cue.DELIVERY_VEHICLE_ARRIVAL)
+                }, onPresentationCancelled = audio::stopEffectPlayback)
+                onUi {
+                    host.setContentView(view)
+                    view.render(fixture.activeFrame, true)
+                    view.render(frame, true, read)
+                }
+                await("탁송 고정 입력 도착 효과 완료 $scene") {
+                    starts == 1 && view.findViewWithTag<View>("delivery:confirm-scene")?.isShown == true
+                }
+                capture(host, "audio-fixture-$scene")
+                onUi {
+                    assertTrue(view.handleBack())
+                    view.render(frame.copy(version = 4), true, read)
+                    assertEquals(1, starts)
+                    assertNull(view.findViewWithTag<View>("delivery:scene:$scene"))
+                }
+            }
+        } finally {
+            onUi { audio.enabled = originalSound; audio.close(); host.finish() }
+        }
+    }
+
+    fun testFirstCompletedRentalShowsGiftAndOpensGachaWithoutDrawing() {
+        val context = instrumentation.targetContext
+        checkIsolatedPackage(context.packageName)
+        val database = "unified-simulation.db"
+        assertFalse(context.getDatabasePath(database).exists())
+        val timeline = SimulationTimeline()
+        val prefs = context.getSharedPreferences("unified-simulation-v1", Context.MODE_PRIVATE)
+        assertFalse(prefs.contains("stage"))
+        assertTrue(prefs.edit().putInt("stage", timeline.stage).putLong("elapsed", timeline.elapsedMs).commit())
+        val games = GameSessionFactory(context, mapOf(InputSource.SIMULATION to database), InputSource.SIMULATION)
+        val onboarding = io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource(games)
+        val identity = ok(onboarding.read()).identity
+        ok(onboarding.choose(identity, VehicleId("hyundai_casper")))
+        val before = ok(games.open()).use { game ->
+            val store = game.store
+            val content = ok(game.content)
+            val vehicle = ok(store.listOwnedVehicles()).single()
+            val rental = RequestId("opening-gift-main-rental")
+            val start = EpochMillis(0)
+            val end = EpochMillis(3_600_000)
+            val terms = io.drivegrowth.app.data.RentalTerms(content.ruleVersion,
+                io.drivegrowth.core.rental.SimulatedCustomer(30, 36), 99, start, 15, GameMoney(0),
+                java.math.RoundingMode.DOWN)
+            ok(store.rental.assign(io.drivegrowth.core.rental.RentalRequest(rental, vehicle.vehicleId, 1), content.catalog,
+                mapOf(vehicle.vehicleId to io.drivegrowth.core.rental.RentalCategory.SMALL),
+                mapOf(vehicle.vehicleId to GameMoney(100)), terms))
+            ok(store.rental.account(rental, start, end, null))
+            ok(store.rental.settle(rental))
+            val gift = ok(store.readFirstRentalGift(identity.profileId))
+            assertNull(gift.granted)
+            ok(store.readGachaState()).progress.drawsSinceGuarantee
+        }
+        val host = launchActivity(Intent(context, UnifiedSimulationActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        try {
+            await("개업 선물 확인 경로", timeoutMillis = 30_000) {
+                val start = button(host, "presentation:start")
+                if (start?.isShown == true && start.isEnabled) start.performClick()
+                button(host, "opening-gift:gacha")?.let {
+                    it.isShown && it.isEnabled && it.isLaidOut && host.hasWindowFocus()
+                } == true
+            }
+            val session = onUiValue { host.onRetainNonConfigurationInstance() as HostSession }
+            onUi {
+                val card = checkNotNull(button(host, "opening-gift:card"))
+                assertTrue(session.home.refresh())
+                assertEquals(io.drivegrowth.app.ui.shop.ShopScreenState.Loading, session.home.state.screen)
+                assertSame(card, button(host, "opening-gift:card"))
+                assertTrue(card.isShown)
+            }
+            capture(host, "main-opening-gift")
+            onUi { touchView(host, checkNotNull(button(host, "opening-gift:gacha"))) }
+            await("추첨 전 뽑기 화면") {
+                host.window.decorView.isMainPageShown(HostPage.GACHA) &&
+                    button(host, "gacha:option:free")?.isEnabled == true
+            }
+            ok(games.open()).use { game ->
+                assertEquals(1L, ok(game.store.readFirstRentalGift(identity.profileId)).progress.freeTickets)
+                assertEquals(before, ok(game.store.readGachaState()).progress.drawsSinceGuarantee)
+            }
+            verifyNewGachaAward(host, games, GachaOptionKind.FREE)
+        } finally { finishHost(host) }
+    }
+
+    private fun verifyNewGachaAward(
+        host: UnifiedSimulationActivity,
+        games: GameSessionFactory,
+        kind: GachaOptionKind,
+    ) {
+        val optionTag = "gacha:option:${kind.name.lowercase()}"
+        val badgeTag = "gacha:new-collection"
+        fun currentRequest(): RequestId = onUiValue {
+            val view = descendants(host.window.decorView).filterIsInstance<GachaView>().single()
+            val offers = (view.uiState.frame?.screen as GachaScreen.Offers).value
+            checkNotNull(offers.options.single { it.kind == kind }.requestId)
+        }
+        lateinit var candidate: io.drivegrowth.core.contract.GachaCommand
+        var firstOwnership = false
+        for (attempt in 1..12) {
+            await("권위 뽑기 후보 ${kind.name}") { button(host, optionTag)?.isEnabled == true }
+            val id = currentRequest()
+            firstOwnership = ok(games.open()).use { game ->
+                val use = if (kind == GachaOptionKind.FREE) GachaTicketUse.FREE else GachaTicketUse.PURCHASED
+                candidate = ok(GachaPull(ok(game.content)).prepare(game.store, id, use))
+                val car = candidate.award.vehicle
+                ok(game.store.listVehicleHistory()).none { it.vehicleId == car.vehicleId && it.rarity == car.rarity }
+            }
+            if (firstOwnership) break
+            click(host, "host:refresh")
+            await("미제출 후보 다시 조회") {
+                val view = descendants(host.window.decorView).filterIsInstance<GachaView>().single()
+                val offers = (view.uiState.frame?.screen as? GachaScreen.Offers)?.value
+                offers?.options?.any { it.kind == kind && it.requestId != id } == true
+            }
+        }
+        assertTrue("최초 보유에 해당하는 권위 후보", firstOwnership)
+        click(host, optionTag)
+        await("확정 버튼과 창 포커스") {
+            val confirm = button(host, "gacha:confirm") ?: return@await false
+            if (!confirm.isShown || !confirm.isEnabled || !confirm.isLaidOut || !host.hasWindowFocus()) return@await false
+            val bounds = Rect()
+            val visible = confirm.getGlobalVisibleRect(bounds)
+            android.util.Log.i("Pr300GiftProbe",
+                "confirm view=${confirm.width}x${confirm.height} visible=$visible bounds=$bounds " +
+                    "display=${host.display?.displayId} window=${host.window.decorView.width}x${host.window.decorView.height} " +
+                    "award=${candidate.award.vehicle.vehicleId.value}/${candidate.award.vehicle.rarity}")
+            confirm.performClick()
+        }
+        if (ValueAnimator.areAnimatorsEnabled()) {
+            await("결과 공개 전 셔터", diagnostic = {
+                onUiValue {
+                    val view = descendants(host.window.decorView).filterIsInstance<GachaView>().single()
+                    val shutter = button(host, "gacha:reveal")
+                    "award=${candidate.award.vehicle.vehicleId.value}/${candidate.award.vehicle.rarity} " +
+                        "screen=${view.uiState.frame?.screen?.javaClass?.simpleName} " +
+                        "focus=${host.hasWindowFocus()} size=${view.width}×${view.height} " +
+                        "reveal=${shutter?.isShown} enabled=${shutter?.isEnabled} " +
+                        "pending=${view.uiState.pending != null} badge=${button(host, badgeTag)?.isShown}"
+                }
+            }) { button(host, "gacha:reveal")?.isShown == true }
+            onUi { assertFalse(button(host, badgeTag)?.isShown == true) }
+            click(host, "gacha:reveal")
+        }
+        await("실제 원정산 배지") { button(host, badgeTag)?.isShown == true }
+        capture(host, "main-gacha-new-${kind.name.lowercase()}")
+        ok(games.open()).use { game ->
+            assertEquals(candidate.award.vehicle, ok(game.store.listOwnedVehicles()).single {
+                it.ownedVehicleId == candidate.award.vehicle.ownedVehicleId
+            })
+        }
+        onUi { host.onBackPressed() }
+        openPage(host, HostPage.COLLECTION)
+        val car = candidate.award.vehicle
+        val model = ok(games.open()).use { game ->
+            ok(game.content).catalog.vehicles.single { it.vehicleId == car.vehicleId }.displayName
+        }
+        val rarity = io.drivegrowth.app.ui.garage.GarageStyle(host).rarity(car.rarity)
+        fun cell() = descendants(host.window.decorView).firstOrNull {
+            it.contentDescription?.toString()?.startsWith("$model $rarity · ") == true
+        }
+        await("실제 도감 목록") { button(host, "collection:filter:OWNED")?.isShown == true }
+        if (onUiValue { cell() == null || cell()?.getGlobalVisibleRect(Rect()) != true }) {
+            click(host, "collection:filter:OWNED")
+            await("보유 이력의 대상 차종·희귀도 표시") {
+                val target = cell() ?: return@await false
+                if (!target.isLaidOut) return@await false
+                target.requestRectangleOnScreen(Rect(0, 0, target.width, target.height), true)
+                target.getGlobalVisibleRect(Rect())
+            }
+        }
+        await("뽑기 결과 이후 독립 도감 배지 ($model $rarity)") {
+            cell()?.let { ownedCell ->
+                descendants(ownedCell).any { it.isShown && it.contentDescription?.toString() == "NEW · 도감 등록" }
+            } == true
+        }
+        capture(host, "main-gacha-collection-new")
+        openPage(host, HostPage.HOME)
+        openPage(host, HostPage.GACHA)
+        await("저장된 원래 결과") { button(host, "gacha:garage")?.isEnabled == true }
+        onUi { assertNull(button(host, badgeTag)) }
+        val restored = recreate(host)
+        try {
+            await("재생성한 원래 결과") { button(restored, "gacha:garage")?.isEnabled == true }
+            onUi { assertNull(button(restored, badgeTag)) }
+        } finally { finishHost(restored) }
+    }
+
+    fun testRestPreviewInExistingProfile() {
+        val context = instrumentation.targetContext
+        checkIsolatedPackage(context.packageName)
+        val games = GameSessionFactory(context, mapOf(InputSource.SIMULATION to "unified-simulation.db"), InputSource.SIMULATION)
+        val host = launchActivity(Intent(context, UnifiedSimulationActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        try {
+            val title = "presentation:start"
+            onUi { button(host, title)?.takeIf { it.isEnabled }?.performClick() }
+            await("HOME 모의 입력 허용", timeoutMillis = 30_000) {
+                host.window.decorView.isMainPageShown(HostPage.HOME) && host.hasWindowFocus()
+            }
+            verifyRestStopPreview(host, games)
+        } finally {
+            finishHost(host)
+        }
+    }
+
     fun testLauncherTitleStartsExistingGameAndCanReopen() {
         checkIsolatedPackage(instrumentation.targetContext.packageName)
         val host = launchActivity(Intent(instrumentation.targetContext,
@@ -131,7 +400,9 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             .setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER))
         try {
             await("포커스를 받은 런처 시작 버튼", timeoutMillis = 30_000) {
-                host.window.decorView.findViewWithTag<Button>("presentation:start")?.isEnabled == true && host.hasWindowFocus()
+                host.window.decorView.findViewWithTag<Button>("presentation:start")?.let {
+                    it.isShown && it.isEnabled && it.alpha > .55f
+                } == true && host.hasWindowFocus()
             }
             onUi {
                 assertTitleCoversGame(host)
@@ -164,13 +435,170 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                 val start = host.window.decorView.findViewWithTag<Button>("simulation:start")
                 if (start != null) assertFalse(start.isEnabled)
             }
-            touchStart(host, background = true)
+            onUi {
+                val title = checkNotNull(button(host, "presentation:title"))
+                val origin = IntArray(2).also(title::getLocationInWindow)
+                dispatchTap(host.window.decorView, origin[0] + 2f, origin[1] + 2f)
+                assertTrue("포스터 배경 입력은 시작 화면을 유지", title.isShown)
+            }
+            await("건너뛴 포스터의 명시 시작 버튼") {
+                button(host, "presentation:start")?.let { it.isShown && it.isEnabled && it.alpha > 0f } == true
+            }
+            touchStart(host)
             await { host.window.decorView.findViewWithTag<Button>(io.drivegrowth.app.R.string.onboarding_start)?.isEnabled == true }
             onUi {
                 assertNull(host.window.decorView.findViewWithTag<Button>(io.drivegrowth.app.R.string.onboarding_review))
             }
         } finally { onUi { host.finish() } }
     }
+    fun testPr300MainRestoresCollectionViewport() {
+        val context = instrumentation.targetContext
+        checkIsolatedPackage(context.packageName)
+        var host = launchActivity(Intent(context, UnifiedSimulationActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        fun scroll() = host.window.decorView.findViewWithTag<android.widget.ScrollView>("collection:scroll")
+        val filter = "collection:filter:UNDISCOVERED"
+        val rect = Rect()
+        try {
+            for (tag in listOf(R.string.onboarding_start, VehicleId("hyundai_casper"),
+                R.string.onboarding_review, R.string.onboarding_confirm, R.string.onboarding_to_shop)) {
+                clickOnboarding(host, tag)
+            }
+            await("정상 HOME HUD") {
+                button(host, "shop:map-balance")?.let { it.isShown && it.getGlobalVisibleRect(rect) } == true &&
+                    button(host, "shop:loading-map")?.isShown != true && host.hasWindowFocus()
+            }
+            instrumentation.waitForIdleSync()
+            capture(host, "main-home-content")
+            openPage(host, HostPage.COLLECTION)
+            click(host, filter)
+            await("발견하지 않은 차종 목록") {
+                val list = scroll() ?: return@await false
+                button(host, filter)?.isSelected == true && list.isLaidOut &&
+                    list.getChildAt(0).height - list.height >= 320
+            }
+            onUi { checkNotNull(scroll()).scrollTo(0, 320) }
+            val before = onUiValue { checkNotNull(scroll()).scrollY }
+            assertEquals(320, before)
+            host = recreate(host)
+            await("새 Activity의 도감 필터와 스크롤 복원") {
+                host.window.decorView.isMainPageShown(HostPage.COLLECTION) &&
+                    button(host, filter)?.isSelected == true && scroll()?.scrollY == before
+            }
+            capture(host, "main-collection-viewport-restored")
+        } finally {
+            finishHost(host)
+        }
+    }
+
+    fun testPr300ActualWindowsAndCaptures() {
+        val context = instrumentation.targetContext
+        checkIsolatedPackage(context.packageName)
+        val intent = Intent(context, UnifiedSimulationActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        var host = launchActivity(intent)
+        val task = onUiValue { host.taskId }
+        val callbacks = object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, state: Bundle?) = Unit
+            override fun onActivityStarted(activity: Activity) = Unit
+            override fun onActivityResumed(activity: Activity) {
+                if (activity is UnifiedSimulationActivity && activity.taskId == task) host = activity
+            }
+            override fun onActivityPaused(activity: Activity) = Unit
+            override fun onActivityStopped(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        }
+        fun resize(width: Int, height: Int) {
+            val fd = instrumentation.uiAutomation.executeShellCommand("am task resize $task 0 0 $width $height")
+            val output = android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).bufferedReader().use { it.readText() }
+            assertFalse(output, output.contains("Error:"))
+            await("실제 앱 창 ${width}×${height}", diagnostic = {
+                onUiValue { "창=${host.window.decorView.width}×${host.window.decorView.height} " +
+                    "포커스=${host.hasWindowFocus()} 종료=${host.isDestroyed}" }
+            }) {
+                val decor = host.window.decorView
+                !host.isDestroyed && decor.width == width && decor.height == height && host.hasWindowFocus()
+            }
+        }
+        fun awaitHome() = await("HOME 지도·크림 HUD·메뉴 6개", timeoutMillis = 30_000) {
+            val root = host.window.decorView
+            root.isMainPageShown(HostPage.HOME) && button(host, "shop:map-hud")?.isShown == true &&
+                button(host, "shop:map-settings")?.isShown == true &&
+                button(host, "shop:map-balance")?.isShown == true &&
+                button(host, "shop:loading-map")?.isShown != true &&
+                listOf(HostPage.GARAGE, HostPage.COLLECTION, HostPage.GACHA, HostPage.DELIVERY,
+                    HostPage.RESULTS, HostPage.RANKING).all {
+                    root.findViewWithTag<View>("host:page:${it.name}")?.isShown == true
+                }
+        }
+        fun awaitTitle() = await("포스터 제목과 명시 시작 버튼", timeoutMillis = 30_000, diagnostic = {
+            onUiValue {
+                "focus=${host.hasWindowFocus()} title=${button(host, "presentation:start")?.isShown} " +
+                    "page=${HostPage.entries.firstOrNull { host.window.decorView.isMainPageShown(it) }}"
+            }
+        }) {
+            button(host, "presentation:start")?.let {
+                val bounds = Rect()
+                it.isLaidOut && it.isShown && it.isEnabled && it.alpha > .55f && host.hasWindowFocus() &&
+                    it.getGlobalVisibleRect(bounds) && bounds.height() >= 48 * it.resources.displayMetrics.density
+            } == true
+        }
+        fun renderPage(name: String, page: HostPage) {
+            openPage(host, page)
+            await("현재 창의 기능과 닫기 버튼 $page") {
+                val close = button(host, "host:back")
+                val bounds = Rect()
+                host.window.decorView.isMainPageShown(page) && close?.isShown == true &&
+                    close.isEnabled && close.getGlobalVisibleRect(bounds) &&
+                    bounds.height() >= 48 * close.resources.displayMetrics.density
+            }
+            if (page == HostPage.COLLECTION) {
+                await("로드된 차량 행 $name", timeoutMillis = 30_000) {
+                    button(host, "collection:model:hyundai_casper")?.isShown == true ||
+                        button(host, "collection:next")?.isLaidOut == true
+                }
+            }
+            capture(host, name)
+        }
+        onUi { host.application.registerActivityLifecycleCallbacks(callbacks) }
+        try {
+            awaitTitle()
+            capture(host, "pr300-title-wide")
+            touchStart(host)
+            for (tag in listOf(R.string.onboarding_start, VehicleId("hyundai_casper"),
+                R.string.onboarding_review, R.string.onboarding_confirm, R.string.onboarding_to_shop)) {
+                clickOnboarding(host, tag)
+            }
+            awaitHome()
+            capture(host, "pr300-home-wide")
+            renderPage("pr300-garage-wide", HostPage.GARAGE)
+            renderPage("pr300-collection-wide", HostPage.COLLECTION)
+            renderPage("pr300-results-wide", HostPage.RESULTS)
+            renderPage("pr300-delivery-wide", HostPage.DELIVERY)
+            renderPage("pr300-gacha-wide", HostPage.GACHA)
+            resize(480, 700)
+            renderPage("pr300-garage-portrait", HostPage.GARAGE)
+            renderPage("pr300-collection-portrait", HostPage.COLLECTION)
+            resize(650, 420)
+            renderPage("pr300-collection-shallow", HostPage.COLLECTION)
+            openPage(host, HostPage.HOME)
+            awaitHome()
+            capture(host, "pr300-home-shallow")
+            await("설정의 시작 화면 열기") {
+                host.window.decorView.openMainSettings()
+                button(host, "presentation:home-title")?.takeIf { it.isShown && it.isEnabled }?.performClick() == true
+            }
+            awaitTitle()
+            capture(host, "pr300-title-shallow")
+            touchStart(host)
+            awaitHome()
+        } finally {
+            onUi { host.application.unregisterActivityLifecycleCallbacks(callbacks) }
+            finishHost(host)
+        }
+    }
+
     private fun titleMusicPlaying(host: UnifiedSimulationActivity): Boolean {
         val manager = host.getSystemService(android.media.AudioManager::class.java)
         return manager.isMusicActive
@@ -281,7 +709,20 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                     descendants(root).any { it.isShown && it.tag?.toString()?.startsWith("shop:map-vehicle:") == true }
             }
             capture(host, "main-home")
-            verifyMenuTouches(host)
+            verifyMenuTouches(host) { page ->
+                if (page == HostPage.COLLECTION) {
+                    await("첫 도감 방문의 최초 지급 NEW 표기", timeoutMillis = 5_000) {
+                        descendants(host.window.decorView).any {
+                            it.isShown && it.contentDescription?.toString() == "NEW · 도감 등록"
+                        }
+                    }
+                    capture(host, "main-collection-new")
+                }
+            }
+            await("메뉴 확인 뒤 HOME 지도 재부착") {
+                val settings = button(host, "shop:map-settings")
+                settings?.isShown == true && settings.isLaidOut && !settings.isLayoutRequested && host.hasWindowFocus()
+            }
             verifyRestStopPreview(host, games)
             verifyRestPreparationDoesNotStartAfterBack(host)
             onUi { assertNotNull(host.window.decorView.openMainSettings()) }
@@ -289,7 +730,7 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             onUi { assertEquals("게임 소리 켜기", (button(host, sound) as? Button)?.text.toString()) }
             click(host, sound)
             onUi { assertEquals("게임 소리 끄기", (button(host, sound) as? Button)?.text.toString()) }
-            click(host, sound)
+            // This isolated evidence run keeps sound on for real Main settlement, draw and delivery.
             click(host, "host:settings-close")
             openPage(host, HostPage.RESULTS)
             onUi {
@@ -342,6 +783,33 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                 assertEquals(GameMoney(500), ok(game.store.balance()))
                 assertEquals(2, ok(game.store.listOwnedVehicles()).size)
             }
+            val storedGacha = ok(games.open()).use { game ->
+                checkNotNull(ok(game.store.hostCommands.load(game.identity.profileId)))
+            }
+            onUi { host.onBackPressed() } // 전체 화면 셔터를 닫고 원결과를 보존한다.
+            openPage(host, HostPage.HOME)
+            await("가챠 결과 확인을 보류한 채 가게 지도 조회") {
+                buttonWithText(host, "뽑기 화면에서 보관 요청 확인")?.isEnabled == true &&
+                    host.window.decorView.findViewWithTag<View>("shop:scene")?.isShown == true
+            }
+            capture(host, "pdf-foreign-home")
+            openPage(host, HostPage.DELIVERY)
+            await("가챠 보관 요청과 탁송 읽기 전용 상태") {
+                val session = host.onRetainNonConfigurationInstance() as HostSession
+                session.delivery.state?.readOnly == true &&
+                    buttonWithText(host, "뽑기 화면에서 보관 요청 확인")?.isEnabled == true &&
+                    button(host, "simulation:destination")?.isShown != true
+            }
+            capture(host, "pdf-foreign-delivery")
+            openPage(host, HostPage.HOME)
+            ok(games.open()).use { game ->
+                assertEquals(storedGacha, ok(game.store.hostCommands.load(game.identity.profileId)))
+                assertEquals(GameMoney(500), ok(game.store.balance()))
+                assertEquals(2, ok(game.store.listOwnedVehicles()).size)
+            }
+            await("가게에서 가챠 보관 요청으로 복귀") {
+                buttonWithText(host, "뽑기 화면에서 보관 요청 확인")?.performClick() == true
+            }
             click(host, "gacha:garage")
             await("확정 가챠 결과 확인 후 차고") {
                 host.window.decorView.isMainPageShown(HostPage.GARAGE)
@@ -375,12 +843,17 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                 SystemClock.sleep(2_200)
                 capture(host, "main-delivery-arrival-finished")
             }
-            click(host, "delivery:skip-motion")
-            click(host, "delivery:acknowledge")
-            await("탁송 결과 다시 표시하지 않음") {
-                button(host, "delivery:acknowledge") == null &&
-                    host.window.decorView.findViewWithTag<View>("delivery:scene:INCOME_ARRIVAL") == null
+            click(host, "delivery:confirm-scene")
+            await("탁송 결과 장면 닫기") {
+                host.window.decorView.findViewWithTag<View>("delivery:scene:INCOME_ARRIVAL") == null
             }
+            val confirmationDeadline = SystemClock.uptimeMillis() + 15_000
+            while (true) {
+                if (ok(games.open()).use { ok(it.store.hostCommands.load(it.identity.profileId)) == null }) break
+                check(SystemClock.uptimeMillis() < confirmationDeadline) { "탁송 보관 요청이 정리되지 않았습니다." }
+                SystemClock.sleep(100)
+            }
+            await("탁송 결과 확인 조작 정리") { button(host, "delivery:acknowledge") == null }
         } finally { finishHost(host) }
     }
 
@@ -396,8 +869,19 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         click(host, preview)
         await("휴게소 미리보기") { root.findViewWithTag<View>(scene)?.isShown == true }
         capture(host, "main-rest-preview")
+        fun focusState(): String {
+            val overlay = root.findViewWithTag<View>(scene)
+            val focused = root.findFocus()
+            return "display=${host.display?.displayId} windowFocus=${root.hasWindowFocus()} " +
+                "touchMode=${root.isInTouchMode} overlay=${overlay?.isShown}/${overlay?.isAttachedToWindow} " +
+                "focused=${focused?.tag} close=${button(host, "rest-stop:close")?.isShown}/" +
+                "${button(host, "rest-stop:close")?.isFocused} skip=${button(host, "rest-stop:skip")?.isShown}"
+        }
+        onUi { android.util.Log.i("RestPreviewFocus", "before skip · ${focusState()}") }
         if (ValueAnimator.areAnimatorsEnabled()) click(host, "rest-stop:skip")
-        await("미리보기 닫기 포커스") { button(host, "rest-stop:close")?.isFocused == true }
+        onUi { android.util.Log.i("RestPreviewFocus", "after skip · ${focusState()}") }
+        await("미리보기 닫기 포커스", diagnostic = ::focusState) { button(host, "rest-stop:close")?.isFocused == true }
+        onUi { android.util.Log.i("RestPreviewFocus", focusState()) }
         val display = host.display?.displayId ?: 0
         val commands = listOf("keyevent KEYCODE_TAB", "keycombination KEYCODE_SHIFT_LEFT KEYCODE_TAB", "keyevent KEYCODE_TAB")
         for (command in commands) {
@@ -425,7 +909,7 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         assertEquals(before, ok(games.open()).use { ok(it.store.balance()) })
     }
 
-    private fun verifyMenuTouches(host: UnifiedSimulationActivity) {
+    private fun verifyMenuTouches(host: UnifiedSimulationActivity, onFirstPage: (HostPage) -> Unit) {
         fun tapVisible(tag: String) {
             var tapped = false
             await("실제 창의 터치 대상 $tag") {
@@ -434,6 +918,20 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                 if (!host.hasWindowFocus() || !target.isLaidOut || !target.getGlobalVisibleRect(bounds) || bounds.isEmpty) {
                     return@await false
                 }
+                val shop = descendants(host.window.decorView).filterIsInstance<ShopView>().firstOrNull()
+                fun field(name: String): Any? = shop?.let {
+                    ShopView::class.java.getDeclaredField(name).apply { isAccessible = true }.get(it)
+                }
+                val hit = Rect()
+                val overlays = descendants(host.window.decorView).filter {
+                    it.isShown && it.isClickable && it.getGlobalVisibleRect(hit) &&
+                        hit.contains(bounds.centerX(), bounds.centerY())
+                }.map { it.tag?.toString() ?: it.javaClass.simpleName }.toList()
+                android.util.Log.i("PdfSettingsTouch", "tag=$tag bounds=$bounds display=${host.display?.displayId}" +
+                    " drawn=${target.isAttachedToWindow} focus=${host.hasWindowFocus()}" +
+                    " generation=${field("sceneGeneration")} busy=${field("managementBusy")}" +
+                    " hostOverlay=${field("hostOverlayOpen")} pending=${shop?.uiState?.pending != null}" +
+                    " loading=${button(host, "shop:loading-map")?.isShown == true} hits=$overlays")
                 touchView(host, target)
                 tapped = true
                 true
@@ -480,13 +978,14 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                 assertEquals(refresh.paddingStart, close.paddingStart)
                 assertTrue("닫기 터치 면적은 56dp 이상", close.measuredHeight >= (56 * close.resources.displayMetrics.density).toInt())
             }
+            onFirstPage(page)
             tapVisible("host:back")
             await("닫기 터치 뒤 HOME") { host.window.decorView.isMainPageShown(HostPage.HOME) }
         }
     }
 
     private fun finishHost(host: UnifiedSimulationActivity) {
-        onUi { host.finishAndRemoveTask() }
+        onUi { if (!host.isDestroyed) host.finishAndRemoveTask() }
         await("계측 Activity 종료") { host.isDestroyed }
     }
 
@@ -520,8 +1019,15 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         click(host, VehicleAction.LEVEL_UP)
         clickText(host, "확정")
         await("레벨업 확정 원결과") { visibleTextButton(host, "결과 확인")?.isEnabled == true }
+        onUi {
+            if (ValueAnimator.areAnimatorsEnabled()) {
+                assertNotNull(host.window.decorView.findViewWithTag<View>("garage:care-motion"))
+            }
+        }
         host = recreate(host)
         clickText(host, "보관 요청 처리 · 결과 확인")
+        await("복원한 레벨업 원결과") { visibleTextButton(host, "결과 확인")?.isEnabled == true }
+        onUi { assertNull(host.window.decorView.findViewWithTag<View>("garage:care-motion")) }
         clickText(host, "결과 확인")
         await("재생성된 관리 원결과 확인 뒤 HOME 재조회") { button(host, "map:vehicle-manage")?.isEnabled == true }
         ok(games.open()).use { game ->
@@ -531,6 +1037,13 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         click(host, "map:vehicle-manage")
         click(host, VehicleAction.SELL)
         clickText(host, "확정")
+        await("지도 판매 확정과 가시 영역") {
+            val effect = host.window.decorView.findViewWithTag<View>("garage:care-motion")
+            visibleTextButton(host, "결과 확인")?.isEnabled == true &&
+                (!ValueAnimator.areAnimatorsEnabled() || (effect?.isShown == true && effect.alpha > 0f &&
+                    effect.getLocalVisibleRect(Rect())))
+        }
+        if (ValueAnimator.areAnimatorsEnabled()) capture(host, "main-map-sale-motion")
         clickText(host, "결과 확인")
         await("처분한 차량의 지도 선택 해제") {
             button(host, mapTag) == null &&
@@ -790,6 +1303,10 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         }
     }
 
+    private fun buttonWithText(host: UnifiedSimulationActivity, label: String): Button? =
+        descendants(host.window.decorView).filterIsInstance<Button>()
+            .firstOrNull { it.isShown && it.text.toString() == label }
+
     private fun button(host: UnifiedSimulationActivity, tag: Any): View? = host.window.decorView.findViewWithTag(tag)
 
     private fun descendants(view: View): Sequence<View> = sequence {
@@ -815,19 +1332,9 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         return host
     }
 
-    private fun touchStart(host: UnifiedSimulationActivity, background: Boolean = false) = onUi {
-        val button = host.window.decorView.findViewWithTag<Button>("presentation:start")
-        val decor = host.window.decorView
-        val target = if (background) decor.findViewWithTag<View>("presentation:title") else button
-        val point = IntArray(2).also(target::getLocationInWindow)
-        val x = point[0] + if (background) 2f else button.width / 2f
-        val y = point[1] + if (background) 2f else button.height / 2f
-        if (background) {
-            val buttonOrigin = IntArray(2).also(button::getLocationInWindow)
-            assertFalse(Rect(buttonOrigin[0], buttonOrigin[1],
-                buttonOrigin[0] + button.width, buttonOrigin[1] + button.height).contains(x.toInt(), y.toInt()))
-        }
-        dispatchTap(decor, x, y)
+    private fun touchStart(host: UnifiedSimulationActivity) = onUi {
+        val start = checkNotNull(button(host, "presentation:start"))
+        touchView(host, start)
     }
 
     private fun touchView(host: UnifiedSimulationActivity, view: View) {
@@ -879,6 +1386,12 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         }
         fail("실제 Main 화면에서 $label 확인 실패 ${diagnostic()}".trimEnd())
     }
+    private fun <T> onUiValue(action: () -> T): T {
+        var result: Result<T>? = null
+        onUi { result = runCatching(action) }
+        return checkNotNull(result).getOrThrow()
+    }
+
     private fun onUi(action: () -> Unit) {
         var failure: Throwable? = null
         instrumentation.runOnMainSync { try { action() } catch (t: Throwable) { failure = t } }

@@ -19,6 +19,9 @@ class InitializationAuthority(source: InputSource, content: GameContentSnapshot,
     val allowedCandidates: Set<VehicleId> = Collections.unmodifiableSet(LinkedHashSet(allowedCandidates))
 }
 
+/** 같은 쓰기 트랜잭션에서 관측한 결과이며 영속 데이터에는 포함하지 않는다. */
+internal data class InitializationCommit(val settlement: InitializationSettlement, val newlyCommitted: Boolean)
+
 /** 기존 공용 DB·지갑·shop 공간만 사용한다. helper/capability 연결은 공용 writer가 적용한다. */
 internal class InitializationLedger(
     private val store: SqliteGameChangeStore,
@@ -70,7 +73,8 @@ internal class InitializationLedger(
         if (row.moveToNext()) throw SQLiteException("프로필 중복")
         Profile(id, proof, marker)
     }
-    fun profileId(): ContractResult<ProfileId> = store.read { profile(it).id }
+    internal fun profileId(db: SQLiteDatabase): ProfileId = profile(db).id
+    fun profileId(): ContractResult<ProfileId> = store.read(::profileId)
     private fun ownedCount(db: SQLiteDatabase): Int = db.rawQuery("SELECT owned_id,payload FROM vehicles",null).use { row ->
         var count = 0
         while (row.moveToNext()) {
@@ -107,11 +111,17 @@ internal class InitializationLedger(
             balance=store.readBalance(db),ownedVehicleCount=ownedCount(db)))
         else current(db,p)
     }
-    override fun commitInitialization(command: InitializationCommand): ContractResult<InitializationSettlement> = store.atomic { db ->
+    override fun commitInitialization(command: InitializationCommand): ContractResult<InitializationSettlement> =
+        when (val result = commitWithOutcome(command)) {
+            is ContractResult.Failure -> result
+            is ContractResult.Success -> ContractResult.Success(result.value.settlement)
+        }
+
+    fun commitWithOutcome(command: InitializationCommand): ContractResult<InitializationCommit> = store.atomic { db ->
         val p = profile(db)
         if (command.profileId != p.id || command.grant.source != store.source) return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
         recorded(db,p)?.let { (old,_) ->
-            return@atomic if (old.command == command) ContractResult.Success(old) else ContractResult.Failure(ContractError.STATE_CONFLICT)
+            return@atomic if (old.command == command) ContractResult.Success(InitializationCommit(old, newlyCommitted = false)) else ContractResult.Failure(ContractError.STATE_CONFLICT)
         }
         if (p.proof == null) return@atomic ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         if (store.requestUnavailable(db,command.grant.requestId)) return@atomic ContractResult.Failure(ContractError.STATE_CONFLICT)
@@ -126,7 +136,7 @@ internal class InitializationLedger(
         if (store.findVehicle(db,ready.vehicle.ownedVehicleId) != null || capacity(db) != ready.garageCapacity)
             return@atomic ContractResult.Failure(ContractError.STATE_CONFLICT)
         val encoded = InitializationJson.command(command).toString()
-        val receipt = when (val result = store.record(db,command.grant,encoded)) {
+        val receipt = when (val result = store.record(db,command.grant,encoded, trackAcquisition = true)) {
             is ContractResult.Failure -> return@atomic result
             is ContractResult.Success -> result.value
         }
@@ -138,7 +148,7 @@ internal class InitializationLedger(
         db.execSQL("INSERT INTO initialization_requests VALUES(?,?,?,?,?)",arrayOf(command.grant.requestId.value,p.id.value,encoded,
             InitializationJson.state(before).toString(),InitializationJson.result(result).toString()))
         if (recorded(db,profile(db))?.first != result) throw JSONException("초기화 확정 연결 검증 실패")
-        ContractResult.Success(result)
+        ContractResult.Success(InitializationCommit(result, newlyCommitted = true))
     }
     /** 현재 콘텐츠가 아니라 기록한 당시 상태로 원래 전체 정산의 연결을 검증한다. */
     private fun recorded(db: SQLiteDatabase,p: Profile): Pair<InitializationSettlement,InitializationState>? {

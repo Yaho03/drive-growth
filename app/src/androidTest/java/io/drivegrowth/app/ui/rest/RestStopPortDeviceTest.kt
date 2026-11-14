@@ -12,11 +12,14 @@ import io.drivegrowth.core.driving.RestOutcome
 
 @Suppress("DEPRECATION")
 class RestStopPortDeviceTest : InstrumentationTestCase() {
-    fun testPackagedBlanketAnimationAndEffectTracksAreReadable() {
+    fun testPackagedRestAnimationAndEffectTracksAreReadable() {
         val assets = instrumentation.targetContext.assets
-        for ((part, seconds) in listOf("intro" to 6, "loop" to 10, "still" to 10)) {
-            val base = "pixel/rest/blanket-$part"
-            val drawable = ImageDecoder.decodeDrawable(ImageDecoder.createSource(assets, "$base.webp"))
+        for (part in RestStopMotionView.Part.entries) {
+            val seconds = if (part == RestStopMotionView.Part.INTRO) 6 else 10
+            val base = "pixel/rest/blanket-${part.asset}"
+            val image = RestStopMotionView.imageAsset(part)
+            assertEquals("pixel/rest/rururu-${part.asset}.webp", image)
+            val drawable = ImageDecoder.decodeDrawable(ImageDecoder.createSource(assets, image))
             assertTrue("$part 움직임 프레임", drawable is AnimatedImageDrawable)
             assertEquals(340, drawable.intrinsicWidth)
             assertEquals(237, drawable.intrinsicHeight)

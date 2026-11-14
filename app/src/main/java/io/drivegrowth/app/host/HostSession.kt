@@ -33,6 +33,18 @@ internal class HostSession(
     val simulation: HostSimulation? = null,
 ) {
     private val worker = Executors.newSingleThreadExecutor()
+    val openingGift = io.drivegrowth.app.ui.onboarding.OpeningGiftPresentation()
+    var onOpeningGiftChanged: (() -> Unit)? = null
+    private var openingGiftReleased = false
+    private fun openingGiftCommitted(receipt: FirstRentalGiftSettlement) {
+        main.execute {
+            if (!openingGiftReleased) {
+                openingGift.publish(receipt)
+                onOpeningGiftChanged?.invoke()
+            }
+        }
+    }
+
     private fun epochNow(): EpochMillis = if (simulation == null) EpochMillis(System.currentTimeMillis()) else
         when (val result = simulation.clock()) { is ContractResult.Failure -> error("모의 논리 시각 미제공"); is ContractResult.Success -> result.value.epoch }
     private val questDefinitions = {
@@ -43,9 +55,18 @@ internal class HostSession(
             } catch (_: java.time.DateTimeException) { ContractResult.Failure(ContractError.POLICY_UNRESOLVED) }
         }
     }
+    internal val collectionNew = CollectionNewPresentation()
+    internal var onCollectionNewChanged: (() -> Unit)? = null
     val games = (if (simulation == null) GameSessionFactory(context, questDefinitions = questDefinitions) else
         GameSessionFactory(context, mapOf(InputSource.SIMULATION to "unified-simulation.db"), InputSource.SIMULATION,
-            questDefinitions, { epochNow().value })).also { it.enableAchievements() }
+            questDefinitions, { epochNow().value })).also { factory ->
+        factory.enableAchievements()
+        factory.onFirstCollectionOwnership = { event ->
+            main.execute {
+                if (collectionNew.offer(event)) onCollectionNewChanged?.invoke()
+            }
+        }
+    }
     val drivingCalendar = ObservationCalendar(64) // 원관측-zone 상관용 기술 버퍼. 게임 수치가 아니다.
     private val recordingPolicy = simulation?.policy ?: io.drivegrowth.app.vehicle.TRIAL_INTERACTION_POLICY.let { policy ->
         RecordingPolicy(policy.maxSignalAgeMs, policy.maxSampleGapMs, 1000, policy.requiredParkMs,
@@ -55,7 +76,8 @@ internal class HostSession(
         else RentalClockReader(simulation::clock)
     private val rentalSource = io.drivegrowth.app.host.rental.SessionRentalProductSource(games, {
         io.drivegrowth.app.data.AssetTrialDefinitionProvider(context.assets).load()
-    }, recordingPolicy, rentalClock::read, random = { simulation?.rentalRandom(games, it) ?: kotlin.random.Random.Default })
+    }, recordingPolicy, rentalClock::read, random = { simulation?.rentalRandom(games, it) ?: kotlin.random.Random.Default },
+        onNewOpeningGift = ::openingGiftCommitted)
     private var ordinaryRentalReplayClock: RestClockDomain? = null // 직렬 worker의 새 시연 세션 복원 경계.
     val rental = io.drivegrowth.app.host.rental.RentalProductHost(worker, main, { frame, recorded ->
         val replayClock = ordinaryRentalReplayClock
@@ -83,35 +105,45 @@ internal class HostSession(
         { if (simulation == null) RecordingClock(android.os.SystemClock.elapsedRealtime(), epochNow()) else
             when (val result = simulation.clock()) { is ContractResult.Failure -> null
                 is ContractResult.Success -> RecordingClock(result.value.elapsedMs, result.value.epoch) } },
-        { receiver, frame, at ->
-            val recorded = when (val activated = activateDriving(frame.observation.source)) {
-                is ContractResult.Failure -> activated
-                is ContractResult.Success -> if (simulation?.restRecording == true) {
-                    val sample = simulation.restSample(frame)
-                    if (sample == null) ContractResult.Failure(ContractError.STATE_CONFLICT)
-                    else when (val staged = stageSimulationRest(frame, sample)) {
-                        is ContractResult.Failure -> staged
-                        is ContractResult.Success -> drivingSource.observe(SIMULATION_REST_RECEIVER, frame, at)
-                    }
-                } else drivingSource.observe(receiver, frame, at)
-            }
-            val simulated = simulation?.observed(frame, recorded)
-            if (simulated !is ContractResult.Failure) {
-                val rentalResult = rental.observed(receiver, frame, recorded)
-                simulation?.rentalResult(rentalResult)
-                if (simulation != null && recorded is ContractResult.Success) {
-                    if (simulation.restRecording) simulation.restInputRecorded(frame, recorded.value)
-                    if (rentalResult is ContractResult.Success && rentalSource.issue == null) {
-                        simulation.inputConsumed(frame, recorded.value, rentalResult.value)
-                    }
-                }
-            }
-            recorded
-        }, { receiver, at ->
+        { receiver, frame, at -> observeDriving(receiver, frame, at, null) }, { receiver, at ->
             // 명시 시연은 화면이 멈춘 동안 표본과 논리 시간이 모두 멈춘다.
             if (drivingActivated && simulation?.restRecording != true) drivingSource.pause(receiver, at)
             else ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
-        })
+        }).apply {
+        prepareObservation = {
+            val mapTicket = rental.captureMapPresentation()
+            val work: DrivingObservationWork =
+                { receiver, frame, at -> observeDriving(receiver, frame, at, mapTicket) }
+            work
+        }
+    }
+
+    private fun observeDriving(receiver: String, frame: DrivingFrame, at: RecordingClock, mapTicket: Any?):
+        ContractResult<DrivingRecordingResult> {
+        val recorded = when (val activated = activateDriving(frame.observation.source)) {
+            is ContractResult.Failure -> activated
+            is ContractResult.Success -> if (simulation?.restRecording == true) {
+                val sample = simulation.restSample(frame)
+                if (sample == null) ContractResult.Failure(ContractError.STATE_CONFLICT)
+                else when (val staged = stageSimulationRest(frame, sample)) {
+                    is ContractResult.Failure -> staged
+                    is ContractResult.Success -> drivingSource.observe(SIMULATION_REST_RECEIVER, frame, at)
+                }
+            } else drivingSource.observe(receiver, frame, at)
+        }
+        val simulated = simulation?.observed(frame, recorded)
+        if (simulated !is ContractResult.Failure) {
+            val rentalResult = rental.observed(receiver, frame, recorded, mapTicket)
+            simulation?.rentalResult(rentalResult)
+            if (simulation != null && recorded is ContractResult.Success) {
+                if (simulation.restRecording) simulation.restInputRecorded(frame, recorded.value)
+                if (rentalResult is ContractResult.Success && rentalSource.issue == null) {
+                    simulation.inputConsumed(frame, recorded.value, rentalResult.value)
+                }
+            }
+        }
+        return recorded
+    }
 
     private fun stageSimulationRest(frame: DrivingFrame, sample: SimulationRestSample): ContractResult<Unit> {
         if (frame.observation.source != InputSource.SIMULATION) return ContractResult.Failure(ContractError.INVALID_INPUT)
@@ -237,7 +269,7 @@ internal class HostSession(
         { RequestId("delivery-choice-" + java.util.UUID.randomUUID()) },
         { RouteId("delivery-route-" + java.util.UUID.randomUUID()) }), worker, main)
     private val source = StoredHostSource(context, sessions = games)
-    val onboarding = OnboardingHostController(StoredOnboardingHostSource(games), worker, main, restoredOnboarding)
+    val onboarding = OnboardingHostController(StoredOnboardingHostSource(games, ::openingGiftCommitted), worker, main, restoredOnboarding)
     val queries = HostQueryController(worker, main, source::read, null)
     val gacha = GachaLiveHost(CheckpointGachaSource(StoredGachaHostSource(context, games), SessionGachaJournal(games)), worker, main, queries::refresh)
     val ranking = io.drivegrowth.app.host.ranking.RankingController(worker, main, { source.readRanking(epochNow()) })
@@ -293,14 +325,23 @@ internal class HostSession(
     }
 
     fun expansionWorker(action: () -> Unit) { worker.execute(action) }
-    fun pendingRoute(done: (ContractResult<HostPage?>) -> Unit) {
+    fun pendingRoute(done: (ContractResult<Pair<HostPage?, Boolean>>) -> Unit) {
         worker.execute {
             val result = when (val opened = games.open()) {
                 is ContractResult.Failure -> opened
                 is ContractResult.Success -> opened.value.use { game ->
                     when (val saved = game.store.hostCommands.load(game.identity.profileId)) {
                         is ContractResult.Failure -> saved
-                        is ContractResult.Success -> pendingHostPage(saved.value?.command, facilityPageAvailable = true, decorationPageAvailable = true)
+                        is ContractResult.Success -> {
+                            val checkpoint = saved.value
+                            when (val page = pendingHostPage(checkpoint?.command,
+                                facilityPageAvailable = true, decorationPageAvailable = true)) {
+                                is ContractResult.Failure -> page
+                                is ContractResult.Success -> ContractResult.Success(page.value to
+                                    (page.value == HostPage.PROGRESSION &&
+                                        checkpoint?.phase == io.drivegrowth.app.data.HostCheckpointPhase.SAVED))
+                            }
+                        }
                     }
                 }
             }
@@ -309,6 +350,8 @@ internal class HostSession(
     }
 
     fun release() {
+        openingGiftReleased = true
+        onOpeningGiftChanged = null
         simulation?.stop()
         simulation?.changed = null
         driving.stop()

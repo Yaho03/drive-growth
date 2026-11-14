@@ -28,13 +28,21 @@ class OnboardingHostControllerTest {
     private inner class Source : OnboardingHostSource {
         var snapshot=OnboardingSnapshot(GameIdentity(newState().profileId,InputSource.VEHICLE),newState(),ContractResult.Success(content()),null)
         var reads=0;var commits=0;var failure:ContractError?=null;var giftClaims=0
-        override fun read():ContractResult<OnboardingSnapshot>{reads++;return ContractResult.Success(snapshot)}
-        override fun choose(identity:GameIdentity,vehicleId:VehicleId):ContractResult<InitializationSettlement>{
+        var failNextReadAfterCommit = false
+        override fun read(): ContractResult<OnboardingSnapshot> {
+            reads++
+            if (failNextReadAfterCommit && snapshot.initialization.status is ProfileInitializationStatus.Existing) {
+                failNextReadAfterCommit = false
+                return ContractResult.Failure(ContractError.STORAGE_FAILURE)
+            }
+            return ContractResult.Success(snapshot)
+        }
+        override fun chooseWithOutcome(identity:GameIdentity,vehicleId:VehicleId):ContractResult<OnboardingChoice>{
             commits++;failure?.let{return ContractResult.Failure(it)}
-            (snapshot.initialization.status as? ProfileInitializationStatus.Existing)?.original?.let { return ContractResult.Success(it) }
+            (snapshot.initialization.status as? ProfileInitializationStatus.Existing)?.original?.let { return ContractResult.Success(OnboardingChoice(it, newlyCommitted = false)) }
             val saved=result(snapshot.initialization,vehicleId)
             snapshot=snapshot.copy(initialization=snapshot.initialization.copy(status=ProfileInitializationStatus.Existing(saved),balance=GameMoney(1000),ownedVehicleCount=1))
-            return ContractResult.Success(saved)
+            return ContractResult.Success(OnboardingChoice(saved, newlyCommitted = true))
         }
         override fun claimGift(identity:GameIdentity):ContractResult<FirstRentalGiftSettlement> {
             giftClaims++
@@ -50,8 +58,8 @@ class OnboardingHostControllerTest {
             return ContractResult.Success(result)
         }
     }
-    private inner class Harness(initial:OnboardingHostUiState=OnboardingHostUiState()) {
-        val w=Queue();val m=Queue();val source=Source();val frames=mutableListOf<Pair<OnboardingScreenState,Boolean>>();var shops=0
+    private inner class Harness(initial:OnboardingHostUiState=OnboardingHostUiState(), val source: Source = Source()) {
+        val w=Queue();val m=Queue();val frames=mutableListOf<Pair<OnboardingScreenState,Boolean>>();var shops=0
         val host=OnboardingHostController(source,w,m,initial)
         init {host.attach({s,e->frames+=s to e},{shops++})}
         fun load(){host.setControlsEnabled(true);w.run();m.run()}
@@ -62,8 +70,73 @@ class OnboardingHostControllerTest {
         assertTrue(h.frames.last().first is OnboardingScreenState.Confirming)
         h.host.onEvent(OnboardingEvent.ConfirmSelection(FirstGrant.CANDIDATES.first()));h.host.onEvent(OnboardingEvent.ConfirmSelection(FirstGrant.CANDIDATES.first()))
         assertEquals(0,h.source.commits);h.w.run();h.m.run();assertEquals(1,h.source.commits);assertEquals(2,h.source.reads)
-        assertTrue(h.frames.last().first is OnboardingScreenState.Completed);h.host.onEvent(OnboardingEvent.GoToShop);assertEquals(1,h.shops)
+        val fresh = h.frames.last().first as OnboardingScreenState.Completed
+        assertFalse(fresh.alreadyGranted)
+        h.host.refresh(); h.w.run(); h.m.run()
+        assertEquals(fresh, h.frames.last().first)
+        assertEquals(1, h.source.commits)
+
+        h.host.onEvent(OnboardingEvent.GoToShop)
+        assertEquals(1, h.shops)
+        assertTrue((h.frames.last().first as OnboardingScreenState.Completed).alreadyGranted)
+        h.host.refresh(); h.w.run(); h.m.run()
+        assertTrue((h.frames.last().first as OnboardingScreenState.Completed).alreadyGranted)
+        assertEquals(1, h.source.commits)
     }
+    @Test fun twoHostsThatReadNewOnlyCelebrateTheCommittedFirstGrant() {
+        val source = Source()
+        val first = Harness(source = source)
+        val second = Harness(source = source)
+        first.load(); second.load()
+        first.choose(); second.choose()
+
+        val choice = FirstGrant.CANDIDATES.first()
+        first.host.onEvent(OnboardingEvent.ConfirmSelection(choice)); first.w.run(); first.m.run()
+        val stored = source.snapshot.initialization
+        second.host.onEvent(OnboardingEvent.ConfirmSelection(choice)); second.w.run(); second.m.run()
+
+        val fresh = first.frames.last().first as OnboardingScreenState.Completed
+        val replay = second.frames.last().first as OnboardingScreenState.Completed
+        assertFalse(fresh.alreadyGranted)
+        assertTrue(replay.alreadyGranted)
+        assertEquals(fresh.copy(alreadyGranted = true), replay)
+        assertEquals(stored, source.snapshot.initialization)
+        assertEquals(1, stored.ownedVehicleCount)
+        assertEquals(GameMoney(1000), stored.balance)
+    }
+
+    @Test fun retryAfterCommittedReadFailureRestoresSameResultWithoutNewGrant() {
+        val h = Harness(); h.load(); h.choose()
+        val choice = FirstGrant.CANDIDATES.first()
+        h.source.failNextReadAfterCommit = true
+        h.host.onEvent(OnboardingEvent.ConfirmSelection(choice)); h.w.run(); h.m.run()
+        assertTrue(h.frames.last().first is OnboardingScreenState.GrantError)
+        val saved = h.source.snapshot.initialization
+        assertTrue(saved.status is ProfileInitializationStatus.Existing)
+        h.host.onEvent(OnboardingEvent.Retry(choice)); h.w.run(); h.m.run()
+        val restored = h.frames.last().first as OnboardingScreenState.Completed
+        assertTrue(restored.alreadyGranted)
+        assertEquals(saved, h.source.snapshot.initialization)
+        assertEquals(2, h.source.commits)
+        assertEquals(1, saved.ownedVehicleCount)
+        assertEquals(GameMoney(1000), saved.balance)
+    }
+
+    @Test fun reconnectAfterFreshCompletionShowsOnlyTheStoredResult() {
+        val h = Harness(); h.load(); h.choose()
+        h.host.onEvent(OnboardingEvent.ConfirmSelection(FirstGrant.CANDIDATES.first()))
+        h.w.run(); h.m.run()
+        val fresh = h.frames.last().first as OnboardingScreenState.Completed
+        assertFalse(fresh.alreadyGranted)
+
+        h.host.attach({ screen, enabled -> h.frames += screen to enabled }, {})
+        assertTrue((h.frames.last().first as OnboardingScreenState.Completed).alreadyGranted)
+        h.load()
+        val restored = h.frames.last().first as OnboardingScreenState.Completed
+        assertEquals(fresh.copy(alreadyGranted = true), restored)
+        assertEquals(1, h.source.commits)
+    }
+
     @Test fun gateLossDropsQueuedCommitAndLateReadThenRestoresSameChoiceRetry() {
         val h=Harness();h.load();h.choose();val saved=h.host.uiState
         h.host.onEvent(OnboardingEvent.ConfirmSelection(FirstGrant.CANDIDATES.first()));h.host.setControlsEnabled(false);h.w.run();h.m.run();assertEquals(0,h.source.commits)
@@ -126,6 +199,6 @@ class OnboardingHostControllerTest {
     @Test fun completedCommitLateCallbackIsDiscardedAndDatabaseResultRestores() {
         val h=Harness();h.load();h.choose();h.host.onEvent(OnboardingEvent.ConfirmSelection(FirstGrant.CANDIDATES.first()));h.w.run()
         h.host.setControlsEnabled(false);val frames=h.frames.size;h.m.run();assertEquals(frames,h.frames.size)
-        h.host.setControlsEnabled(true);h.w.run();h.m.run();assertTrue(h.frames.last().first is OnboardingScreenState.Completed);assertEquals(1,h.source.commits)
+        h.host.setControlsEnabled(true);h.w.run();h.m.run();assertTrue((h.frames.last().first as OnboardingScreenState.Completed).alreadyGranted);assertEquals(1,h.source.commits)
     }
 }

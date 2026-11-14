@@ -56,16 +56,18 @@ class CheckpointDecorationBackend(private val games: GameSessionFactory, private
     }
 
     /** 같은 연결의 현재 상태/정의/가게 표시 공급이다. 순차 조회이며 원자 snapshot을 주장하지 않는다. */
-    override fun read(): ContractResult<DecorationFacts> = use { game ->
+    override fun read(): ContractResult<DecorationFacts> = use { game -> readIn(game) }
+
+    internal fun readIn(game: GameSession): ContractResult<DecorationFacts> {
         val state = when (val result = game.store.decorations.state(identity.profileId)) {
-            is ContractResult.Failure -> return@use result
+            is ContractResult.Failure -> return result
             is ContractResult.Success -> result.value
         }
         val definitions = when (val result = game.store.decorations.definitions()) {
-            is ContractResult.Failure -> return@use result
+            is ContractResult.Failure -> return result
             is ContractResult.Success -> result.value
         }
-        when (val shop = readShop(game)) {
+        return when (val shop = readShop(game)) {
             is ContractResult.Failure -> shop
             is ContractResult.Success -> ContractResult.Success(DecorationFacts(state, definitions, shop.value))
         }

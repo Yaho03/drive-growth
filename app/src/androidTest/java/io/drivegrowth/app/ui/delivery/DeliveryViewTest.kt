@@ -328,7 +328,7 @@ class DeliveryViewTest : InstrumentationTestCase() {
         assertTrue(nodes(view).filterIsInstance<TextView>().none { staleDistanceLabel in it.text.toString() })
     }
 
-    fun testConfirmedIncomeAndCloseAreVisibleWithArrivalArtworkOnFirstLayout() = onUi {
+    fun testConfirmedIncomeArtworkAndDistinctSceneExitActions() = onUi {
         val context = instrumentation.targetContext
         val order = (incomeFrame().screen as DeliveryScreen.Active).delivery.active
         val route = RouteId("fixture-route")
@@ -345,9 +345,12 @@ class DeliveryViewTest : InstrumentationTestCase() {
         val read = DeliveryHostRead(GameIdentity(ProfileId("fixture"), InputSource.SIMULATION), frame.screen,
             pending = DeliveryHostOperation.Arrival(rules, order.requestId, evidence, time, order.proposed.list, order.proposed.list),
             receipt = DeliveryHostReceipt.Arrived(ArrivalCommit(outcome, receipt)))
-        for ((width, height) in listOf(320 to 440, 700 to 280, 1360 to 948)) {
+        for ((width, height, exit) in listOf(
+            Triple(320, 440, "skip"), Triple(700, 280, "back"), Triple(1360, 948, "confirm"),
+        )) {
             val requests = mutableListOf<DeliveryRequest>()
-            val view = DeliveryView(context, requests::add)
+            var confirmations = 0
+            val view = DeliveryView(context, requests::add).apply { onConfirmSceneResult = { confirmations++ } }
             layoutAt(view, width, height)
             assertTrue(view.render(frame, true, read))
             layoutAt(view, width, height)
@@ -362,7 +365,20 @@ class DeliveryViewTest : InstrumentationTestCase() {
             assertTrue(art.getGlobalVisibleRect(artRect))
             assertTrue("도착 그림 너비: ${artRect.width()}/${view.width}", artRect.width() >= view.width * .5f)
             assertTrue(close.getGlobalVisibleRect(Rect()))
-            assertTrue(close.performClick())
+            when (exit) {
+                "skip" -> assertTrue(close.performClick())
+                "back" -> assertTrue(view.handleBack())
+                "confirm" -> {
+                    (art as DeliveryMotionView).onSceneFrame?.invoke(1.8f)
+                    layoutAt(view, width, height)
+                    val confirm = checkNotNull(view.findViewWithTag<Button>("delivery:confirm-scene"))
+                    assertTrue(confirm.getGlobalVisibleRect(Rect()))
+                    assertFalse(close.isShown)
+                    assertTrue(confirm.performClick())
+                    confirm.performClick() // 분리된 버튼으로 다시 호출해도 중복 확인하지 않는다.
+                }
+            }
+            assertEquals(if (exit == "confirm") 1 else 0, confirmations)
             assertTrue(requests.isEmpty())
             assertNull(view.findViewWithTag<View>("delivery:confirmed-reward"))
         }

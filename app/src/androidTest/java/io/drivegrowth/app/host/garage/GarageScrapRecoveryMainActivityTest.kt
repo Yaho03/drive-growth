@@ -1,6 +1,7 @@
 package io.drivegrowth.app.host.garage
 
 import io.drivegrowth.app.exposeMainPage
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.graphics.Rect
@@ -84,10 +85,11 @@ class GarageScrapRecoveryMainActivityTest :
         }
         tapTag(VehicleAction.USE_MATERIAL)
         val beforeMaterial = snapshot()
-        tapButton { it.text.toString().startsWith("${material.ownedVehicleId.value} ·") }
+        tapButton { it.text.toString().contains("${material.rarity} · Lv.${material.level}") }
         awaitLabel("비용 0 게임머니")
         tapText("확정")
         awaitLabel("당시 확정 잔액 ${beforeMaterial.balance.units} 게임머니")
+        assertCareMotion("재료 강화")
         val materialResult = snapshot()
         assertEquals(beforeMaterial.balance, materialResult.balance)
         val materialReceipt = materialResult.settlements.drop(beforeMaterial.settlements.size).single()
@@ -125,6 +127,20 @@ class GarageScrapRecoveryMainActivityTest :
         val before = snapshot()
         val damaged = before.vehicles.single { it.ownedVehicleId == target.ownedVehicleId }
         assertNull(before.checkpoint)
+        if (instrumentation.targetContext.packageName.endsWith(".careaudiopresuite") ||
+            instrumentation.targetContext.packageName.endsWith(".careaudiofinal")) {
+            tapText("확정")
+            awaitLabel("당시 확정 잔액 ${before.balance.units + 100} 게임머니")
+            assertCareMotion("폐차")
+            val after = snapshot()
+            assertEquals(VehicleLifecycle.SCRAPPED, after.vehicles.single { it.ownedVehicleId == target.ownedVehicleId }.lifecycle)
+            assertEquals(MoneyChange(MoneyDirection.CREDIT, GameMoney(100)),
+                after.settlements.drop(before.settlements.size).single().transaction.money)
+            onUi { activity.onBackPressed() }
+            awaitStored("Back 뒤 폐차 결과 확인 및 슬롯 해제") { it.checkpoint == null }
+            assertEquals(after.copy(checkpoint = null), snapshot())
+            return
+        }
 
         // UI 확인 이전에는 durable 슬롯이 없다. 미실행 종료 조건은 공개 저널 save로만 준비한다.
         val adapter = CheckpointGarageCommandAdapter(context, sessions = games)
@@ -254,6 +270,7 @@ class GarageScrapRecoveryMainActivityTest :
         assertEquals(before, snapshot())
         tapText("확정")
         awaitLabel("당시 확정 잔액 ${before.balance.units - debit} 게임머니")
+        assertCareMotion(action.name)
         val after = snapshot()
         val updated = expected(current)
         val receipt = after.settlements.drop(before.settlements.size).single()
@@ -276,6 +293,14 @@ class GarageScrapRecoveryMainActivityTest :
         awaitUi("저장된 차고 관리 경로") { buttons().any { it.text.toString() == route || it.text.toString() == "보관 요청 처리 · 결과 확인" } }
         if (onUi { buttons().any { it.text.toString() == route } }) tapText(route)
         awaitLabel("보관한 요청입니다.", prefix = true)
+    }
+
+    private fun assertCareMotion(action: String) {
+        awaitUi("$action 확정과 차량 관리 연출") {
+            val scene = activityRoot().findViewWithTag<View>("garage:care-motion")
+            if (ValueAnimator.areAnimatorsEnabled()) scene != null else scene == null
+        }
+        Log.i("GarageCareVerify", "$action confirmed motion gate observed")
     }
 
     private fun acknowledge() {
@@ -305,7 +330,11 @@ class GarageScrapRecoveryMainActivityTest :
     }
 
     private fun requireIsolated() {
-        assertEquals("폐차 복원 전용 계측 패키지", "io.drivegrowth.verify.garage466scrap", context.packageName)
+        assertTrue("폐차 복원 전용 계측 패키지", context.packageName in setOf(
+            "io.drivegrowth.verify.garage466scrap",
+            "io.drivegrowth.verify.prototype.careaudiopresuite",
+            "io.drivegrowth.verify.prototype.careaudiofinal",
+        ))
         assertTrue((context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0)
         assertFalse(context.getDatabasePath("game-ledger-vehicle.db").exists())
     }

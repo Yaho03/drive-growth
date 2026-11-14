@@ -1,10 +1,19 @@
 package io.drivegrowth.app.ui.garage
 
+import android.app.ActivityOptions
+import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.drawable.Drawable
+import android.hardware.display.DisplayManager
+import android.os.SystemClock
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.ScrollView
 import io.drivegrowth.app.R
@@ -46,55 +55,99 @@ class GarageViewTest : InstrumentationTestCase() {
     }
 
     fun testWideGarageKeepsSelectionBesideListAndReturnsToSinglePaneWhenNarrow() {
-        lateinit var view: GarageView
-        val events = mutableListOf<GarageEvent>()
-        val state = GaragePreviewStates.normal
-        val first = state.data.vehicles.first().vehicle
-        fun layout(widthDp: Int) {
+        val context = instrumentation.targetContext
+        val display = context.getSystemService(DisplayManager::class.java).displays
+            .singleOrNull { it.displayId != 0 && it.name == "Emulator 2D Display" }
+        val options = display?.let { ActivityOptions.makeBasic().setLaunchDisplayId(it.displayId).toBundle() }
+        val host = instrumentation.startActivitySync(
+            Intent(context, CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options,
+        )
+        try {
+            lateinit var view: GarageView
+            val events = mutableListOf<GarageEvent>()
+            val state = GaragePreviewStates.normal
+            val first = state.data.vehicles.first().vehicle
+            val sale = GarageEvent.RequestAction(first.ownedVehicleId, first.revision, VehicleAction.SELL)
             runOnUiTest {
-                val density = view.resources.displayMetrics.density
-                val width = (widthDp * density).toInt()
-                val height = (600 * density).toInt()
-                view.measure(
-                    View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-                    View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
-                )
-                view.layout(0, 0, width, height)
+                val config = Configuration(host.resources.configuration).apply { fontScale = 1f }
+                view = GarageView(host.createConfigurationContext(config), events::add)
+                val root = FrameLayout(host)
+                root.addView(view, FrameLayout.LayoutParams(0, 0))
+                host.setContentView(root)
+                view.render(state, true)
             }
-        }
-        runOnUiTest {
-            val base = instrumentation.targetContext
-            val config = Configuration(base.resources.configuration).apply { fontScale = 1f }
-            view = GarageView(base.createConfigurationContext(config), events::add)
-            view.render(state, true)
-        }
-        layout(1200)
-        runOnUiTest {
-            view.render(state, true)
-            view.findViewWithTag<Button>(first.ownedVehicleId).performClick()
-        }
-        layout(1200)
-        runOnUiTest {
-            val list = view.findViewWithTag<ScrollView>("garage:list")
-            val detail = view.findViewWithTag<ScrollView>("garage:detail")
-            assertTrue(list.width > 0 && detail.width > 0)
-            assertTrue(list.right < detail.left)
-            assertTrue(list.findViewWithTag<Button>(first.ownedVehicleId).isSelected)
-            val selectedCard = list.findViewWithTag<Button>(first.ownedVehicleId).parent as View
-            val selectedLabel = view.context.getString(R.string.garage_selected)
-            assertTrue(selectedLabel in texts(selectedCard))
-            assertEquals(1, texts(list).count { it == selectedLabel })
-            button(detail, "판매 조건 확인").performClick()
-            assertFalse(view.findViewWithTag<Button>(first.ownedVehicleId).isEnabled)
-            assertEquals(GarageEvent.RequestAction(first.ownedVehicleId, first.revision,
-                VehicleAction.SELL), events.last())
-        }
-        layout(480)
-        runOnUiTest {
-            view.render(state, true)
-            assertNull(view.findViewWithTag<ScrollView>("garage:list"))
-            assertNotNull(view.findViewWithTag<ScrollView>("garage:detail"))
-            assertEquals(first.ownedVehicleId, view.selectedVehicleId)
+
+            fun resize(widthDp: Int) {
+                var width = 0
+                var height = 0
+                runOnUiTest {
+                    val density = view.resources.displayMetrics.density
+                    width = (widthDp * density).toInt()
+                    height = (600 * density).toInt()
+                    view.layoutParams = FrameLayout.LayoutParams(width, height)
+                }
+                val deadline = SystemClock.uptimeMillis() + 5000L
+                var observed = ""
+                while (SystemClock.uptimeMillis() < deadline) {
+                    instrumentation.waitForIdleSync()
+                    var ready = false
+                    runOnUiTest {
+                        observed = "${view.width}×${view.height}px, attached=${view.isAttachedToWindow}, " +
+                            "layoutRequested=${view.isLayoutRequested}"
+                        ready = view.isAttachedToWindow && view.isLaidOut && !view.isLayoutRequested &&
+                            view.width == width && view.height == height
+                    }
+                    if (ready) {
+                        // onSizeChanged가 게시한 화면 교체와 그 뒤의 layout을 비운다.
+                        instrumentation.waitForIdleSync()
+                        return
+                    }
+                    SystemClock.sleep(20L)
+                }
+                fail("차고 ${widthDp}×600dp (${width}×${height}px) 배치 대기 시간 초과 · $observed")
+            }
+
+            resize(1200)
+            runOnUiTest { assertTrue(view.findViewWithTag<Button>(first.ownedVehicleId).performClick()) }
+            instrumentation.waitForIdleSync()
+            runOnUiTest {
+                val list = view.findViewWithTag<ScrollView>("garage:list")
+                val detail = view.findViewWithTag<ScrollView>("garage:detail")
+                assertTrue(list.width > 0 && detail.width > 0)
+                assertTrue(list.right < detail.left)
+                val selected = list.findViewWithTag<Button>(first.ownedVehicleId)
+                assertTrue(selected.isSelected)
+                val selectedCard = selected.parent as View
+                val selectedLabel = view.context.getString(R.string.garage_selected)
+                assertTrue(selectedLabel in texts(selectedCard))
+                assertEquals(1, texts(list).count { it == selectedLabel })
+                assertTrue(button(detail, "판매 조건 확인").performClick())
+                assertFalse(view.findViewWithTag<Button>(first.ownedVehicleId).isEnabled)
+                assertEquals(listOf(GarageEvent.SelectVehicle(first.ownedVehicleId), sale), events)
+            }
+
+            resize(480)
+            runOnUiTest {
+                assertNull(view.findViewWithTag<ScrollView>("garage:list"))
+                assertNotNull(view.findViewWithTag<ScrollView>("garage:detail"))
+                assertEquals(first.ownedVehicleId, view.selectedVehicleId)
+                assertEquals(listOf(GarageEvent.SelectVehicle(first.ownedVehicleId), sale), events)
+            }
+
+            resize(1200)
+            runOnUiTest {
+                val list = view.findViewWithTag<ScrollView>("garage:list")
+                val detail = view.findViewWithTag<ScrollView>("garage:detail")
+                assertTrue(list.right < detail.left)
+                val selected = list.findViewWithTag<Button>(first.ownedVehicleId)
+                assertTrue(selected.isSelected)
+                assertFalse(selected.isEnabled)
+                assertEquals(first.ownedVehicleId, view.selectedVehicleId)
+                assertEquals(listOf(GarageEvent.SelectVehicle(first.ownedVehicleId), sale), events)
+            }
+        } finally {
+            runOnUiTest { host.finish() }
+            instrumentation.waitForIdleSync()
         }
     }
 
@@ -172,6 +225,7 @@ class GarageViewTest : InstrumentationTestCase() {
         val content = GaragePreviewStates.collection
         val casper = content.entries.take(3).map { it.copy(unlockShopLevel = null) }
         view.render(content.copy(entries = casper + content.entries.drop(4)), true)
+        layoutCollection(view, 320, 480)
 
         assertTrue(texts(view).contains("차량 도감"))
         view.showHeading = false
@@ -179,63 +233,100 @@ class GarageViewTest : InstrumentationTestCase() {
         val labels = texts(view)
         assertFalse(labels.contains("차량 도감"))
         assertTrue(labels.contains("수집 20 / 79칸"))
-        assertEquals(1, labels.count { it == "보유 이력 있음" })
-        assertEquals(1, labels.count { it == "발견 · 보유 이력 없음" })
-        assertEquals(3, labels.count { it == "미발견" }) // 상태 필터 1개와 도감 칸 2개
+        assertEquals(20, labels.count { it == "보유 이력 있음" })
+        assertEquals(20, labels.count { it == "발견 · 보유 이력 없음" })
+        assertEquals(40, labels.count { it == "미발견" }) // 필터 1개와 도감 칸 39개
         assertTrue(labels.contains("가게 Lv1 해금"))
         assertFalse(labels.any { it.startsWith("잠김") })
-
-        val next = view.findViewWithTag<Button>("collection:next")
-        repeat(19) { view.findViewWithTag<Button>("collection:next").performClick() }
-        assertFalse(view.findViewWithTag<Button>("collection:next").isEnabled)
-        next.performClick() // 이전 렌더의 버튼은 페이지를 변경하지 않는다.
-        assertEquals("20 / 20", collectionPage(view))
-        assertTrue(texts(view).contains("해금 정보 확인 불가"))
+        assertTrue(labels.contains("해금 정보 확인 불가"))
         assertTrue(descendants(view).any {
             it.contentDescription == "캐스퍼 전설 · 수집 기록 확인 불가"
         })
 
         view.render(GaragePreviewStates.emptyCollection, true)
         assertTrue(texts(view).contains("도감 데이터가 없어요"))
-        assertNull(view.findViewWithTag<TextView>("collection:page"))
+        assertFalse(descendants(view).any { it.tag?.toString()?.startsWith("collection:model:") == true })
     }
 
-    fun testCollectionFilterKeepsEachPageAndShowsNoMatches() = runOnUiTest {
+    private fun layoutCollection(view: CollectionView, widthDp: Int, heightDp: Int) {
+        val density = view.resources.displayMetrics.density
+        val width = (widthDp * density).toInt()
+        val height = (heightDp * density).toInt()
+        view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+        view.layout(0, 0, width, height)
+    }
+
+    fun testCollectionFilterKeepsEachPositionAndShowsNoMatches() = runOnUiTest {
         val view = CollectionView(instrumentation.targetContext) {}
         val preview = GaragePreviewStates.collection
         val input = preview.copy(entries = preview.entries.mapIndexed { index, cell ->
-            if (index >= 8 && cell.entry.state == CollectionState.DISCOVERED)
+            if (index >= 16 && cell.entry.state == CollectionState.DISCOVERED)
                 cell.copy(entry = cell.entry.copy(state = CollectionState.UNDISCOVERED))
             else cell
         })
+        fun layout() = layoutCollection(view, 320, 480)
+        fun scroll() = view.findViewWithTag<ScrollView>("collection:scroll")
         view.render(input, true)
-        view.findViewWithTag<Button>("collection:next").performClick()
-        view.findViewWithTag<Button>("collection:next").performClick()
-        assertEquals("3 / 20", collectionPage(view))
+        layout()
+        scroll().scrollTo(0, 500)
+        val allPosition = scroll().scrollY
+        assertTrue(allPosition > 0)
 
         val discovered = view.findViewWithTag<Button>("collection:filter:DISCOVERED")
         discovered.performClick()
+        layout()
         assertTrue(view.findViewWithTag<Button>("collection:filter:DISCOVERED").isSelected)
-        assertEquals("1 / 2", collectionPage(view))
-        view.findViewWithTag<Button>("collection:next").performClick()
+        assertEquals(0, scroll().scrollY)
+        assertEquals(4, descendants(view).count { it.tag?.toString()?.startsWith("collection:model:") == true })
+        scroll().scrollTo(0, 150)
+        val discoveredPosition = scroll().scrollY
+        assertTrue(discoveredPosition > 0)
 
         view.findViewWithTag<Button>("collection:filter:all").performClick()
+        layout()
         discovered.performClick()
-        assertEquals("3 / 20", collectionPage(view))
+        assertEquals(allPosition, scroll().scrollY)
         view.findViewWithTag<Button>("collection:filter:DISCOVERED").performClick()
-        assertEquals("2 / 2", collectionPage(view))
+        layout()
+        assertEquals(discoveredPosition, scroll().scrollY)
         assertTrue(texts(view).containsAll(listOf("베뉴", "보유 이력 있음", "전설")))
 
         val noDiscoveries = input.entries.filterNot { it.entry.state == CollectionState.DISCOVERED }
         view.render(input.copy(entries = noDiscoveries), true)
+        layout()
         assertTrue(texts(view).contains("이 상태에 해당하는 차종이 없어요"))
-        assertNull(view.findViewWithTag<TextView>("collection:page"))
+        assertEquals(0, scroll().scrollY)
         view.findViewWithTag<Button>("collection:filter:all").performClick()
-        assertEquals("3 / 20", collectionPage(view))
+        layout()
+        assertEquals(allPosition, scroll().scrollY)
     }
 
-    private fun collectionPage(view: CollectionView) =
-        view.findViewWithTag<TextView>("collection:page").text.toString()
+    fun testCollectionKeepsRowsThroughScrollAndRefreshesChangedSupply() = runOnUiTest {
+        val view = CollectionView(instrumentation.targetContext) {}
+        val content = GaragePreviewStates.collection
+        view.render(content, true)
+        layoutCollection(view, 320, 480)
+        fun row(name: String) = descendants(view).filterIsInstance<TextView>().single { it.text.toString() == name }
+        val scroll = view.findViewWithTag<ScrollView>("collection:scroll")
+        val first = row("캐스퍼")
+        val second = row("베뉴")
+        scroll.scrollTo(0, scroll.getChildAt(0).height)
+        assertTrue(scroll.scrollY > 0)
+        scroll.scrollTo(0, 0)
+        assertSame(first, row("캐스퍼"))
+        assertSame(second, row("베뉴"))
+
+        val changed = content.copy(entries = content.entries.map { entry ->
+            if (entry.name == "캐스퍼") entry.copy(name = "변경된 캐스퍼") else entry
+        })
+        view.render(changed, true)
+        layoutCollection(view, 320, 480)
+        assertEquals(0, view.findViewWithTag<ScrollView>("collection:scroll").scrollY)
+        assertNotSame(first, row("변경된 캐스퍼"))
+        assertFalse(texts(view).contains("캐스퍼"))
+        assertEquals("변경된 캐스퍼", row("변경된 캐스퍼").text.toString())
+    }
 
     fun testCollectionDiscoveredStatusFitsAtLargeFontScale() = runOnUiTest {
         val base = instrumentation.targetContext
@@ -262,45 +353,73 @@ class GarageViewTest : InstrumentationTestCase() {
         assertTrue("마지막 줄이 문구 영역 안에 있어야 합니다",
             label.totalPaddingTop + layout.getLineBottom(lastLine) <= label.height - label.totalPaddingBottom)
         assertTrue("셀 안에 문구 전체가 들어가야 합니다", label.bottom <= (label.parent as View).height)
-        val next = view.findViewWithTag<Button>("collection:next")
-        val pager = next.parent as View
-        assertTrue("큰 글자에서도 다음 버튼의 터치 높이를 유지해야 합니다", next.height >= (48 * density).toInt())
-        assertTrue("페이지 조작이 창 아래로 잘리지 않아야 합니다", pager.bottom <= view.height)
-        assertFalse("페이지 조작은 본문 스크롤과 분리해야 합니다",
-            descendants(view).filterIsInstance<ScrollView>().any { next in descendants(it) })
+        val filter = view.findViewWithTag<Button>("collection:filter:DISCOVERED")
+        val filters = filter.parent.parent as View
+        assertTrue("큰 글자에서도 필터의 터치 높이를 유지해야 합니다", filter.height >= (48 * density).toInt())
+        assertTrue("필터가 창 아래로 잘리지 않아야 합니다", filters.bottom <= view.height)
+        assertFalse("필터는 본문 스크롤과 분리해야 합니다",
+            descendants(view).filterIsInstance<ScrollView>().any { filter in descendants(it) })
     }
 
-    fun testCollectionRepaginatesAroundSameVehicleAtNarrowAndWideSizes() = runOnUiTest {
+    fun testCollectionHeadersAndCellsShareSteppedBordersAndKeepRarityColors() = runOnUiTest {
         val base = instrumentation.targetContext
         val context = base.createConfigurationContext(Configuration(base.resources.configuration).apply { fontScale = 1f })
         val view = CollectionView(context) {}
-        fun layout(widthDp: Int, heightDp: Int) {
-            val density = context.resources.displayMetrics.density
-            val width = (widthDp * density).toInt()
-            val height = (heightDp * density).toInt()
-            view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
-            view.layout(0, 0, width, height)
+        view.render(GaragePreviewStates.collection, true)
+        fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
+        val width = View.MeasureSpec.makeMeasureSpec(dp(900), View.MeasureSpec.EXACTLY)
+        val height = View.MeasureSpec.makeMeasureSpec(dp(480), View.MeasureSpec.EXACTLY)
+        view.measure(width, height)
+        view.layout(0, 0, View.MeasureSpec.getSize(width), View.MeasureSpec.getSize(height))
+
+        fun assertBorderAndFill(drawable: Drawable, expectedFill: Int) {
+            val bitmap = Bitmap.createBitmap(dp(72), dp(40), Bitmap.Config.ARGB_8888)
+            val previousBounds = drawable.copyBounds()
+            try {
+                drawable.setBounds(0, 0, bitmap.width, bitmap.height)
+                drawable.draw(Canvas(bitmap))
+                assertEquals("모서리는 계단처럼 비워야 합니다", Color.TRANSPARENT, bitmap.getPixel(0, 0))
+                assertEquals("윗변에는 같은 갈색 테두리를 씁니다", 0xff916340.toInt(), bitmap.getPixel(bitmap.width / 2, 0))
+                assertEquals("등급마다 기존 채움색을 유지합니다", expectedFill, bitmap.getPixel(bitmap.width / 2, bitmap.height / 2))
+            } finally {
+                drawable.bounds = previousBounds
+                bitmap.recycle()
+            }
         }
 
-        view.render(GaragePreviewStates.collection, true)
-        layout(900, 480)
-        assertEquals("1 / 10", collectionPage(view))
-        assertTrue(texts(view).containsAll(listOf("캐스퍼", "베뉴", "일반", "고급", "희귀", "전설")))
-        view.findViewWithTag<Button>("collection:next").performClick()
-        layout(900, 480)
-        assertEquals("2 / 10", collectionPage(view))
-        assertTrue(texts(view).containsAll(listOf("코나", "아반떼")))
+        val colors = mapOf("일반" to 0xfff7e1ac.toInt(), "고급" to 0xffe4edbf.toInt(),
+            "희귀" to 0xffdbeaf4.toInt(), "전설" to 0xffffdf8c.toInt())
+        val nodes = descendants(view)
+        for ((rarity, color) in colors) {
+            val header = nodes.filterIsInstance<TextView>().single { it.text.toString() == rarity }
+            val cell = nodes.single { it.contentDescription?.startsWith("캐스퍼 $rarity ·") == true }
+            assertBorderAndFill(checkNotNull(header.background), color)
+            assertBorderAndFill(checkNotNull(cell.background), color)
+        }
+    }
 
-        layout(320, 640)
-        assertEquals("3 / 20", collectionPage(view))
-        assertTrue(texts(view).contains("코나"))
-        assertFalse(texts(view).contains("아반떼"))
-        assertTrue(descendants(view).any { it.contentDescription == "코나 전설 · 미발견" })
-        layout(900, 340)
-        assertEquals("3 / 20", collectionPage(view))
-        layout(900, 480)
-        assertEquals("2 / 10", collectionPage(view))
-        assertTrue(texts(view).containsAll(listOf("코나", "아반떼")))
+    fun testCollectionKeepsScrollThroughWidthChangesAndReachesLastModel() = runOnUiTest {
+        val base = instrumentation.targetContext
+        val context = base.createConfigurationContext(Configuration(base.resources.configuration).apply { fontScale = 1f })
+        val view = CollectionView(context) {}
+        val content = GaragePreviewStates.collection
+        val lastTag = "collection:model:${content.entries.last().entry.key.vehicleId.value}"
+        view.render(content, true)
+
+        layoutCollection(view, 900, 480)
+        assertTrue(texts(view).containsAll(listOf("캐스퍼", "베뉴", "일반", "고급", "희귀", "전설")))
+        view.findViewWithTag<ScrollView>("collection:scroll").scrollTo(0, 250)
+        val before = view.findViewWithTag<ScrollView>("collection:scroll").scrollY
+        assertTrue(before > 0)
+        for ((width, height) in listOf(320 to 640, 900 to 340, 900 to 480)) {
+            layoutCollection(view, width, height)
+            val scroll = view.findViewWithTag<ScrollView>("collection:scroll")
+            assertEquals(before, scroll.scrollY)
+            assertTrue(descendants(view).any { it.contentDescription == "코나 전설 · 미발견" })
+            val last = scroll.findViewWithTag<View>(lastTag)
+            scroll.scrollTo(0, scroll.getChildAt(0).height)
+            assertTrue(last.bottom + (last.parent as View).top <= scroll.scrollY + scroll.height)
+            scroll.scrollTo(0, before)
+        }
     }
 }

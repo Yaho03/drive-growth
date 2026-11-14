@@ -81,7 +81,25 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
      * STARTED와 기존 commit을 같은 DB 거래에 확정한다. 새 시도가 확정 거절되면 SAVED도 복원된다.
      * 기존 STARTED의 결과 불명은 실패로 지우지 않는다. 현재 입력으로 재prepare하지 않는다.
      */
-    fun execute(profileId: ProfileId, command: HostCheckpointCommand): ContractResult<HostCheckpointResult> = store.atomic { db ->
+    fun execute(profileId: ProfileId, command: HostCheckpointCommand): ContractResult<HostCheckpointResult> =
+        executeInternal(profileId, command, {})
+
+    internal fun executeFacilityPurchase(profileId: ProfileId, command: HostCheckpointCommand.FacilityPurchase):
+        ContractResult<FacilityPurchaseCommit> {
+        var newlyInstalled = false
+        return when (val committed = executeInternal(profileId, command) { newlyInstalled = true }) {
+            is ContractResult.Failure -> committed
+            is ContractResult.Success -> {
+                val result = committed.value as? HostCheckpointResult.FacilityPurchase ?: return conflict()
+                ContractResult.Success(FacilityPurchaseCommit(result, newlyInstalled))
+            }
+        }
+    }
+
+    internal data class FacilityPurchaseCommit(val result: HostCheckpointResult.FacilityPurchase, val newlyInstalled: Boolean)
+
+    private fun executeInternal(profileId: ProfileId, command: HostCheckpointCommand,
+        onNewFacility: () -> Unit): ContractResult<HostCheckpointResult> = store.atomic { db ->
         when (val checked = profile(profileId)) { is ContractResult.Failure -> return@atomic checked; else -> Unit }
         val prior = read(db, profileId) ?: return@atomic ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         if (prior.command != command) return@atomic conflict()
@@ -108,7 +126,7 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
         val result = store.recoverCheckpointNamespace(db, prior) {
             if (command is HostCheckpointCommand.Decoration && prior.phase == HostCheckpointPhase.SAVED)
                 wrap(store.decorations.commitFromSavedCheckpointIn(db, command.value)) { HostCheckpointResult.Decoration(it) }
-            else commit(command)
+            else commit(command, onNewFacility)
         }
         if(result is ContractResult.Success && result.value is HostCheckpointResult.Delivery && !(result.value as HostCheckpointResult.Delivery).value.isFinal) {
             db.execSQL("UPDATE host_command_checkpoint SET phase=0,digest=? WHERE id=1",arrayOf(HostCheckpointJson.digest(HostCheckpointJson.encode(profileId,command),0)))
@@ -200,7 +218,7 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
             HostCommandCheckpoint(owner, command, phase)
         }
 
-    private fun commit(command: HostCheckpointCommand): ContractResult<HostCheckpointResult> = when (command) {
+    private fun commit(command: HostCheckpointCommand, onNewFacility: () -> Unit = {}): ContractResult<HostCheckpointResult> = when (command) {
         is HostCheckpointCommand.Gacha -> wrap(store.commitGacha(command.value)) { HostCheckpointResult.Gacha(it) }
         is HostCheckpointCommand.Garage -> wrap(store.commitGameChange(command.value)) { HostCheckpointResult.Garage(it) }
         is HostCheckpointCommand.Material -> wrap(store.commitMaterial(command.value)) { HostCheckpointResult.Material(it) }
@@ -212,7 +230,7 @@ class HostCommandCheckpointLedger(private val store: SqliteGameChangeStore) {
         is HostCheckpointCommand.Expand -> wrap(commitExpand(command)) { HostCheckpointResult.Expand(it) }
         is HostCheckpointCommand.FacilityPurchase,is HostCheckpointCommand.VehicleResting -> store.atomic { db ->
             val profileId=when(val r=store.localProfileId()){is ContractResult.Failure->return@atomic r;is ContractResult.Success->r.value}
-            FacilityCheckpointStorage.commit(store,db,profileId,command)
+            FacilityCheckpointStorage.commit(store, db, profileId, command, onNewFacility)
         }
     }
     /** 확장 기존 입구를 재사용하되 새 확정의 필수 쓰기와 원래 전체 receipt 연결을 확인한다. */

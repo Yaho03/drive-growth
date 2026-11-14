@@ -316,7 +316,8 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
         // 이 의뢰의 정산 ID를 다른 기록이 먼저 썼으면 그 정산을 이 도착의 결과로 재사용하지 않는다.
         if (hasSettlement(db, settleIdOf(requestId))) return@atomic failure(ContractError.STATE_CONFLICT)
         val recorded = change?.let {
-            when (val result = store.record(db, it, LedgerJson.command(it).toString(), SqliteGameChangeStore.RequestDomain.DELIVERY)) {
+            when (val result = store.record(db, it, LedgerJson.command(it).toString(),
+                SqliteGameChangeStore.RequestDomain.DELIVERY, trackAcquisition = outcome is DeliveryOutcome.VehicleDelivered)) {
                 is ContractResult.Failure -> return@atomic result
                 is ContractResult.Success -> result.value
             }
@@ -476,7 +477,8 @@ class DeliveryLedger internal constructor(private val store: SqliteGameChangeSto
                 is HoldOutcome.Refunded -> outcome.change
             }
             if (hasSettlement(db, change.requestId)) return@atomic failure(ContractError.STATE_CONFLICT)
-            val recorded = when (val result = store.record(db, change, LedgerJson.command(change).toString(), SqliteGameChangeStore.RequestDomain.DELIVERY)) {
+            val recorded = when (val result = store.record(db, change, LedgerJson.command(change).toString(),
+                SqliteGameChangeStore.RequestDomain.DELIVERY, trackAcquisition = outcome is HoldOutcome.Claimed)) {
                 is ContractResult.Failure -> return@atomic result
                 is ContractResult.Success -> result.value
             }

@@ -22,16 +22,30 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
     override fun read(): ContractResult<DeliveryHostRead> {
         val identity = when (val read = queries.identity()) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
         // 과거 요청 복구에는 현재 규칙·가격·콘텐츠·내비 조회를 선행하지 않는다.
-        val pending = when (val read = journal.pending(identity)) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
-        if (pending != null) return ContractResult.Success(DeliveryHostRead(identity, DeliveryScreen.Loading, pending = pending))
-        return current(identity, true)
+        return when (val read = journal.slot(identity)) {
+            is ContractResult.Failure -> read
+            is ContractResult.Success -> when (val slot = read.value) {
+                DeliveryJournalSlot.Clear -> current(identity, true)
+                DeliveryJournalSlot.Foreign -> current(identity, automatic = false, readOnly = true)
+                is DeliveryJournalSlot.Own -> ContractResult.Success(DeliveryHostRead(identity, DeliveryScreen.Loading, pending = slot.operation))
+            }
+        }
     }
-    private fun current(identity: GameIdentity, automatic: Boolean): ContractResult<DeliveryHostRead> {
+    private fun current(identity: GameIdentity, automatic: Boolean, readOnly: Boolean = false): ContractResult<DeliveryHostRead> {
         val data = when (val read = queries.read(identity)) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
         if (data.identity != identity) return ContractResult.Failure(ContractError.STATE_CONFLICT)
         val rules = when (val read = definitions()) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
         val nav = readNavigation(identity, data)
         val names = data.content.catalog.vehicles.associate { it.vehicleId to it.displayName }
+        if (readOnly) {
+            val terms = data.terms
+            if (terms == null) return offers.readOnly(data, nav, rules.proposal, names)
+            val blocked = DeliveryAvailability(false, DELIVERY_SLOT_NOTICE)
+            val active = DeliveryHostMapper.active(terms, names, destinationName(terms.active, nav), nav.observed)
+            return ContractResult.Success(DeliveryHostRead(identity,
+                DeliveryScreen.Active(active.copy(change = blocked, abandon = blocked)), data.held,
+                navigation = nav, readOnly = true))
+        }
         val at = now()
         if (automatic) {
             for (held in data.held) {
@@ -94,6 +108,11 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
             DeliveryScreen.Active(DeliveryHostMapper.active(terms, names, destinationName(terms.active, nav), nav.observed)), data.held, navigation = nav))
     }
     override fun prepare(identity: GameIdentity, command: DeliveryCommand): ContractResult<DeliveryHostPrepared> {
+        when (val slot = journal.slot(identity)) {
+            is ContractResult.Failure -> return slot
+            is ContractResult.Success -> if (slot.value == DeliveryJournalSlot.Foreign)
+                return ContractResult.Failure(ContractError.STATE_CONFLICT)
+        }
         val data = when (val read = queries.read(identity)) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
         if (data.identity != identity) return ContractResult.Failure(ContractError.STATE_CONFLICT)
         val rules = when (val read = definitions()) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
@@ -191,6 +210,11 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
     override fun cancelUnstarted(identity: GameIdentity, operation: DeliveryHostOperation) = journal.cancelUnstarted(identity, operation)
     override fun finish(identity: GameIdentity, operation: DeliveryHostOperation) = journal.finish(identity, operation)
     override fun displayed(identity: GameIdentity, proposed: DeliveryProposed): ContractResult<Unit> {
+        when (val slot = journal.slot(identity)) {
+            is ContractResult.Failure -> return slot
+            is ContractResult.Success -> if (slot.value == DeliveryJournalSlot.Foreign)
+                return ContractResult.Failure(ContractError.STATE_CONFLICT)
+        }
         val change = changeOffer
         return if (change != null && change.proposed.containsDisplayedOffers(proposed)) {
             queries.discoverChange(identity, change.copy(proposed = proposed))

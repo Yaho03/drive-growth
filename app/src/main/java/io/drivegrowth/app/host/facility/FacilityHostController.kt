@@ -25,7 +25,7 @@ class FacilityHostController(private val source:FacilityHostSource,private val w
     private fun available()=enabled && !released && !busy
     private fun run(action:(()->Boolean)->ContractResult<FacilityHostState>):Boolean {
         if(!available())return false
-        busy=true;val token=epoch;publish(state.copy(busy=true,error=null))
+        busy=true;val token=epoch;publish(state.copy(busy=true,error=null,newInstallation=null))
         worker.execute {
             val valid={enabled && !released && epoch==token}
             val result=if(valid())action(valid) else failure(ContractError.UX_RESTRICTED)
@@ -58,13 +58,13 @@ class FacilityHostController(private val source:FacilityHostSource,private val w
             }
         }
     }
-    fun submit(request:ShopRequest):Boolean {
+    fun submit(request: ShopRequest, presentInstallation: Boolean = false): Boolean {
         if(!available() || state.pending!=null || state.receipt!=null || state.unsupported || state.foreign || state.error!=null)return false
         val facts=state.facts?:return false
         val option=FacilityHostMapper.options(facts,true).map{it.option}.singleOrNull{it==request.selection.option}?:return false
         if(request.selection.revision.value!=state.version || option.availability!=ShopAvailability.AVAILABLE)return false
         val offer=(option.command as? ShopCommand.BuyFacility)?.offer?:return false
-        return save(FacilityCommand.Buy(facts.identity,request.requestId,facts.definitionVersion,offer))
+        return save(FacilityCommand.Buy(facts.identity,request.requestId,facts.definitionVersion,offer), presentInstallation)
     }
     fun setResting(request:RestingRequest):Boolean {
         if(!available() || state.pending!=null || state.receipt!=null || state.unsupported || state.foreign || state.error!=null)return false
@@ -74,7 +74,7 @@ class FacilityHostController(private val source:FacilityHostSource,private val w
             (car.ownedVehicleId in facts.resting)!=request.expected || request.expected==request.desired)return false
         return save(FacilityCommand.Rest(facts.identity,request.requestId,request.vehicle,request.expected,request.desired))
     }
-    private fun save(command:FacilityCommand)=run { valid ->
+    private fun save(command: FacilityCommand, presentInstallation: Boolean = false) = run { valid ->
         known=command
         when(val saved=source.save(command)) {
             is ContractResult.Failure->{
@@ -82,7 +82,17 @@ class FacilityHostController(private val source:FacilityHostSource,private val w
                         ContractError.INSUFFICIENT_FUNDS,ContractError.CAPACITY_EXCEEDED,ContractError.STATE_CONFLICT))known=null
                 saved
             }
-            is ContractResult.Success->execute(command,valid)
+            is ContractResult.Success -> if (presentInstallation && command is FacilityCommand.Buy && valid()) {
+                when (val purchase = source.executeForInstallation(command)) {
+                    is ContractResult.Failure -> purchase
+                    is ContractResult.Success -> {
+                        val result = purchase.value
+                        if (result.receipt.command != command) failure(ContractError.STATE_CONFLICT)
+                        else ContractResult.Success(FacilityHostState(pending = command, receipt = result.receipt,
+                            newInstallation = (result.receipt as? FacilityReceipt.Purchased)?.takeIf { result.newlyInstalled }))
+                    }
+                }
+            } else execute(command, valid)
         }
     }
     private fun execute(command:FacilityCommand,valid:()->Boolean):ContractResult<FacilityHostState> {

@@ -35,11 +35,19 @@ sealed interface FacilityPending {
     data object Foreign:FacilityPending
     data class Own(val command:FacilityCommand):FacilityPending
 }
+/** 이 실행이 설치를 확정했고, 같은 저장 경계에서 운영 상태를 읽은 경우에만 true다. */
+data class FacilityPurchaseExecution(val receipt: FacilityReceipt, val newlyInstalled: Boolean)
+
 interface FacilityHostSource {
     fun pending():ContractResult<FacilityPending>
     fun read():ContractResult<FacilityFacts>
     fun save(command:FacilityCommand):ContractResult<Unit>
     fun execute(command:FacilityCommand):ContractResult<FacilityReceipt>
+    fun executeForInstallation(command: FacilityCommand.Buy): ContractResult<FacilityPurchaseExecution> =
+        when (val result = execute(command)) {
+            is ContractResult.Failure -> result
+            is ContractResult.Success -> ContractResult.Success(FacilityPurchaseExecution(result.value, false))
+        }
     fun finish(command:FacilityCommand):ContractResult<Unit>
     fun cancelSaved(command:FacilityCommand):ContractResult<Unit>
 }
@@ -47,4 +55,5 @@ data class RestingRequest(val version:Int,val requestId:RequestId,val vehicle:Ve
 data class RestingRow(val vehicle:VehicleRef,val activity:VehicleActivity?,val resting:Boolean,val description:String)
 data class FacilityHostState(val version:Int=0,val facts:FacilityFacts?=null,val pending:FacilityCommand?=null,
     val receipt:FacilityReceipt?=null,val error:ContractError?=null,val foreign:Boolean=false,
-    val unsupported:Boolean=false,val busy:Boolean=false)
+    val unsupported:Boolean=false,val busy:Boolean=false,
+    val newInstallation: FacilityReceipt.Purchased? = null)

@@ -1,5 +1,8 @@
 package io.drivegrowth.app.host
 
+import io.drivegrowth.app.data.SettlementHistoryCause
+import io.drivegrowth.app.data.SettlementHistoryEntry
+import io.drivegrowth.app.data.SettlementHistorySnapshot
 import io.drivegrowth.app.ui.results.*
 import io.drivegrowth.core.contract.*
 import org.junit.Assert.*
@@ -15,6 +18,20 @@ class ResultsHostMapperTest {
         assertEquals(2, state.results.single().settlement.changedVehicle!!.level)
         assertEquals(GameMoney(100), state.results.single().settlement.balance)
         assertEquals(GameMoney(500), state.results.single().settlement.transaction.money!!.amount)
+    }
+
+    @Test fun onlyVerifiedHistorySuppliesCauseToThePresentation() {
+        val mapper = ResultsHostMapper()
+        val saved = ResultsHostTestData.settlement()
+        val fallback = mapper.map(HostQueryState.Content(ResultsHostTestData.snapshot(saved))) as ResultsScreenState.Content
+        assertNull(fallback.results.single().cause)
+
+        val identity = GameIdentity(ProfileId("history"), saved.transaction.source)
+        val entry = SettlementHistoryEntry(saved, viewed = false, cause = SettlementHistoryCause.GACHA)
+        val history = mapper.history(ContractResult.Success(SettlementHistorySnapshot(identity, listOf(entry))))
+            as ResultsScreenState.Content
+        assertSame(saved, history.results.single().settlement)
+        assertEquals(SettlementHistoryCause.GACHA, history.results.single().cause)
     }
 
     @Test fun externalListMutationDoesNotChangeDisplayedSnapshotAndBrokenSourcesAreRejected() {

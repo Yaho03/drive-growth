@@ -25,8 +25,8 @@ object OnboardingPreviewStates {
     val completed = OnboardingScreenState.Completed(
         OwnedVehicle(OwnedVehicleId("onboarding-preview-owned"), casper.vehicle.vehicleId, 1, Revision(0), VehicleLifecycle.OWNED,
             Rarity.COMMON, 0, GameMoney(0), VehicleAcquisitionSource.INITIAL_GRANT), casper.vehicle.displayName,
-        listOf("초기 재화 1,000 게임머니 · 고정 확정 시험 입력", "차고 3칸 · 고정 확정 시험 입력", "개업 선물 뽑기권 1장 · 고정 확정 시험 입력"),
-        false, SOURCE,
+        listOf("개업 선물 뽑기권 1장 · 고정 확정 시험 입력"),
+        false, SOURCE, initialMoney = GameMoney(1000), initialParkingSpaces = 3,
     )
     val alreadyGranted = completed.copy(alreadyGranted = true)
 }

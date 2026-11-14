@@ -118,8 +118,8 @@ class OnboardingGrantColdRecoveryTest :
             val visible = labels(main)
             assertTrue(context.getString(R.string.onboarding_already_granted) in visible)
             assertTrue("캐스퍼" in visible)
-            assertTrue("최초 확정 게임머니 1000" in visible)
-            assertTrue("최초 차량 공간 3칸" in visible)
+            assertTrue("1,000" in visible)
+            assertTrue("3칸" in visible)
             assertNull(button(main, R.string.onboarding_confirm))
             captureContent(main, "first-grant-original-screen.png")
         }

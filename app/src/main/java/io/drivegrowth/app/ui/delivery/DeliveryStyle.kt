@@ -10,18 +10,19 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import io.drivegrowth.app.ui.garage.GarageStyle
+import io.drivegrowth.app.ui.pixel.CleanUi
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 
 internal class DeliveryStyle(private val context: Context, private val creamPanel: Boolean = false) {
-    private val layout = GarageStyle(context, pixelPanel = true, creamPanel = creamPanel)
+    private val layout = GarageStyle(context, pixelPanel = true, featureWindow = creamPanel)
     val base get() = layout.base
     val ink get() = layout.ink
     val muted get() = layout.muted
     val inset get() = layout.inset
     val accent get() = layout.blue
-    val moneyInk get() = if (creamPanel) 0xff70450d.toInt() else PixelStyle.gold
+    val moneyInk get() = if (creamPanel) CleanUi.SUN else PixelStyle.gold
 
     fun heading(label: CharSequence) = layout.heading(label, ReferenceHudIcon.TRUCK)
 

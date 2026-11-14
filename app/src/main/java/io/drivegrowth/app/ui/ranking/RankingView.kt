@@ -55,11 +55,14 @@ class RankingView(context: Context, private val onEvent: (RankingEvent) -> Unit)
     }
 
     fun render(value: RankingState, controlsEnabled: Boolean) {
-        saved = uiState
+        val previous = state
+        val previouslyAllowed = allowed
+        val previousUi = uiState
+        saved = previousUi
         state = if (value is RankingState.Content) value.copy(snapshot = value.snapshot.frozen()) else value
         allowed = controlsEnabled && value != RankingState.Restricted
         if (value is RankingState.Content || value is RankingState.Failure) saved = saved.copy(retryPending = false)
-        paint()
+        if (childCount == 0 || previous != state || previouslyAllowed != allowed || previousUi != saved) paint()
     }
 
     fun handleBack(): Boolean {

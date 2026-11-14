@@ -19,8 +19,8 @@ class GachaLedgerTest : InstrumentationTestCase() {
         GameMoney(500), 30, Rarity.RARE, setOf(carId), Rarity.entries.toSet())
     private lateinit var name: String
     private lateinit var store: SqliteGameChangeStore
-    private fun open() = SqliteGameChangeStore(context, source, name,
-        gachaAuthority = { ContractResult.Success(authority) },
+    private fun open(gachaAuthority: GachaAuthority = authority) = SqliteGameChangeStore(context, source, name,
+        gachaAuthority = { ContractResult.Success(gachaAuthority) },
         initialGachaProgress = GachaProgress(Revision(0), 0, 1))
     private fun <T> ok(result: ContractResult<T>): T {
         assertTrue(result.toString(), result is ContractResult.Success)
@@ -41,6 +41,73 @@ class GachaLedgerTest : InstrumentationTestCase() {
         authority.contentVersion, version, Revision(0), 1, 3, 0,
         if (free) GachaTicketUse.FREE else GachaTicketUse.PURCHASED,
         GachaAward(vehicle(id, if (free) 0 else 500), 1, false))
+
+    fun testCollectionOwnershipWaitsForOuterCommitAndIncludesDisposedHistory() {
+        store.close()
+        store = open(GachaAuthority(source, authority.contentVersion, version, authority.shopLevel,
+            authority.garageCapacity, authority.purchasePrice, 3, authority.guaranteedFrom,
+            authority.unlockedVehicles, authority.eligibleRarities))
+        val c = command()
+        val events = mutableListOf<FirstCollectionOwnership>()
+        store.onFirstCollectionOwnership = { events += it }
+        val failed = store.atomic {
+            ok(store.commitGacha(c))
+            assertTrue(events.isEmpty())
+            ContractResult.Failure(ContractError.STATE_CONFLICT)
+        }
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), failed)
+        assertTrue(events.isEmpty())
+        assertTrue(ok(store.listVehicleHistory()).isEmpty())
+        val first = ok(store.commitGacha(c))
+        assertEquals(listOf(io.drivegrowth.core.garage.CollectionKey(carId, Rarity.COMMON)), events.map { it.key })
+        assertEquals(FirstGachaReceipt(c.requestId, first.settlement.settlementId, c.award.vehicle.ownedVehicleId),
+            events.single().gachaReceipt)
+        ok(store.commitGacha(c))
+        ok(store.commitGameChange(GameChange(RequestId("sell-first"), TransactionKind.GARAGE, source, version,
+            vehicle = VehicleWrite.Update(c.award.vehicle.ownedVehicleId, Revision(0), 1, VehicleLifecycle.SOLD, 0))))
+        val second = command("draw-two").copy(expectedRevision = Revision(1), drawsSinceGuarantee = 1,
+            award = GachaAward(vehicle("draw-two", 500), 2, false))
+        ok(store.commitGacha(second))
+        assertEquals(1, events.size)
+        val rare = command("draw-rare").copy(expectedRevision = Revision(2), drawsSinceGuarantee = 2,
+            award = GachaAward(vehicle("draw-rare", 500).copy(rarity = Rarity.RARE), 0, true))
+        val guaranteed = ok(store.commitGacha(rare))
+        assertTrue(guaranteed.command.award.guaranteed)
+        assertEquals(0, guaranteed.progress.drawsSinceGuarantee)
+        assertEquals(guaranteed, ok(store.commitGacha(rare)))
+        assertEquals(listOf(Rarity.COMMON, Rarity.RARE).map { io.drivegrowth.core.garage.CollectionKey(carId, it) },
+            events.map { it.key })
+    }
+
+    fun testTwoConnectionsConfirmOnlyOneFirstOwnershipAndDiscoveryIsNotOwnership() {
+        val events = java.util.concurrent.ConcurrentLinkedQueue<FirstCollectionOwnership>()
+        val key = io.drivegrowth.core.garage.CollectionKey(carId, Rarity.COMMON)
+        ok(store.atomic { db ->
+            db.execSQL("INSERT INTO discoveries(vehicle_id,rarity) VALUES(?,?)", arrayOf(carId.value, key.rarity.name))
+            ContractResult.Success(Unit)
+        })
+        store.onFirstCollectionOwnership = { events.add(it) }
+        open().use { other ->
+            other.onFirstCollectionOwnership = { events.add(it) }
+            val pool = Executors.newFixedThreadPool(2)
+            val gate = CountDownLatch(1)
+            val commands = listOf(command("first-a"), command("first-b"))
+            try {
+                val results = listOf(store, other).mapIndexed { index, connection -> pool.submit(Callable {
+                    gate.await()
+                    connection.commitGacha(commands[index])
+                }) }.also { gate.countDown() }.map { it.get(20, TimeUnit.SECONDS) }
+                assertEquals(1, results.count { it is ContractResult.Success })
+                val retry = commands[results.indexOfFirst { it is ContractResult.Failure }]
+                ok(other.commitGacha(retry.copy(expectedRevision = Revision(1), drawsSinceGuarantee = 1,
+                    award = retry.award.copy(nextCounter = 2))))
+            } finally {
+                pool.shutdownNow()
+            }
+        }
+        assertEquals(listOf(key), events.map { it.key })
+        assertEquals(2, ok(store.listOwnedVehicles()).size)
+    }
 
     fun testPaidReplaySurvivesGrowthAndReopenWithOriginalSnapshot() {
         val c = command()

@@ -4,12 +4,15 @@ import android.database.sqlite.SQLiteDatabase
 import android.test.InstrumentationTestCase
 import io.drivegrowth.app.data.*
 import io.drivegrowth.app.host.*
+import io.drivegrowth.app.ui.onboarding.OnboardingEvent
+import io.drivegrowth.app.ui.onboarding.OnboardingScreenState
 import io.drivegrowth.core.content.GameContentSnapshot
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.*
 import io.drivegrowth.core.rental.*
 import java.math.RoundingMode
 import java.util.UUID
+import java.util.concurrent.Executor
 
 /** 실제 helper/같은 DB 경로. 시험 입력으로 영업만 공급하며 SDK·제품 프로세스 시험으로 표시하지 않는다. */
 @Suppress("DEPRECATION")
@@ -34,6 +37,69 @@ class OnboardingLiveSqliteTest : InstrumentationTestCase() {
         assertEquals(saved,ok(reopened.choose(latest.identity,FirstGrant.CANDIDATES.first())))
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),reopened.choose(latest.identity,FirstGrant.CANDIDATES.last()))
     }
+    fun testTwoHostsThatReadNewOnlyCelebrateTheFirstCommit() {
+        val firstSource = StoredOnboardingHostSource(factory())
+        val secondSource = StoredOnboardingHostSource(factory())
+        val choice = FirstGrant.CANDIDATES.first()
+        val direct = Executor { it.run() }
+        val firstFrames = mutableListOf<OnboardingScreenState>()
+        val secondFrames = mutableListOf<OnboardingScreenState>()
+        val first = OnboardingHostController(firstSource, direct, direct)
+        val second = OnboardingHostController(secondSource, direct, direct)
+        listOf(first to firstFrames, second to secondFrames).forEach { (host, frames) ->
+            host.attach({ screen, _ -> frames += screen }, {})
+            host.setControlsEnabled(true)
+            assertTrue(frames.last() is OnboardingScreenState.Intro)
+            host.onEvent(OnboardingEvent.StartChoosing)
+            host.onEvent(OnboardingEvent.SelectVehicle(choice))
+            host.onEvent(OnboardingEvent.ReviewSelection(choice))
+            assertTrue(frames.last() is OnboardingScreenState.Confirming)
+        }
+
+        first.onEvent(OnboardingEvent.ConfirmSelection(choice))
+        val fresh = firstFrames.last() as OnboardingScreenState.Completed
+        assertFalse(fresh.alreadyGranted)
+        second.onEvent(OnboardingEvent.ConfirmSelection(choice))
+        assertEquals(fresh.copy(alreadyGranted = true), secondFrames.last())
+        val identity = ok(secondSource.read()).identity
+        assertFalse(ok(firstSource.chooseWithOutcome(identity, choice)).newlyCommitted)
+        assertFalse(ok(secondSource.chooseWithOutcome(identity, choice)).newlyCommitted)
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
+            secondSource.chooseWithOutcome(identity, FirstGrant.CANDIDATES.last()))
+        ok(factory().open()).use { game ->
+            assertEquals(listOf(fresh.vehicle), ok(game.store.listOwnedVehicles()))
+            assertEquals(GameMoney(1000), ok(game.store.balance()))
+            assertEquals(1, ok(SettlementHistoryReader(game.store).read()).entries.size)
+        }
+    }
+
+    fun testSamePreparedCommandUsesTheAtomicCommitOutcomeAfterAnotherWriterWins() {
+        val f = factory()
+        val source = StoredOnboardingHostSource(f)
+        val initial = ok(source.read())
+        val choice = FirstGrant.CANDIDATES.first()
+        ok(f.open()).use { first ->
+            var prepared: InitializationCommand? = null
+            val preparation = object : InitializationChangeStore by first.store {
+                override fun commitInitialization(command: InitializationCommand): ContractResult<InitializationSettlement> {
+                    prepared = command
+                    return ContractResult.Failure(ContractError.STORAGE_FAILURE)
+                }
+            }
+            assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE),
+                FirstGrant(ok(first.content)).choose(preparation, initial.identity.profileId, choice))
+            ok(factory().open()).use { second ->
+                val original = ok(first.store.commitInitializationWithOutcome(checkNotNull(prepared)))
+                assertTrue(original.newlyCommitted)
+                val replay = ok(second.store.commitInitializationWithOutcome(checkNotNull(prepared)))
+                assertFalse(replay.newlyCommitted)
+                assertEquals(original.settlement, replay.settlement)
+                assertEquals(GameMoney(1000), ok(second.store.balance()))
+                assertEquals(1, ok(second.store.listOwnedVehicles()).size)
+            }
+        }
+    }
+
     fun testExistingSimulationModeAndMissingProgressArePreserved(){
         SqliteGameChangeStore(context,InputSource.SIMULATION,names.getValue(InputSource.SIMULATION)).use{ok(it.localProfileId())}
         val f=factory();val source=StoredOnboardingHostSource(f);val snapshot=ok(source.read());assertEquals(InputSource.SIMULATION,snapshot.identity.source)
@@ -45,8 +111,12 @@ class OnboardingLiveSqliteTest : InstrumentationTestCase() {
         val name=names.getValue(InputSource.SIMULATION)
         SqliteGameChangeStore(context,InputSource.SIMULATION,name).use{ok(it.localProfileId())}
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path,null,SQLiteDatabase.OPEN_READWRITE).use{db->
-            for(table in listOf("initialization_profile","initialization_requests","first_gift_markers","first_gift_requests","host_command_checkpoint"))db.execSQL("DROP TABLE $table")
-            db.version=7
+            for (table in listOf("initialization_profile", "initialization_requests", "first_gift_markers",
+                "first_gift_requests", "host_command_checkpoint", "quest_events", "quest_claims", "quest_tracking")) {
+                db.execSQL("DROP TABLE $table")
+            }
+            stripDeliveryCheckpointFixture(db)
+            db.version = 7
         }
         val f=factory();val source=StoredOnboardingHostSource(f);val snapshot=ok(source.read());assertTrue(snapshot.initialization.status is ProfileInitializationStatus.Unknown)
         assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),source.choose(snapshot.identity,FirstGrant.CANDIDATES.first()))

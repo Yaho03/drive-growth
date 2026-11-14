@@ -24,6 +24,7 @@ class RentalProcessorTest {
         var settleFailure: ContractError? = null
         var assigned: OwnedVehicleId? = OwnedVehicleId("car")
         var received: RentalVisit? = null
+        var returnProof: RentalLedger.ReturnCommit? = null
         override fun assign(visit: RentalVisit): ContractResult<OwnedVehicleId?> { calls += "assign"; received = visit; return ContractResult.Success(assigned) }
         override fun pending(): ContractResult<List<RentalLedger.Pending>> { calls += "pending"; return ContractResult.Success(rows) }
         override fun account(id: RequestId, from: EpochMillis, to: EpochMillis, parkedSince: EpochMillis?,
@@ -35,6 +36,12 @@ class RentalProcessorTest {
         }
         override fun settle(id: RequestId): ContractResult<RentalReceipt> { calls += "settle"; return ContractResult.Failure(settleFailure ?: ContractError.POLICY_UNRESOLVED) }
         override fun finishReturn(id: RequestId, now: EpochMillis): ContractResult<VehicleActivity> { calls += "return"; rows = emptyList(); return ContractResult.Success(VehicleActivity.IDLE) }
+        override fun finishReturnWithCommit(id: RequestId, now: EpochMillis): ContractResult<RentalLedger.ReturnCommit> {
+            val outcome = returnProof ?: return ContractResult.Success(RentalLedger.ReturnCommit(VehicleActivity.IDLE, null))
+            calls += "return-proof"
+            rows = emptyList()
+            return ContractResult.Success(outcome)
+        }
         override fun firstCompleted(): ContractResult<CompletedRental?> { calls += "completed"; return ContractResult.Success(null) }
     }
     private fun <T> ok(value: ContractResult<T>) = (value as ContractResult.Success).value
@@ -111,6 +118,29 @@ class RentalProcessorTest {
             val db=Ledger();assertEquals(ContractResult.Failure(ContractError.INVALID_INPUT),RentalProcessor(InputSource.SIMULATION,db).advance(t,clock(100)));assertTrue(db.calls.isEmpty())
         }
         val db=Ledger();assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE),RentalProcessor(InputSource.SIMULATION,db).advance(tick(0,100),RentalClock("boot",EpochMillis(201),200)));assertTrue(db.calls.isEmpty())
+    }
+
+    @Test fun onlyCurrentReturnWriteCanPublishAnEffect() {
+        for ((from, proof, emits) in listOf(
+            Triple(4_499_999L, RentalLedger.ReturnCommit(VehicleActivity.IDLE, car), true),
+            Triple(4_499_999L, RentalLedger.ReturnCommit(VehicleActivity.NEEDS_REPAIR, car), true),
+            Triple(4_499_999L, RentalLedger.ReturnCommit(VehicleActivity.IDLE, null), false),
+            Triple(4_500_000L, RentalLedger.ReturnCommit(VehicleActivity.IDLE, car), false),
+        )) {
+            val db = Ledger()
+            db.rows = db.rows.map { it.copy(phase = VehicleActivity.RETURNING, cursor = it.end) }
+            db.returnProof = proof
+            val notices = mutableListOf<Pair<RequestId, RentalLedger.ReturnCommit>>()
+            val processor = RentalProcessor(InputSource.SIMULATION, db)
+            ok(processor.advance(tick(from, 4_500_001L), clock(4_500_001L)) { rental, commit -> notices += rental to commit })
+            assertEquals(if (emits) listOf(id to proof) else emptyList(), notices)
+        }
+        val db = Ledger()
+        db.rows = db.rows.map { it.copy(cursor = it.end) }
+        ok(RentalProcessor(InputSource.SIMULATION, db).advance(tick(4_499_999L, 4_500_001L), clock(4_500_001L)) { _, _ ->
+            fail("정산 실패에서 반납 연출이 발행되면 안 됩니다")
+        })
+        assertFalse(db.calls.contains("return-proof"))
     }
 
 }

@@ -101,10 +101,25 @@ class SqliteRentalProductJournal(private val games:GameSessionFactory,
         val encoded=RentalProductJson.prepared(input).toString();val frozen=RentalProductJson.prepared(JSONObject(encoded));if(RentalProductJson.prepared(frozen).toString()!=encoded)return@withDb ContractResult.Failure(ContractError.INVALID_INPUT)
         RentalProductStorage.update(db,st,st.copy(pending=frozen,definition=input.definitionVersion,trial=input.trial));ContractResult.Success(frozen)
     }
-    override fun execute(input:PreparedRentalVisit):ContractResult<OwnedVehicleId?> = withDb(input.identity){s,db->
-        when(val old=original(db,input)){is ContractResult.Failure->return@withDb old;is ContractResult.Success->if(old.value.first)return@withDb ContractResult.Success(old.value.second)}
-        when(val r=free(s)){is ContractResult.Failure->return@withDb r;else->Unit}
-        RentalProductStorage.commit(s.store,db,input)
+    override fun execute(input: PreparedRentalVisit): ContractResult<OwnedVehicleId?> =
+        when (val result = executeVisit(input)) {
+            is ContractResult.Failure -> result
+            is ContractResult.Success -> ContractResult.Success(result.value.assigned)
+        }
+
+    internal data class VisitCommit(val assigned: OwnedVehicleId?, val newlyAssigned: Boolean)
+
+    internal fun executeVisit(input: PreparedRentalVisit): ContractResult<VisitCommit> = withDb(input.identity) { session, db ->
+        when (val old = original(db, input)) {
+            is ContractResult.Failure -> return@withDb old
+            is ContractResult.Success -> if (old.value.first) return@withDb ContractResult.Success(VisitCommit(old.value.second, false))
+        }
+        val free = free(session)
+        if (free is ContractResult.Failure) return@withDb free
+        when (val result = RentalProductStorage.commit(session.store, db, input)) {
+            is ContractResult.Failure -> result
+            is ContractResult.Success -> ContractResult.Success(VisitCommit(result.value, result.value != null))
+        }
     }
     override fun finish(input:PreparedRentalVisit):ContractResult<Unit> = withDb(input.identity){_,db->
         when(val old=original(db,input)){is ContractResult.Failure->return@withDb old;is ContractResult.Success->if(!old.value.first)return@withDb data()}

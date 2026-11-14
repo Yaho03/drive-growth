@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteDatabaseCorruptException
 import android.database.sqlite.SQLiteOpenHelper
+import android.database.sqlite.SQLiteTransactionListener
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.decoration.*
 import io.drivegrowth.core.quest.QuestDefinitions
@@ -77,6 +78,7 @@ class SqliteGameChangeStore(
     val decorations = SqliteDecorationLedger(this)
     override fun readInitialization(profileId: ProfileId) = initialization.readInitialization(profileId)
     override fun commitInitialization(command: InitializationCommand) = initialization.commitInitialization(command)
+    internal fun commitInitializationWithOutcome(command: InitializationCommand) = initialization.commitWithOutcome(command)
     private val firstGift = FirstRentalGiftLedger(this, { initialization.profileId() }, { id ->
         when (val read = initialization.readInitialization(id)) {
             is ContractResult.Failure -> read
@@ -88,6 +90,7 @@ class SqliteGameChangeStore(
     }, firstGiftContent)
     override fun readFirstRentalGift(profileId: ProfileId) = firstGift.readFirstRentalGift(profileId)
     override fun commitFirstRentalGift(command: FirstRentalGiftCommand) = firstGift.commitFirstRentalGift(command)
+    internal fun commitFirstRentalGiftWithOutcome(command: FirstRentalGiftCommand) = firstGift.commitWithOutcome(command)
     private val repair = RepairLedger(this)
     override fun readRepairState(target: OwnedVehicleId) = repair.readState(target)
     override fun repairSettlement(requestId: RequestId) = repair.settlement(requestId)
@@ -100,20 +103,41 @@ class SqliteGameChangeStore(
     override fun readGachaState() = gacha.readState()
     override fun commitGacha(command: GachaCommand) = gacha.commit(command)
 
+    internal var onFirstCollectionOwnership: ((FirstCollectionOwnership) -> Unit)? = null
+    private var pendingFirstOwnerships: MutableList<FirstCollectionOwnership>? = null
+
     @Synchronized
-    internal fun <T> atomic(action: (SQLiteDatabase) -> ContractResult<T>): ContractResult<T> = storage {
-        val db = helper.writableDatabase
-        db.beginTransaction()
-        try {
-            val result = action(db)
-            if (result is ContractResult.Success) {
-                beforeCommit?.invoke()
-                db.setTransactionSuccessful()
+    internal fun <T> atomic(action: (SQLiteDatabase) -> ContractResult<T>): ContractResult<T> {
+        val observer = onFirstCollectionOwnership
+        var committedOwnerships = emptyList<FirstCollectionOwnership>()
+        val result = storage {
+            val db = helper.writableDatabase
+            val track = observer != null && !db.inTransaction()
+            val ownerships = if (track) mutableListOf<FirstCollectionOwnership>() else null
+            var markedForCommit = false
+            if (ownerships == null) db.beginTransaction()
+            else db.beginTransactionWithListener(object : SQLiteTransactionListener {
+                override fun onBegin() = Unit
+                override fun onCommit() { markedForCommit = true }
+                override fun onRollback() = Unit
+            })
+            if (track) pendingFirstOwnerships = ownerships
+            try {
+                val outcome = action(db)
+                if (outcome is ContractResult.Success) {
+                    beforeCommit?.invoke()
+                    db.setTransactionSuccessful()
+                }
+                outcome
+            } finally {
+                if (track) pendingFirstOwnerships = null
+                db.endTransaction()
+                // SQLite의 onCommit은 실제 쓰기 종료 전에 호출된다. endTransaction 성공 뒤에만 전달한다.
+                if (markedForCommit && ownerships != null) committedOwnerships = ownerships
             }
-            result
-        } finally {
-            db.endTransaction()
         }
+        if (result is ContractResult.Success && observer != null) committedOwnerships.forEach(observer)
+        return result
     }
 
     // 같은 직렬 쓰기 거래에서 검증된 기존 checkpoint를 처리하는 동안만 적용한다.
@@ -172,7 +196,7 @@ class SqliteGameChangeStore(
     }
 
     internal fun record(db: SQLiteDatabase, change: GameChange, command: String,
-                        domain: RequestDomain = RequestDomain.GENERAL): ContractResult<Settlement> {
+                        domain: RequestDomain = RequestDomain.GENERAL, trackAcquisition: Boolean = false): ContractResult<Settlement> {
         if (change.source != source) return failure(ContractError.INVALID_INPUT)
         val id = change.requestId.value
         if (domain == RequestDomain.DELIVERY && change.kind != TransactionKind.DELIVERY ||
@@ -240,6 +264,7 @@ class SqliteGameChangeStore(
         }
         var beforeGrowth: OwnedVehicle? = null
         val write = change.vehicle
+        var firstOwnership: FirstCollectionOwnership? = null
         val vehicle = when (write) {
             null -> null
             is VehicleWrite.Add -> {
@@ -249,6 +274,9 @@ class SqliteGameChangeStore(
                     return failure(ContractError.CAPACITY_EXCEEDED)
                 if (findVehicle(db, write.vehicle.ownedVehicleId) != null) return failure(ContractError.STATE_CONFLICT)
                 if (write.vehicle.revision != Revision(0) || write.vehicle.lifecycle != VehicleLifecycle.OWNED) return failure(ContractError.INVALID_INPUT)
+                if (trackAcquisition && pendingFirstOwnerships != null) {
+                    firstOwnership = firstCollectionOwnership(db, write.vehicle)
+                }
                 write.vehicle
             }
             is VehicleWrite.Update -> {
@@ -296,8 +324,30 @@ class SqliteGameChangeStore(
             val recorded = achievements.observe(db, setOf(AchievementMetric.OWNED, AchievementMetric.COLLECTION))
             if (recorded is ContractResult.Failure) return recorded
         }
+        if (firstOwnership != null && vehicle != null && findVehicle(db, vehicle.ownedVehicleId) == vehicle) {
+            val gachaReceipt = if (vehicle.acquisitionSource == VehicleAcquisitionSource.GACHA) {
+                FirstGachaReceipt(change.requestId, result.settlementId, vehicle.ownedVehicleId)
+            } else null
+            pendingFirstOwnerships?.add(firstOwnership.copy(gachaReceipt = gachaReceipt))
+        }
         return ContractResult.Success(result)
     }
+
+    private fun firstCollectionOwnership(db: SQLiteDatabase, vehicle: OwnedVehicle): FirstCollectionOwnership? = try {
+        val key = CollectionKey(vehicle.vehicleId, vehicle.rarity)
+        val alreadyOwned = db.rawQuery("SELECT owned_id, payload FROM vehicles", null).use { cursor ->
+            var found = false
+            while (cursor.moveToNext()) {
+                val previous = LedgerJson.vehicle(JSONObject(cursor.text(1)))
+                if (previous.ownedVehicleId.value != cursor.text(0)) throw JSONException("개체 이력 ID 불일치")
+                if (previous.vehicleId == key.vehicleId && previous.rarity == key.rarity) found = true
+            }
+            found
+        }
+        if (alreadyOwned) null else FirstCollectionOwnership(initialization.profileId(db), source, key)
+    } catch (_: SQLiteException) { null }
+      catch (_: JSONException) { null }
+      catch (_: IllegalArgumentException) { null }
 
     internal fun writeVehicle(db: SQLiteDatabase, vehicle: OwnedVehicle, add: Boolean = false) {
         val values = ContentValues().apply {

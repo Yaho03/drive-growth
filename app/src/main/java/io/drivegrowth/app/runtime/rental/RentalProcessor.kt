@@ -1,5 +1,6 @@
 package io.drivegrowth.app.runtime.rental
 
+import io.drivegrowth.app.data.RentalLedger
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.progression.VehicleActivity
 import java.util.Collections
@@ -17,7 +18,8 @@ internal class RentalProcessor(private val source: InputSource, private val ledg
 
     fun read(): ContractResult<RentalRuntimeSnapshot> = snapshot(emptyMap())
 
-    fun advance(tick: RentalTick, now: RentalClock): ContractResult<RentalRuntimeSnapshot> {
+    fun advance(tick: RentalTick, now: RentalClock,
+        onNewReturn: ((RequestId, RentalLedger.ReturnCommit) -> Unit)? = null): ContractResult<RentalRuntimeSnapshot> {
         if (tick.source != source || !valid(tick.from) || !valid(tick.to) || !valid(now))
             return ContractResult.Failure(ContractError.INVALID_INPUT)
         if (tick.to.epoch.value > now.epoch.value || tick.to.elapsedMs > now.elapsedMs)
@@ -36,11 +38,20 @@ internal class RentalProcessor(private val source: InputSource, private val ledg
             is ContractResult.Success -> read.value
         }
         val deferred = linkedMapOf<RequestId, ContractError>()
+        fun finish(rental: RentalLedger.Pending) {
+            if (onNewReturn == null || rental.returnEnd.value <= tick.from.epoch.value) {
+                val returned = ledger.finishReturn(rental.id, tick.to.epoch)
+                if (returned is ContractResult.Failure) deferred[rental.id] = returned.error
+            } else when (val returned = ledger.finishReturnWithCommit(rental.id, tick.to.epoch)) {
+                is ContractResult.Failure -> deferred[rental.id] = returned.error
+                is ContractResult.Success -> if (returned.value.newlyReturned == rental.vehicle)
+                    onNewReturn(rental.id, returned.value) else Unit
+            }
+        }
         for (rental in pending) {
             if (rental.phase == VehicleActivity.RETURNING) {
                 if (tick.to.epoch.value >= rental.returnEnd.value) {
-                    val returned = ledger.finishReturn(rental.id, tick.to.epoch)
-                    if (returned is ContractResult.Failure) deferred[rental.id] = returned.error
+                    finish(rental)
                 }
                 continue
             }
@@ -66,8 +77,7 @@ internal class RentalProcessor(private val source: InputSource, private val ledg
                 when (val settled = ledger.settle(rental.id)) {
                     is ContractResult.Failure -> deferred[rental.id] = settled.error
                     is ContractResult.Success -> if (tick.to.epoch.value >= rental.returnEnd.value) {
-                        val returned = ledger.finishReturn(rental.id, tick.to.epoch)
-                        if (returned is ContractResult.Failure) deferred[rental.id] = returned.error
+                        finish(rental)
                     }
                 }
             }

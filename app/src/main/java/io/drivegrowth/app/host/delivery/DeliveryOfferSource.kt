@@ -7,6 +7,8 @@ import io.drivegrowth.core.delivery.*
 import java.time.LocalDate
 import kotlin.random.Random
 
+internal const val DELIVERY_SLOT_NOTICE = "다른 화면에서 보관한 요청을 먼저 확인해 주세요."
+
 /** 후보 생성·저장과 실제 표시 확인을 분리한다. 규칙은 중앙 공급자가 명시한다. worker 전용. */
 class DeliveryOfferSource(private val queries: DeliveryHostQueries,
     private val definitions: () -> ContractResult<DeliveryHostRules>, private val navigation: DeliveryNavigationPort,
@@ -37,6 +39,39 @@ class DeliveryOfferSource(private val queries: DeliveryHostQueries,
             DeliveryScreen.Offers(DeliveryHostMapper.proposal(stored, names, nav.destinationName, current.balance, identity.source)),
             current.held, stored, navigation = nav))
     }
+    internal fun readOnly(data: DeliveryHostData, nav: DeliveryNavigationSnapshot, rules: DeliveryRules,
+        names: Map<VehicleId, String>): ContractResult<DeliveryHostRead> {
+        displayed = null
+        val identity = data.identity
+        val quote = (nav.estimated as? Observation.Available)?.value
+        val destination = nav.destination
+        val day = today()
+        val screen = if (destination != null && quote != null && quote.meters > 0 && quote.source == identity.source) {
+            val list = when (val read = queries.lists(identity, day)) {
+                is ContractResult.Failure -> return read
+                is ContractResult.Success -> read.value.singleOrNull {
+                    it.band == rules.bandIndexOf(quote.meters) && it.source == identity.source &&
+                        it.createdOn == day && it.contentVersion == data.content.catalog.contentVersion && it.ruleVersion == rules.ruleVersion
+                }
+            }
+            if (list == null) null else when (val read = DeliveryProposal(rules).propose(
+                listOf(list), destination, nav.estimated, data.content, data.shopLevel, day, random())) {
+                is ContractResult.Failure -> return read
+                is ContractResult.Success -> {
+                    val proposal = DeliveryHostMapper.proposal(read.value, names, nav.destinationName, data.balance, identity.source)
+                    DeliveryScreen.Offers(proposal.copy(availability = proposal.availability.mapValues {
+                        DeliveryAvailability(false, DELIVERY_SLOT_NOTICE)
+                    }))
+                }
+            }
+        } else null
+        return ContractResult.Success(DeliveryHostRead(identity,
+            screen ?: DeliveryScreen.Destination(nav.destinationName.takeIf { destination != null },
+                quote?.takeIf { destination != null && it.source == identity.source }
+                    ?.let { io.drivegrowth.app.ui.delivery.deliveryDistance(it.meters) },
+                null, false, DELIVERY_SLOT_NOTICE), data.held, navigation = nav, readOnly = true))
+    }
+
     fun displayed(identity: GameIdentity, proposed: DeliveryProposed): ContractResult<Unit> {
         val (owner, original) = displayed ?: return ContractResult.Failure(ContractError.STATE_CONFLICT)
         if (owner != identity || !original.containsDisplayedOffers(proposed)) return ContractResult.Failure(ContractError.STATE_CONFLICT)

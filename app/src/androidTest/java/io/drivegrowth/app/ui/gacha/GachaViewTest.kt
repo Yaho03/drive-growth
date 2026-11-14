@@ -13,6 +13,8 @@ import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
 import io.drivegrowth.app.ui.garage.CollectionScrollTestActivity
+import io.drivegrowth.app.ui.pixel.CleanUi
+import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import io.drivegrowth.core.contract.*
 
 /** 실제 위젯 표적. 기기 배정 전에는 컴파일만 확인한다. */
@@ -27,6 +29,19 @@ class GachaViewTest : InstrumentationTestCase() {
     private fun text(v:View)=nodes(v).filterIsInstance<TextView>().joinToString("\n") { it.text.toString() }
     private fun button(v:View,tag:String):Button=v.findViewWithTag(tag)
     private fun make(events:MutableList<GachaEvent> = mutableListOf()) = GachaView(instrumentation.targetContext,events::add)
+
+    fun testForeignCheckpointReplacesConflictWithOwnerPageNotice() = onUi {
+        val view = make()
+        val frame = GachaFrame(1, GachaScreen.Failure(ContractError.STATE_CONFLICT, "internal", true))
+        assertTrue(view.render(frame, true))
+        assertTrue("다시 조회" in text(view))
+        view.setForeignCheckpoint(true)
+        assertTrue("다른 화면에 보관된 요청을 먼저 확인해 주세요." in text(view))
+        assertFalse("다시 조회" in text(view))
+        assertFalse("internal" in text(view))
+        view.setForeignCheckpoint(false)
+        assertTrue("다시 조회" in text(view))
+    }
 
     fun testAppliedProbabilitiesUseSuppliedCurrentTableAndKeepSpeciesSeparate()=onUi {
         val view=make();view.render(GachaPreviewStates.ready(),true)
@@ -103,12 +118,42 @@ class GachaViewTest : InstrumentationTestCase() {
     }
     fun testExternalResultUsesOriginalOwnedVehicleAndGarageIsOnlyANavigationRequest()=onUi {
         val events=mutableListOf<GachaEvent>();val view=make(events);view.render(GachaPreviewStates.result(),true)
-        assertTrue(text(view).contains("아반떼 · 희귀"));assertTrue(text(view).contains("실제 취득 기준액 · 500 게임머니"))
+        assertTrue(text(view).contains("아반떼 · 희귀"));assertFalse(text(view).contains("실제 취득 기준액"))
+        assertFalse(text(view).contains("이번 뽑기에 쓴 금액")) // 고정 결과의 거래에는 실제 차감이 없다.
         assertTrue(text(view).contains("차량 획득"));assertFalse(text(view).contains("fixture-gacha-owned"))
         assertTrue(text(view).contains("실제 추첨·차감·지급 아님"))
         button(view,"gacha:garage").performClick();button(view,"gacha:garage").performClick();assertEquals(1,events.size)
         assertEquals(OwnedVehicleId("fixture-gacha-owned"),(events.single() as GachaEvent.OpenGarage).request.ownedVehicleId)
     }
+    fun testCollectionNewBadgeRequiresCurrentSubmissionAndDoesNotRestore() = onUi {
+        val events = mutableListOf<GachaEvent>()
+        val view = make(events).apply { animationsEnabled = { false } }
+        view.render(GachaPreviewStates.ready(), true)
+        button(view, "gacha:option:paid").performClick()
+        button(view, "gacha:confirm").performClick()
+        val request = (events.single() as GachaEvent.Draw).request.input.option.requestId
+        val supplied = GachaPreviewStates.result()
+        val value = (supplied.screen as GachaScreen.Result).value.copy(origin = GachaOrigin.STORED)
+        val frame = supplied.copy(screen = GachaScreen.Result(value))
+        assertEquals(request, value.settlement.transaction.requestId)
+        var takes = 0
+        view.takeNewGachaResult = { receipt -> takes++; receipt == value.settlement }
+        assertNull(view.findViewWithTag<View>("gacha:new-collection"))
+        view.render(frame, true)
+        val badge = view.findViewWithTag<TextView>("gacha:new-collection")
+        assertEquals("NEW · 도감 등록", badge.text.toString())
+        assertEquals(CleanUi.INK, badge.currentTextColor)
+        view.render(frame, true)
+        assertEquals(1, takes)
+        val restored = GachaView(instrumentation.targetContext, events::add, view.uiState)
+        restored.takeNewGachaResult = { fail("복원은 새 획득 통지를 요청하지 않는다"); false }
+        restored.render(frame, true)
+        assertNull(restored.findViewWithTag<View>("gacha:new-collection"))
+        view.render(frame, false)
+        view.render(frame, true)
+        assertNull(view.findViewWithTag<View>("gacha:new-collection"))
+    }
+
     fun testDrawAgainOnlyReloadsTheDisplayedReceiptAndRejectsStaleButtons() = onUi {
         val events = mutableListOf<GachaEvent>()
         val view = make(events)
@@ -170,6 +215,7 @@ class GachaViewTest : InstrumentationTestCase() {
         val supplied = GachaPreviewStates.result()
         val result = (supplied.screen as GachaScreen.Result).value.copy(origin = GachaOrigin.STORED)
         val frame = supplied.copy(screen = GachaScreen.Result(result))
+        view.takeNewGachaResult = { it == result.settlement }
         view.render(frame, true)
         val earlyReveal = button(view, "gacha:reveal")
         assertEquals(View.GONE, earlyReveal.visibility)
@@ -179,15 +225,22 @@ class GachaViewTest : InstrumentationTestCase() {
         view.findViewWithTag<View>("gacha:reveal-scene").performClick()
         assertEquals(1, events.size)
         assertNull(view.findViewWithTag<View>("gacha:garage"))
+        assertEquals(View.INVISIBLE, view.findViewWithTag<View>("gacha:reference-card").visibility)
+        val hiddenBadge = view.findViewWithTag<TextView>("gacha:new-collection")
+        assertFalse(hiddenBadge.isShown)
+        assertEquals(ReferenceHudStyle(view.context).signInk, hiddenBadge.currentTextColor)
 
         val restored = GachaView(instrumentation.targetContext, events::add, view.uiState)
         restored.render(frame, true)
         assertNull(restored.findViewWithTag<View>("gacha:reveal"))
         assertTrue(button(restored, "gacha:garage").isEnabled)
+        assertNull(restored.findViewWithTag<View>("gacha:new-collection"))
 
         assertTrue(view.handleBack())
         assertNull(view.findViewWithTag<View>("gacha:reveal"))
         assertTrue(button(view, "gacha:garage").isEnabled)
+        val resultBadge = view.findViewWithTag<TextView>("gacha:new-collection")
+        assertEquals(CleanUi.INK, resultBadge.currentTextColor)
         view.render(frame, false)
         view.render(frame, true)
         assertNull(view.findViewWithTag<View>("gacha:reveal"))

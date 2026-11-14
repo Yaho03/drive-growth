@@ -20,14 +20,22 @@ internal class FactoryHomeShopPort(context: Context, private val games: GameSess
                 is ContractResult.Success -> result.value?.command
             }
             // 원명령 복구 전에 현재 정의·현재 꾸미기 조회를 요구하지 않는다.
-            if (pending != null) return@use ContractResult.Success(HomeShopLoad(game.identity, pending))
+            if (pending?.isHomeShopCommand() == true) return@use ContractResult.Success(HomeShopLoad(game.identity, pending))
             val active = when (val result = game.store.decorations.state(game.identity.profileId)) {
                 is ContractResult.Success -> true
                 is ContractResult.Failure -> if (result.error == ContractError.DATA_UNAVAILABLE) false else return@use result
             }
             when (val result = reader.read(game)) {
                 is ContractResult.Failure -> result
-                is ContractResult.Success -> ContractResult.Success(HomeShopLoad(game.identity, null, result.value, active))
+                is ContractResult.Success -> {
+                    val facts = result.value
+                    if (pending == null || !active) ContractResult.Success(HomeShopLoad(game.identity, pending, facts, active))
+                    else when (val decoration = decorationBackend(game.identity) { ContractResult.Success(facts.screen) }.readIn(game)) {
+                        is ContractResult.Failure -> decoration
+                        is ContractResult.Success -> ContractResult.Success(HomeShopLoad(game.identity, pending, facts,
+                            active, decoration.value))
+                    }
+                }
             }
         }
     }
@@ -66,7 +74,7 @@ internal class FactoryHomeShopPort(context: Context, private val games: GameSess
         }
     }
     override fun decoration(identity: GameIdentity, currentFacts: (HomeShopFacts) -> Unit): DecorationBackend =
-        CheckpointDecorationBackend(games, identity) { game ->
+        decorationBackend(identity) { game ->
             when (val read = reader.read(game)) {
                 is ContractResult.Failure -> read
                 is ContractResult.Success -> {
@@ -75,4 +83,6 @@ internal class FactoryHomeShopPort(context: Context, private val games: GameSess
                 }
             }
         }
+    private fun decorationBackend(identity: GameIdentity, readShop: (GameSession) -> ContractResult<ShopScreenState.Content>) =
+        CheckpointDecorationBackend(games, identity, readShop)
 }

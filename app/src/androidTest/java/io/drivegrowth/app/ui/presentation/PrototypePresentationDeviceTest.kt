@@ -55,6 +55,9 @@ class PrototypePresentationDeviceTest : InstrumentationTestCase() {
             onUi {
                 title.setPresentationAllowed(true)
                 title.performClick()
+                val button = title.findViewWithTag<Button>("presentation:start")
+                assertEquals(View.VISIBLE, button.visibility)
+                assertTrue(button.performClick())
                 assertEquals("화면 전환이 끝나기 전에는 시작하지 않는다", 0, starts)
                 title.setPresentationAllowed(false)
             }
@@ -65,6 +68,8 @@ class PrototypePresentationDeviceTest : InstrumentationTestCase() {
         onUi {
             val button = title.findViewWithTag<Button>("presentation:start")
             title.setPresentationAllowed(true)
+            title.performClick()
+            assertEquals(View.VISIBLE, button.visibility)
             assertTrue("활성 창의 시작 버튼이 입력을 받아야 한다", button.isEnabled)
             button.performClick()
             title.performClick()
@@ -89,7 +94,10 @@ class PrototypePresentationDeviceTest : InstrumentationTestCase() {
         awaitTitleWindow(title)
         val interruption = onUi {
             title.setPresentationAllowed(true)
-            assertTrue(title.findViewWithTag<Button>("presentation:start").performClick())
+            title.performClick()
+            val button = title.findViewWithTag<Button>("presentation:start")
+            assertEquals(View.VISIBLE, button.visibility)
+            assertTrue(button.performClick())
             Dialog(host).apply {
                 setContentView(TextView(host).apply { text = "창 포커스 전환" })
                 show()

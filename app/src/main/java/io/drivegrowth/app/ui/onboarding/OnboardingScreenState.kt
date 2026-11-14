@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.onboarding
 
+import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.OwnedVehicle
 import io.drivegrowth.core.contract.VehicleDefinition
 import io.drivegrowth.core.contract.VehicleId
@@ -33,6 +34,7 @@ sealed interface OnboardingScreenState {
     data class Completed(
         val vehicle: OwnedVehicle, val displayName: String, val summary: List<String>,
         val alreadyGranted: Boolean, val sourceLabel: String,
+        val initialMoney: GameMoney? = null, val initialParkingSpaces: Int? = null,
     ) : OnboardingScreenState
 }
 

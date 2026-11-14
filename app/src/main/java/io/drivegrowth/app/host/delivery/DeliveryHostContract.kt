@@ -43,7 +43,7 @@ sealed interface DeliveryHostOperation {
 data class DeliveryHostRead(val identity: GameIdentity, val screen: DeliveryScreen,
     val held: List<HeldVehicle> = emptyList(), val displayedProposal: DeliveryProposed? = null,
     val pending: DeliveryHostOperation? = null, val receipt: DeliveryHostReceipt? = null,
-    val navigation: DeliveryNavigationSnapshot? = null)
+    val navigation: DeliveryNavigationSnapshot? = null, val readOnly: Boolean = false)
 data class DeliveryHostPrepared(val screen: DeliveryScreen, val operation: DeliveryHostOperation? = null,
     val navigation: DeliveryNavigationSnapshot? = null)
 
@@ -54,9 +54,19 @@ sealed interface DeliveryHostReceipt {
     data class Arrived(val value: ArrivalCommit) : DeliveryHostReceipt
     data class Held(val value: HoldCommit) : DeliveryHostReceipt
 }
+sealed interface DeliveryJournalSlot {
+    data object Clear : DeliveryJournalSlot
+    data object Foreign : DeliveryJournalSlot
+    data class Own(val operation: DeliveryHostOperation) : DeliveryJournalSlot
+}
+
 /** E 공통 checkpoint adapter가 구현한다. 별도 영속 저장을 만들지 않는다. */
 interface DeliveryOperationJournal {
     fun pending(identity: GameIdentity): ContractResult<DeliveryHostOperation?>
+    fun slot(identity: GameIdentity): ContractResult<DeliveryJournalSlot> = when (val result = pending(identity)) {
+        is ContractResult.Failure -> result
+        is ContractResult.Success -> ContractResult.Success(result.value?.let(DeliveryJournalSlot::Own) ?: DeliveryJournalSlot.Clear)
+    }
     fun save(identity: GameIdentity, operation: DeliveryHostOperation): ContractResult<Unit>
     fun execute(identity: GameIdentity, operation: DeliveryHostOperation): ContractResult<DeliveryHostReceipt>
     fun cancelUnstarted(identity: GameIdentity, operation: DeliveryHostOperation): ContractResult<Unit>

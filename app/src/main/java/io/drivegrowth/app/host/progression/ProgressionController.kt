@@ -65,9 +65,17 @@ class ProgressionController(private val worker: Executor, private val main: Exec
             else -> Unit // 상세 선택/닫기는 기존 View가 소유한다.
         }
     }
+    val canCancelSaved: Boolean
+        get() = enabled.get() && !released.get() && !busy && !requested && content == null &&
+            when (val pending = latest?.journal) {
+                is ProgressionJournalState.Quest -> pending.phase == ProgressionPhase.SAVED
+                is ProgressionJournalState.Achievement -> pending.phase == ProgressionPhase.SAVED
+                else -> false
+            }
+
     /** B의 명시적인 미시작 청구 취소 행동에서만 호출한다. 상세 Back/페이지 이동은 취소가 아니다. */
     fun cancelSaved() {
-        if (!enabled.get() || released.get() || busy) return
+        if (!canCancelSaved) return
         val read = latest ?: return
         val cancel: () -> ContractResult<Unit> = when (val pending = read.journal) {
             is ProgressionJournalState.Quest -> {
