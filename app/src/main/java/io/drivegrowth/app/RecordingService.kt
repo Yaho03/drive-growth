@@ -16,7 +16,7 @@ class RecordingService : Service() {
         val launch = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         startForeground(1, Notification.Builder(this, "recording")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setContentTitle("드라이브 키우기")
+            .setContentTitle("르르르 렌터카")
             .setContentText("차량 연결 상태를 확인하며 주행을 자동 기록합니다.")
             .setContentIntent(launch).setOngoing(true).build())
         (application as DriveApplication).runtime.start()

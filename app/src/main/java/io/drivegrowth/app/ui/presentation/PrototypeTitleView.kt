@@ -48,10 +48,10 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
         tag = "presentation:title-badge"
         background = pill(0xff1c1e2c.toInt(), 0xfffcdc64.toInt())
     }
-    private val gold = TitleWord(context, "드라이브", titleFont, intArrayOf(
+    private val gold = TitleWord(context, "르르르", titleFont, intArrayOf(
         0xfffff7c8.toInt(), 0xfffcdc64.toInt(), 0xfff6a83c.toInt(),
     )).apply { tag = "presentation:title-first" }
-    private val sky = TitleWord(context, "키우기", titleFont, intArrayOf(
+    private val sky = TitleWord(context, "렌터카", titleFont, intArrayOf(
         Color.WHITE, 0xffcfe4ff.toInt(), 0xff68a0f0.toInt(),
     )).apply { tag = "presentation:title-second" }
     private val ribbon = label("달린 만큼 커지는 우리 동네 렌터카", Color.WHITE).apply {

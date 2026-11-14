@@ -306,7 +306,7 @@ open class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(style.dp(12), style.dp(4), style.dp(12), style.dp(4))
             addView(pageActions, LinearLayout.LayoutParams(-2, -2))
-            addView(style.button("드라이브 키우기") {
+            addView(style.button("르르르 렌터카") {
                 if (allowed()) showPresentationTitle(true)
             }.apply {
                 tag = "presentation:home-title"

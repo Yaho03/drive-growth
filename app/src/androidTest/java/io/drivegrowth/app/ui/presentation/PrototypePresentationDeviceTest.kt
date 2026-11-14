@@ -74,7 +74,7 @@ class PrototypePresentationDeviceTest : InstrumentationTestCase() {
                 assertTrue(first.left < second.left && first.top < second.top)
                 assertTrue(second.bottom < ribbon.top && ribbon.bottom < button.top)
                 assertEquals("화면을 눌러 시작  ▶", button.text.toString())
-                for ((line, expected) in listOf(first to "드라이브", second to "키우기")) {
+                for ((line, expected) in listOf(first to "르르르", second to "렌터카")) {
                     assertEquals(expected, line.text.toString())
                     val glyphs = Rect().also { line.paint.getTextBounds(expected, 0, expected.length, it) }
                     val top = line.baseline + glyphs.top
