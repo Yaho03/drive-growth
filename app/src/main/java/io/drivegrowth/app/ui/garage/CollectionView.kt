@@ -1,6 +1,8 @@
 package io.drivegrowth.app.ui.garage
 
 import android.content.Context
+import android.graphics.Rect
+import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup
 import android.view.View
@@ -9,54 +11,58 @@ import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.core.contract.Rarity
-import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.garage.CollectionState
 import io.drivegrowth.core.garage.CollectionKey
 
-/** 차종 × 희귀도 기록을 차종 단위로 넘겨 읽는다. */
+/** 차종 × 희귀도 기록을 차종 순서대로 스크롤해 읽는다. */
 class CollectionView(context: Context, private val onRetry: () -> Unit) : LinearLayout(context) {
-    private val style = GarageStyle(context, pixelPanel = true, creamPanel = true)
+    private val style = GarageStyle(context, pixelPanel = true, featureWindow = true)
     private val artwork = VehicleArtwork(context, style)
     internal var showHeading = true
     internal var takeNewCollectionKey: (CollectionKey) -> Boolean = { false }
 
+    private val visibleBounds = Rect()
+
     internal fun refreshNewCollectionCells() {
-        fun visit(view: View) {
-            if (view is CollectionNewArtwork) view.invalidate()
-            if (view is ViewGroup) for (index in 0 until view.childCount) visit(view.getChildAt(index))
+        val viewport = contentScroll ?: return
+        refreshNewCollectionCells(viewport)
+    }
+
+    private fun refreshNewCollectionCells(view: View) {
+        if (!view.getLocalVisibleRect(visibleBounds)) return
+        if (view is CollectionNewArtwork) view.invalidate()
+        if (view is ViewGroup) {
+            for (index in 0 until view.childCount) refreshNewCollectionCells(view.getChildAt(index))
         }
-        visit(this)
     }
 
     private var state: CollectionScreenState = CollectionScreenState.Loading
     private var controlsEnabled = false
     private var retryPending = false
     private var filter: CollectionState? = null
-    private val positions = mutableMapOf<CollectionState?, PagePosition>()
+    private val positions = mutableMapOf<CollectionState?, Int>()
+    private var contentScroll: ScrollView? = null
+    private var contentFilter: CollectionState? = null
     private var renderedLayout: LayoutMode? = null
-    private var viewportWidth = 0
-    private var viewportHeight = 0
+    private var viewportWidth: Int? = null
     private val fontScale get() = resources.configuration.fontScale
-    private val wide get() = viewportWidth >= style.dp(700) && fontScale <= 1.3f
-    private val pageSize get() = if (wide && viewportHeight >= style.dp(395)) 2 else 1
-    private val filterColumns get() = if (viewportWidth >= style.dp(520) && fontScale <= 1.3f) 4 else 2
+    private val wide get() = (viewportWidth ?: 0) >= style.dp(700) && fontScale <= 1.3f
+    private val filterColumns get() = if ((viewportWidth ?: 0) >= style.dp(520) && fontScale <= 1.3f) 4 else 2
     private val rarityColumns get() = when {
         wide -> 4
-        viewportWidth >= style.dp(290) -> 2
+        (viewportWidth ?: 0) >= style.dp(290) -> 2
         else -> 1
     }
 
     private data class LayoutMode(
         val rarityColumns: Int,
         val filterColumns: Int,
-        val pageSize: Int,
+        val wide: Boolean,
         val showHeading: Boolean,
         val fontScale: Float,
     )
 
-    private fun layoutMode() = LayoutMode(rarityColumns, filterColumns, pageSize, showHeading, fontScale)
-
-    private data class PagePosition(val vehicle: VehicleId, val index: Int)
+    private fun layoutMode() = LayoutMode(rarityColumns, filterColumns, wide, showHeading, fontScale)
 
     init {
         orientation = VERTICAL
@@ -71,25 +77,44 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
         state = value
         this.controlsEnabled = controlsEnabled
         retryPending = false
-        drawScreen()
+        if (viewportWidth != null) drawScreen() else requestLayout()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         viewportWidth = MeasureSpec.getSize(widthMeasureSpec)
-        viewportHeight = MeasureSpec.getSize(heightMeasureSpec)
         if (renderedLayout != layoutMode()) drawScreen()
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        // 같은 크기로 다시 붙어도 페이지 조작을 새 창에 배치한다.
-        renderedLayout = null
+    /** 화면 재생성 때 호스트가 보존할 표시 선택과 스크롤 위치다. */
+    internal fun saveViewport(): Bundle {
+        rememberPosition()
+        return Bundle().apply {
+            putString("filter", filter?.name)
+            for ((option, offset) in positions) putInt(option?.name ?: "all", offset)
+        }
+    }
+
+    internal fun restoreViewport(saved: Bundle) {
+        contentScroll = null
+        filter = CollectionState.entries.firstOrNull { it.name == saved.getString("filter") }
+        positions.clear()
+        for (option in listOf(null) + CollectionState.entries) {
+            positions[option] = saved.getInt(option?.name ?: "all").coerceAtLeast(0)
+        }
+        if (viewportWidth != null) drawScreen() else requestLayout()
+    }
+
+    private fun rememberPosition() {
+        // Loading/Error의 스크롤이나 배치되기 전에 교체된 Content는 이전 값을 덮지 않는다.
+        contentScroll?.takeIf { it.isLaidOut }?.let { positions[contentFilter] = it.scrollY }
     }
 
     private fun s(id: Int, vararg args: Any) = context.getString(id, *args)
 
     private fun drawScreen(): Unit = with(style) {
+        rememberPosition()
+        contentScroll = null
         renderedLayout = layoutMode()
         val focusedTag = findFocus()?.tag
         removeAllViews()
@@ -101,11 +126,23 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
 
         if (showHeading) addView(heading(s(R.string.garage_collection_title), ReferenceHudIcon.COLLECTION))
         val body = card().apply { setPadding(dp(10), dp(6), dp(10), dp(8)) }
-        val viewport = scroll(body)
         val current = state
-        if (current is CollectionScreenState.Content && current.entries.isNotEmpty()) {
-            addView(filters(), LayoutParams(-1, -2))
+        val hasContent = current is CollectionScreenState.Content && current.entries.isNotEmpty()
+        val viewport = scroll(body, if (hasContent) positions[filter] ?: 0 else 0).apply {
+            tag = "collection:scroll"
+            isVerticalScrollBarEnabled = true
         }
+        if (hasContent) {
+            contentScroll = viewport
+            contentFilter = filter
+            // 다시 보이는 칸은 하드웨어가 기존 display list를 재사용해도 NEW를 확인한다.
+            viewport.setOnScrollChangeListener { view, _, _, _, _ ->
+                if (view === contentScroll && view.isAttachedToWindow) refreshNewCollectionCells()
+            }
+        } else if (current is CollectionScreenState.Content) {
+            positions.clear()
+        }
+        if (hasContent) addView(filters(), LayoutParams(-1, -2))
         addView(viewport, LayoutParams(-1, 0, 1f).apply { topMargin = dp(6) })
 
         when (current) {
@@ -121,7 +158,7 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
                     }
                 })
             }
-            is CollectionScreenState.Content -> showContent(body, viewport, current)
+            is CollectionScreenState.Content -> showContent(body, current)
         }
         if (focusedTag != null) findViewWithTag<View>(focusedTag)?.takeIf { it.isEnabled }?.requestFocus()
     }
@@ -153,10 +190,9 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
         }
     }
 
-    private fun showContent(body: LinearLayout, viewport: ScrollView, content: CollectionScreenState.Content) = with(style) {
+    private fun showContent(body: LinearLayout, content: CollectionScreenState.Content) = with(style) {
         sourceText(content.sourceLabel)?.let { body.addView(text(it, 14, muted)) }
         if (content.entries.isEmpty()) {
-            positions.clear()
             body.addView(text(s(R.string.garage_collection_empty), 24, bold = true))
             body.addView(text(s(R.string.garage_collection_empty_body), color = muted))
             return@with
@@ -174,78 +210,8 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
             return@with
         }
 
-        val lastPage = (vehicles.size - 1) / pageSize
-        val position = positions[filter]
-        val matched = vehicles.indexOfFirst { it.first().entry.key.vehicleId == position?.vehicle }
-        val index = if (matched >= 0) matched else position?.index ?: 0
-        val page = (index / pageSize).coerceAtMost(lastPage)
-        val start = page * pageSize
-        val anchor = if (matched >= 0) matched else start
-        positions[filter] = PagePosition(vehicles[anchor].first().entry.key.vehicleId, anchor)
         if (wide) add(body, rarityHeaders(), gap = 4)
-        val rows = column()
-        body.addView(rows, LayoutParams(-1, -2))
-        var visibleStart = -1
-        var visibleRows = emptyList<View>()
-        var previousStart = -1
-        var previousRows = emptyList<View>()
-        fun showRows(first: Int) {
-            val nextRows = if (first == previousStart) previousRows else
-                (first until minOf(first + pageSize, vehicles.size)).map { vehicleRow(vehicles[it]) }
-            rows.removeAllViews()
-            nextRows.forEach { add(rows, it, gap = 4) }
-            previousStart = visibleStart
-            previousRows = visibleRows
-            visibleStart = first
-            visibleRows = nextRows
-        }
-        showRows(start)
-        add(this@CollectionView, pager(page, lastPage) { target ->
-            val first = target * pageSize
-            positions[filter] = PagePosition(vehicles[first].first().entry.key.vehicleId, first)
-            showRows(first)
-            viewport.scrollTo(0, 0)
-        }, gap = 6)
-    }
-
-    private fun pager(initialPage: Int, lastPage: Int, onPageChanged: (Int) -> Unit) = with(style) {
-        row().apply {
-            gravity = Gravity.CENTER_VERTICAL
-            val previous = button(s(R.string.garage_collection_previous), onClick = {}).apply { tag = "collection:previous" }
-            val next = button(s(R.string.garage_collection_next), onClick = {}).apply { tag = "collection:next" }
-            val label = text("", 16, bold = true).apply {
-                tag = "collection:page"
-                gravity = Gravity.CENTER
-                setPadding(dp(8), 0, dp(8), 0)
-                accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE
-            }
-            var page = initialPage
-            fun updatePager() {
-                val focused = findFocus()
-                label.text = s(R.string.garage_collection_page, page + 1, lastPage + 1)
-                previous.isEnabled = page > 0
-                previous.setTextColor(if (previous.isEnabled) ink else muted)
-                next.isEnabled = page < lastPage
-                next.setTextColor(if (next.isEnabled) ink else muted)
-                when {
-                    focused === previous && !previous.isEnabled && next.isEnabled -> next.requestFocus()
-                    focused === next && !next.isEnabled && previous.isEnabled -> previous.requestFocus()
-                }
-            }
-            fun move(offset: Int) {
-                val target = page + offset
-                if (parent !== this@CollectionView || !controlsEnabled || target !in 0..lastPage) return
-                page = target
-                onPageChanged(page)
-                updatePager()
-            }
-            previous.setOnClickListener { if (previous.isEnabled) move(-1) }
-            next.setOnClickListener { if (next.isEnabled) move(1) }
-            addView(previous, LayoutParams(0, -2, 1f))
-            addView(label, LayoutParams(-2, -2))
-            addView(next, LayoutParams(0, -2, 1f))
-            updatePager()
-        }
+        vehicles.forEach { cells -> add(body, vehicleRow(cells), gap = 4) }
     }
 
     private fun rarityHeaders() = with(style) {
@@ -269,6 +235,7 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
                 else s(R.string.garage_collection_unlock_level, unlock), 13, muted))
         }
         column().apply {
+            tag = "collection:model:${first.entry.key.vehicleId.value}"
             if (!wide) addView(model, LayoutParams(-1, -2))
             Rarity.entries.chunked(rarityColumns).forEach { line ->
                 add(this, row().apply {
@@ -317,7 +284,7 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
                 } else image
                 addView(art, LayoutParams(-1, dp(44)))
             }
-            addView(text(status, 14, ink, bold = true).apply { gravity = Gravity.CENTER }, LayoutParams(-1, -2))
+            addView(text(status, 14, 0xff163619.toInt(), bold = true).apply { gravity = Gravity.CENTER }, LayoutParams(-1, -2))
         }
     }
 }

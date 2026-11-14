@@ -11,13 +11,14 @@ import android.widget.TextView
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
+import io.drivegrowth.app.ui.pixel.CleanUi
 import io.drivegrowth.app.ui.pixel.MapPanelStyle
 
 /** 정산의 목록과 상세에서 공용 픽셀 팔레트와 여백을 사용한다. */
 internal class ResultsStyle(private val context: Context) {
-    private val hud = ReferenceHudStyle(context)
-    private val panels = MapPanelStyle(context)
-    val base = 0xfff5e3bd.toInt()
+    private val hud = ReferenceHudStyle(context, featureWindow = true)
+    private val panels = MapPanelStyle(context, featureWindow = true)
+    val base = CleanUi.CARD_SOFT
     val ink get() = hud.signInk
     val muted get() = panels.muted
     val accent get() = panels.accent
@@ -47,7 +48,7 @@ internal class ResultsStyle(private val context: Context) {
     fun button(label: String, enabled: Boolean = true, primary: Boolean = false, action: () -> Unit) = Button(context).apply {
         text = label; textSize = 18f; isAllCaps = false; isEnabled = enabled
         setTypeface(typeface, Typeface.BOLD)
-        setTextColor(if (enabled) ink else muted)
+        setTextColor(hud.featureButtonText(primary))
         backgroundTintList = null
         background = hud.signButton(primary)
         minHeight = dp(52); minimumHeight = dp(52)

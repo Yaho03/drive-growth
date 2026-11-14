@@ -305,9 +305,29 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         }
         assertTrue("최초 보유에 해당하는 권위 후보", firstOwnership)
         click(host, optionTag)
-        click(host, "gacha:confirm")
+        await("확정 버튼과 창 포커스") {
+            val confirm = button(host, "gacha:confirm") ?: return@await false
+            if (!confirm.isShown || !confirm.isEnabled || !confirm.isLaidOut || !host.hasWindowFocus()) return@await false
+            val bounds = Rect()
+            val visible = confirm.getGlobalVisibleRect(bounds)
+            android.util.Log.i("Pr300GiftProbe",
+                "confirm view=${confirm.width}x${confirm.height} visible=$visible bounds=$bounds " +
+                    "display=${host.display?.displayId} window=${host.window.decorView.width}x${host.window.decorView.height} " +
+                    "award=${candidate.award.vehicle.vehicleId.value}/${candidate.award.vehicle.rarity}")
+            confirm.performClick()
+        }
         if (ValueAnimator.areAnimatorsEnabled()) {
-            await("결과 공개 전 셔터") { button(host, "gacha:reveal")?.isShown == true }
+            await("결과 공개 전 셔터", diagnostic = {
+                onUiValue {
+                    val view = descendants(host.window.decorView).filterIsInstance<GachaView>().single()
+                    val shutter = button(host, "gacha:reveal")
+                    "award=${candidate.award.vehicle.vehicleId.value}/${candidate.award.vehicle.rarity} " +
+                        "screen=${view.uiState.frame?.screen?.javaClass?.simpleName} " +
+                        "focus=${host.hasWindowFocus()} size=${view.width}×${view.height} " +
+                        "reveal=${shutter?.isShown} enabled=${shutter?.isEnabled} " +
+                        "pending=${view.uiState.pending != null} badge=${button(host, badgeTag)?.isShown}"
+                }
+            }) { button(host, "gacha:reveal")?.isShown == true }
             onUi { assertFalse(button(host, badgeTag)?.isShown == true) }
             click(host, "gacha:reveal")
         }
@@ -329,9 +349,14 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             it.contentDescription?.toString()?.startsWith("$model $rarity · ") == true
         }
         await("실제 도감 목록") { button(host, "collection:filter:OWNED")?.isShown == true }
-        if (onUiValue { cell() == null }) {
+        if (onUiValue { cell() == null || cell()?.getGlobalVisibleRect(Rect()) != true }) {
             click(host, "collection:filter:OWNED")
-            if (onUiValue { cell() == null }) click(host, "collection:next")
+            await("보유 이력의 대상 차종·희귀도 표시") {
+                val target = cell() ?: return@await false
+                if (!target.isLaidOut) return@await false
+                target.requestRectangleOnScreen(Rect(0, 0, target.width, target.height), true)
+                target.getGlobalVisibleRect(Rect())
+            }
         }
         await("뽑기 결과 이후 독립 도감 배지 ($model $rarity)") {
             cell()?.let { ownedCell ->
@@ -375,7 +400,9 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             .setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER))
         try {
             await("포커스를 받은 런처 시작 버튼", timeoutMillis = 30_000) {
-                host.window.decorView.findViewWithTag<Button>("presentation:start")?.isEnabled == true && host.hasWindowFocus()
+                host.window.decorView.findViewWithTag<Button>("presentation:start")?.let {
+                    it.isShown && it.isEnabled && it.alpha > .55f
+                } == true && host.hasWindowFocus()
             }
             onUi {
                 assertTitleCoversGame(host)
@@ -408,13 +435,170 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                 val start = host.window.decorView.findViewWithTag<Button>("simulation:start")
                 if (start != null) assertFalse(start.isEnabled)
             }
-            touchStart(host, background = true)
+            onUi {
+                val title = checkNotNull(button(host, "presentation:title"))
+                val origin = IntArray(2).also(title::getLocationInWindow)
+                dispatchTap(host.window.decorView, origin[0] + 2f, origin[1] + 2f)
+                assertTrue("포스터 배경 입력은 시작 화면을 유지", title.isShown)
+            }
+            await("건너뛴 포스터의 명시 시작 버튼") {
+                button(host, "presentation:start")?.let { it.isShown && it.isEnabled && it.alpha > 0f } == true
+            }
+            touchStart(host)
             await { host.window.decorView.findViewWithTag<Button>(io.drivegrowth.app.R.string.onboarding_start)?.isEnabled == true }
             onUi {
                 assertNull(host.window.decorView.findViewWithTag<Button>(io.drivegrowth.app.R.string.onboarding_review))
             }
         } finally { onUi { host.finish() } }
     }
+    fun testPr300MainRestoresCollectionViewport() {
+        val context = instrumentation.targetContext
+        checkIsolatedPackage(context.packageName)
+        var host = launchActivity(Intent(context, UnifiedSimulationActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        fun scroll() = host.window.decorView.findViewWithTag<android.widget.ScrollView>("collection:scroll")
+        val filter = "collection:filter:UNDISCOVERED"
+        val rect = Rect()
+        try {
+            for (tag in listOf(R.string.onboarding_start, VehicleId("hyundai_casper"),
+                R.string.onboarding_review, R.string.onboarding_confirm, R.string.onboarding_to_shop)) {
+                clickOnboarding(host, tag)
+            }
+            await("정상 HOME HUD") {
+                button(host, "shop:map-balance")?.let { it.isShown && it.getGlobalVisibleRect(rect) } == true &&
+                    button(host, "shop:loading-map")?.isShown != true && host.hasWindowFocus()
+            }
+            instrumentation.waitForIdleSync()
+            capture(host, "main-home-content")
+            openPage(host, HostPage.COLLECTION)
+            click(host, filter)
+            await("발견하지 않은 차종 목록") {
+                val list = scroll() ?: return@await false
+                button(host, filter)?.isSelected == true && list.isLaidOut &&
+                    list.getChildAt(0).height - list.height >= 320
+            }
+            onUi { checkNotNull(scroll()).scrollTo(0, 320) }
+            val before = onUiValue { checkNotNull(scroll()).scrollY }
+            assertEquals(320, before)
+            host = recreate(host)
+            await("새 Activity의 도감 필터와 스크롤 복원") {
+                host.window.decorView.isMainPageShown(HostPage.COLLECTION) &&
+                    button(host, filter)?.isSelected == true && scroll()?.scrollY == before
+            }
+            capture(host, "main-collection-viewport-restored")
+        } finally {
+            finishHost(host)
+        }
+    }
+
+    fun testPr300ActualWindowsAndCaptures() {
+        val context = instrumentation.targetContext
+        checkIsolatedPackage(context.packageName)
+        val intent = Intent(context, UnifiedSimulationActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        var host = launchActivity(intent)
+        val task = onUiValue { host.taskId }
+        val callbacks = object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, state: Bundle?) = Unit
+            override fun onActivityStarted(activity: Activity) = Unit
+            override fun onActivityResumed(activity: Activity) {
+                if (activity is UnifiedSimulationActivity && activity.taskId == task) host = activity
+            }
+            override fun onActivityPaused(activity: Activity) = Unit
+            override fun onActivityStopped(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        }
+        fun resize(width: Int, height: Int) {
+            val fd = instrumentation.uiAutomation.executeShellCommand("am task resize $task 0 0 $width $height")
+            val output = android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).bufferedReader().use { it.readText() }
+            assertFalse(output, output.contains("Error:"))
+            await("실제 앱 창 ${width}×${height}", diagnostic = {
+                onUiValue { "창=${host.window.decorView.width}×${host.window.decorView.height} " +
+                    "포커스=${host.hasWindowFocus()} 종료=${host.isDestroyed}" }
+            }) {
+                val decor = host.window.decorView
+                !host.isDestroyed && decor.width == width && decor.height == height && host.hasWindowFocus()
+            }
+        }
+        fun awaitHome() = await("HOME 지도·크림 HUD·메뉴 6개", timeoutMillis = 30_000) {
+            val root = host.window.decorView
+            root.isMainPageShown(HostPage.HOME) && button(host, "shop:map-hud")?.isShown == true &&
+                button(host, "shop:map-settings")?.isShown == true &&
+                button(host, "shop:map-balance")?.isShown == true &&
+                button(host, "shop:loading-map")?.isShown != true &&
+                listOf(HostPage.GARAGE, HostPage.COLLECTION, HostPage.GACHA, HostPage.DELIVERY,
+                    HostPage.RESULTS, HostPage.RANKING).all {
+                    root.findViewWithTag<View>("host:page:${it.name}")?.isShown == true
+                }
+        }
+        fun awaitTitle() = await("포스터 제목과 명시 시작 버튼", timeoutMillis = 30_000, diagnostic = {
+            onUiValue {
+                "focus=${host.hasWindowFocus()} title=${button(host, "presentation:start")?.isShown} " +
+                    "page=${HostPage.entries.firstOrNull { host.window.decorView.isMainPageShown(it) }}"
+            }
+        }) {
+            button(host, "presentation:start")?.let {
+                val bounds = Rect()
+                it.isLaidOut && it.isShown && it.isEnabled && it.alpha > .55f && host.hasWindowFocus() &&
+                    it.getGlobalVisibleRect(bounds) && bounds.height() >= 48 * it.resources.displayMetrics.density
+            } == true
+        }
+        fun renderPage(name: String, page: HostPage) {
+            openPage(host, page)
+            await("현재 창의 기능과 닫기 버튼 $page") {
+                val close = button(host, "host:back")
+                val bounds = Rect()
+                host.window.decorView.isMainPageShown(page) && close?.isShown == true &&
+                    close.isEnabled && close.getGlobalVisibleRect(bounds) &&
+                    bounds.height() >= 48 * close.resources.displayMetrics.density
+            }
+            if (page == HostPage.COLLECTION) {
+                await("로드된 차량 행 $name", timeoutMillis = 30_000) {
+                    button(host, "collection:model:hyundai_casper")?.isShown == true ||
+                        button(host, "collection:next")?.isLaidOut == true
+                }
+            }
+            capture(host, name)
+        }
+        onUi { host.application.registerActivityLifecycleCallbacks(callbacks) }
+        try {
+            awaitTitle()
+            capture(host, "pr300-title-wide")
+            touchStart(host)
+            for (tag in listOf(R.string.onboarding_start, VehicleId("hyundai_casper"),
+                R.string.onboarding_review, R.string.onboarding_confirm, R.string.onboarding_to_shop)) {
+                clickOnboarding(host, tag)
+            }
+            awaitHome()
+            capture(host, "pr300-home-wide")
+            renderPage("pr300-garage-wide", HostPage.GARAGE)
+            renderPage("pr300-collection-wide", HostPage.COLLECTION)
+            renderPage("pr300-results-wide", HostPage.RESULTS)
+            renderPage("pr300-delivery-wide", HostPage.DELIVERY)
+            renderPage("pr300-gacha-wide", HostPage.GACHA)
+            resize(480, 700)
+            renderPage("pr300-garage-portrait", HostPage.GARAGE)
+            renderPage("pr300-collection-portrait", HostPage.COLLECTION)
+            resize(650, 420)
+            renderPage("pr300-collection-shallow", HostPage.COLLECTION)
+            openPage(host, HostPage.HOME)
+            awaitHome()
+            capture(host, "pr300-home-shallow")
+            await("설정의 시작 화면 열기") {
+                host.window.decorView.openMainSettings()
+                button(host, "presentation:home-title")?.takeIf { it.isShown && it.isEnabled }?.performClick() == true
+            }
+            awaitTitle()
+            capture(host, "pr300-title-shallow")
+            touchStart(host)
+            awaitHome()
+        } finally {
+            onUi { host.application.unregisterActivityLifecycleCallbacks(callbacks) }
+            finishHost(host)
+        }
+    }
+
     private fun titleMusicPlaying(host: UnifiedSimulationActivity): Boolean {
         val manager = host.getSystemService(android.media.AudioManager::class.java)
         return manager.isMusicActive
@@ -1148,19 +1332,9 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         return host
     }
 
-    private fun touchStart(host: UnifiedSimulationActivity, background: Boolean = false) = onUi {
-        val button = host.window.decorView.findViewWithTag<Button>("presentation:start")
-        val decor = host.window.decorView
-        val target = if (background) decor.findViewWithTag<View>("presentation:title") else button
-        val point = IntArray(2).also(target::getLocationInWindow)
-        val x = point[0] + if (background) 2f else button.width / 2f
-        val y = point[1] + if (background) 2f else button.height / 2f
-        if (background) {
-            val buttonOrigin = IntArray(2).also(button::getLocationInWindow)
-            assertFalse(Rect(buttonOrigin[0], buttonOrigin[1],
-                buttonOrigin[0] + button.width, buttonOrigin[1] + button.height).contains(x.toInt(), y.toInt()))
-        }
-        dispatchTap(decor, x, y)
+    private fun touchStart(host: UnifiedSimulationActivity) = onUi {
+        val start = checkNotNull(button(host, "presentation:start"))
+        touchView(host, start)
     }
 
     private fun touchView(host: UnifiedSimulationActivity, view: View) {

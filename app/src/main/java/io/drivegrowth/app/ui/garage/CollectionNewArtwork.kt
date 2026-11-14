@@ -49,7 +49,8 @@ internal class CollectionNewArtwork(
     }
 
     private fun canReveal() = isAttachedToWindow && hasWindowFocus() && isShown &&
-        windowVisibility == VISIBLE && getLocalVisibleRect(visibleBounds)
+        windowVisibility == VISIBLE && stamp.isLaidOut && stamp.width > 0 && stamp.height > 0 &&
+        getLocalVisibleRect(visibleBounds) && visibleBounds.contains(stamp.left, stamp.top, stamp.right, stamp.bottom)
 
     private fun reveal() {
         stamp.visibility = VISIBLE

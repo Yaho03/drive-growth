@@ -19,7 +19,7 @@ import java.util.Locale
 
 /** 호스트가 허용한 영역에 삽입하는 표시 전용 View. 탐색·저장·차량 SDK를 호출하지 않는다. */
 class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayout(context) {
-    private val style = GarageStyle(context, pixelPanel = true, creamPanel = true)
+    private val style = GarageStyle(context, pixelPanel = true, featureWindow = true)
     private val artwork = VehicleArtwork(context, style)
     internal var showHeading = true
     private val heldDeadlineFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.KOREA)
@@ -286,7 +286,7 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
                     }.apply {
                         tag = action
                         if (!enabled) contentDescription = s(R.string.garage_action_with_reason, s(label), reason)
-                        if (action == VehicleAction.SCRAP && enabled) setTextColor(0xff7d3026.toInt())
+                        if (action == VehicleAction.SCRAP && enabled) setTextColor(0xffffb3ac.toInt())
                     }, 6)
                     if (info?.enabled != true && reason !in sharedReasons && !interaction.requestPending) {
                         add(this, text(reason, 14, muted), 0)

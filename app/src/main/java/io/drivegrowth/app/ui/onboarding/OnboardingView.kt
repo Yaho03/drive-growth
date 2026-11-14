@@ -16,6 +16,7 @@ import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
+import io.drivegrowth.app.ui.pixel.CleanUi
 import io.drivegrowth.app.ui.pixel.MapPanelStyle
 import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.app.ui.presentation.RewardCelebrationKind
@@ -29,8 +30,8 @@ import java.util.Locale
 /** 실제 지급·저장·탐색을 호출하지 않고 호스트가 전달한 단계와 확정 결과만 표시한다. */
 class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : LinearLayout(context) {
     internal var showHeading = true
-    private val hud = ReferenceHudStyle(context)
-    private val panels = MapPanelStyle(context)
+    private val hud = ReferenceHudStyle(context, featureWindow = true)
+    private val panels = MapPanelStyle(context, featureWindow = true)
     private val style = GarageStyle(context, pixelPanel = true, creamActions = true)
     internal var onCelebration: ((RewardCelebrationKind) -> Unit)? = null
     private val celebration = RewardCelebrationView(context).apply {
@@ -59,7 +60,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
     val selectedVehicleId: VehicleId? get() = interaction.selectedId
     val pendingVehicleId: VehicleId? get() = interaction.pendingSelection
 
-    init { orientation = VERTICAL; setBackgroundColor(0xfff5e3bd.toInt()) }
+    init { orientation = VERTICAL; setBackgroundColor(CleanUi.CARD_SOFT) }
 
     /** false인 늦은/역행 응답은 표시하지 않는다. 호스트는 프로필·requestId·응답 순서도 대조한다. */
     fun render(state: OnboardingScreenState, controlsEnabled: Boolean): Boolean {
@@ -338,7 +339,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             this.tag = tag
             backgroundTintList = null
             background = hud.signButton(primary)
-            setTextColor(if (available) hud.signInk else panels.muted)
+            setTextColor(hud.featureButtonText(primary))
             if (description != null) contentDescription = description
         }, PixelStyle.gapDp)
     }

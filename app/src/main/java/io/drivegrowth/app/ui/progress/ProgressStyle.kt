@@ -6,19 +6,20 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import io.drivegrowth.app.ui.pixel.PixelStyle
+import io.drivegrowth.app.ui.pixel.CleanUi
 import io.drivegrowth.app.ui.pixel.MapPanelStyle
 import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 
 /** 진행과 기록 화면에 공용 도트 패널을 적용한다. */
 internal class ProgressStyle(private val context: Context) {
-    private val hud = ReferenceHudStyle(context)
-    private val panels = MapPanelStyle(context)
-    val base = 0xfff5e3bd.toInt()
+    private val hud = ReferenceHudStyle(context, featureWindow = true)
+    private val panels = MapPanelStyle(context, featureWindow = true)
+    val base = CleanUi.CARD_SOFT
     val ink get() = hud.signInk
     val muted get() = panels.muted
     val green get() = panels.accent
-    val amber = 0xff73430c.toInt()
+    val amber = CleanUi.SUN
 
     fun icon(icon: ReferenceHudIcon) = hud.icon(icon, 28)
     fun surface(selected: Boolean = false) = hud.detailSurface(selected)
@@ -39,7 +40,7 @@ internal class ProgressStyle(private val context: Context) {
     }
     fun button(label: String, enabled: Boolean = true, primary: Boolean = false, action: () -> Unit) = Button(context).apply {
         text = label; textSize = 22f; isAllCaps = false; isEnabled = enabled
-        setTextColor(if (enabled) ink else muted)
+        setTextColor(hud.featureButtonText(primary))
         backgroundTintList = null
         background = hud.signButton(primary)
         setTypeface(typeface, Typeface.BOLD)

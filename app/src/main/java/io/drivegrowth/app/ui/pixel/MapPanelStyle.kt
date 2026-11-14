@@ -3,22 +3,30 @@ package io.drivegrowth.app.ui.pixel
 import android.content.Context
 import android.graphics.Typeface
 import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Shader
 import android.graphics.Paint
 import android.view.View
 import android.widget.Button
 
-/** 지도 위의 확인창과 차량 상세가 HUD와 같은 색·모서리를 사용한다. */
-internal class MapPanelStyle(private val context: Context) {
-    private val signs = ReferenceHudStyle(context)
+/** 지도와 기능 창의 버튼 크기를 유지하면서 화면에 맞는 팔레트를 사용한다. */
+internal class MapPanelStyle(
+    private val context: Context,
+    private val featureWindow: Boolean = false,
+) {
+    private val signs = ReferenceHudStyle(context, featureWindow)
     val ink get() = signs.signInk
-    val muted = 0xff5a4c37.toInt()
-    val accent = 0xff396b28.toInt()
+    val muted = if (featureWindow) CleanUi.MUTED else 0xff5a4c37.toInt()
+    val accent = if (featureWindow) CleanUi.SEA else 0xff396b28.toInt()
 
     fun card() = signs.signSurface()
 
     fun chip(active: Boolean = false) = signs.detailSurface(active)
 
-    fun experienceTrack(percent: Int) = object : View(context) {
+    fun experienceTrack(percent: Int): View =
+        if (featureWindow) featureTrack(percent) else pixelTrack(percent)
+
+    private fun pixelTrack(percent: Int) = object : View(context) {
         private val paint = Paint()
 
         init { importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO }
@@ -49,10 +57,43 @@ internal class MapPanelStyle(private val context: Context) {
         }
     }.apply { background = chip() }
 
+    private fun featureTrack(percent: Int) = object : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val inset = signs.dp(3).toFloat()
+        private val fraction = percent.coerceIn(0, 100) / 100f
+        private var fill: Shader? = null
+
+        init { importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO }
+
+        override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+            super.onSizeChanged(w, h, oldw, oldh)
+            fill = if (w > inset * 2) LinearGradient(inset, 0f, w - inset, 0f,
+                CleanUi.SEA_LIGHT, CleanUi.SEA, Shader.TileMode.CLAMP) else null
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            val right = width - inset
+            val bottom = height - inset
+            if (right <= inset || bottom <= inset) return
+            val radius = (bottom - inset) / 2
+            paint.color = CleanUi.CHIP
+            canvas.drawRoundRect(inset, inset, right, bottom, radius, radius, paint)
+            if (fraction <= 0f) return
+            // 트랙 모양을 유지하면서 실제 값까지만 채운다.
+            val saved = canvas.save()
+            canvas.clipRect(inset, inset, inset + (right - inset) * fraction, bottom)
+            paint.shader = fill
+            canvas.drawRoundRect(inset, inset, right, bottom, radius, radius, paint)
+            paint.shader = null
+            canvas.restoreToCount(saved)
+        }
+    }
+
     fun styleButton(button: Button, primary: Boolean) = button.apply {
         backgroundTintList = null
         background = signs.signButton(primary)
-        setTextColor(if (isEnabled) ink else muted)
+        if (featureWindow) setTextColor(signs.featureButtonText(primary))
+        else setTextColor(if (isEnabled) ink else muted)
         minHeight = signs.dp(48)
         minimumHeight = minHeight
         minWidth = 0

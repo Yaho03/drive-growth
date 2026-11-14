@@ -425,7 +425,7 @@ class DeliveryView(
             ((observed.coerceIn(0L, estimated).toDouble() / estimated) * 100).toInt() else null
         val status = panel(padding = 12).apply {
             tag = "delivery:highway-status"
-            addView(chip(s(R.string.delivery_active), 0xffe4edbf.toInt(), accent), LayoutParams(-2, -2))
+            addView(chip(s(R.string.delivery_active), 0xffe4edbf.toInt(), 0xff28551f.toInt()), LayoutParams(-2, -2))
             addView(text(destination, 20, bold = true))
             val routeFacts = if (wide) row() else column()
             for (fact in listOf(estimatedDistance(road.details), distance)) {
@@ -720,7 +720,7 @@ class DeliveryView(
             if (!review && (!tile || income)) {
                 addView(chip(s(if (income) R.string.delivery_income else R.string.delivery_purchase),
                     if (income) 0xffe4edbf.toInt() else 0xffffdf8c.toInt(),
-                    if (income) accent else moneyInk), LayoutParams(-2, -2))
+                    if (income) 0xff28551f.toInt() else 0xff70450d.toInt()), LayoutParams(-2, -2))
             }
             when (offer) {
                 is DeliveryOffer.Income -> {

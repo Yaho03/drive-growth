@@ -13,6 +13,8 @@ import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
 import io.drivegrowth.app.ui.garage.CollectionScrollTestActivity
+import io.drivegrowth.app.ui.pixel.CleanUi
+import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import io.drivegrowth.core.contract.*
 
 /** 실제 위젯 표적. 기기 배정 전에는 컴파일만 확인한다. */
@@ -138,7 +140,9 @@ class GachaViewTest : InstrumentationTestCase() {
         view.takeNewGachaResult = { receipt -> takes++; receipt == value.settlement }
         assertNull(view.findViewWithTag<View>("gacha:new-collection"))
         view.render(frame, true)
-        assertEquals("NEW · 도감 등록", view.findViewWithTag<TextView>("gacha:new-collection").text.toString())
+        val badge = view.findViewWithTag<TextView>("gacha:new-collection")
+        assertEquals("NEW · 도감 등록", badge.text.toString())
+        assertEquals(CleanUi.INK, badge.currentTextColor)
         view.render(frame, true)
         assertEquals(1, takes)
         val restored = GachaView(instrumentation.targetContext, events::add, view.uiState)
@@ -222,6 +226,9 @@ class GachaViewTest : InstrumentationTestCase() {
         assertEquals(1, events.size)
         assertNull(view.findViewWithTag<View>("gacha:garage"))
         assertEquals(View.INVISIBLE, view.findViewWithTag<View>("gacha:reference-card").visibility)
+        val hiddenBadge = view.findViewWithTag<TextView>("gacha:new-collection")
+        assertFalse(hiddenBadge.isShown)
+        assertEquals(ReferenceHudStyle(view.context).signInk, hiddenBadge.currentTextColor)
 
         val restored = GachaView(instrumentation.targetContext, events::add, view.uiState)
         restored.render(frame, true)
@@ -232,7 +239,8 @@ class GachaViewTest : InstrumentationTestCase() {
         assertTrue(view.handleBack())
         assertNull(view.findViewWithTag<View>("gacha:reveal"))
         assertTrue(button(view, "gacha:garage").isEnabled)
-        assertNotNull(view.findViewWithTag<View>("gacha:new-collection"))
+        val resultBadge = view.findViewWithTag<TextView>("gacha:new-collection")
+        assertEquals(CleanUi.INK, resultBadge.currentTextColor)
         view.render(frame, false)
         view.render(frame, true)
         assertNull(view.findViewWithTag<View>("gacha:reveal"))

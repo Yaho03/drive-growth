@@ -162,6 +162,7 @@ open class MainActivity : Activity() {
     private lateinit var session: HostSession
     private lateinit var style: GarageStyle
     private lateinit var featureStyle: GarageStyle
+    private lateinit var deliveryFeatureStyle: GarageStyle
     private lateinit var garage: GarageView
     private lateinit var collection: CollectionView
     private lateinit var body: FrameLayout
@@ -208,6 +209,7 @@ open class MainActivity : Activity() {
         }
         style = GarageStyle(this, pixelPanel = true)
         featureStyle = GarageStyle(this, pixelPanel = true, creamPanel = true)
+        deliveryFeatureStyle = GarageStyle(this, pixelPanel = true, featureWindow = true)
         titlePending = savedInstanceState?.getBoolean("presentationTitlePending")
             ?: intent.hasCategory(Intent.CATEGORY_LAUNCHER)
         presentationAudio = PrototypeAudio(applicationContext)
@@ -222,6 +224,7 @@ open class MainActivity : Activity() {
         }
         collection = CollectionView(this, ::refresh).apply {
             showHeading = false
+            savedInstanceState?.getBundle("collectionViewport")?.let(::restoreViewport)
             takeNewCollectionKey = { key ->
                 val snapshot = (screen as? HostQueryState.Content)?.snapshot
                 val identity = session.onboarding.uiState.identity
@@ -368,7 +371,7 @@ open class MainActivity : Activity() {
         if (session.simulation != null) {
             simulationControls = createSimulationControls()
         }
-        val sign = ReferenceHudStyle(this)
+        val sign = ReferenceHudStyle(this, featureWindow = true)
         chrome = style.column()
         body = FrameLayout(this)
         stage = FrameLayout(this).apply {
@@ -431,7 +434,8 @@ open class MainActivity : Activity() {
             }
         }.apply {
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(style.dp(12), style.dp(6), style.dp(12), style.dp(6))
+            background = sign.featureHeading()
+            setPadding(style.dp(14), style.dp(8), style.dp(10), style.dp(8))
             addView(pageTitle, LinearLayout.LayoutParams(0, -2, 1f))
             addView(pageActions, LinearLayout.LayoutParams(-2, -2))
         }
@@ -745,6 +749,7 @@ open class MainActivity : Activity() {
     override fun onRetainNonConfigurationInstance(): Any = session
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBundle("collectionViewport", collection.saveViewport())
         outState.putBoolean("presentationTitlePending", titlePending)
         session.progressionUi = progression.uiState
         outState.putBundle("progression", io.drivegrowth.app.host.progression.ProgressionUiStateBundle.encode(progression.uiState))
@@ -952,7 +957,7 @@ open class MainActivity : Activity() {
     private fun Button.stylePageAction(sign: ReferenceHudStyle) {
         backgroundTintList = null
         background = sign.signButton()
-        setTextColor(sign.signInk)
+        setTextColor(sign.featureButtonText(primary = false))
         textSize = 18f
         minWidth = style.dp(64)
         minimumWidth = minWidth
@@ -1207,7 +1212,7 @@ open class MainActivity : Activity() {
             else -> CollectionScreenState.Loading
         }
         ranking.render(rankingState, gameEnabled && navigation.page == HostPage.RANKING)
-        managementView.render(managementState, gameEnabled)
+        managementView.render(managementState, gameEnabled, featureWindow = navigation.page == HostPage.GARAGE)
         val homeEnabled = gameEnabled && navigation.page == HostPage.HOME && !shopRestoreFailed
         val facility = session.facility.state
         val facilityEnabled = homeEnabled && session.home.facilityControlsEnabled
@@ -1609,10 +1614,16 @@ open class MainActivity : Activity() {
     private fun renderSceneChrome(enabled: Boolean) {
         val fillsApp = referenceSceneFillsApp()
         val changed = (body.tag != null) != fillsApp
-        pageHeading.visibility = if (enabled && !titlePending && navigation.page != HostPage.HOME && !fillsApp)
-            View.VISIBLE else View.GONE
+        val showHeading = enabled && !titlePending && navigation.page != HostPage.HOME && !fillsApp
+        pageHeading.visibility = if (showHeading) View.VISIBLE else View.GONE
+        val stageParams = stage.layoutParams as LinearLayout.LayoutParams
+        val headingGap = if (showHeading) style.dp(6) else 0
+        if (stageParams.topMargin != headingGap) {
+            stageParams.topMargin = headingGap
+            stage.layoutParams = stageParams
+        }
         body.tag = "host:scene-page:${navigation.page.name}".takeIf { fillsApp }
-        updateFeatureWindow(enabled && !titlePending && navigation.page != HostPage.HOME && !fillsApp)
+        updateFeatureWindow(showHeading)
         if (statusOverlay.parent === panel) {
             statusOverlay.visibility = if (enabled && !fillsApp) View.VISIBLE else View.GONE
         }
@@ -1627,7 +1638,7 @@ open class MainActivity : Activity() {
             windowMap.setImageDrawable(BitmapDrawable(resources, map).apply { isFilterBitmap = false })
         }
         windowMap.visibility = if (show) View.VISIBLE else View.GONE
-        panel.background = if (show) ReferenceHudStyle(this).signSurface() else null
+        panel.background = if (show) ReferenceHudStyle(this, featureWindow = true).signSurface() else null
         panel.tag = "host:feature-window".takeIf { show }
         val border = if (show) style.dp(7) else 0
         panel.setPadding(border, border, border, border)
@@ -1847,7 +1858,7 @@ open class MainActivity : Activity() {
 
     private fun deliveryNavigationControls(): View? {
         if (session.delivery.state?.readOnly == true) return null
-        val style = featureStyle
+        val style = deliveryFeatureStyle
         val details = style.column()
         if (session.simulation != null) {
             val estimate = session.delivery.state?.navigation?.estimated as? Observation.Available
@@ -1889,7 +1900,7 @@ open class MainActivity : Activity() {
         val heldVehicles = state?.held.orEmpty()
         val canCancel = session.delivery.canCancelUnstarted
         if (heldVehicles.isEmpty() && state?.receipt == null && !canCancel) return null
-        val style = featureStyle
+        val style = deliveryFeatureStyle
         val details = style.column()
         val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
             ?.associate { it.vehicleId to it.displayName }.orEmpty()

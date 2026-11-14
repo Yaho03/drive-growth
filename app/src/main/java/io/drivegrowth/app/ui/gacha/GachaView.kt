@@ -12,6 +12,7 @@ import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.garage.VehicleArtwork
+import io.drivegrowth.app.ui.pixel.CleanUi
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.app.ui.presentation.ReferenceSceneArt
@@ -29,8 +30,9 @@ import java.util.Locale
 class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: GachaUiState = GachaUiState()) : LinearLayout(context) {
     private val sceneArt = ReferenceSceneArt(context)
     private val sceneText = ReferenceSceneTypography(context)
-    private val style = GarageStyle(context, pixelPanel = true, creamPanel = true)
+    private val style = GarageStyle(context, pixelPanel = true, featureWindow = true)
     private val sceneStyle = GarageStyle(context, pixelPanel = true, creamActions = true)
+    private val referenceBadgeStyle = GarageStyle(context, pixelPanel = true, creamPanel = true)
     private val artwork = VehicleArtwork(context, style)
     private val sprites = VehicleSprites(context)
     internal var onCelebration: ((RewardCelebrationKind) -> Unit)? = null
@@ -161,7 +163,7 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
         val body = column()
         scroll = scroll(body, savedY)
         addView(scroll, LayoutParams(-1, 0, 1f).apply { topMargin = dp(8) })
-        if (uiState.pending != null) add(body,text(s(R.string.gacha_pending),color=rarityColor(Rarity.RARE)))
+        if (uiState.pending != null) add(body,text(s(R.string.gacha_pending),color = CleanUi.SEA_LIGHT))
         val screen = session.frame?.screen
         if (screen !is GachaScreen.Failure && screen !is GachaScreen.Missing) {
             uiState.failure?.let { add(body, text(error(it), 24)) }
@@ -299,7 +301,7 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
     }
     private fun offers(parent: LinearLayout, value: GachaOffers) = with(style) {
         if (value.origin == GachaOrigin.FIXTURE)
-            add(parent, text(s(R.string.gacha_fixture), color = rarityColor(Rarity.LEGEND)))
+            add(parent, text(s(R.string.gacha_fixture), color = CleanUi.SUN))
         add(parent,text(s(R.string.gacha_balance,money(value.balance)),24,bold=true))
         value.displayProblem()?.let { add(parent,text(status(it),24,bold=true)) }
         if(session.awaitingConfirmation) add(parent,text(s(R.string.gacha_awaiting)))
@@ -382,20 +384,20 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
                 val remaining = guarantee?.remaining
                 addView(text(s(R.string.gacha_remaining, remaining?.toString() ?: s(R.string.gacha_missing)), 17, bold = true))
                 if (rules != null && rules.pity > 0 && remaining != null && remaining in 0..rules.pity) {
-                    addView(progressTrack(rules.pity - remaining, rules.pity, rarityColor(rules.guaranteedFrom)),
+                    addView(progressTrack(rules.pity - remaining, rules.pity, CleanUi.SEA),
                         LayoutParams(-1, dp(10)))
                 }
                 addView(text(s(when (guarantee?.nextGuaranteed) {
                     true -> R.string.gacha_next_guaranteed
                     false -> R.string.gacha_next_normal
                     null -> R.string.gacha_missing
-                }), 15, color = if (guarantee?.nextGuaranteed == true) rarityColor(Rarity.RARE) else muted))
+                }), 15, color = if (guarantee?.nextGuaranteed == true) CleanUi.SEA_LIGHT else muted))
                 if (guarantee?.available == false) addView(text(s(R.string.gacha_status_guarantee), 15))
                 guarantee?.description?.let { addView(text(it, 14, muted)) }
             })
             addView(text(s(R.string.gacha_space_value, value.space?.owned?.toString() ?: s(R.string.gacha_missing),
                 value.space?.capacity?.toString() ?: s(R.string.gacha_missing)), 15))
-            value.space?.let { if (it.availability != GachaAvailability.READY) addView(text(status(it.availability), 16, rarityColor(Rarity.LEGEND))) }
+            value.space?.let { if (it.availability != GachaAvailability.READY) addView(text(status(it.availability), 16, CleanUi.SUN)) }
         }
         facts.apply {
             addView(text(s(R.string.gacha_rates), 22, bold = true))
@@ -419,7 +421,12 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
                 add(this, row().apply {
                     gravity = Gravity.CENTER_VERTICAL
                     addView(rarityChip(tier), LayoutParams(dp(66), -2))
-                    addView(progressTrack(ticks, 1000, rarityColor(tier)), LayoutParams(0, dp(10), 1f).apply {
+                    addView(progressTrack(ticks, 1000, when (tier) {
+                        Rarity.COMMON -> muted
+                        Rarity.ADVANCED -> 0xffb9df8b.toInt()
+                        Rarity.RARE -> CleanUi.SEA_LIGHT
+                        Rarity.LEGEND -> CleanUi.SUN
+                    }), LayoutParams(0, dp(10), 1f).apply {
                         marginStart = dp(8)
                         marginEnd = dp(8)
                     })
@@ -531,7 +538,7 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
                     badge(rarity(tier), tierColor, 0xff0b0e1f.toInt())
                     badge("Lv${vehicle.level}", secondary, creamText)
                 })
-                if (newResult == receipt) append(newCollectionBadge())
+                if (newResult == receipt) append(newCollectionBadge(referenceBadgeStyle))
                 addView(View(context).apply { setBackgroundColor(secondary) }, LayoutParams(-1, 2).apply {
                     topMargin = 24
                 })
@@ -642,7 +649,7 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
     private fun <T : TextView> T.referenceSize(size: Float, bold: Boolean = true): T =
         sceneText.apply(this, size, if (bold) sceneText.plexBold else sceneText.plexMedium)
 
-    private fun newCollectionBadge() = with(style) {
+    private fun newCollectionBadge(badgeStyle: GarageStyle) = with(badgeStyle) {
         text(s(R.string.gacha_new_collection), 16, bold = true).apply {
             tag = "gacha:new-collection"
             background = shape(panel, selected = true)
@@ -672,9 +679,9 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
         val details = card().apply {
             addView(rarityChip(vehicle.rarity).apply { gravity = Gravity.CENTER })
             addView(text(s(R.string.gacha_result), 28, bold = true))
-            addView(text(s(R.string.gacha_vehicle,value.vehicleName ?: s(R.string.gacha_missing),rarity(vehicle.rarity)),30,color=rarityColor(vehicle.rarity),bold=true))
+            addView(text(s(R.string.gacha_vehicle,value.vehicleName ?: s(R.string.gacha_missing),rarity(vehicle.rarity)),30,color = ink, bold = true))
             addView(text(s(R.string.gacha_growth,vehicle.level,vehicle.levelProgressPercent)))
-            if (newResult == receipt) addView(newCollectionBadge())
+            if (newResult == receipt) addView(newCollectionBadge(style))
             receipt.transaction.money?.takeIf { it.direction == MoneyDirection.DEBIT }?.let { change ->
                 addView(text(s(R.string.gacha_result_debit, money(change.amount))))
             }
