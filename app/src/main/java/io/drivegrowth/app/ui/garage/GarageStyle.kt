@@ -123,12 +123,15 @@ internal class GarageStyle(
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
 
-    fun raritySurface(value: Rarity) = shape(when (value) {
-        Rarity.COMMON -> inset
-        Rarity.ADVANCED -> 0xffe4edbf.toInt()
-        Rarity.RARE -> 0xffdbeaf4.toInt()
-        Rarity.LEGEND -> 0xffffdf8c.toInt()
-    })
+    fun raritySurface(value: Rarity): Drawable {
+        val fill = when (value) {
+            Rarity.COMMON -> inset
+            Rarity.ADVANCED -> 0xffe4edbf.toInt()
+            Rarity.RARE -> 0xffdbeaf4.toInt()
+            Rarity.LEGEND -> 0xffffdf8c.toInt()
+        }
+        return if (creamPanel) hud.detailSurface(active = false, fill = fill) else shape(fill)
+    }
 
     fun rarityChip(value: Rarity) = text(rarity(value), 14, rarityColor(value), bold = true).apply {
         background = if (creamPanel) raritySurface(value) else GradientDrawable().apply {

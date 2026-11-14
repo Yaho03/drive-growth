@@ -42,6 +42,7 @@
     <string name="garage_action_repair">수리 조건 확인</string>
     <string name="garage_action_sell">판매 조건 확인</string>
     <string name="garage_action_scrap">폐차 조건 확인</string>
+    <string name="garage_action_with_reason">%1$s · %2$s</string>
     <string name="garage_action_unknown">행동 정보 확인 불가</string>
     <string name="garage_action_unavailable">현재 이용 불가</string>
     <string name="garage_pending">요청을 전달했어요. 결과를 확인하고 있어요.</string>

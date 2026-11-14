@@ -132,10 +132,13 @@ class ProgressionHostTest {
  @Test fun savedRejectionCanBeExplicitlyCancelledButNeverByBack(){
   val r=Rig();r.source.executeFailure=ContractError.STATE_CONFLICT;r.source.value=data(ProgressionJournalState.Quest(command(),ProgressionPhase.SAVED));r.start()
   r.controller.handle(ProgressEvent.CloseDetail);r.drain();assertEquals(0,r.source.cancels)
+  assertTrue(r.controller.canCancelSaved)
   r.controller.cancelSaved();r.drain();assertEquals(1,r.source.cancels)
+  assertFalse(r.controller.canCancelSaved)
  }
  @Test fun uncertainStartedCommandCannotBeCancelled(){
   val r=Rig();r.source.executeFailure=ContractError.STORAGE_FAILURE;r.source.value=data(ProgressionJournalState.Quest(command(),ProgressionPhase.STARTED));r.start()
+  assertFalse(r.controller.canCancelSaved)
   r.controller.cancelSaved();r.drain();assertEquals(0,r.source.cancels)
  }
 

@@ -14,15 +14,25 @@ data class OnboardingSnapshot(
     val gift: ContractResult<FirstRentalGiftState>?,
 )
 
+data class OnboardingChoice(val settlement: InitializationSettlement, val newlyCommitted: Boolean)
+
 /** worker 전용. 조회 결과와 확정 결과를 분리하고 같은 프로필의 원래 명령만 재생한다. */
 interface OnboardingHostSource {
     fun read(): ContractResult<OnboardingSnapshot>
-    fun choose(identity: GameIdentity, vehicleId: VehicleId): ContractResult<InitializationSettlement>
+    fun choose(identity: GameIdentity, vehicleId: VehicleId): ContractResult<InitializationSettlement> =
+        when (val result = chooseWithOutcome(identity, vehicleId)) {
+            is ContractResult.Failure -> result
+            is ContractResult.Success -> ContractResult.Success(result.value.settlement)
+        }
+    fun chooseWithOutcome(identity: GameIdentity, vehicleId: VehicleId): ContractResult<OnboardingChoice>
     fun claimGift(identity: GameIdentity): ContractResult<FirstRentalGiftSettlement>
 }
 
 /** 같은 factory/DB에서만 실행한다. 미확정 명령 메모리는 구성 변경용이며 영속 checkpoint가 아니다. */
-class StoredOnboardingHostSource(private val sessions: GameSessionFactory) : OnboardingHostSource {
+class StoredOnboardingHostSource(
+    private val sessions: GameSessionFactory,
+    private val onNewOpeningGift: (FirstRentalGiftSettlement) -> Unit = {},
+) : OnboardingHostSource {
     private var pendingInitialization: InitializationCommand? = null
     private var pendingGift: FirstRentalGiftCommand? = null
 
@@ -49,12 +59,18 @@ class StoredOnboardingHostSource(private val sessions: GameSessionFactory) : Onb
         ContractResult.Success(OnboardingSnapshot(session.identity, initialization, session.content, gift))
     }
 
-    override fun choose(identity: GameIdentity, vehicleId: VehicleId): ContractResult<InitializationSettlement> = withSession(identity) { session ->
+    override fun chooseWithOutcome(identity: GameIdentity, vehicleId: VehicleId): ContractResult<OnboardingChoice> = withSession(identity) { session ->
+        fun commit(command: InitializationCommand): ContractResult<OnboardingChoice> =
+            when (val result = session.store.commitInitializationWithOutcome(command)) {
+                is ContractResult.Failure -> result
+                is ContractResult.Success -> ContractResult.Success(OnboardingChoice(result.value.settlement, result.value.newlyCommitted))
+            }
+
         pendingInitialization?.let { original ->
             if (original.profileId != identity.profileId || original.grant.source != identity.source ||
                 (original.grant.vehicle as? VehicleWrite.Add)?.vehicle?.vehicleId != vehicleId)
                 return@withSession ContractResult.Failure(ContractError.STATE_CONFLICT)
-            return@withSession session.store.commitInitialization(original)
+            return@withSession commit(original)
         }
         val state = when (val read = session.store.readInitialization(identity.profileId)) {
             is ContractResult.Failure -> return@withSession read
@@ -66,29 +82,50 @@ class StoredOnboardingHostSource(private val sessions: GameSessionFactory) : Onb
                 val original = status.original?.command ?: return@withSession ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
                 if ((original.grant.vehicle as? VehicleWrite.Add)?.vehicle?.vehicleId != vehicleId)
                     ContractResult.Failure(ContractError.STATE_CONFLICT)
-                else { pendingInitialization = original; session.store.commitInitialization(original) }
+                else { pendingInitialization = original; commit(original) }
             }
             is ProfileInitializationStatus.New -> {
                 val content = when (val loaded = session.content) {
                     is ContractResult.Failure -> return@withSession loaded
                     is ContractResult.Success -> loaded.value
                 }
+                var outcome: OnboardingChoice? = null
                 val bridge = object : InitializationChangeStore by session.store {
                     override fun commitInitialization(command: InitializationCommand): ContractResult<InitializationSettlement> {
                         pendingInitialization = command
-                        return session.store.commitInitialization(command)
+                        return when (val result = commit(command)) {
+                            is ContractResult.Failure -> result
+                            is ContractResult.Success -> {
+                                outcome = result.value
+                                ContractResult.Success(result.value.settlement)
+                            }
+                        }
                     }
                 }
-                FirstGrant(content).choose(bridge, identity.profileId, vehicleId)
+                when (val result = FirstGrant(content).choose(bridge, identity.profileId, vehicleId)) {
+                    is ContractResult.Failure -> result
+                    is ContractResult.Success -> outcome?.let { ContractResult.Success(it) }
+                        ?: ContractResult.Failure(ContractError.STORAGE_FAILURE)
+                }
             }
         }
     }
 
     override fun claimGift(identity: GameIdentity): ContractResult<FirstRentalGiftSettlement> = withSession(identity) { session ->
+        fun commit(command: FirstRentalGiftCommand): ContractResult<FirstRentalGiftSettlement> =
+            when (val result = session.store.commitFirstRentalGiftWithOutcome(command)) {
+                is ContractResult.Failure -> result
+                is ContractResult.Success -> {
+                    val outcome = result.value
+                    if (outcome.newlyCommitted) onNewOpeningGift(outcome.settlement)
+                    ContractResult.Success(outcome.settlement)
+                }
+            }
+
         pendingGift?.let { command ->
             if (command.profileId != identity.profileId || command.source != identity.source)
                 return@withSession ContractResult.Failure(ContractError.INVALID_INPUT)
-            return@withSession session.store.commitFirstRentalGift(command)
+            return@withSession commit(command)
         }
         val state = when (val read = session.store.readFirstRentalGift(identity.profileId)) {
             is ContractResult.Failure -> return@withSession read
@@ -98,7 +135,7 @@ class StoredOnboardingHostSource(private val sessions: GameSessionFactory) : Onb
             return@withSession ContractResult.Failure(ContractError.INVALID_INPUT)
         state.granted?.let { original ->
             pendingGift = original.command
-            return@withSession session.store.commitFirstRentalGift(original.command)
+            return@withSession commit(original.command)
         }
         val content = when (val read = session.content) {
             is ContractResult.Failure -> return@withSession read
@@ -109,6 +146,6 @@ class StoredOnboardingHostSource(private val sessions: GameSessionFactory) : Onb
             is ContractResult.Success -> prepared.value
         }
         pendingGift = command
-        session.store.commitFirstRentalGift(command)
+        commit(command)
     }
 }

@@ -34,8 +34,8 @@ internal class ReferenceHudStyle(private val context: Context) {
 
     fun signSurface(focused: Boolean = false): Drawable = PixelSignDrawable(dp(3).coerceAtLeast(1), focused)
 
-    fun detailSurface(active: Boolean): Drawable =
-        PixelSignDrawable(dp(2).coerceAtLeast(1), focused = false, primary = active, detail = true)
+    fun detailSurface(active: Boolean, fill: Int? = null): Drawable =
+        PixelSignDrawable(dp(2).coerceAtLeast(1), focused = false, primary = active, detail = true, detailFill = fill)
 
     fun signButton(primary: Boolean = false): Drawable = StateListDrawable().apply {
         val step = dp(3).coerceAtLeast(1)
@@ -139,6 +139,7 @@ private class PixelSignDrawable(
     private val primary: Boolean = false,
     private val disabled: Boolean = false,
     private val detail: Boolean = false,
+    private val detailFill: Int? = null,
 ) : Drawable() {
     private val paint = Paint()
     private val shape = android.graphics.Path()
@@ -189,7 +190,7 @@ private class PixelSignDrawable(
         })
         plate(p, b, if (primary && !detail) 0xff87a94c.toInt() else 0xffdaa975.toInt())
         plate(2 * p, b, when {
-            detail -> if (primary) 0xffe4edbf.toInt() else 0xfff7e1ac.toInt()
+            detail -> detailFill ?: if (primary) 0xffe4edbf.toInt() else 0xfff7e1ac.toInt()
             focused -> 0xffffd985.toInt()
             primary -> 0xffe0f1b6.toInt()
             disabled -> 0xffe6ded0.toInt()

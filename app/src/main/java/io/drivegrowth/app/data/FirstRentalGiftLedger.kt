@@ -11,6 +11,11 @@ import org.json.JSONException
 import org.json.JSONObject
 import java.util.UUID
 
+internal data class FirstRentalGiftCommitOutcome(
+    val settlement: FirstRentalGiftSettlement,
+    val newlyCommitted: Boolean,
+)
+
 /**
  * 같은 DB의 영속 프로필 ID와 새 청구 자격은 초기화 경계가 공급한다. 여기서 프로필/NEW를 생성하지 않는다.
  * profileId는 현재 콘텐츠/진행을 읽지 않는다. eligible/content는 새 지급에만 사용하며 누락은 명시 미지원이다.
@@ -67,11 +72,16 @@ internal class FirstRentalGiftLedger(
         if (profileId != id) return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
         current(db,id,recorded(db,id))
     }
-    override fun commitFirstRentalGift(command: FirstRentalGiftCommand): ContractResult<FirstRentalGiftSettlement> = store.atomic { db ->
+    override fun commitFirstRentalGift(command: FirstRentalGiftCommand): ContractResult<FirstRentalGiftSettlement> = when (val outcome = commitWithOutcome(command)) {
+        is ContractResult.Failure -> outcome
+        is ContractResult.Success -> ContractResult.Success(outcome.value.settlement)
+    }
+
+    fun commitWithOutcome(command: FirstRentalGiftCommand): ContractResult<FirstRentalGiftCommitOutcome> = store.atomic { db ->
         val id = when (val read = profile()) { is ContractResult.Failure -> return@atomic read; is ContractResult.Success -> read.value }
         if (command.profileId != id || command.source != store.source) return@atomic ContractResult.Failure(ContractError.INVALID_INPUT)
         recorded(db,id)?.let { original ->
-            return@atomic if (original.command == command) ContractResult.Success(original)
+            return@atomic if (original.command == command) ContractResult.Success(FirstRentalGiftCommitOutcome(original, newlyCommitted = false))
                 else ContractResult.Failure(ContractError.STATE_CONFLICT)
         }
         if (store.requestUnavailable(db,command.requestId)) return@atomic ContractResult.Failure(ContractError.STATE_CONFLICT)
@@ -93,7 +103,7 @@ internal class FirstRentalGiftLedger(
         db.execSQL("INSERT INTO first_gift_requests VALUES(?,?,?,?,?)",arrayOf(command.requestId.value,id.value,encoded,
             FirstGiftJson.state(before).toString(),FirstGiftJson.result(result).toString()))
         if (recorded(db,id) != result) throw JSONException("선물 확정 전체 결과 연결 검증 실패")
-        ContractResult.Success(result)
+        ContractResult.Success(FirstRentalGiftCommitOutcome(result, newlyCommitted = true))
     }
 
     /** 현재 진행/완료 조회에 의존하지 않고, 당시 원명령·상태·마커·공용 정산의 연결만 검증한다. */

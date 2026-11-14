@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.results
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.view.Gravity
 import android.view.View
@@ -8,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.data.RentalIncomeKind
+import io.drivegrowth.app.data.SettlementHistoryCause
 import io.drivegrowth.app.runtime.rental.product.RentalCity
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
@@ -33,7 +35,17 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
         onStarted = { onCelebration?.invoke(it) }
     }
     private var openedResult: SettlementId? = null
+    private val displayedAccidents = mutableSetOf<SettlementId>()
+    private var accidentEffect: RentalAccidentEffectView? = null
+
+    internal fun saveDisplayedAccidents(): ArrayList<String> =
+        ArrayList(displayedAccidents.map { it.value })
+
+    internal fun restoreDisplayedAccidents(ids: List<String>) {
+        ids.filter { it.isNotBlank() }.mapTo(displayedAccidents, ::SettlementId)
+    }
     private var wide = false
+    private var drawnWide = false
     private var listScroll: ScrollView? = null
     private var detailScroll: ScrollView? = null
     private var listY = 0
@@ -44,7 +56,11 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
     init { orientation = VERTICAL; setBackgroundColor(style.base) }
 
     fun render(state: ResultsScreenState, controlsEnabled: Boolean) {
-        interaction.render(state, controlsEnabled); drawScreen()
+        val previous = interaction.state
+        val previouslyEnabled = interaction.controlsEnabled
+        interaction.render(state, controlsEnabled)
+        if (childCount == 0 || drawnWide != wide || previous != interaction.state ||
+            previouslyEnabled != controlsEnabled) drawScreen()
     }
 
     fun restoreSelection(id: SettlementId?) {
@@ -70,12 +86,15 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        val next = w >= style.dp(1000)
-        if (next != wide) { wide = next; post { drawScreen() } }
+        val next = w >= style.dp(1000) && resources.configuration.fontScale <= 1.3f
+        if (next != wide) { wide = next; post { if (drawnWide != wide) drawScreen() } }
     }
 
     private fun s(id: Int) = context.getString(id)
-    private fun drawScreen(): Unit = with(style) {
+    private fun drawScreen(accidentToShow: SettlementId? = null): Unit = with(style) {
+        accidentEffect?.stop()
+        accidentEffect = null
+        drawnWide = wide
         // Loading/Error/Restricted에는 콘텐츠 scroll을 만들지 않아 저장 위치를 0으로 덮지 않는다.
         listScroll?.takeIf { it.isLaidOut }?.let { listY = it.scrollY }
         detailScroll?.takeIf { it.isLaidOut }?.let { detailY = it.scrollY }
@@ -97,9 +116,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
         when (val current = interaction.state) {
             ResultsScreenState.Loading -> addView(scroll(message(if (uiState.scope == ResultsScope.ALL) "정산 이력을 불러오고 있어요" else s(R.string.results_loading)), 0), LayoutParams(-1, 0, 1f))
             is ResultsScreenState.Error -> addView(scroll(problem(s(R.string.results_error), current.message, true), 0), LayoutParams(-1, 0, 1f))
-            is ResultsScreenState.Missing -> addView(scroll(problem(s(R.string.results_missing), current.message, true).apply {
-                addView(text(s(R.string.results_missing_body), color = muted))
-            }, 0), LayoutParams(-1, 0, 1f))
+            is ResultsScreenState.Missing -> addView(scroll(problem(s(R.string.results_missing), current.message, true), 0), LayoutParams(-1, 0, 1f))
             is ResultsScreenState.Unsupported -> addView(scroll(problem(s(R.string.results_unsupported), current.message, false), 0), LayoutParams(-1, 0, 1f))
             is ResultsScreenState.Content -> {
                 if (current.origin == ResultsOrigin.FIXTURE) addView(text(s(R.string.results_fixture), color = accent))
@@ -109,8 +126,8 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                     listScroll = scroll(resultList(current), listY).apply { tag = "results:list" }
                     area.addView(listScroll, if (wide) LayoutParams(0, -1, 1f) else LayoutParams(-1, -1))
                 }
-                if (wide || selectedSettlementId != null) {
-                    detailScroll = scroll(detail(), detailY).apply { tag = "results:detail" }
+                if (selectedSettlementId != null) {
+                    detailScroll = scroll(detail(accidentToShow), detailY).apply { tag = "results:detail" }
                     area.addView(detailScroll, if (wide) LayoutParams(0, -1, 1.2f).apply { marginStart = dp(PixelStyle.gapDp) } else LayoutParams(-1, -1))
                 }
             }
@@ -158,7 +175,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                         addView(row().apply {
                             isBaselineAligned = false
                             gravity = Gravity.CENTER_VERTICAL
-                            addView(chip(kind(settlement.transaction.kind)), LayoutParams(-2, -2))
+                            addView(chip(kind(value)), LayoutParams(-2, -2))
                             addView(text(moneyChange(settlement), 18, amountColor(settlement), bold = true).apply {
                                 gravity = Gravity.END
                             }, LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
@@ -176,13 +193,17 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                         if (interaction.readState(settlement.settlementId) == ResultsReadState.Done) addView(text(s(R.string.results_mark_done)))
                         add(this, button(s(R.string.results_open), primary = selectedSettlementId == settlement.settlementId) {
                             if (selectedSettlementId != settlement.settlementId) { detailY = 0; detailScroll = null }
-                            openedResult = settlement.settlementId
-                            interaction.select(settlement.settlementId)
-                            drawScreen()
+                            val id = settlement.settlementId
+                            val accident = id.takeIf {
+                                interaction.controlsEnabled && interaction.visibleResults.contains(value) && canShowAccident(value)
+                            }
+                            openedResult = id
+                            interaction.select(id)
+                            drawScreen(accident)
                         }.apply {
                             tag = "results:open:${settlement.settlementId.value}"
                             contentDescription = "목록 ${index + 1}번 · " + context.getString(
-                                R.string.results_open_accessibility, kind(settlement.transaction.kind), time(settlement)
+                                R.string.results_open_accessibility, kind(value), time(settlement)
                             )
                         }, gap = 6)
                     }, gap = 10)
@@ -214,10 +235,19 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
         return context.getString(R.string.results_money, sign + formatted)
     }
 
-    private fun detail() = with(style) {
+    private fun canShowAccident(value: ResultPresentation): Boolean {
+        val settlement = value.settlement
+        val rental = value.rental ?: return false
+        return (interaction.state as? ResultsScreenState.Content)?.origin == ResultsOrigin.STORED &&
+            !value.viewed && interaction.readState(settlement.settlementId) == ResultsReadState.Ready &&
+            settlement.transaction.kind == TransactionKind.RENTAL &&
+            settlement.transaction.requestId.value == "rental/settle/${rental.rentalId.value}" &&
+            rental.ownedVehicleId.value.isNotBlank() && rental.receipt.settlement == settlement && rental.receipt.accident
+    }
+
+    private fun detail(accidentToShow: SettlementId?) = with(style) {
         column().apply {
-            val id = selectedSettlementId
-            if (id == null) { add(this, message(s(R.string.results_select_prompt))); return@apply }
+            val id = selectedSettlementId ?: return@apply
             add(this, button(s(R.string.results_close)) { closeDetail() }.apply { tag = "results:close" })
             val value = interaction.selectedResult
             if (value == null) {
@@ -231,33 +261,35 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                     openedResult == id && interaction.readState(id) == ResultsReadState.Ready &&
                     money?.direction == MoneyDirection.CREDIT && money.amount.units > 0
             }
+            val showAccident = accidentToShow == id && canShowAccident(value) && displayedAccidents.add(id) &&
+                ValueAnimator.areAnimatorsEnabled()
             celebration.render(effectKey, RewardCelebrationKind.SETTLEMENT)
             add(this, celebration.over(card(selected = effectKey != null).apply {
-                addView(text(kind(settlement.transaction.kind), 32, bold = true))
-                addView(text(s(R.string.results_confirmed), color = accent))
-                add(this, card().apply {
-                    background = surface(selected = settlement.transaction.money?.direction == MoneyDirection.CREDIT)
-                    addView(text(s(R.string.results_money_change), color = muted))
-                    addView(text(moneyChange(settlement), 36, amountColor(settlement), bold = true).apply {
+                val heading = text(kind(value), 30, bold = true)
+                if (showAccident) addView(row().apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(heading, LayoutParams(0, -2, 1f))
+                    val effect = RentalAccidentEffectView(context)
+                    accidentEffect = effect
+                    addView(effect, LayoutParams(dp(76), dp(42)))
+                }) else addView(heading)
+                addView(text(time(settlement), 15, muted))
+                addView(text(moneyChange(settlement), 30, amountColor(settlement), bold = true).apply {
+                    if (settlement.transaction.money != null) {
                         setCompoundDrawables(icon(ReferenceHudIcon.COIN), null, null, null)
                         compoundDrawablePadding = dp(8)
-                    })
+                    }
                 })
-                add(this, card(inset = true, paddingDp = 12).apply {
-                    addView(text(pair(R.string.results_balance, money(settlement.balance)), 19, bold = true))
-                })
-            }))
-            add(this, card().apply {
+                addView(text(context.getString(R.string.results_balance, money(settlement.balance)), 17))
                 if ((interaction.state as? ResultsScreenState.Content)?.origin == ResultsOrigin.FIXTURE) {
                     addView(text(pair(R.string.results_source, s(if (settlement.transaction.source == InputSource.VEHICLE)
                         R.string.results_source_vehicle else R.string.results_source_simulation)), color = muted))
                 }
-                addView(text(pair(R.string.results_time, time(settlement)), color = muted))
-            })
-            add(this, vehicle(value))
+            }))
+            if (settlement.changedVehicle != null) add(this, vehicle(value))
             if (value.rental != null) add(this, rentalDetails(value))
-            else add(this, text(if ((interaction.state as? ResultsScreenState.Content)?.historyAvailable == true)
-                "추가 상세 정보는 확인할 수 없어요." else s(R.string.results_details_unsupported), color = muted))
+            else if ((interaction.state as? ResultsScreenState.Content)?.historyAvailable != true)
+                add(this, text(s(R.string.results_details_unsupported), color = muted))
             val read = interaction.readState(id)
             when (read) {
                 ResultsReadState.Pending -> add(this, text(s(R.string.results_mark_pending), bold = true))
@@ -348,13 +380,10 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
 
     private fun vehicle(value: ResultPresentation) = with(style) {
         card().apply {
-            val v = value.settlement.changedVehicle
-            addView(text(s(R.string.results_vehicle), 24, bold = true))
-            if (v == null) { addView(text(s(R.string.results_no_vehicle))); return@apply }
+            val v = checkNotNull(value.settlement.changedVehicle)
+            addView(text(s(R.string.results_vehicle), 21, bold = true))
             vehicleArt(v.vehicleId)?.let { addView(it, LayoutParams(-1, dp(108))) }
             addView(text(value.vehicleName ?: s(R.string.results_vehicle_name_missing), 28, bold = true))
-            addView(text(pair(R.string.results_owned_id, v.ownedVehicleId.value)))
-            addView(text(pair(R.string.results_vehicle_id, v.vehicleId.value), color = muted))
             addView(text(s(when (v.rarity) {
                 Rarity.COMMON -> R.string.results_rarity_common
                 Rarity.ADVANCED -> R.string.results_rarity_advanced
@@ -374,7 +403,6 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                 VehicleLifecycle.SCRAPPED -> R.string.results_lifecycle_scrapped
                 VehicleLifecycle.CONSUMED -> R.string.results_lifecycle_consumed
             }))))
-            addView(text(pair(R.string.results_revision, v.revision.value.toString()), color = muted))
         }
     }
 
@@ -401,14 +429,22 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
     private fun money(value: GameMoney) = context.getString(R.string.results_money, NumberFormat.getIntegerInstance(Locale.KOREA).format(value.units))
     private fun moneyChange(value: Settlement): String {
         val change = value.transaction.money ?: return s(R.string.results_no_money_change)
+        if (change.amount.units == 0L) return s(R.string.results_no_money_change)
         return (if (change.direction == MoneyDirection.CREDIT) "+" else "−") + money(change.amount)
     }
-    private fun time(value: Settlement) = SimpleDateFormat("yyyy.MM.dd HH:mm:ss z", Locale.KOREA).format(Date(value.confirmedAt.value))
-    private fun kind(value: TransactionKind) = s(when (value) {
+    // 기기 현지 시간으로 보던 기존 날짜를 유지한다.
+    private fun time(value: Settlement) =
+        SimpleDateFormat("yyyy년 M월 d일 a h:mm", Locale.KOREA).format(Date(value.confirmedAt.value))
+
+    private fun kind(value: ResultPresentation) = s(when (value.settlement.transaction.kind) {
         TransactionKind.DRIVING -> R.string.results_kind_driving
         TransactionKind.DELIVERY -> R.string.results_kind_delivery
         TransactionKind.RENTAL -> R.string.results_kind_rental
         TransactionKind.FACILITY -> R.string.results_kind_facility
-        TransactionKind.GARAGE -> R.string.results_kind_garage
+        TransactionKind.GARAGE -> when (value.cause) {
+            SettlementHistoryCause.INITIAL_GRANT -> R.string.results_kind_initial_grant
+            SettlementHistoryCause.GACHA -> R.string.results_kind_gacha
+            null -> R.string.results_kind_garage
+        }
     })
 }

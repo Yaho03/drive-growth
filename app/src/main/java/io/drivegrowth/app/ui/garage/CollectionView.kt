@@ -2,29 +2,59 @@ package io.drivegrowth.app.ui.garage
 
 import android.content.Context
 import android.view.Gravity
+import android.view.ViewGroup
 import android.view.View
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.core.contract.Rarity
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.garage.CollectionState
+import io.drivegrowth.core.garage.CollectionKey
 
 /** 차종 × 희귀도 기록을 차종 단위로 넘겨 읽는다. */
 class CollectionView(context: Context, private val onRetry: () -> Unit) : LinearLayout(context) {
     private val style = GarageStyle(context, pixelPanel = true, creamPanel = true)
     private val artwork = VehicleArtwork(context, style)
     internal var showHeading = true
+    internal var takeNewCollectionKey: (CollectionKey) -> Boolean = { false }
+
+    internal fun refreshNewCollectionCells() {
+        fun visit(view: View) {
+            if (view is CollectionNewArtwork) view.invalidate()
+            if (view is ViewGroup) for (index in 0 until view.childCount) visit(view.getChildAt(index))
+        }
+        visit(this)
+    }
+
     private var state: CollectionScreenState = CollectionScreenState.Loading
     private var controlsEnabled = false
     private var retryPending = false
     private var filter: CollectionState? = null
     private val positions = mutableMapOf<CollectionState?, PagePosition>()
+    private var renderedLayout: LayoutMode? = null
     private var viewportWidth = 0
     private var viewportHeight = 0
     private val fontScale get() = resources.configuration.fontScale
     private val wide get() = viewportWidth >= style.dp(700) && fontScale <= 1.3f
     private val pageSize get() = if (wide && viewportHeight >= style.dp(395)) 2 else 1
+    private val filterColumns get() = if (viewportWidth >= style.dp(520) && fontScale <= 1.3f) 4 else 2
+    private val rarityColumns get() = when {
+        wide -> 4
+        viewportWidth >= style.dp(290) -> 2
+        else -> 1
+    }
+
+    private data class LayoutMode(
+        val rarityColumns: Int,
+        val filterColumns: Int,
+        val pageSize: Int,
+        val showHeading: Boolean,
+        val fontScale: Float,
+    )
+
+    private fun layoutMode() = LayoutMode(rarityColumns, filterColumns, pageSize, showHeading, fontScale)
 
     private data class PagePosition(val vehicle: VehicleId, val index: Int)
 
@@ -35,6 +65,9 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
     }
 
     fun render(value: CollectionScreenState, controlsEnabled: Boolean) {
+        if (this.controlsEnabled == controlsEnabled && !retryPending &&
+            renderedLayout == layoutMode() && state == value
+        ) return
         state = value
         this.controlsEnabled = controlsEnabled
         retryPending = false
@@ -42,19 +75,22 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val measuredWidth = MeasureSpec.getSize(widthMeasureSpec)
-        val measuredHeight = MeasureSpec.getSize(heightMeasureSpec)
-        if (viewportWidth != measuredWidth || viewportHeight != measuredHeight) {
-            viewportWidth = measuredWidth
-            viewportHeight = measuredHeight
-            drawScreen()
-        }
+        viewportWidth = MeasureSpec.getSize(widthMeasureSpec)
+        viewportHeight = MeasureSpec.getSize(heightMeasureSpec)
+        if (renderedLayout != layoutMode()) drawScreen()
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        // 같은 크기로 다시 붙어도 페이지 조작을 새 창에 배치한다.
+        renderedLayout = null
     }
 
     private fun s(id: Int, vararg args: Any) = context.getString(id, *args)
 
     private fun drawScreen(): Unit = with(style) {
+        renderedLayout = layoutMode()
         val focusedTag = findFocus()?.tag
         removeAllViews()
         if (!controlsEnabled) {
@@ -85,7 +121,7 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
                     }
                 })
             }
-            is CollectionScreenState.Content -> showContent(body, current)
+            is CollectionScreenState.Content -> showContent(body, viewport, current)
         }
         if (focusedTag != null) findViewWithTag<View>(focusedTag)?.takeIf { it.isEnabled }?.requestFocus()
     }
@@ -97,9 +133,8 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
             CollectionState.DISCOVERED to R.string.garage_collection_filter_discovered,
             CollectionState.UNDISCOVERED to R.string.garage_undiscovered,
         )
-        val columns = if (viewportWidth >= dp(520) && fontScale <= 1.3f) 4 else 2
         column().apply {
-            options.chunked(columns).forEach { line ->
+            options.chunked(filterColumns).forEach { line ->
                 addView(row().apply {
                     val filterRow = this
                     line.forEachIndexed { index, (option, label) ->
@@ -118,7 +153,7 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
         }
     }
 
-    private fun showContent(body: LinearLayout, content: CollectionScreenState.Content) = with(style) {
+    private fun showContent(body: LinearLayout, viewport: ScrollView, content: CollectionScreenState.Content) = with(style) {
         sourceText(content.sourceLabel)?.let { body.addView(text(it, 14, muted)) }
         if (content.entries.isEmpty()) {
             positions.clear()
@@ -148,29 +183,68 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
         val anchor = if (matched >= 0) matched else start
         positions[filter] = PagePosition(vehicles[anchor].first().entry.key.vehicleId, anchor)
         if (wide) add(body, rarityHeaders(), gap = 4)
-        vehicles.drop(start).take(pageSize).forEach { add(body, vehicleRow(it), gap = 4) }
-        add(this@CollectionView, pager(vehicles, page, lastPage), gap = 6)
+        val rows = column()
+        body.addView(rows, LayoutParams(-1, -2))
+        var visibleStart = -1
+        var visibleRows = emptyList<View>()
+        var previousStart = -1
+        var previousRows = emptyList<View>()
+        fun showRows(first: Int) {
+            val nextRows = if (first == previousStart) previousRows else
+                (first until minOf(first + pageSize, vehicles.size)).map { vehicleRow(vehicles[it]) }
+            rows.removeAllViews()
+            nextRows.forEach { add(rows, it, gap = 4) }
+            previousStart = visibleStart
+            previousRows = visibleRows
+            visibleStart = first
+            visibleRows = nextRows
+        }
+        showRows(start)
+        add(this@CollectionView, pager(page, lastPage) { target ->
+            val first = target * pageSize
+            positions[filter] = PagePosition(vehicles[first].first().entry.key.vehicleId, first)
+            showRows(first)
+            viewport.scrollTo(0, 0)
+        }, gap = 6)
     }
 
-    private fun pager(vehicles: List<List<CollectionPresentation>>, page: Int, lastPage: Int) = with(style) {
+    private fun pager(initialPage: Int, lastPage: Int, onPageChanged: (Int) -> Unit) = with(style) {
         row().apply {
             gravity = Gravity.CENTER_VERTICAL
-            fun move(target: Int) {
-                if (parent !== this@CollectionView) return
-                val first = target * pageSize
-                positions[filter] = PagePosition(vehicles[first].first().entry.key.vehicleId, first)
-                drawScreen()
-            }
-            addView(button(s(R.string.garage_collection_previous), page > 0) { move(page - 1) }.apply { tag = "collection:previous" },
-                LayoutParams(0, -2, 1f))
-            addView(text(s(R.string.garage_collection_page, page + 1, lastPage + 1), 16, bold = true).apply {
+            val previous = button(s(R.string.garage_collection_previous), onClick = {}).apply { tag = "collection:previous" }
+            val next = button(s(R.string.garage_collection_next), onClick = {}).apply { tag = "collection:next" }
+            val label = text("", 16, bold = true).apply {
                 tag = "collection:page"
                 gravity = Gravity.CENTER
                 setPadding(dp(8), 0, dp(8), 0)
                 accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE
-            }, LayoutParams(-2, -2))
-            addView(button(s(R.string.garage_collection_next), page < lastPage) { move(page + 1) }.apply { tag = "collection:next" },
-                LayoutParams(0, -2, 1f))
+            }
+            var page = initialPage
+            fun updatePager() {
+                val focused = findFocus()
+                label.text = s(R.string.garage_collection_page, page + 1, lastPage + 1)
+                previous.isEnabled = page > 0
+                previous.setTextColor(if (previous.isEnabled) ink else muted)
+                next.isEnabled = page < lastPage
+                next.setTextColor(if (next.isEnabled) ink else muted)
+                when {
+                    focused === previous && !previous.isEnabled && next.isEnabled -> next.requestFocus()
+                    focused === next && !next.isEnabled && previous.isEnabled -> previous.requestFocus()
+                }
+            }
+            fun move(offset: Int) {
+                val target = page + offset
+                if (parent !== this@CollectionView || !controlsEnabled || target !in 0..lastPage) return
+                page = target
+                onPageChanged(page)
+                updatePager()
+            }
+            previous.setOnClickListener { if (previous.isEnabled) move(-1) }
+            next.setOnClickListener { if (next.isEnabled) move(1) }
+            addView(previous, LayoutParams(0, -2, 1f))
+            addView(label, LayoutParams(-2, -2))
+            addView(next, LayoutParams(0, -2, 1f))
+            updatePager()
         }
     }
 
@@ -194,14 +268,9 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
             addView(text(if (unlock == null) s(R.string.garage_unlock_missing)
                 else s(R.string.garage_collection_unlock_level, unlock), 13, muted))
         }
-        val columns = when {
-            wide -> 4
-            viewportWidth >= dp(290) -> 2
-            else -> 1
-        }
         column().apply {
             if (!wide) addView(model, LayoutParams(-1, -2))
-            Rarity.entries.chunked(columns).forEach { line ->
+            Rarity.entries.chunked(rarityColumns).forEach { line ->
                 add(this, row().apply {
                     if (wide) addView(model, modelColumn())
                     line.forEachIndexed { index, rarity ->
@@ -237,9 +306,16 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
                 gravity = Gravity.CENTER
             }, LayoutParams(-1, -2))
             if (value != null) {
-                addView(artwork.view(value.entry.key.vehicleId, rarity, 44, value.entry.state, showRing = false).apply {
+                val image = artwork.view(value.entry.key.vehicleId, rarity, 44, value.entry.state, showRing = false).apply {
                     background = null
-                }, LayoutParams(-1, dp(44)))
+                }
+                val art = if (value.entry.state == CollectionState.OWNED) {
+                    CollectionNewArtwork(context, image, {
+                        artwork.view(value.entry.key.vehicleId, rarity, 44, CollectionState.UNDISCOVERED, showRing = false)
+                            .apply { background = null }
+                    }) { controlsEnabled && takeNewCollectionKey(value.entry.key) }
+                } else image
+                addView(art, LayoutParams(-1, dp(44)))
             }
             addView(text(status, 14, ink, bold = true).apply { gravity = Gravity.CENTER }, LayoutParams(-1, -2))
         }

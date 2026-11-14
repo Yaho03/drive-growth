@@ -142,7 +142,10 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
     }
 
     fun testPurchaseArrivalGivesVehicleWithoutMoneyChange() {
+        val ownerships = mutableListOf<FirstCollectionOwnership>()
+        store.onFirstCollectionOwnership = { ownerships += it }
         choose(purchase)
+        assertTrue(ownerships.isEmpty())
         assertEquals(7_000, balance())
         val commit = ok(settle(arrival()))
         assertTrue(commit.outcome is DeliveryOutcome.VehicleDelivered)
@@ -152,10 +155,15 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
         assertEquals(Rarity.RARE, car.rarity)
         assertEquals(GameMoney(3_000), car.acquisitionCost)
         assertEquals(VehicleAcquisitionSource.PURCHASE_DELIVERY, car.acquisitionSource)
+        assertEquals(io.drivegrowth.core.garage.CollectionKey(car.vehicleId, car.rarity), ownerships.single().key)
+        assertEquals(commit, ok(settle(arrival())))
+        assertEquals(1, ownerships.size)
         assertNull(ok(ledger.active()))
     }
 
     fun testFullGarageHoldsVehicleThenClaimsWhenSlotOpens() {
+        val ownerships = mutableListOf<FirstCollectionOwnership>()
+        store.onFirstCollectionOwnership = { ownerships += it }
         fillGarage(3)
         choose(purchase)
         val held = (ok(settle(arrival())).outcome as DeliveryOutcome.VehicleHeld).held
@@ -163,14 +171,18 @@ class DeliverySettlementLedgerTest : InstrumentationTestCase() {
         assertEquals(listOf(held), ok(ledger.held()))
         assertNull(ok(ledger.active()))
         assertTrue(ok(ledger.resolveHold(rules, RequestId("r1"), EpochMillis(held.deadline.value - 1))).outcome is HoldOutcome.StillHeld)
+        assertTrue(ownerships.isEmpty())
         ok(store.commitGameChange(GameChange(RequestId("sell0"), TransactionKind.GARAGE, source, rule,
             vehicle = VehicleWrite.Update(OwnedVehicleId("car0"), Revision(0), 1, VehicleLifecycle.SOLD, 0))))
         reopen()
+        store.onFirstCollectionOwnership = { ownerships += it }
         val claim = ok(ledger.resolveHold(rules, RequestId("r1"), EpochMillis(held.deadline.value - 1)))
         assertTrue(claim.outcome is HoldOutcome.Claimed)
         assertTrue(owned().any { it.ownedVehicleId == OwnedVehicleId("delivery/r1") })
+        assertEquals(io.drivegrowth.core.garage.CollectionKey(VehicleId("hyundai_sonata"), Rarity.RARE), ownerships.single().key)
         assertTrue(ok(ledger.held()).isEmpty())
         reopen()
+        store.onFirstCollectionOwnership = { fail("보관 수령 재생은 신규 소유가 아니다") }
         assertEquals(claim, ok(ledger.resolveHold(rules, RequestId("r1"), EpochMillis(held.deadline.value - 1))))
         assertEquals(claim, ok(ledger.holdResult(RequestId("r1"))))
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), ledger.resolveHold(rules, RequestId("r1"), held.deadline))

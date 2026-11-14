@@ -42,4 +42,8 @@
     <string name="shop_pending">요청 처리 중 · 확정 조회 상태 유지</string>
     <string name="shop_wait_refresh">같은 표시 상태의 요청은 중복 전송하지 않습니다. 확정 상태 재조회가 필요합니다.</string>
     <string name="shop_neutral">자체 중립 도형 · 실차 외형 아님</string>
+    <string name="shop_menu_available">건설 가능</string>
+    <string name="shop_menu_installed">운영 중</string>
+    <string name="shop_menu_unknown">상태 확인 불가</string>
+    <string name="shop_menu_map_view">지도 보기</string>
 </resources>

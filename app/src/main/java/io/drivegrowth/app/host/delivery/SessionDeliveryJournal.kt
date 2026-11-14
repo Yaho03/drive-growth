@@ -14,14 +14,23 @@ class SessionDeliveryJournal(private val games: GameSessionFactory) : DeliveryOp
                 if (identity != it.identity) ContractResult.Failure(ContractError.STATE_CONFLICT) else action(it)
             }
         }
-    override fun pending(identity: GameIdentity) = use(identity) { game ->
+    override fun pending(identity: GameIdentity): ContractResult<DeliveryHostOperation?> = when (val result = slot(identity)) {
+        is ContractResult.Failure -> result
+        is ContractResult.Success -> when (val slot = result.value) {
+            DeliveryJournalSlot.Clear -> ContractResult.Success(null)
+            DeliveryJournalSlot.Foreign -> conflict()
+            is DeliveryJournalSlot.Own -> ContractResult.Success(slot.operation)
+        }
+    }
+
+    override fun slot(identity: GameIdentity): ContractResult<DeliveryJournalSlot> = use(identity) { game ->
         when (val loaded = game.store.hostCommands.load(identity.profileId)) {
             is ContractResult.Failure -> loaded
             is ContractResult.Success -> when (val command = loaded.value?.command) {
-                null -> ContractResult.Success(null)
+                null -> ContractResult.Success(DeliveryJournalSlot.Clear)
                 is HostCheckpointCommand.Delivery -> if (command.source == identity.source)
-                    ContractResult.Success(command.operation.host()) else conflict()
-                else -> conflict() // 다른 기능의 명령은 실행·취소하지 않는다.
+                    ContractResult.Success(DeliveryJournalSlot.Own(command.operation.host())) else conflict()
+                else -> ContractResult.Success(DeliveryJournalSlot.Foreign)
             }
         }
     }

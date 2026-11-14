@@ -55,4 +55,75 @@ class RentalProductHostTest {
         assertEquals(result,answer)
     }
 
+    @Test fun mapEventsExpireAcrossGateAndLateReceiverWithoutLosingSnapshot() {
+        val worker = Queue()
+        val main = Queue()
+        val event = RentalMapEvent(io.drivegrowth.app.host.GameIdentity(ProfileId("profile"), InputSource.SIMULATION),
+            RequestId("visit"), OwnedVehicleId("owned"), RentalMapDirection.DEPARTURE,
+            io.drivegrowth.core.progression.VehicleActivity.RENTED)
+        val snapshot = RentalRuntimeSnapshot(emptyList(), null, mapEvents = listOf(event))
+        val replies = mutableListOf<RentalRuntimeSnapshot>()
+        val host = RentalProductHost(worker, main, { _, _ -> ContractResult.Success(snapshot) }, {}, {},
+            { _, _ -> ContractResult.Success(Unit) })
+        host.start("active") { replies += (it as ContractResult.Success).value }
+        host.setMapPresentationEnabled(true)
+        host.observed("active", frame, recorded, host.captureMapPresentation())
+        main.drain()
+        assertEquals(listOf(event), replies.single().mapEvents)
+        host.observed("active", frame, recorded, host.captureMapPresentation())
+        host.setMapPresentationEnabled(false)
+        host.setMapPresentationEnabled(true)
+        main.drain()
+        assertEquals(snapshot.copy(mapEvents = emptyList()), replies.last())
+        host.observed("active", frame, recorded)
+        host.pause()
+        host.start("replacement") { replies += (it as ContractResult.Success).value }
+        main.drain()
+        assertEquals(2, replies.size)
+    }
+
+    @Test fun acceptedObservationAfterHomeRoundTripStillCommitsWithoutOldMapMotion() {
+        val worker = Queue()
+        val main = Queue()
+        var assignments = 0
+        val event = RentalMapEvent(io.drivegrowth.app.host.GameIdentity(ProfileId("profile"), InputSource.SIMULATION),
+            RequestId("observed-visit"), OwnedVehicleId("owned"), RentalMapDirection.DEPARTURE,
+            io.drivegrowth.core.progression.VehicleActivity.RENTED)
+        val pending = io.drivegrowth.app.data.RentalLedger.Pending(event.rentalId, event.vehicle, event.activity,
+            EpochMillis(1_000), EpochMillis(2_000), EpochMillis(3_000))
+        val rental = RentalProductHost(worker, main, { _, _ ->
+            assignments++
+            ContractResult.Success(RentalRuntimeSnapshot(listOf(pending), null, mapEvents = listOf(event)))
+        }, {}, {}, { _, _ -> ContractResult.Success(Unit) })
+        val driving = ObservedDrivingHost(worker, main, { RecordingClock(100, EpochMillis(1_000)) },
+            { _, _, _ -> fail("수락 시점의 관측 작업을 사용해야 합니다"); recorded },
+            { _, _ -> recorded }, nextReceiver = { "receiver" }).apply {
+            prepareObservation = {
+                val ticket = rental.captureMapPresentation()
+                val work: (String, DrivingFrame, RecordingClock) -> ContractResult<DrivingRecordingResult> = { token, value, _ ->
+                    rental.observed(token, value, recorded, ticket)
+                    recorded
+                }
+                work
+            }
+        }
+        val replies = mutableListOf<RentalRuntimeSnapshot>()
+        rental.start(driving.start {}) { replies += (it as ContractResult.Success).value }
+        for (visibleAtAccept in listOf(true, false)) {
+            rental.setMapPresentationEnabled(visibleAtAccept)
+            driving.accept(frame)
+            rental.setMapPresentationEnabled(false)
+            rental.setMapPresentationEnabled(true)
+            worker.drain()
+            main.drain()
+            assertEquals(listOf(pending), replies.last().pending)
+            assertTrue(replies.last().mapEvents.isEmpty())
+        }
+        driving.accept(frame)
+        worker.drain()
+        main.drain()
+        assertEquals(3, assignments)
+        assertEquals(listOf(event), replies.last().mapEvents)
+    }
+
 }

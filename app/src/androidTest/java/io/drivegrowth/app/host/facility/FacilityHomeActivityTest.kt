@@ -1,5 +1,8 @@
 package io.drivegrowth.app.host.facility
 
+import android.app.ActivityOptions
+import android.content.Intent
+import android.hardware.display.DisplayManager
 import android.graphics.Rect
 import android.os.SystemClock
 import android.test.ActivityInstrumentationTestCase2
@@ -22,6 +25,9 @@ import io.drivegrowth.app.host.GameSession
 import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
 import io.drivegrowth.app.ui.onboarding.OnboardingView
+import io.drivegrowth.app.simulation.SimulationTimeline
+import io.drivegrowth.app.simulation.UnifiedSimulationActivity
+import io.drivegrowth.app.ui.shop.ShopSceneView
 import io.drivegrowth.app.ui.shop.FacilityControlsView
 import io.drivegrowth.app.ui.shop.ShopCommand
 import io.drivegrowth.app.ui.shop.ShopView
@@ -201,6 +207,62 @@ class FacilityHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity>(
         // 최초 완료 영업의 개업 선물을 준비 단계에서 확정해 미리보기와 별개로 처리한다.
         val gift = ok(onboarding.claimGift(identity))
         assertEquals(FirstGrant.GIFT_REQUEST_ID, gift.command.requestId)
+    }
+
+    fun testIsolatedSimulationHomeFuelPurchaseAndMotion() {
+        val context = instrumentation.targetContext
+        assertTrue(context.packageName.startsWith("io.drivegrowth.verify.prototype."))
+        val name = "unified-simulation.db"
+        val prefs = context.getSharedPreferences("unified-simulation-v1", 0)
+        assertFalse("새 모의 프로필 필요", context.getDatabasePath(name).exists())
+        assertFalse(prefs.contains("stage"))
+        val timeline = SimulationTimeline()
+        assertTrue(prefs.edit().putInt("stage", timeline.stage).putLong("elapsed", timeline.elapsedMs).commit())
+        val games = GameSessionFactory(context, mapOf(InputSource.SIMULATION to name), InputSource.SIMULATION)
+        prepareFiveOwnedVehicles(games)
+        val before = ok(games.open()).use(::fuelPurchaseState)
+        val display = context.getSystemService(DisplayManager::class.java).displays
+            .singleOrNull { it.displayId != 0 && it.name == "Emulator 2D Display" }
+        val options = display?.let { ActivityOptions.makeBasic().setLaunchDisplayId(it.displayId).toBundle() }
+        val host = instrumentation.startActivitySync(Intent(context, UnifiedSimulationActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options) as UnifiedSimulationActivity
+        try {
+            val decor = host.window.decorView
+            val fuelLot = "shop:map-facility:FUEL_STATION"
+            var lotClick: Result<Boolean>? = null
+            await(host, "현재 가게 지도에서 주유소 부지 열기") {
+                if (!host.hasWindowFocus()) return@await false
+                val lot = decor.findViewWithTag<Button>(fuelLot)
+                lot?.takeIf { it.isAttachedToWindow && it.isShown && it.isLaidOut && it.isEnabled }
+                    ?.let { runCatching { it.performClick() }.also { result -> lotClick = result }; true } == true
+            }
+            assertTrue(checkNotNull(lotClick).getOrThrow())
+            var confirmClicks: Result<Boolean>? = null
+            await(host, "현재 주유소 건설 요청과 중복 입력") {
+                val confirm = decor.findViewWithTag<Button>("shop:map-confirm")
+                    ?.takeIf { it.isShown && it.isEnabled && it.isAttachedToWindow && it.isLaidOut }
+                    ?: return@await false
+                confirmClicks = runCatching {
+                    val accepted = confirm.performClick()
+                    confirm.performClick()
+                    accepted
+                }
+                true
+            }
+            assertTrue(checkNotNull(confirmClicks).getOrThrow())
+            await(host, "확정된 주유소 설치와 실제 지도 연출") {
+                decor.findViewWithTag<View>("facility:receipt")?.isShown == true &&
+                    decor.findViewWithTag<ShopSceneView>("shop:scene")?.showingFacilityInstallation == true
+            }
+            val after = ok(games.open()).use(::fuelPurchaseState)
+            assertEquals(before.shop.facilities + Facility.FUEL_STATION, after.shop.facilities)
+            assertEquals(before.balance.units - 500, after.balance.units)
+            assertEquals(before.vehicles, after.vehicles)
+            assertEquals(before.resultCount + 1, after.resultCount)
+            assertEquals(before.settlements.size + 1, after.settlements.size)
+        } finally {
+            instrumentation.runOnMainSync { host.finish() }
+        }
     }
 
     fun testActualHomeFuelPurchaseDuplicateConfirmAndRecreation() {

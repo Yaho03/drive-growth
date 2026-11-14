@@ -21,6 +21,18 @@ class CheckpointFacilityDurablePort:FacilityDurablePort {
             is ContractResult.Failure->r
             is ContractResult.Success->receipt(command,r.value)
         }
+    override fun executeForInstallation(game: GameSession, command: FacilityCommand.Buy): ContractResult<FacilityPurchaseExecution> {
+        val encoded = HostCheckpointCommand.FacilityPurchase(command.requestId, command.identity.source,
+            command.definitionVersion, command.offer)
+        return when (val applied = game.store.hostCommands.executeFacilityPurchase(game.identity.profileId, encoded)) {
+            is ContractResult.Failure -> applied
+            is ContractResult.Success -> when (val checked = receipt(command, applied.value.result)) {
+                is ContractResult.Failure -> checked
+                is ContractResult.Success -> ContractResult.Success(FacilityPurchaseExecution(checked.value, applied.value.newlyInstalled))
+            }
+        }
+    }
+
     override fun finish(game:GameSession,command:FacilityCommand):ContractResult<Unit> =
         when(val r=game.store.hostCommands.finish(game.identity.profileId,encode(command))) {
             is ContractResult.Failure->r

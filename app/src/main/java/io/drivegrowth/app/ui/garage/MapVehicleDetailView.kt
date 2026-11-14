@@ -17,7 +17,6 @@ import io.drivegrowth.app.ui.vehicleDisplayName
 import io.drivegrowth.core.contract.MAX_VEHICLE_LEVEL
 import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.contract.VehicleLifecycle
-import io.drivegrowth.core.progression.VehicleAction
 import io.drivegrowth.app.ui.shop.ShopFocusLayout
 import io.drivegrowth.app.ui.shop.ShopFocusRegion
 import io.drivegrowth.core.progression.VehicleActivity
@@ -172,6 +171,8 @@ internal class MapVehicleDetailView(
         val scroll = scroll(content, scrollY).apply {
             isFillViewport = false
             tag = "map:vehicle-detail-scroll"
+            isVerticalScrollBarEnabled = true
+            isScrollbarFadingEnabled = false
         }
         contentScroll = scroll
         detailPanel.addView(scroll, LinearLayout.LayoutParams(-1, -2, 1f))
@@ -265,15 +266,26 @@ internal class MapVehicleDetailView(
             .apply { isAccessibilityHeading = true })
         if (onRest != null) add(parent, control(restLabel ?: "영업 쉬기 확인 불가", "shop:focus-rest",
             restLabel != null && restEnabled && !actionsBlocked && !interaction.requestPending) { onRest?.invoke() }, 6)
-        for ((action, label) in managementActions) {
+        val sharedReasons = sharedGarageRestrictions(selected)
+        sharedReasons.forEach { reason -> add(parent, text(reason, 16, mapStyle.muted), 4) }
+        for ((action, label) in garageManagementActions) {
             val info = selected.actions[action]
-            add(parent, control(s(label), action, info?.enabled == true && !actionsBlocked && !interaction.requestPending) {
+            val enabled = info?.enabled == true && !actionsBlocked && !interaction.requestPending
+            val restriction = when {
+                interaction.requestPending -> s(R.string.garage_pending)
+                info == null -> s(R.string.garage_action_unknown)
+                !info.enabled -> info.explanation.ifBlank { s(R.string.garage_action_unknown) }
+                actionsBlocked -> s(R.string.garage_action_unavailable)
+                else -> null
+            }
+            add(parent, control(s(label), action, enabled) {
                 if (interaction.request(action, car.ownedVehicleId, car.revision) && generation == version) drawPanel()
+            }.apply {
+                restriction?.let { contentDescription = context.getString(R.string.garage_action_with_reason, s(label), it) }
             }, 6)
-            parent.addView(text(info?.explanation ?: s(R.string.garage_action_unknown), 15, mapStyle.muted).apply {
-                background = mapStyle.chip()
-                setPadding(dp(10), dp(6), dp(10), dp(7))
-            })
+            if (restriction != null && restriction !in sharedReasons && !interaction.requestPending && info?.enabled != true) {
+                add(parent, text(restriction, 15, mapStyle.muted), 0)
+            }
         }
     }
 
@@ -309,13 +321,5 @@ internal class MapVehicleDetailView(
     companion object {
         internal fun usesSidePanel(width: Int, height: Int, density: Float): Boolean =
             ShopFocusLayout.usesSidePanel(width, height, density)
-
-        private val managementActions = listOf(
-            VehicleAction.LEVEL_UP to R.string.garage_action_level,
-            VehicleAction.USE_MATERIAL to R.string.garage_action_material,
-            VehicleAction.REPAIR to R.string.garage_action_repair,
-            VehicleAction.SELL to R.string.garage_action_sell,
-            VehicleAction.SCRAP to R.string.garage_action_scrap,
-        )
     }
 }

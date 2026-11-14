@@ -7,7 +7,6 @@ import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
-import io.drivegrowth.app.showSimulationControls
 import io.drivegrowth.app.host.HostSession
 import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
@@ -117,15 +116,26 @@ class UnifiedSimulationRestRecoveryTest : InstrumentationTestCase() {
                 val root = activity.window.decorView
                 assertFalse(root.findViewWithTag<Button>("simulation:controls").isSelected)
                 assertFalse(root.findViewWithTag<TextView>("simulation:status").isShown)
+                val restricted = checkNotNull(root.findViewWithTag<View>("host:restricted-screen"))
                 assertEquals("진행이 중단됐어요. 설정에서 다시 시도해 주세요.",
-                    root.findViewWithTag<TextView>("simulation:blocked").text.toString())
+                    restricted.findViewWithTag<TextView>("simulation:blocked").text.toString())
                 assertNull(root.findViewWithTag<View>("host:destination"))
+                assertNull(root.findViewWithTag<View>("shop:scene"))
                 val retry = root.findViewWithTag<Button>("simulation:retry")
                 assertFalse(retry.isShown)
-                root.showSimulationControls()
+                val recovery = checkNotNull(root.findViewWithTag<Button>("host:simulation-recovery-settings"))
+                assertTrue(recovery.performClick())
+                val settings = checkNotNull(root.findViewWithTag<View>("host:settings-panel"))
+                val items = checkNotNull(settings.findViewWithTag<View>("host:settings-items"))
+                assertNotNull(settings.findViewWithTag<View>("host:settings-close"))
+                assertNull(items.findViewWithTag<View>("presentation:sound"))
+                assertTrue(items.findViewWithTag<Button>("host:simulation-settings").performClick())
+                assertNull(root.findViewWithTag<View>("host:settings-panel"))
                 assertTrue(retry.isShown && retry.isEnabled)
                 assertFalse(root.findViewWithTag<Button>("simulation:start").isShown)
                 assertTrue(retry.performClick())
+                assertSame(restricted, root.findViewWithTag<View>("host:restricted-screen"))
+                assertSame(recovery, restricted.findViewWithTag<View>("host:simulation-recovery-settings"))
                 assertEquals(2, frames.size)
                 assertEquals(frames.first(), frames.last())
                 activity.onBackPressed()

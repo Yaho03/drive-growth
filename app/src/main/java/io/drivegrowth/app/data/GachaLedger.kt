@@ -120,7 +120,7 @@ internal class GachaLedger(private val store: SqliteGameChangeStore) {
             p.freeTickets - if (command.ticket == GachaTicketUse.FREE) 1 else 0)
         val change = GameChange(command.requestId, TransactionKind.GARAGE, command.source, command.ruleVersion,
             if (command.ticket == GachaTicketUse.PURCHASED) MoneyChange(MoneyDirection.DEBIT, price) else null, VehicleWrite.Add(v))
-        when (val result = store.record(db, change, encoded)) {
+        when (val result = store.record(db, change, encoded, trackAcquisition = true)) {
             is ContractResult.Failure -> result
             is ContractResult.Success -> {
                 db.execSQL("UPDATE gacha_progress SET revision=?,counter=?,tickets=? WHERE id=1",

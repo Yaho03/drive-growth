@@ -62,6 +62,23 @@ class InitializationLedgerTest : InstrumentationTestCase() {
         raw { db -> db.beginTransaction();try {try {InitializationLedger.onNewDatabase(db,source);fail("기존 DB에서 NEW를 다시 발급하면 안 됨")} catch(_:SQLiteException) {}}finally {db.endTransaction()} }
         assertEquals(before.status,state().status)
     }
+    fun testFirstGrantNotifiesOnlyAfterCommitAndDoesNotReplay() {
+        val c = command()
+        val observed = mutableListOf<FirstCollectionOwnership>()
+        store.onFirstCollectionOwnership = { event ->
+            assertEquals(c.profileId, event.profileId)
+            assertEquals(source, event.source)
+            assertEquals(event.key.vehicleId, ok(store.listOwnedVehicles()).single().vehicleId)
+            observed += event
+        }
+        val first = ok(ledger.commitInitialization(c))
+        assertEquals(first, ok(ledger.commitInitialization(c)))
+        assertEquals(1, observed.size)
+        reopen()
+        store.onFirstCollectionOwnership = { fail("재개방 재생은 신규 소유가 아니다") }
+        assertEquals(first, ok(ledger.commitInitialization(c)))
+    }
+
     fun testFirstGrantAdapterCommitReopenAndOriginalReplay() {
         val p=profile();val proof=(state().status as ProfileInitializationStatus.New).evidence
         val first=ok(commitFirstGrantInitialization(ledger,proof,content,VehicleId("hyundai_casper"),3))

@@ -23,6 +23,7 @@ class GachaLiveHostTest {
         var loseReply=false;var finishFailure=false;var loadFailure=false
         var started=false
         var prepares=0;var executes=0;var finishes=0;var changes=0
+        val liveResultFlags = mutableListOf<Boolean>()
         val commands=mutableListOf<GachaCommand>()
         private val delegate=GachaStoreHostSource(content,store,{ContractResult.Success(balance)},GachaOrigin.FIXTURE)
         private val journal=object:GachaCommandJournal {
@@ -51,7 +52,9 @@ class GachaLiveHostTest {
             }
         }
         fun newHost()=GachaLiveHost(source,Executor{tasks.addLast(it)},Executor{replies.addLast(it)}){changes++}
-        fun attach(){host.attach({f,e->ui.render(f,e);host.remember(ui.uiState)}, {r,v->ui.complete(r,v);host.remember(ui.uiState)},
+        fun attach(){host.attach({f,e->
+            if (f.screen is GachaScreen.Result) liveResultFlags += host.presentingLiveResult
+            ui.render(f,e);host.remember(ui.uiState)}, {r,v->ui.complete(r,v);host.remember(ui.uiState)},
             {ui.completeReload(it);host.remember(ui.uiState)},{ui.resolveFailedRequest(it);host.remember(ui.uiState)})}
         fun start(){attach();host.setControlsEnabled(true);drain()}
         fun drain(){while(tasks.isNotEmpty()||replies.isNotEmpty()){if(tasks.isNotEmpty()){onWorker=true;tasks.removeFirst().run();onWorker=false};if(replies.isNotEmpty())replies.removeFirst().run()}}
@@ -62,6 +65,7 @@ class GachaLiveHostTest {
             val result=(h.ui.frame!!.screen as GachaScreen.Result).value.settlement
             assertEquals(if(kind==GachaOptionKind.FREE)GameMoney(0) else GameMoney(500),result.changedVehicle!!.acquisitionCost)
             assertEquals(result.changedVehicle,(h.store.listOwnedVehicles() as ContractResult.Success).value.single())
+            assertEquals(listOf(true), h.liveResultFlags)
             assertNotNull(h.pending);assertEquals(0,h.finishes);assertEquals(1,h.prepares);assertEquals(1,h.executes)
             h.host.acknowledge{assertTrue(it is ContractResult.Success)};h.drain();assertNull(h.pending)
             assertEquals(1,h.changes)
@@ -76,6 +80,7 @@ class GachaLiveHostTest {
         assertTrue(h.ui.frame!!.screen is GachaScreen.Failure);val original=h.pending!!
         h.host.release();h.loseReply=false;h.host=h.newHost();h.ui=GachaInteraction({});h.start()
         assertEquals(original,h.commands.last());assertEquals(1,h.prepares)
+        assertEquals(listOf(false), h.liveResultFlags)
         assertEquals(original.award.vehicle,(h.ui.frame!!.screen as GachaScreen.Result).value.settlement.changedVehicle)
         assertEquals(1,(h.store.listOwnedVehicles() as ContractResult.Success).value.size);assertEquals(GameMoney(500),h.balance)
     }

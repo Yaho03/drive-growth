@@ -19,6 +19,8 @@ class GachaLiveHost(private val source: CheckpointGachaSource, private val worke
     private var controller: GachaHostController? = null
     private var original: GachaCommand? = null
     private var request: GachaRequest? = null
+    internal var presentingLiveResult = false
+        private set
     var uiState = GachaUiState()
         private set
     val failed: Boolean get() = frame.screen is GachaScreen.Failure
@@ -101,8 +103,19 @@ class GachaLiveHost(private val source: CheckpointGachaSource, private val worke
                                 token?.let { deliverReload(it) }
                                 return@reply
                             }
+                            var lastLiveResultGeneration: Long? = null
                             val host = GachaHostController(source, { worker.execute(it) }, { main.execute(it) },
-                                { ContractResult.Success(Unit) }, { value, _ -> show(value.screen); if (value.screen is GachaScreen.Result) changed() },
+                                { ContractResult.Success(Unit) }, { value, _ ->
+                                    val result = value.screen is GachaScreen.Result
+                                    presentingLiveResult = result && lastLiveResultGeneration != value.generation
+                                    if (result) lastLiveResultGeneration = value.generation
+                                    try {
+                                        show(value.screen)
+                                    } finally {
+                                        presentingLiveResult = false
+                                    }
+                                    if (result) changed()
+                                },
                                 { value, outcome -> deliverComplete(request?.takeIf { it.attemptId == value.attemptId } ?: value, outcome) },
                                 { key -> deliverReload(key) })
                             controller = host; host.setControlsEnabled(enabled)

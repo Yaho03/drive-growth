@@ -69,6 +69,7 @@ class DeliveryView(
     private var offerPage = 0
     internal var showHeading = true
     internal var onReturnToShop: (() -> Unit)? = null
+    internal var onConfirmSceneResult: (() -> Unit)? = null
     internal val headingRes: Int
         get() = when (val state = session.frame?.screen) {
             is DeliveryScreen.ChangeReview -> R.string.delivery_change_review
@@ -336,8 +337,15 @@ class DeliveryView(
         }
         val hasBalanceHud = scene.details.confirmedBalance != null
         frame.place(skip.referenceSize(20f), 1184, if (hasBalanceHud) 100 else 28, 148, 48)
-        val confirm = button(s(R.string.delivery_scene_confirm), session.pending == null, primary = true, onClick = close)
+        val confirm = button(s(R.string.delivery_scene_confirm), session.pending == null, primary = true) {
+            if (generation == drawGeneration && session.controlsEnabled && session.pending == null &&
+                presentation.scene?.key == scene.key) {
+                dismissScene()
+                onConfirmSceneResult?.invoke()
+            }
+        }
             .apply {
+                tag = "delivery:confirm-scene"
                 background = referenceShape(0xff2f6fe8.toInt(), 14f)
                 setTextColor(0xffffffff.toInt())
             }
@@ -377,8 +385,6 @@ class DeliveryView(
             skip.alpha = if (departure) 1f - ((time - 1.95f) / .15f).coerceIn(0f, 1f)
                 else if (balance == null) 1f else 1f - ((time - 1.55f) / .18f).coerceIn(0f, 1f)
             if (time >= end) {
-                skip.tag = null
-                confirm.tag = "delivery:skip-motion"
                 skip.visibility = View.INVISIBLE
             }
             confirmed?.alpha = ((time - 1.3f) / .15f).coerceIn(0f, 1f)

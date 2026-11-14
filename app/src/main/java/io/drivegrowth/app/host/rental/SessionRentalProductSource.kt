@@ -21,7 +21,8 @@ import kotlin.random.Random
 class SessionRentalProductSource(private val games: GameSessionFactory,
     private val definitions: () -> ContractResult<TrialDefinition>, private val policy: RecordingPolicy,
     private val rawClock: () -> ContractResult<RentalClock>, private val random: (RentalPreparationInputs) -> Random = { Random.Default },
-    private val nextRequest: () -> RequestId = { RequestId("rental-visit-" + UUID.randomUUID()) }) {
+    private val nextRequest: () -> RequestId = { RequestId("rental-visit-" + UUID.randomUUID()) },
+    private val onNewOpeningGift: (FirstRentalGiftSettlement) -> Unit = {}) {
     private val calibration = RentalClockCalibration(policy.maxUtcSkewMs)
     private var bound: GameIdentity? = null
     private var connected = false
@@ -66,7 +67,7 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
     private var visitFloor: RentalClock? = null
     private var giftAttempt: RequestId? = null
     private val spans = ArrayDeque<RentalTick>()
-    private val gift = StoredOnboardingHostSource(games)
+    private val gift = StoredOnboardingHostSource(games, onNewOpeningGift)
     var issue: ContractError? = null
         private set(value) {
             if (field != value && value != null) Log.w("DriveGrowthRental", "input_schedule_deferred code=$value")
@@ -145,7 +146,7 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
         }
     }
     private fun <T> withRuntime(timed: Boolean, acceptedAt: RentalClock? = null,
-        action: (RentalRuntimeSource) -> ContractResult<T>): ContractResult<T> {
+        action: (SqliteRentalRuntimeSource) -> ContractResult<T>): ContractResult<T> {
         val now = acceptedAt ?: if (timed) when (val r = clock()) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value } else null
         val game = when (val r = games.open()) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
         if (game.identity != bound) { game.close(); return failure(ContractError.STATE_CONFLICT) }
@@ -342,7 +343,7 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
                 is ContractResult.Success -> if (r.value.deferred.isNotEmpty()) return r
             }
         }
-        return drain()
+        return drain(liveThrough = at.takeIf { originalClock == null && restStartBoot == null && stationaryPark(input) })
     }
 
     private fun stationaryPark(input: VehicleObservation): Boolean =
@@ -560,16 +561,35 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
         else issue = ContractError.DATA_UNAVAILABLE // 원래 범위를 버리고 현재부터 정상 재개하지 않는다.
     }
     private fun drain(through: RentalClock? = null, forwardWallJump: Boolean = false,
-        planVisits: Boolean = true): ContractResult<RentalRuntimeSnapshot> {
+        planVisits: Boolean = true, liveThrough: RentalClock? = null): ContractResult<RentalRuntimeSnapshot> {
         if (!connected) return failure(ContractError.DATA_UNAVAILABLE)
         val acceptedThrough = through.takeIf { forwardWallJump }
         when (val r = recoverVisit(acceptedThrough)) { is ContractResult.Failure -> return r; is ContractResult.Success -> Unit }
         when (val r = free()) { is ContractResult.Failure -> return r; is ContractResult.Success -> Unit }
         var snapshot = when (val r = runtime.read()) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
+        val events = mutableListOf<RentalMapEvent>()
+        fun current(result: RentalRuntimeSnapshot) = ContractResult.Success(result.copy(mapEvents = events.toList()))
+        fun advance(tick: RentalTick, live: Boolean): ContractResult<RentalRuntimeSnapshot> {
+            if (forwardWallJump) return withRuntime(true, checkNotNull(through)) { it.advance(tick) }
+            if (!live) return runtime.advance(tick)
+            val id = checkNotNull(bound)
+            return runtime.advanceWith(tick) { accepted ->
+                withRuntime(true) { source ->
+                    source.advance(accepted) { rentalId, returned ->
+                        returned.newlyReturned?.let {
+                            events += RentalMapEvent(id, rentalId, it, RentalMapDirection.RETURN, returned.activity)
+                        }
+                    }
+                }
+            }
+        }
         while (spans.isNotEmpty()) {
             val tick = spans.first
             if (through != null && (tick.to.bootId != through.bootId || tick.to.elapsedMs > through.elapsedMs)) break
             var from = tick.from
+            // 지연 span과 비활성/시계 재조정 복구는 경제 처리만 한다.
+            val live = tick.to == liveThrough && tick.to.elapsedMs - tick.from.elapsedMs in 1..policy.maxGapMs &&
+                tick.motion is Observation.Available && tick.unobservedSince == null && !forwardWallJump
             var visits = 0
             // 준비된 이탈 복구가 끝날 때까지 기존 대여만 진행한다.
             while (planVisits && tick.motion is Observation.Available) {
@@ -587,23 +607,33 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
                 val limit = when (val r = definition.rentalReplayLimit()) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
                 if (visits >= limit) { issue = ContractError.DATA_UNAVAILABLE; break }
                 if (from != cursor.nextAt) {
-                    snapshot = when (val r = runtime.advance(tick.slice(from, cursor.nextAt))) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
-                    completed(snapshot); if (snapshot.deferred.isNotEmpty()) return ContractResult.Success(snapshot)
+                    snapshot = when (val r = advance(tick.slice(from, cursor.nextAt), live)) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value }
+                    completed(snapshot); if (snapshot.deferred.isNotEmpty()) return current(snapshot)
                 }
                 eligible = tick.to
                 val prepared = when (val r = preparation.next()) { is ContractResult.Failure -> return r; is ContractResult.Success -> r.value } ?: break
-                when (val r = runtime.visit(ContractResult.Success(prepared.visit))) { is ContractResult.Failure -> return r; is ContractResult.Success -> Unit }
+                // 한 관측 안에서 앞선 슬롯을 복원한 경우에도 현재 구간에 속한 새 방문만 장식한다.
+                if (live && prepared.visit.terms.start.value > tick.from.epoch.value) {
+                    when (val committed = runtime.visitWith(ContractResult.Success(prepared.visit), journal::executeVisit)) {
+                        is ContractResult.Failure -> return committed
+                        is ContractResult.Success -> if (committed.value.newlyAssigned) committed.value.assigned?.let {
+                            events += RentalMapEvent(id, prepared.visit.request.id, it, RentalMapDirection.DEPARTURE, VehicleActivity.RENTED)
+                        }
+                    }
+                } else when (val r = runtime.visit(ContractResult.Success(prepared.visit))) {
+                    is ContractResult.Failure -> return r
+                    is ContractResult.Success -> Unit
+                }
                 from = cursor.nextAt; visits++
             }
             val remainder = tick.slice(from, tick.to)
-            val advanced = if (forwardWallJump) withRuntime(true, checkNotNull(through)) { it.advance(remainder) }
-                else runtime.advance(remainder)
+            val advanced = advance(remainder, live)
             snapshot = when (advanced) { is ContractResult.Failure -> return advanced; is ContractResult.Success -> advanced.value }
-            completed(snapshot); if (snapshot.deferred.isNotEmpty()) return ContractResult.Success(snapshot)
+            completed(snapshot); if (snapshot.deferred.isNotEmpty()) return current(snapshot)
             spans.removeFirst()
         }
         completed(snapshot)
-        return ContractResult.Success(snapshot)
+        return current(snapshot)
     }
     private fun RentalTick.slice(start: RentalClock, end: RentalClock) =
         copy(from = start, to = end, unobservedSince = unobservedSince.takeIf { start == from })

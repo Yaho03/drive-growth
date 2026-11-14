@@ -1,6 +1,7 @@
 package io.drivegrowth.app.runtime.rental
 
 import io.drivegrowth.app.data.SqliteGameChangeStore
+import io.drivegrowth.app.data.RentalLedger
 import io.drivegrowth.core.contract.*
 
 /** 공급자는 같은 프로필·출처의 기존 원장을 열고, 호출자는 worker에서만 이 API를 사용한다. */
@@ -27,9 +28,12 @@ class SqliteRentalRuntimeSource(
         }
     }
 
-    override fun advance(tick: RentalTick): ContractResult<RentalRuntimeSnapshot> = guarded {
+    override fun advance(tick: RentalTick): ContractResult<RentalRuntimeSnapshot> = advance(tick, null)
+
+    internal fun advance(tick: RentalTick, onNewReturn: ((RequestId, RentalLedger.ReturnCommit) -> Unit)?):
+        ContractResult<RentalRuntimeSnapshot> = guarded {
         val now = clock()
-        withProcessor { it.advance(tick, now) }
+        withProcessor { it.advance(tick, now, onNewReturn) }
     }
     override fun read(): ContractResult<RentalRuntimeSnapshot> = guarded { withProcessor { it.read() } }
 
@@ -53,5 +57,6 @@ private class SqliteRentalOperations(store: SqliteGameChangeStore) : RentalRunti
         unobservedSince: EpochMillis?) = ledger.accountObserved(id, from, to, parkedSince, unobservedSince)
     override fun settle(id: RequestId) = ledger.settle(id)
     override fun finishReturn(id: RequestId, now: EpochMillis) = ledger.finishReturn(id, now)
+    override fun finishReturnWithCommit(id: RequestId, now: EpochMillis) = ledger.finishReturnWithCommit(id, now)
     override fun firstCompleted() = ledger.firstCompletedRental()
 }

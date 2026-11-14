@@ -2,6 +2,7 @@ package io.drivegrowth.app.runtime.rental
 
 import io.drivegrowth.app.data.RentalLedger
 import io.drivegrowth.app.data.RentalTerms
+import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.progression.VehicleActivity
 import io.drivegrowth.core.rental.*
@@ -28,11 +29,18 @@ sealed interface RentalMotion {
 data class RentalTick(val source: InputSource, val from: RentalClock, val to: RentalClock,
                       val motion: Observation<RentalMotion>, val unobservedSince: RentalClock? = null)
 
+enum class RentalMapDirection { DEPARTURE, RETURN }
+
+/** 현재 관측의 확정 쓰기에서 만들어진 표시 전용 값. 원장이나 복원 상태에 저장하지 않는다. */
+data class RentalMapEvent(val identity: GameIdentity, val rentalId: RequestId, val vehicle: OwnedVehicleId,
+    val direction: RentalMapDirection, val activity: VehicleActivity)
+
 /** 대여별 확정 경계다. 한 대여의 보류가 다른 대여의 이미 확정된 결과를 취소하지 않는다. */
 data class RentalRuntimeSnapshot(
     val pending: List<RentalLedger.Pending>,
     val firstCompleted: CompletedRental?,
     val deferred: Map<RequestId, ContractError> = emptyMap(),
+    val mapEvents: List<RentalMapEvent> = emptyList(),
 )
 
 internal interface RentalRuntimeLedger {
@@ -42,5 +50,10 @@ internal interface RentalRuntimeLedger {
         unobservedSince: EpochMillis?): ContractResult<EpochMillis>
     fun settle(id: RequestId): ContractResult<RentalReceipt>
     fun finishReturn(id: RequestId, now: EpochMillis): ContractResult<VehicleActivity>
+    fun finishReturnWithCommit(id: RequestId, now: EpochMillis): ContractResult<RentalLedger.ReturnCommit> =
+        when (val result = finishReturn(id, now)) {
+            is ContractResult.Failure -> result
+            is ContractResult.Success -> ContractResult.Success(RentalLedger.ReturnCommit(result.value, null))
+        }
     fun firstCompleted(): ContractResult<CompletedRental?>
 }

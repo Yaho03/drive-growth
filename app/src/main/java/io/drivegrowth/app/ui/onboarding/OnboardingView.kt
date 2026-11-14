@@ -23,6 +23,8 @@ import io.drivegrowth.app.ui.presentation.RewardCelebrationView
 import io.drivegrowth.core.contract.Rarity
 import io.drivegrowth.core.contract.VehicleId
 import java.io.IOException
+import java.text.NumberFormat
+import java.util.Locale
 
 /** 실제 지급·저장·탐색을 호출하지 않고 호스트가 전달한 단계와 확정 결과만 표시한다. */
 class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : LinearLayout(context) {
@@ -61,12 +63,20 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
 
     /** false인 늦은/역행 응답은 표시하지 않는다. 호스트는 프로필·requestId·응답 순서도 대조한다. */
     fun render(state: OnboardingScreenState, controlsEnabled: Boolean): Boolean {
+        val previous = interaction.state
+        val selection = interaction.selectedId
+        val previouslyEnabled = interaction.controlsEnabled
         val accepted = interaction.render(state, controlsEnabled)
-        drawScreen()
+        if (childCount == 0 || previous != interaction.state || selection != interaction.selectedId ||
+            previouslyEnabled != interaction.controlsEnabled) drawScreen()
         return accepted
     }
 
-    fun restoreSelection(id: VehicleId?) { interaction.restoreSelection(id); drawScreen() }
+    fun restoreSelection(id: VehicleId?) {
+        val previous = interaction.selectedId
+        interaction.restoreSelection(id)
+        if (previous != interaction.selectedId) drawScreen()
+    }
     fun handleBack(): Boolean {
         val handled = interaction.handleBack()
         if (handled) drawScreen()
@@ -156,7 +166,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             }
             is OnboardingScreenState.Submitting -> {
                 source(body, state.sourceLabel)
-                heading(body, R.string.onboarding_submitting, R.string.onboarding_pending_note)
+                heading(body, R.string.onboarding_submitting)
                 body.addView(label(state.vehicleName ?: s(R.string.onboarding_vehicle_missing), 28, bold = true))
             }
             is OnboardingScreenState.LoadError -> {
@@ -166,7 +176,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             }
             is OnboardingScreenState.GrantError -> {
                 source(body, state.sourceLabel)
-                heading(body, R.string.onboarding_grant_error, R.string.onboarding_recovery_note)
+                heading(body, R.string.onboarding_grant_error)
                 body.addView(label(state.vehicleName ?: s(R.string.onboarding_vehicle_missing), 28, bold = true))
                 add(body, pixelCard().apply { addView(label(state.message, 18, panels.muted)) })
                 action(body, R.string.onboarding_retry, state.retryAllowed, true) { interaction.retry() }
@@ -175,10 +185,8 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             }
             is OnboardingScreenState.Completed -> {
                 source(body, state.sourceLabel)
-                heading(body, if (state.alreadyGranted) R.string.onboarding_already_granted else R.string.onboarding_complete,
-                    R.string.onboarding_completed_note)
+                heading(body, if (state.alreadyGranted) R.string.onboarding_already_granted else R.string.onboarding_complete)
                 completedRewards(body, state)
-                add(body, label(s(R.string.onboarding_next), color = panels.muted))
                 action(this@OnboardingView, R.string.onboarding_to_shop, primary = true) { interaction.goToShop() }
             }
         }
@@ -186,25 +194,23 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
     }
 
     private fun completedRewards(body: LinearLayout, state: OnboardingScreenState.Completed) = with(style) {
-        // 호스트의 확정 표시 문구를 분류하고 금액·공간 값은 문구 그대로 보존한다.
-        val money = state.summary.firstOrNull { it.startsWith("최초 확정 게임머니 ") || it.startsWith("초기 재화 ") }
-        val spaces = state.summary.firstOrNull { it.startsWith("최초 차량 공간 ") || it.startsWith("차고 ") }
+        val money = state.initialMoney?.let { NumberFormat.getIntegerInstance(Locale.KOREA).format(it.units) }
+        val spaces = state.initialParkingSpaces?.let { context.getString(R.string.onboarding_reward_parking_spaces, it) }
         val rewards = if (wide) row() else column()
         val vehicle = pixelCard(selected = true).apply {
             gravity = Gravity.CENTER_HORIZONTAL
-            addView(label("첫 차량", 14, color = panels.muted))
-            val effectKey = state.vehicle.ownedVehicleId.value.takeIf { confirmedChoice == state.vehicle.vehicleId }
+            addView(label(s(R.string.onboarding_reward_vehicle), 14, color = panels.muted))
+            val effectKey = state.vehicle.ownedVehicleId.value.takeIf { !state.alreadyGranted && confirmedChoice == state.vehicle.vehicleId }
             celebration.render(effectKey, RewardCelebrationKind.FIRST_GRANT, vehicle = sprites.bitmap(state.vehicle.vehicleId))
             addVehicleArt(this, state.vehicle.vehicleId, celebrate = true)
             addView(label(state.displayName, 22, bold = true))
             addView(onboardingRarityChip(state.vehicle.rarity))
             addView(label(context.getString(R.string.onboarding_level, state.vehicle.level), 16))
-            addView(label(context.getString(R.string.onboarding_acquisition, state.vehicle.acquisitionCost.units), 14, panels.muted))
         }
         val cards = listOf(
-            rewardCard("게임머니", ReferenceHudIcon.COIN, money),
+            rewardCard(s(R.string.onboarding_reward_money), ReferenceHudIcon.COIN, money),
             vehicle,
-            rewardCard("주차 칸", ReferenceHudIcon.GARAGE, spaces),
+            rewardCard(s(R.string.onboarding_reward_parking), ReferenceHudIcon.GARAGE, spaces),
         )
         cards.forEachIndexed { index, card ->
             val params = if (wide) LayoutParams(0, -1, 1f).apply { if (index > 0) marginStart = dp(PixelStyle.gapDp) }
@@ -212,10 +218,9 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             rewards.addView(card, params)
         }
         add(body, rewards)
-        state.summary.filterNot { it == money || it == spaces }.forEach {
+        state.summary.forEach {
             add(body, label(it, color = panels.muted), PixelStyle.gapDp)
         }
-        if (state.summary.isEmpty()) add(body, label(s(R.string.onboarding_result_missing), color = panels.muted))
     }
 
     private fun rewardCard(title: String, icon: ReferenceHudIcon, value: String?) = pixelCard().apply {
@@ -226,7 +231,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         }, LayoutParams(style.dp(54), style.dp(54)))
         addView(label(title, 15, color = panels.muted))
         addView(if (value != null) label(value, 21, bold = true).apply { gravity = Gravity.CENTER }
-            else label("확정 정보 없음", 16, color = panels.muted))
+            else label(s(R.string.onboarding_reward_unknown), 16, color = panels.muted))
     }
 
     private fun intro(body: LinearLayout, state: OnboardingScreenState.Intro) = with(style) {
@@ -272,7 +277,6 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             addView(label(s(R.string.onboarding_planned_title), 18, bold = true))
             if (lines.isEmpty()) addView(label(s(R.string.onboarding_benefits_missing), color = panels.muted))
             else lines.forEach { addView(label(it, 16)) }
-            addView(label(s(R.string.onboarding_planned_note), color = panels.muted))
         })
     }
     private fun candidate(value: OnboardingCandidate, selectable: Boolean) = with(style) {

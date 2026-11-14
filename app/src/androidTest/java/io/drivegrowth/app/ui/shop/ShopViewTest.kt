@@ -397,6 +397,52 @@ class ShopViewTest : InstrumentationTestCase() {
             view.render(state,false);assertNull(view.findViewWithTag<View>("shop:scene"))
         }
     }
+    fun testFacilityMenuCardsShowSuppliedStateWithoutSendingPurchase() = onUi {
+        val events = mutableListOf<ShopEvent>()
+        val view = ShopView(instrumentation.targetContext, events::add)
+        val state = ShopPreviewStates.normal()
+        fun render(insurance: ShopAvailability?) {
+            val facilities = state.facilities.mapNotNull { facility ->
+                when (facility.facility) {
+                    Facility.FUEL_STATION -> facility
+                    Facility.CAR_WASH -> facility.copy(option = facility.option.copy(availability = ShopAvailability.INSTALLED))
+                    Facility.INSURANCE -> insurance?.let { facility.copy(option = facility.option.copy(availability = it)) }
+                }
+            }
+            view.render(state.copy(facilities = facilities), true)
+            measureAndLayout(view, 320, 480)
+        }
+        render(ShopAvailability.AVAILABLE)
+        view.openMapTools()
+        measureAndLayout(view, 320, 480)
+
+        val fuel = button(view, "shop:menu-facility:FUEL_STATION")
+        assertTrue(fuel.contentDescription.endsWith(" · 잠김"))
+        assertTrue(button(view, "shop:menu-facility:INSURANCE").contentDescription.endsWith(" · 건설 가능"))
+        assertTrue(button(view, "shop:menu-facility:CAR_WASH").contentDescription.endsWith(" · 운영 중"))
+        for (facility in Facility.entries) {
+            val art = view.findViewWithTag<View>("shop:menu-art:${facility.name}")
+            assertTrue(art.width > 0 && art.height > 0)
+            assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO, art.importantForAccessibility)
+        }
+        val footer = button(view, "shop:map-sheet-close")
+        val scroll = view.findViewWithTag<ScrollView>("shop:controls-scroll")
+        assertFalse(footer in views(scroll))
+        assertTrue(fuel.performClick())
+        assertNotNull(view.findViewWithTag<View>("shop:map-overlay"))
+        assertNull(view.findViewWithTag<View>("shop:map-confirm"))
+        assertTrue(events.isEmpty())
+
+        assertTrue(view.handleBack())
+        render(null)
+        view.openMapTools()
+        assertTrue(button(view, "shop:menu-facility:INSURANCE").contentDescription.endsWith(" · 상태 확인 불가"))
+        view.render(state, false)
+        fuel.performClick()
+        assertNull(view.findViewWithTag<View>("shop:map-sheet"))
+        assertTrue(events.isEmpty())
+    }
+
     fun testUnreportedCapacityDoesNotPaintLockedParkingSpaces() = onUi {
         val view = ShopView(instrumentation.targetContext) {}
         val state = ShopPreviewStates.normal().copy(vehicles = emptyList(), ownedCount = 0)

@@ -1,12 +1,17 @@
 package io.drivegrowth.app.host.garage
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.widget.LinearLayout
+import io.drivegrowth.app.ui.garage.GarageCareMotion
+import io.drivegrowth.app.ui.garage.GarageCareOutcome
 import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.garage.VehicleArtwork
 import io.drivegrowth.app.ui.pixel.MapPanelStyle
+import io.drivegrowth.app.ui.presentation.GarageCareMotionView
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.VehicleRef
+import io.drivegrowth.core.progression.VehicleAction
 
 /** 준비된 core 값만 표시한다. 계산/저장/gate 판정은 하지 않는다. */
 class GarageCommandView(context: Context, private val confirm: () -> Unit, private val cancel: () -> Unit,
@@ -14,10 +19,52 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
     private val style = GarageStyle(context, pixelPanel = true)
     private val mapStyle = MapPanelStyle(context)
     private val artwork = VehicleArtwork(context, style)
+    private val careMotion = GarageCareMotion()
+    private val careScene = GarageCareMotionView(context)
+    private var renderedState: GarageCommandState? = null
+    private var controlsEnabled = false
+    private var startMotion: Runnable? = null
     private var generation = 0L
     init { orientation = VERTICAL; setBackgroundColor(0xffffedbd.toInt()) }
 
+    private fun canPlayCareMotion() = controlsEnabled && isAttachedToWindow && isShown &&
+        windowVisibility == VISIBLE && hasWindowFocus() && ValueAnimator.areAnimatorsEnabled()
+
+    internal fun dismissMotion() {
+        careMotion.clear()
+        stopScene()
+    }
+
+    private fun stopScene() {
+        startMotion?.let(::removeCallbacks)
+        startMotion = null
+        careScene.stop()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility != VISIBLE) handler?.post {
+            if (!isAttachedToWindow || windowVisibility != VISIBLE) dismissMotion()
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        // HOME의 같은 프레임 안에서 패널을 다시 붙이는 경우가 있다.
+        handler?.post { if (!isAttachedToWindow) dismissMotion() }
+        super.onDetachedFromWindow()
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (!hasWindowFocus) dismissMotion()
+    }
+
     fun render(state: GarageCommandState, enabled: Boolean) = with(style) {
+        if (state == renderedState && enabled == controlsEnabled) return@with
+        renderedState = state
+        controlsEnabled = enabled
+        val effect = careMotion.observe(state, canPlayCareMotion())
+        stopScene()
         fun text(label: String, size: Int = 16, bold: Boolean = false) =
             style.text(label, size, mapStyle.ink, bold)
         generation++; val token = generation
@@ -33,7 +80,7 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
                 if (token == generation) callback()
             }, primary))
         }
-        fun pending(p: GaragePending) {
+        fun pending(p: GaragePending, showArtwork: Boolean = true) {
             val details = column().apply {
                 background = mapStyle.chip()
                 setPadding(dp(12), dp(10), dp(12), dp(12))
@@ -42,7 +89,7 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
             val title = p.name ?: if (p.command is GarageCommand.Material) "보관한 강화 대상 차량" else p.request.id.value
             details.addView(text(title, 24, bold = true))
             p.vehicle?.let {
-                details.addView(artwork.view(it.vehicleId, it.rarity, 120, showRing = false).apply {
+                if (showArtwork) details.addView(artwork.view(it.vehicleId, it.rarity, 120, showRing = false).apply {
                     background = null
                 }, LayoutParams(-1, dp(120)))
                 details.addView(text(rarity(it.rarity), 16, bold = true))
@@ -85,18 +132,50 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
                 pending(state.pending)
                 content.addView(text(if(state.recovering) "보관한 요청입니다. 미실행이면 표시된 원래 명령을 처리하고, 이미 실행됐으면 당시 결과를 확인합니다" else "아직 실행하지 않았습니다. 확인하면 보관한 이 명령만 확정합니다"))
                 if(!state.canConfirm) content.addView(text("차량 관리는 준비 중입니다. 지금은 비용과 조건만 확인할 수 있습니다"))
-                action(if(state.recovering) "보관 요청 처리 · 결과 확인" else "확정", state.canConfirm, primary = true, callback = confirm); action("취소 / 화면 닫기", callback = cancel)
+                action(if (state.recovering) "보관 요청 처리 · 결과 확인" else "확정", state.canConfirm, primary = true) {
+                    careMotion.arm(state, canPlayCareMotion())
+                    confirm()
+                }
+                action("취소 / 화면 닫기", callback = cancel)
             }
             is GarageCommandState.Running -> { content.addView(text("같은 요청을 보존해 처리 중입니다", bold = true)); pending(state.pending) }
             is GarageCommandState.Confirmed -> {
-                pending(state.pending); content.addView(text("이 요청의 확정 결과를 확인했습니다. 현재 차고와 잔액은 다시 조회합니다"))
+                val outcome = effect?.outcome ?: GarageCareOutcome.from(state)
+                outcome?.let {
+                    val message = when (it.action) {
+                        VehicleAction.LEVEL_UP -> "레벨업 완료 · Lv.${it.vehicle.level} · 진행 ${it.vehicle.levelProgressPercent}%"
+                        VehicleAction.USE_MATERIAL -> "재료 강화 완료 · Lv.${it.vehicle.level} · 진행 ${it.vehicle.levelProgressPercent}%"
+                        VehicleAction.REPAIR -> "수리 완료 · 대기"
+                        VehicleAction.SELL -> "판매 완료"
+                        VehicleAction.SCRAP -> "폐차 완료"
+                    }
+                    content.addView(text(message, 20, bold = true).apply {
+                        accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE
+                    })
+                    if (it.action == VehicleAction.SELL || it.action == VehicleAction.SCRAP) {
+                        it.credit?.let { payment -> content.addView(text("확정 지급액 ${payment.units} 게임머니")) }
+                        content.addView(text("도감에 보유 기록이 남아요"))
+                    }
+                }
+                if (effect != null) {
+                    (careScene.parent as? LinearLayout)?.removeView(careScene)
+                    content.addView(careScene, LayoutParams(-1, dp(76)))
+                    val start = Runnable {
+                        startMotion = null
+                        if (generation == token) careScene.play(effect, ::canPlayCareMotion)
+                    }
+                    startMotion = start
+                    postOnAnimation(start)
+                }
                 val balance = when(val receipt = state.receipt) {
                     is GarageReceipt.Single -> receipt.value.balance
                     is GarageReceipt.Material -> receipt.value.balance
                     is GarageReceipt.Repair -> receipt.value.balance
                 }
                 content.addView(text("당시 확정 잔액 ${balance.units} 게임머니", 24, bold = true))
-                content.addView(text("정산이 확정되었습니다")); action("결과 확인", primary = true, callback = done)
+                action("결과 확인", primary = true) { dismissMotion(); done() }
+                pending(state.pending, showArtwork = false)
+                content.addView(text("이 요청의 확정 결과를 확인했습니다. 현재 차고와 잔액은 다시 조회합니다"))
             }
             is GarageCommandState.Rejected -> {
                 content.addView(text("원장이 미실행 요청의 취소를 확인했습니다 (${state.error}). 최신 차량 상태로 다시 선택할 수 있습니다"))

@@ -24,7 +24,8 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
     private var generation = 0L
     private var reading = false
     private var requested = false
-    private var identity: GameIdentity? = restoredIdentity
+    var identity: GameIdentity? = restoredIdentity
+        private set
     private var recoveredOriginal: HostCheckpointResult? = null
     private var facilityCommand = restoredFacility
     val facilityOriginalCommand: FacilityCommand.Buy? get() = facilityCommand?.takeIf { command ->
@@ -47,6 +48,7 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
     private var onState: ((HomeShopState, Boolean) -> Unit)? = null
     private var onComplete: ((ShopRequest, ContractResult<Unit>) -> Unit)? = null
     private var onRetry: (() -> Unit)? = null
+    private var onInstallation: ((ShopRequest, FacilityReceipt.Purchased) -> Unit)? = null
     @Volatile var uiState = initialUi
         private set
     var state = HomeShopState()
@@ -54,12 +56,13 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
 
     init { facility.changed = { value, _ -> facilityChanged(value) } }
     fun attach(changed: (HomeShopState, Boolean) -> Unit,
-        complete: (ShopRequest, ContractResult<Unit>) -> Unit, retry: () -> Unit) {
-        onState = changed; onComplete = complete; onRetry = retry
+        complete: (ShopRequest, ContractResult<Unit>) -> Unit, retry: () -> Unit,
+        installation: ((ShopRequest, FacilityReceipt.Purchased) -> Unit)? = null) {
+        onState = changed; onComplete = complete; onRetry = retry; onInstallation = installation
         changed(state, display.enabled)
     }
     fun remember(value: ShopUiState) { uiState = value }
-    fun detach() { setControlsEnabled(false); onState = null; onComplete = null; onRetry = null }
+    fun detach() { setControlsEnabled(false); onState = null; onComplete = null; onRetry = null; onInstallation = null }
     fun release() { detach(); released = true; decoration?.release(); expansion?.release(); facility.changed = null }
 
     fun setControlsEnabled(value: Boolean) {
@@ -174,8 +177,20 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
             }
             else -> {
                 stopDecoration(); setFacilityAccess(false)
-                show(ShopScreenState.Unsupported("다른 기능의 보관 요청을 해당 화면에서 먼저 확인해 주세요."))
-                onRetry?.invoke()
+                val facts = load.facts?.takeIf { it.identity == load.identity }
+                if (facts == null) {
+                    fail(ContractError.DATA_UNAVAILABLE)
+                    return
+                }
+                val content = load.decorationFacts?.let { decorationMapper.map(it, facts.screen.revision) }
+                    ?: ContractResult.Success(facts.screen)
+                when (content) {
+                    is ContractResult.Failure -> fail(content.error)
+                    is ContractResult.Success -> {
+                        show(withSource(content.value, facts.identity))
+                        onRetry?.invoke()
+                    }
+                }
             }
         }
     }
@@ -223,13 +238,15 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
             receipt.transaction.kind == TransactionKind.FACILITY && receipt.transaction.ruleVersion == request.selection.option.ruleVersion &&
             receipt.transaction.money == request.selection.option.price?.let { MoneyChange(MoneyDirection.DEBIT, it) }
 
+    private val decorationMapper = DecorationMapper(mapOf(
+        "neutral" to ShopAppearance("기본 간판 · 시연", 0xff8fbcff.toInt()),
+        "blue-sign" to ShopAppearance("간판 색상 · 시연", 0xff8fbcff.toInt()),
+    ))
+
     private fun ensureDecoration(owner: GameIdentity) {
         if (decoration != null) return
         val backend = source.decoration(owner) { currentFacts = it }
-        decoration = DecorationHostController(owner, backend, DecorationMapper(mapOf(
-            "neutral" to ShopAppearance("기본 간판 · 시연", 0xff8fbcff.toInt()),
-            "blue-sign" to ShopAppearance("간판 색상 · 시연", 0xff8fbcff.toInt()),
-        )), worker, reply, ::completeMapped, { onRetry?.invoke() },
+        decoration = DecorationHostController(owner, backend, decorationMapper, worker, reply, ::completeMapped, { onRetry?.invoke() },
             restoredRequest = uiState.pending?.takeIf { it.selection.option.command is ShopCommand.Decorate })
             .also { host -> host.changed = { value, _ -> decorationChanged(value) } }
     }
@@ -282,10 +299,7 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
         if (facilities.facts == facts.facility && !facilities.busy && facilities.pending == null &&
             facilities.receipt == null && facilities.error == null && !facilities.foreign && !facilities.unsupported)
             routes[HomeShopAction.FACILITY] = Revision(facilities.version)
-        val shown = content.copy(name = content.name + when (facts.identity.source) {
-            InputSource.SIMULATION -> " · 모의 원장"; InputSource.VEHICLE -> " · 차량 원장"
-        })
-        show(shown, inactive = inactive, routes = routes)
+        show(withSource(content, facts.identity), inactive = inactive, routes = routes)
         if (HomeShopAction.EXPANSION !in routes && !expansionLoading) loadExpansion()
         if (facilities.facts != facts.facility && !facilities.busy && facilities.pending == null &&
             facilities.receipt == null && facilityRefreshFor != facts.facility) {
@@ -293,6 +307,12 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
             facility.refresh()
         }
     }
+    private fun withSource(content: ShopScreenState.Content, identity: GameIdentity) =
+        content.copy(name = content.name + when (identity.source) {
+            InputSource.SIMULATION -> " · 모의 원장"
+            InputSource.VEHICLE -> " · 차량 원장"
+        })
+
     private var facilityRefreshFor: FacilityFacts? = null
     @Volatile private var expansionCommand: HostCheckpointCommand.Expand? = null
     private fun loadExpansion() {
@@ -350,7 +370,11 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
             if (receipt.command.identity != owner || receipt.command.requestId != original.requestId || receipt.command.offer != expected) {
                 fail(ContractError.STATE_CONFLICT); return
             }
-            if (mapped != null) completeMapped(mapped, ContractResult.Success(Unit)) else completeRequest(original, ContractResult.Success(Unit))
+            if (mapped != null) {
+                if (receipt == value.newInstallation && financialMatches(owner, original, receipt.settlement))
+                    onInstallation?.invoke(original, receipt)
+                completeMapped(mapped, ContractResult.Success(Unit))
+            } else completeRequest(original, ContractResult.Success(Unit))
         } else if (mapped != null && !value.busy && value.error != null) completeMapped(mapped, ContractResult.Failure(value.error))
     }
     private fun matches(request: ShopRequest, command: HostCheckpointCommand, owner: GameIdentity): Boolean {
@@ -377,7 +401,7 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
         originals.entries.removeAll { it.value == request }
         completeRequest(request, ContractResult.Success(Unit))
     }
-    fun submit(request: ShopRequest): Boolean {
+    fun submit(request: ShopRequest, presentInstallation: Boolean = false): Boolean {
         if (originals.values.any { it == request } ||
             (uiState.pending == request && display.screen !is ShopScreenState.Content)) return false
         val mapped = when (val result = display.map(request)) {
@@ -397,7 +421,7 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
                 if (facts == null) false else {
                     facilityCommand = FacilityCommand.Buy(facts.identity, mapped.requestId, facts.definitionVersion,
                         (mapped.selection.option.command as ShopCommand.BuyFacility).offer)
-                    facility.submit(mapped)
+                    facility.submit(mapped, presentInstallation)
                 }
             }
             null -> false

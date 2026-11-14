@@ -72,7 +72,8 @@ internal object FacilityCheckpointStorage {
             else -> ContractResult.Failure(ContractError.INVALID_INPUT)
         }
     }
-    fun commit(store:SqliteGameChangeStore,db:SQLiteDatabase,profile:ProfileId,c:HostCheckpointCommand):ContractResult<HostCheckpointResult> {
+    fun commit(store: SqliteGameChangeStore, db: SQLiteDatabase, profile: ProfileId, c: HostCheckpointCommand,
+        onNewFacility: () -> Unit): ContractResult<HostCheckpointResult> {
         when(val old=original(store,db,profile,c)){is ContractResult.Failure->return old;is ContractResult.Success->old.value?.let{return ContractResult.Success(it)}}
         when(val valid=prepare(store,db,profile,c)){is ContractResult.Failure->return valid;else->Unit}
         val result:HostCheckpointResult
@@ -100,6 +101,8 @@ internal object FacilityCheckpointStorage {
         val values=ContentValues().apply{put("request_id",c.requestId.value);put("profile",profile.value);put("source",store.source.name);put("command",command);put("result",raw);put("digest",ObservedDrivingJson.digest(command+"\n"+raw))}
         if(db.insertOrThrow("facility_command_results",null,values)<0)throw SQLiteException("시설/쉬기 원결과 무삽입")
         when(val actual=original(store,db,profile,c)){is ContractResult.Failure->throw SQLiteException("시설/쉬기 실제 원결과 불일치");is ContractResult.Success->if(actual.value!=result)throw SQLiteException("시설/쉬기 실제 원결과 누락")}
+        // 신규 분기만 설치 후조건과 typed 원정산 쓰기를 통과한다.
+        if (c is HostCheckpointCommand.FacilityPurchase) onNewFacility()
         return ContractResult.Success(result)
     }
 }

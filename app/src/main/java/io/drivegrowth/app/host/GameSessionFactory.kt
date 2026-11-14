@@ -71,6 +71,7 @@ class GameSessionFactory internal constructor(context: Context, private val data
     @Volatile internal var deliveryDistanceSession: DeliveryDistanceSession? = null
     internal var deliveryDistanceElapsedRealtime: () -> Long = SystemClock::elapsedRealtime
     private var achievementTracking = false
+    internal var onFirstCollectionOwnership: ((io.drivegrowth.app.data.FirstCollectionOwnership) -> Unit)? = null
 
     internal fun enableAchievements() { achievementTracking = true }
 
@@ -120,6 +121,7 @@ class GameSessionFactory internal constructor(context: Context, private val data
                     }
                 })
             store.currentDeliveryDistanceSession = { deliveryDistanceSession }
+            store.onFirstCollectionOwnership = onFirstCollectionOwnership
             val achievementAuthority by lazy {
                 when (content) {
                     is ContractResult.Failure -> content

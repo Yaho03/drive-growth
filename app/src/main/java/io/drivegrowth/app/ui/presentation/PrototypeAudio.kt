@@ -28,7 +28,7 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
     }
 
     enum class Cue {
-        START, FIRST_GRANT, GACHA, SETTLEMENT, EXPAND,
+        CLICK, START, FIRST_GRANT, GACHA, SETTLEMENT, EXPAND,
         DELIVERY_DEPARTURE, DELIVERY_INCOME_ARRIVAL, DELIVERY_VEHICLE_ARRIVAL, DELIVERY_HELD,
     }
 
@@ -223,7 +223,10 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
     private fun playEffect(samples: ShortArray, canPlayEffect: () -> Boolean) {
         if (!canPlayEffect()) return
         stopEffect()
-        if (!requestFocus(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)) return
+        if (!requestFocus(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)) {
+            Log.d("DriveGrowthAudio", "Effect audio focus unavailable: $scene")
+            return
+        }
         try {
             val track = AudioTrack.Builder().setAudioAttributes(attributes)
                 .setAudioFormat(AudioFormat.Builder().setSampleRate(SAMPLE_RATE)
@@ -231,18 +234,36 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
                     .setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
                 .setTransferMode(AudioTrack.MODE_STATIC).setBufferSizeInBytes(samples.size * 2).build()
             effect = track
-            val wrote = track.write(samples, 0, samples.size, AudioTrack.WRITE_NON_BLOCKING)
+            val wrote = track.write(samples, 0, samples.size, AudioTrack.WRITE_BLOCKING)
+            if (wrote != samples.size) Log.w("DriveGrowthAudio", "Effect PCM write: $wrote/${samples.size}")
             if (wrote != samples.size || !canPlayEffect()) {
                 stopEffect()
                 abandonIdleFocus()
                 return
             }
-            track.play()
-            releaseEffect = Runnable {
-                stopEffect()
-                abandonIdleFocus()
-            }.also { handler?.postDelayed(it, samples.size * 1_000L / SAMPLE_RATE + 80L) }
-        } catch (_: RuntimeException) {
+            // 쓰는 동안 도착한 포커스 변경을 먼저 처리하고 재생 직전에 다시 검사한다.
+            handler?.post {
+                if (effect !== track) return@post
+                if (!canPlayEffect()) {
+                    stopEffect()
+                    abandonIdleFocus()
+                    return@post
+                }
+                try {
+                    track.play()
+                    Log.d("DriveGrowthAudio", "Effect started: $scene (${samples.size} samples)")
+                    releaseEffect = Runnable {
+                        stopEffect()
+                        abandonIdleFocus()
+                    }.also { handler?.postDelayed(it, samples.size * 1_000L / SAMPLE_RATE + 80L) }
+                } catch (failure: RuntimeException) {
+                    Log.w("DriveGrowthAudio", "Effect playback error: $scene", failure)
+                    stopEffect()
+                    abandonIdleFocus()
+                }
+            }
+        } catch (failure: RuntimeException) {
+            Log.w("DriveGrowthAudio", "Effect playback error: $scene", failure)
             stopEffect()
             abandonIdleFocus()
         }
@@ -411,6 +432,7 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
     )
 
     private fun notes(cue: Cue) = when (cue) {
+        Cue.CLICK -> listOf(Note(880, 0, 50, .06))
         Cue.START -> listOf(Note(300, 0, 300, .1, Wave.SINE, slide = 900))
         Cue.FIRST_GRANT -> listOf(
             Note(1200, 0, 30, .07), Note(1200, 100, 30, .07), Note(1200, 200, 30, .07),
@@ -418,7 +440,8 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
             Note(440, 780, 200, .1, Wave.SAWTOOTH), Note(554, 780, 200, .08, Wave.SAWTOOTH),
         ) + fanfare(1250)
         Cue.GACHA -> gachaNotes(Rarity.COMMON, opening = true)
-        Cue.SETTLEMENT -> listOf(Note(1047, 0, 80, .1), Note(1568, 80, 160, .1))
+        Cue.SETTLEMENT -> listOf(Note(880, 0, 50, .06), Note(1047, 650, 80, .1), Note(1568, 730, 160, .1)) +
+            listOf(1760, 2200, 2640).mapIndexed { index, hz -> Note(hz, 1050 + index * 60, 140, .08, Wave.TRIANGLE) }
         Cue.DELIVERY_DEPARTURE -> listOf(
             Note(1400, 500, 280, .05, Wave.SAWTOOTH, slide = -1000),
             Note(110, 1000, 300, .18, Wave.SAWTOOTH, slide = -70),
@@ -431,7 +454,7 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
             Note(1047, 1700, 80, .1), Note(1568, 1780, 160, .1),
         )
         Cue.DELIVERY_VEHICLE_ARRIVAL -> arrivalNotes() + Note(400, 1400, 120, .12, slide = 500)
-        Cue.DELIVERY_HELD -> arrivalNotes() + Note(1200, 1450, 30, .07)
+        Cue.DELIVERY_HELD -> arrivalNotes() + Note(880, 1450, 50, .06)
         Cue.EXPAND -> listOf(523, 659, 784, 1047, 1319).mapIndexed { i, hz -> Note(hz, i * 70, 160, .1) }
     }
 

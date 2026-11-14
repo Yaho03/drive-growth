@@ -63,7 +63,10 @@ class SessionDeliveryJournalSqliteTest : InstrumentationTestCase() {
             }
         }
         val journal = SessionDeliveryJournal(games)
+        assertEquals(ContractResult.Success(DeliveryJournalSlot.Foreign), journal.slot(identity))
         assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), journal.pending(identity))
+        assertTrue(journal.execute(identity, select()) is ContractResult.Failure)
+        assertTrue(journal.finish(identity, select()) is ContractResult.Failure)
         assertTrue(journal.save(identity, select()) is ContractResult.Failure)
         assertTrue(journal.cancelUnstarted(identity, select()) is ContractResult.Failure)
         assertTrue(journal.pending(identity.copy(profileId = ProfileId("foreign"))) is ContractResult.Failure)

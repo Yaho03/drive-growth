@@ -51,7 +51,7 @@ class ResultsHostMapper {
                         is Observation.Available -> Observation.Available(RentalDemandPresentation(
                             demand.value.desired.displayName, demand.value.purpose, demand.value.city,
                         ))
-                    })
+                    }, cause = it.cause)
             }), ResultsOrigin.STORED, historyAvailable = true)
         }
     }

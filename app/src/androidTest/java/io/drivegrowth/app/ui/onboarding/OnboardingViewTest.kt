@@ -10,6 +10,7 @@ import android.widget.ImageView
 import android.widget.ScrollView
 import android.widget.TextView
 import io.drivegrowth.app.R
+import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.core.contract.VehicleId
 
@@ -87,7 +88,7 @@ class OnboardingViewTest : InstrumentationTestCase() {
         confirm.performClick(); confirm.performClick()
         assertEquals(1, events.filterIsInstance<OnboardingEvent.ConfirmSelection>().size)
         assertTrue(all(view).none { it is Button })
-        assertFalse(texts(view).contains("첫 차량 지급을 확인했어요"))
+        assertFalse(texts(view).contains("첫 차가 도착했어요!"))
         assertFalse(view.render(OnboardingPreviewStates.completed, true))
         val completed = OnboardingPreviewStates.completed.copy(vehicle = OnboardingPreviewStates.completed.vehicle.copy(
             vehicleId = OnboardingPreviewStates.avante.vehicle.vehicleId), displayName = "아반떼")
@@ -117,23 +118,24 @@ class OnboardingViewTest : InstrumentationTestCase() {
 
     fun testCompletedRewardsKeepConfirmedMoneyVehicleAndParkingInSeparateCards() = onUi {
         val view = OnboardingView(instrumentation.targetContext) { fail("확정 결과 표시 중 요청이 발생했다") }
-        val money = "최초 확정 게임머니 2345"
-        val parking = "최초 차량 공간 7칸"
-        val gift = "첫 영업 완료를 기다리고 있습니다"
-        val state = OnboardingPreviewStates.completed.copy(summary = listOf(gift, parking, money))
+        val gift = "개업 선물은 첫 영업을 마치면 받을 수 있어요."
+        val state = OnboardingPreviewStates.completed.copy(summary = listOf(gift),
+            initialMoney = GameMoney(2345), initialParkingSpaces = 7)
         assertTrue(view.render(state, true))
         fun card(title: String) = all(view).filterIsInstance<TextView>().single { it.text == title }.parent as ViewGroup
-        assertTrue(money in texts(card("게임머니")))
+        assertTrue("첫 차가 도착했어요!" in texts(view))
+        assertFalse("첫 차를 받은 기록이에요" in texts(view))
+        assertTrue("2,345" in texts(card("시작 게임머니")))
         assertTrue(state.displayName in texts(card("첫 차량")))
-        assertTrue(parking in texts(card("주차 칸")))
+        assertTrue("7칸" in texts(card("처음 열린 주차 공간")))
         assertTrue(gift in texts(view))
-        assertFalse(gift in texts(card("주차 칸")))
+        assertFalse(gift in texts(card("처음 열린 주차 공간")))
 
-        assertTrue(view.render(state.copy(summary = listOf(gift)), true))
-        assertFalse(money in texts(view))
-        assertFalse(parking in texts(view))
-        assertTrue("확정 정보 없음" in texts(card("게임머니")))
-        assertTrue("확정 정보 없음" in texts(card("주차 칸")))
+        assertTrue(view.render(state.copy(initialMoney = null, initialParkingSpaces = null), true))
+        assertFalse("2,345" in texts(view))
+        assertFalse("7칸" in texts(view))
+        assertTrue("확인할 수 없어요" in texts(card("시작 게임머니")))
+        assertTrue("확인할 수 없어요" in texts(card("처음 열린 주차 공간")))
         assertTrue(gift in texts(view))
     }
 
@@ -180,14 +182,14 @@ class OnboardingViewTest : InstrumentationTestCase() {
         assertFalse(button(view, "다시 확인").isEnabled)
         view.render(OnboardingPreviewStates.grantError.copy(message = "표시 문구 갱신", sourceLabel = "출처 갱신"), true)
         assertFalse(button(view, "다시 확인").isEnabled)
-        assertFalse(texts(view).contains("첫 차량 지급을 확인했어요"))
+        assertFalse(texts(view).contains("첫 차가 도착했어요!"))
     }
 
     fun testAlreadyGrantedProfileOnlyRequestsShopNavigation() = onUi {
         val events = mutableListOf<OnboardingEvent>()
         val view = OnboardingView(instrumentation.targetContext, events::add)
         view.render(OnboardingPreviewStates.alreadyGranted, true)
-        assertTrue(texts(view).contains("이미 첫 차량을 받은 프로필이에요"))
+        assertTrue(texts(view).contains("첫 차를 받은 기록이에요"))
         assertFalse(view.render(OnboardingPreviewStates.choosing, true))
         assertEquals(listOf("가게로"), all(view).filterIsInstance<Button>().map { it.text.toString() })
         assertFalse(view.handleBack())

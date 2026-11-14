@@ -145,6 +145,25 @@ class RentalLedgerTest : InstrumentationTestCase() {
         assertNull(ok(assign(r=request.copy(id=RequestId("third")))))
     }
 
+    fun testReturnProofRequiresActualPhaseWriteAndSurvivesReplayWithoutNewMotion() {
+        assertEquals(car.ownedVehicleId, ok(assign()))
+        ok(store.rental.account(request.id, terms.start, EpochMillis(3_600_000L), null))
+        val receipt = ok(store.rental.settle(request.id))
+        val target = EpochMillis(4_500_000L)
+        val pending = ok(store.rental.pending())
+        val balance = ok(store.balance())
+        store.beforeCommit = { throw SQLiteException("반납 COMMIT 실패") }
+        try { assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), store.rental.finishReturnWithCommit(request.id, target)) }
+        finally { store.beforeCommit = null }
+        assertEquals(pending, ok(store.rental.pending()))
+        assertEquals(balance, ok(store.balance()))
+        assertEquals(RentalLedger.ReturnCommit(VehicleActivity.IDLE, car.ownedVehicleId), ok(store.rental.finishReturnWithCommit(request.id, target)))
+        reopen()
+        assertEquals(RentalLedger.ReturnCommit(VehicleActivity.IDLE, null), ok(store.rental.finishReturnWithCommit(request.id, target)))
+        assertEquals(balance, ok(store.balance()))
+        assertEquals(receipt, ok(store.rental.settle(request.id)))
+    }
+
     fun testUnresolvedRoundingLeavesBalanceAndRequestRecoverable() {
         val t = terms.copy(rounding=null)
         val start = t.start

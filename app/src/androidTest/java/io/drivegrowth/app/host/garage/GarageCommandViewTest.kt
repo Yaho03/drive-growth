@@ -1,10 +1,17 @@
 package io.drivegrowth.app.host.garage
 
+import android.animation.ValueAnimator
+import android.app.ActivityOptions
+import android.content.Intent
+import android.hardware.display.DisplayManager
+import android.os.SystemClock
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.TextView
+import io.drivegrowth.app.ui.garage.CollectionScrollTestActivity
 import io.drivegrowth.app.ui.garage.GarageEvent
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.VehicleRef
@@ -49,6 +56,114 @@ class GarageCommandViewTest : InstrumentationTestCase() {
             assertTrue(texts.contains("당시 확정 잔액 78 게임머니"));assertTrue(texts.contains("조회 잔액 100 게임머니"))
         }
     }
+    fun testRestoredSaleShowsReceiptAndHistoryWithoutMotionOrAnotherCommand() {
+        instrumentation.runOnMainSync {
+            var acknowledged = 0
+            val payment = MoneyChange(MoneyDirection.CREDIT, GameMoney(150))
+            val command = change.copy(money = payment,
+                vehicle = (change.vehicle as VehicleWrite.Update).copy(lifecycle = VehicleLifecycle.SOLD))
+            val restored = pending.copy(request = pending.request.copy(action = VehicleAction.SELL),
+                command = GarageCommand.Single(command))
+            val receipt = Settlement(SettlementId("sold"), Transaction(TransactionId("tx"), command.requestId,
+                command.kind, command.source, command.ruleVersion, payment), GameMoney(250),
+                car.copy(lifecycle = VehicleLifecycle.SOLD), EpochMillis(1))
+            val confirmed = GarageCommandState.Confirmed(restored, GarageReceipt.Single(receipt))
+            val view = GarageCommandView(instrumentation.targetContext, { error("기존 원결과를 재실행하지 않는다") },
+                {}, {}, {}, {}, { acknowledged++ })
+            view.render(confirmed, true)
+            view.render(confirmed, true)
+            assertNull(view.findViewWithTag<View>("garage:care-motion"))
+            val texts = descendants(view).filterIsInstance<TextView>().map { it.text.toString() }
+            assertTrue(texts.containsAll(listOf("판매 완료", "확정 지급액 150 게임머니", "도감에 보유 기록이 남아요")))
+            val confirmResult = descendants(view).filterIsInstance<Button>().single { it.text == "결과 확인" }
+            assertTrue(confirmResult.isEnabled)
+            confirmResult.performClick()
+            assertEquals(1, acknowledged)
+        }
+    }
+
+    fun testNewConfirmationKeepsMotionAcrossReparentAndDismissesItWithResultAction() {
+        val context = instrumentation.targetContext
+        val display = context.getSystemService(DisplayManager::class.java).displays
+            .singleOrNull { it.displayId != 0 && it.name == "Emulator 2D Display" }
+        val options = display?.let { ActivityOptions.makeBasic().setLaunchDisplayId(it.displayId).toBundle() }
+        val host = instrumentation.startActivitySync(Intent(context, CollectionScrollTestActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options) as CollectionScrollTestActivity
+        try {
+            lateinit var view: GarageCommandView
+            lateinit var panel: FrameLayout
+            var commands = 0
+            var acknowledgements = 0
+            val ready = pending.copy(vehicle = car.copy(level = 2, revision = Revision(2)))
+            val result = GarageReceipt.Single(Settlement(SettlementId("new"), Transaction(TransactionId("tx"),
+                change.requestId, change.kind, change.source, change.ruleVersion, change.money), GameMoney(78), car, EpochMillis(1)))
+            val confirmed = GarageCommandState.Confirmed(ready, result)
+            instrumentation.runOnMainSync {
+                panel = FrameLayout(host)
+                view = GarageCommandView(host, {
+                    commands++
+                    view.render(GarageCommandState.Running(ready), true)
+                    view.render(confirmed, true)
+                    panel.removeView(view)
+                    panel.addView(view)
+                }, {}, {}, {}, {}, { acknowledgements++ })
+                panel.addView(view)
+                host.setContentView(panel)
+                view.render(GarageCommandState.Review(ready, true), true)
+            }
+            val focusDeadline = SystemClock.uptimeMillis() + 3_000
+            var hasFocus = false
+            while (!hasFocus && SystemClock.uptimeMillis() < focusDeadline) {
+                instrumentation.runOnMainSync { hasFocus = view.hasWindowFocus() && view.isLaidOut }
+                if (!hasFocus) SystemClock.sleep(20)
+            }
+            assertTrue("계측 창 포커스와 배치가 필요하다", hasFocus)
+            var expectsMotion = false
+            var observed = false
+            instrumentation.runOnMainSync {
+                expectsMotion = ValueAnimator.areAnimatorsEnabled()
+                val button = descendants(view).filterIsInstance<Button>().single { it.text == "확정" }
+                button.performClick()
+                button.performClick()
+                assertEquals(1, commands)
+                assertEquals(expectsMotion, view.findViewWithTag<View>("garage:care-motion") != null)
+            }
+            val deadline = SystemClock.uptimeMillis() + 500
+            while (expectsMotion && !observed && SystemClock.uptimeMillis() < deadline) {
+                instrumentation.runOnMainSync {
+                    observed = view.findViewWithTag<View>("garage:care-motion")?.visibility == View.VISIBLE
+                }
+                if (!observed) SystemClock.sleep(12)
+            }
+            assertEquals(expectsMotion, observed)
+            instrumentation.runOnMainSync {
+                view.render(confirmed, true)
+                assertEquals(expectsMotion, view.findViewWithTag<View>("garage:care-motion") != null)
+                descendants(view).filterIsInstance<Button>().single { it.text == "결과 확인" }.performClick()
+                assertEquals(1, acknowledgements)
+                assertTrue(view.findViewWithTag<View>("garage:care-motion")?.visibility != View.VISIBLE)
+                view.render(confirmed, false)
+                view.render(confirmed, true)
+                assertNull(view.findViewWithTag<View>("garage:care-motion"))
+                val background = GarageCommandView(host, {}, {}, {}, {}, {}, {})
+                lateinit var delayed: GarageCommandView
+                delayed = GarageCommandView(host, { delayed.render(GarageCommandState.Running(ready), true) },
+                    {}, {}, {}, {}, {})
+                panel.removeView(view)
+                panel.addView(delayed)
+                delayed.render(GarageCommandState.Review(ready, true), true)
+                descendants(delayed).filterIsInstance<Button>().single { it.text == "확정" }.performClick()
+                delayed.dismissMotion() // 시스템 Back/닫기에서 부르는 경계
+                panel.removeView(delayed)
+                panel.addView(background)
+                delayed.render(confirmed, true)
+                assertNull(delayed.findViewWithTag<View>("garage:care-motion"))
+            }
+        } finally {
+            instrumentation.runOnMainSync { host.finish() }
+        }
+    }
+
     fun testMaterialChoiceAndReviewShowGarageNamesAndKeepOriginalRef() {
         instrumentation.runOnMainSync {
             val first = car.copy(ownedVehicleId = OwnedVehicleId("material-internal-a"), revision = Revision(5))

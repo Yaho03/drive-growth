@@ -40,8 +40,11 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
     init { orientation = VERTICAL; setBackgroundColor(style.base) }
 
     fun render(state: GarageScreenState, controlsEnabled: Boolean) {
+        val previous = interaction.state
+        val previouslyEnabled = interaction.controlsEnabled
+        val retryWasPending = interaction.retryPending
         interaction.render(state, controlsEnabled)
-        drawScreen()
+        if (childCount == 0 || previous != state || previouslyEnabled != controlsEnabled || retryWasPending) drawScreen()
     }
 
     /** 호스트의 준비/확인/명령 흐름이 끝났을 때 호출한다. 성공 상태는 새 render 입력으로만 반영한다. */
@@ -50,7 +53,7 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
     /** 공통 Back 처리기가 상세를 닫았으면 true. Activity Back 정책 자체는 호스트가 소유한다. */
     fun closeDetail(): Boolean {
         if (interaction.selectedId == null || !interaction.controlsEnabled) return false
-        interaction.closeDetail(); drawScreen(); return true
+        interaction.closeDetail(); detailY = 0; detailScroll = null; drawScreen(); return true
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -95,9 +98,19 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
                     area.addView(listScroll, if (wide) LayoutParams(0, -1, 2f) else LayoutParams(-1, -1))
                 }
                 if (wide || showDetail) {
-                    detailScroll = scroll(detail(), detailY).apply { tag = "garage:detail" }
+                    detailScroll = scroll(detail(), detailY).apply {
+                        tag = "garage:detail"
+                        isVerticalScrollBarEnabled = true
+                        isScrollbarFadingEnabled = false
+                    }
                     area.addView(detailScroll, if (wide) LayoutParams(0, -1, 3f).apply { marginStart = dp(12) }
                         else LayoutParams(-1, -1))
+                    if (showDetail) addView(row().apply {
+                        if (wide) addView(View(context), LayoutParams(0, 0, 2f))
+                        addView(button(s(R.string.garage_close)) { closeDetail() }.apply {
+                            tag = "garage:detail-close"
+                        }, LayoutParams(0, -2, if (wide) 3f else 1f).apply { if (wide) marginStart = dp(12) })
+                    }, LayoutParams(-1, -2).apply { topMargin = dp(6) })
                 }
             }
         }
@@ -221,12 +234,10 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
             }
             val value = interaction.selectedVehicle
             if (value == null) {
-                add(this, button(s(R.string.garage_close)) { closeDetail() })
                 add(this, message(s(R.string.garage_removed), s(R.string.garage_removed_body)))
                 return@apply
             }
             val facts = card().apply {
-                addView(button(s(R.string.garage_close)) { closeDetail() }, LayoutParams(-2, -2))
                 addView(artwork.view(value.vehicle.vehicleId, value.vehicle.rarity, 166).apply { background = null },
                     LayoutParams(-1, dp(166)))
                 if (!artwork.hasSprite(value.vehicle.vehicleId))
@@ -260,33 +271,26 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
             val actions = card().apply {
                 if (interaction.requestPending) add(this, text(s(R.string.garage_pending), 18, bold = true))
                 add(this, text(s(R.string.garage_action_note), 14, muted), 0)
-                listOf(
-                    VehicleAction.LEVEL_UP to R.string.garage_action_level,
-                    VehicleAction.USE_MATERIAL to R.string.garage_action_material,
-                    VehicleAction.REPAIR to R.string.garage_action_repair,
-                    VehicleAction.SELL to R.string.garage_action_sell,
-                    VehicleAction.SCRAP to R.string.garage_action_scrap,
-                ).forEach { (action, label) ->
+                val sharedReasons = sharedGarageRestrictions(value)
+                sharedReasons.forEach { reason -> add(this, text(reason, 16, muted), 4) }
+                garageManagementActions.forEach { (action, label) ->
                     val info = value.actions[action]
                     val enabled = info?.enabled == true && !interaction.requestPending
-                    add(this, row().apply {
-                        background = shape(inset)
-                        gravity = Gravity.CENTER_VERTICAL
-                        setPadding(dp(10), dp(6), dp(10), dp(6))
-                        addView(column().apply {
-                            addView(text(s(label), 16, bold = true))
-                            addView(text(info?.explanation ?: s(R.string.garage_action_unknown), 14, muted))
-                            if (info?.enabled == false) addView(text(s(R.string.garage_action_unavailable), 13, muted))
-                        }, LayoutParams(0, -2, 1f).apply { marginEnd = dp(8) })
-                        addView(button(s(label), enabled,
-                            primary = action == VehicleAction.LEVEL_UP || action == VehicleAction.REPAIR) {
-                            interaction.request(action, value.vehicle.ownedVehicleId, value.vehicle.revision)
-                            drawScreen()
-                        }.apply {
-                            tag = action
-                            if (action == VehicleAction.SCRAP && enabled) setTextColor(0xff7d3026.toInt())
-                        }, LayoutParams(-2, -2))
-                    }, 8)
+                    val reason = if (interaction.requestPending) s(R.string.garage_pending)
+                        else info?.takeUnless { it.enabled }?.explanation?.takeIf { it.isNotBlank() }
+                            ?: s(R.string.garage_action_unknown)
+                    add(this, button(s(label), enabled,
+                        primary = action == VehicleAction.LEVEL_UP || action == VehicleAction.REPAIR) {
+                        interaction.request(action, value.vehicle.ownedVehicleId, value.vehicle.revision)
+                        drawScreen()
+                    }.apply {
+                        tag = action
+                        if (!enabled) contentDescription = s(R.string.garage_action_with_reason, s(label), reason)
+                        if (action == VehicleAction.SCRAP && enabled) setTextColor(0xff7d3026.toInt())
+                    }, 6)
+                    if (info?.enabled != true && reason !in sharedReasons && !interaction.requestPending) {
+                        add(this, text(reason, 14, muted), 0)
+                    }
                 }
             }
             addView(facts, LayoutParams(-1, -2))
@@ -334,3 +338,16 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
         null -> R.string.garage_activity_missing
     })
 }
+
+internal val garageManagementActions = listOf(
+    VehicleAction.LEVEL_UP to R.string.garage_action_level,
+    VehicleAction.USE_MATERIAL to R.string.garage_action_material,
+    VehicleAction.REPAIR to R.string.garage_action_repair,
+    VehicleAction.SELL to R.string.garage_action_sell,
+    VehicleAction.SCRAP to R.string.garage_action_scrap,
+)
+
+internal fun sharedGarageRestrictions(vehicle: VehiclePresentation): Set<String> =
+    garageManagementActions.mapNotNull { (action, _) ->
+        vehicle.actions[action]?.takeUnless { it.enabled }?.explanation?.takeIf { it.isNotBlank() }
+    }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys

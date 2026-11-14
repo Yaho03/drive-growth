@@ -31,6 +31,7 @@ private class HomeFixture : HomeShopPort {
     var readFailure: ContractError? = null
     var finishFailure: ContractError? = null
     var activates = 0; var saves = 0; var executes = 0; var finishes = 0; var prepares = 0; var loads = 0
+    var facilityExecutionError: ContractError? = null
     var facilitySaves = 0; var facilityExecutes = 0; var facilityFinishes = 0
     val expansionOriginals = linkedMapOf<RequestId, Pair<HostCheckpointCommand.Expand, Settlement>>()
     val facilityOriginals = linkedMapOf<RequestId, FacilityReceipt.Purchased>()
@@ -83,7 +84,7 @@ private class HomeFixture : HomeShopPort {
     override fun load(): ContractResult<HomeShopLoad> {
         loads++
         return (loadFailure ?: currentLoadFailure)?.let { ContractResult.Failure(it) }
-            ?: ContractResult.Success(HomeShopLoad(identity,pending,if(pending==null)facts() else null,if(pending==null)active else null))
+            ?: ContractResult.Success(HomeShopLoad(identity,pending,if(pending==null || pending is HostCheckpointCommand.Garage)facts() else null,if(pending==null)active else null))
     }
     override fun pendingIdentity():ContractResult<HomeShopLoad> {
         identityReads++
@@ -210,12 +211,21 @@ private class HomeHarness(val source:HomeFixture=HomeFixture(),queued:Boolean=fa
             source.facilityExecutes++
             val original=source.facilityOriginals[command.requestId]
             if(original!=null)return if(original.command==command)ContractResult.Success(original) else ContractResult.Failure(ContractError.STATE_CONFLICT)
+            source.facilityExecutionError?.let { return ContractResult.Failure(it) }
             val buy=command as? FacilityCommand.Buy ?: return ContractResult.Failure(ContractError.STATE_CONFLICT)
             val ready=buy.offer.planPurchase(source.facts().facility.shop.progress,source.installed,source.money)
             if(ready is ContractResult.Failure)return ready
             source.money=GameMoney(source.money.units-buy.offer.price.units);source.installed+=buy.offer.facility
             val receipt=FacilityReceipt.Purchased(buy,source.financial(buy.requestId,buy.offer.ruleVersion,buy.offer.price,source.money))
             source.facilityOriginals[buy.requestId]=receipt;return ContractResult.Success(receipt)
+        }
+        override fun executeForInstallation(command: FacilityCommand.Buy): ContractResult<FacilityPurchaseExecution> {
+            val original = source.facilityOriginals[command.requestId]
+            return when (val result = execute(command)) {
+                is ContractResult.Failure -> result
+                is ContractResult.Success -> ContractResult.Success(FacilityPurchaseExecution(result.value,
+                    original == null && command.offer.facility in source.installed))
+            }
         }
         override fun finish(command:FacilityCommand):ContractResult<Unit> {
             source.facilityFinishes++
@@ -227,6 +237,7 @@ private class HomeHarness(val source:HomeFixture=HomeFixture(),queued:Boolean=fa
     }
     val facility=FacilityHostController(facilitySource,worker,reply)
     val completed=mutableListOf<Pair<ShopRequest,ContractResult<Unit>>>()
+    val installations = mutableListOf<Pair<ShopRequest, FacilityReceipt.Purchased>>()
     val host=HomeShopHost(source,facility,worker,reply,initialUi,restoredFacility,restoredIdentity)
     val interaction:ShopInteraction=ShopInteraction({event->
         host.remember(interactionState())
@@ -235,7 +246,7 @@ private class HomeHarness(val source:HomeFixture=HomeFixture(),queued:Boolean=fa
     private fun interactionState()=interaction.uiState
     init {
         interaction.restoreUiState(initialUi)
-        host.attach({s,e->interaction.render(s.screen,e)}, {q,r->completed.add(q to r);interaction.complete(q,r)}, interaction::completeRetry)
+        host.attach({s,e->interaction.render(s.screen,e)}, {q,r->completed.add(q to r);interaction.complete(q,r)}, interaction::completeRetry) { request, receipt -> installations += request to receipt }
     }
     fun rememberPending(request:ShopRequest) {
         val ui=interaction.uiState.copy(pending=request,latestRevision=request.selection.revision)
@@ -272,7 +283,11 @@ class HomeShopHostTest {
         assertEquals(listOf(request to ContractResult.Success(Unit)),h.completed)
         assertEquals(foreign,source.pending);assertEquals(1,source.originalReads)
         assertEquals(HostCheckpointResult.Decoration(source.originals[request.requestId]!!),h.host.state.original)
-        assertTrue(h.host.state.screen is ShopScreenState.Unsupported)
+        val screen = h.host.state.screen as ShopScreenState.Content
+        assertEquals(source.money, screen.balance)
+        assertFalse(h.host.facilityControlsEnabled)
+        assertFalse(h.host.state.activationRequired)
+        assertTrue(screen.expansion?.availability != ShopAvailability.AVAILABLE)
         assertNoRecoveryWrites(source)
     }
     @Test fun paidDecorationRefreshesFacilityFactsAndExistingEligiblePurchaseWorksInSameHome() {
@@ -652,6 +667,63 @@ class HomeShopHostTest {
         assertEquals(ContractError.STATE_CONFLICT,h.host.state.error)
         assertEquals(request,h.host.uiState.pending);assertEquals(request,h.interaction.uiState.pending)
         assertTrue(h.completed.isEmpty());assertEquals(0,source.originalReads);assertNoRecoveryWrites(source)
+    }
+
+    @Test fun foregroundNewFacilityReceiptTriggersOnceAndRecoveryDoesNot() {
+        val offer = FacilityOffer(Facility.CAR_WASH, RuleVersion("installation-rule"), true, GameMoney(70))
+        val source = HomeFixture().apply { active = true; level = 3; offers = mapOf(offer.facility to offer) }
+        val h = HomeHarness(source, queued = true)
+        h.start()
+        val screen = h.host.state.screen as ShopScreenState.Content
+        val option = screen.facilities.single { it.facility == offer.facility }.option
+        val request = ShopRequest(RequestId("installation"), ShopSelection(screen.revision, option), "attempt")
+        h.rememberPending(request)
+        assertTrue(h.host.submit(request, presentInstallation = true))
+        assertFalse(h.host.submit(request, presentInstallation = true))
+        h.drain()
+        val original = source.facilityOriginals.getValue(request.requestId)
+        assertEquals(listOf(request to original), h.installations)
+        assertEquals(setOf(offer.facility), source.installed)
+        assertEquals(GameMoney(930), source.money)
+        assertEquals(0, source.facilityFinishes)
+        h.facility.refresh(); h.drain()
+        assertEquals(listOf(request to original), h.installations)
+        val cold = HomeHarness(source, initialUi = ShopUiState(pending = request, latestRevision = screen.revision),
+            restoredFacility = original.command, restoredIdentity = source.identity)
+        cold.start()
+        assertTrue(cold.installations.isEmpty())
+        assertEquals(GameMoney(930), source.money)
+    }
+
+    @Test fun lateFacilityReceiptAndRetryAfterFailedSubmissionRemainStatic() {
+        for (hide in listOf(false, true)) {
+            val offer = FacilityOffer(Facility.CAR_WASH, RuleVersion("late-rule"), true, GameMoney(70))
+            val source = HomeFixture().apply { active = true; level = 3; offers = mapOf(offer.facility to offer) }
+            val h = HomeHarness(source, queued = true)
+            h.start()
+            val screen = h.host.state.screen as ShopScreenState.Content
+            val option = screen.facilities.single { it.facility == offer.facility }.option
+            val request = ShopRequest(RequestId("late-installation"), ShopSelection(screen.revision, option), "attempt")
+            h.rememberPending(request)
+            if (!hide) source.facilityExecutionError = ContractError.STORAGE_FAILURE
+            assertTrue(h.host.submit(request, presentInstallation = true))
+            if (hide) {
+                h.work.removeFirst().run() // 작업은 성공했고 전경 전달만 아직 대기 중이다.
+                h.host.setControlsEnabled(false)
+                h.drain()
+                h.host.setControlsEnabled(true)
+            } else {
+                h.drain()
+                assertTrue(source.installed.isEmpty())
+                assertEquals(GameMoney(1000), source.money)
+                source.facilityExecutionError = null
+                h.facility.refresh()
+            }
+            h.drain()
+            assertEquals(GameMoney(930), source.money)
+            assertEquals(setOf(offer.facility), source.installed)
+            assertTrue(h.installations.isEmpty())
+        }
     }
 
     @Test fun conflictingKnownFacilityMetadataCannotBeOverwrittenByAMatchingUiDurableSlot() {

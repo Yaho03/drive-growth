@@ -1,0 +1,11 @@
+<resources>
+    <string name="host_settings_game">가게와 기록</string>
+    <string name="host_settings_facilities">시설과 지도</string>
+    <string name="host_settings_preferences">앱 설정</string>
+    <string name="host_settings_demo">시연</string>
+    <string name="host_simulation_tool_title">모의 입력 도구</string>
+    <string name="host_simulation_input_note">차량과 목적지에 모의 입력을 사용해요. 시연 기록은 별도로 저장돼요.</string>
+    <string name="host_simulation_start_unavailable">지금은 모의주행을 시작할 수 없어요. 가게 상태를 확인한 뒤 다시 시도해 주세요.</string>
+    <string name="host_vehicle_pause_title">지금은 게임을 쉬고 있어요</string>
+    <string name="host_simulation_pause_title">모의주행 안내</string>
+</resources>

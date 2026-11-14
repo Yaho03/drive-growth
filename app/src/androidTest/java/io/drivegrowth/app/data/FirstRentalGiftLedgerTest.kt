@@ -207,6 +207,31 @@ class FirstRentalGiftLedgerTest : InstrumentationTestCase() {
             assertEquals(ok(results[0]),ok(results[1]));assertEquals(GachaProgress(Revision(8),2,5),currentProgress())
         }finally{other.close()}
     }
+    fun testSameCommandFromTwoProducersHasExactlyOneNewlyCommittedOutcome() {
+        val command = command()
+        val other = open()
+        try {
+            val results = race({ gift.commitWithOutcome(command) }, { module(other).commitWithOutcome(command) })
+                .map { ok(it) as FirstRentalGiftCommitOutcome }
+            assertEquals(1, results.count { it.newlyCommitted })
+            assertEquals(results[0].settlement, results[1].settlement)
+            assertEquals(GachaProgress(Revision(8), 2, 5), currentProgress())
+            assertFalse(ok(gift.commitWithOutcome(command)).newlyCommitted)
+        } finally {
+            other.close()
+        }
+    }
+
+    fun testFailedCommitSuppliesNoNewOutcomeAndRetrySuppliesOne() {
+        val command = command()
+        store.beforeCommit = { throw SQLiteException("선물 커밋 실패") }
+        assertEquals(fail(ContractError.STORAGE_FAILURE), gift.commitWithOutcome(command))
+        store.beforeCommit = null
+        assertTrue(ok(gift.commitWithOutcome(command)).newlyCommitted)
+        reopen()
+        assertFalse(ok(gift.commitWithOutcome(command)).newlyCommitted)
+    }
+
     fun testGiftRacesFreeTicketConsumptionOnTheSameRevision() {
         val c=command();val d=draw();val other=open()
         try{val results=race({gift.commitFirstRentalGift(c)},{other.commitGacha(d)})

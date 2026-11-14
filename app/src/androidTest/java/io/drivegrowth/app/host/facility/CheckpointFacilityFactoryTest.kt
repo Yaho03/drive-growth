@@ -38,6 +38,85 @@ class CheckpointFacilityFactoryTest:InstrumentationTestCase() {
         val result=apply(c) as FacilityReceipt.Purchased;assertEquals(GameMoney(0),result.settlement.balance);ok(source.finish(c));val before=rows()
         assertEquals(result,apply(c));ok(source.finish(c));assertEquals(before,rows());assertEquals(setOf(Facility.CAR_WASH),ok(source.read()).shop.facilities)
     }
+    fun testInstallationPresentationProofUsesNewCommitAndKeepsReplayStatic() {
+        raw { it.execSQL("UPDATE shop SET level=3,capacity=7") }
+        val before = ok(source.read())
+        val command = FacilityCommand.Buy(before.identity, RequestId("installation-proof"), before.definitionVersion,
+            before.offers.getValue(Facility.CAR_WASH))
+        ok(source.save(command))
+        val fresh = ok(source.executeForInstallation(command))
+        assertTrue(fresh.newlyInstalled)
+        val receipt = fresh.receipt as FacilityReceipt.Purchased
+        val installed = ok(source.read())
+        assertEquals(setOf(Facility.CAR_WASH), installed.shop.facilities)
+        assertEquals(before.shop.copy(facilities = installed.shop.facilities), installed.shop)
+        assertEquals(before.vehicles, installed.vehicles)
+        assertEquals(GameMoney(before.balance.units - command.offer.price.units), installed.balance)
+        val savedRows = rows()
+        assertEquals(FacilityPurchaseExecution(receipt, false), ok(source.executeForInstallation(command)))
+        assertEquals(savedRows, rows())
+        ok(source.finish(command))
+        val clean = rows()
+        ok(source.save(command))
+        assertEquals(FacilityPurchaseExecution(receipt, false), ok(source.executeForInstallation(command)))
+        ok(source.finish(command))
+        assertEquals(clean, rows())
+    }
+
+    fun testPresentationPreservesCommitCountAndRollsBackOnExistingWriteFailure() {
+        raw { it.execSQL("UPDATE shop SET level=3,capacity=7") }
+        val baselineNames = names.mapValues { (_, name) -> "baseline-$name" }
+        val baselineGames = GameSessionFactory(context, baselineNames, InputSource.SIMULATION)
+        val port = CheckpointFacilityDurablePort()
+        var existingCommitCount = 0
+        try {
+            val onboarding = StoredOnboardingHostSource(baselineGames)
+            val id = ok(onboarding.read()).identity
+            ok(onboarding.choose(id, FirstGrant.CANDIDATES.first()))
+            SQLiteDatabase.openDatabase(context.getDatabasePath(baselineNames.getValue(InputSource.SIMULATION)).path,
+                null, SQLiteDatabase.OPEN_READWRITE).use { it.execSQL("UPDATE shop SET level=3,capacity=7") }
+            val baseline = FactoryFacilityHostSource(context, baselineGames, port)
+            val before = ok(baseline.read())
+            val command = FacilityCommand.Buy(id, RequestId("installation-baseline"), before.definitionVersion,
+                before.offers.getValue(Facility.CAR_WASH))
+            ok(baseline.save(command))
+            ok(baselineGames.open()).use { game ->
+                game.store.beforeCommit = { existingCommitCount++ }
+                try { assertTrue(ok(port.execute(game, command)) is FacilityReceipt.Purchased) }
+                finally { game.store.beforeCommit = null }
+            }
+        } finally { baselineNames.values.forEach(context::deleteDatabase) }
+        assertTrue(existingCommitCount > 1)
+        val facts = ok(source.read())
+        val command = FacilityCommand.Buy(facts.identity, RequestId("installation-rollback"), facts.definitionVersion,
+            facts.offers.getValue(Facility.CAR_WASH))
+        ok(source.save(command))
+        val saved = rows()
+        val phases = listOf(existingCommitCount - 1, existingCommitCount)
+        for (failAt in phases) {
+            ok(games.open()).use { game ->
+                var calls = 0
+                game.store.beforeCommit = {
+                    if (++calls == failAt) throw android.database.sqlite.SQLiteException("시설 기존 쓰기 실패")
+                }
+                try { assertEquals(ContractResult.Failure(ContractError.STORAGE_FAILURE), port.executeForInstallation(game, command)) }
+                finally { game.store.beforeCommit = null }
+            }
+            assertEquals(saved, rows())
+            assertEquals(facts, ok(source.read()))
+            assertEquals(FacilityPending.Own(command), ok(source.pending()))
+        }
+        ok(games.open()).use { game ->
+            var calls = 0
+            game.store.beforeCommit = { calls++ }
+            val result = try { ok(port.executeForInstallation(game, command)) } finally { game.store.beforeCommit = null }
+            assertTrue(result.newlyInstalled)
+            assertEquals(existingCommitCount, calls)
+        }
+        assertEquals(GameMoney(facts.balance.units - command.offer.price.units), ok(source.read()).balance)
+        assertEquals(setOf(command.offer.facility), ok(source.read()).shop.facilities)
+    }
+
     fun testSavedAndStartedReopenRecoverSameCommandAndAcknowledgeActualResult() {
         val c=rest();ok(source.save(c));assertEquals(FacilityPending.Own(c),ok(source.pending()))
         val controller=FacilityHostController(FactoryFacilityHostSource(context,games,CheckpointFacilityDurablePort()),Executor{it.run()},Executor{it.run()});controller.setControlsEnabled(true)
