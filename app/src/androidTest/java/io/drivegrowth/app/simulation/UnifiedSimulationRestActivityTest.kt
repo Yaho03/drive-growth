@@ -1,27 +1,37 @@
 package io.drivegrowth.app.simulation
 
+import io.drivegrowth.app.mainGameControls
 import io.drivegrowth.app.exposeMainPage
 import io.drivegrowth.app.mainNavigation
 import io.drivegrowth.app.mainPage
 import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.showSimulationControls
 import io.drivegrowth.app.host.HostPage
+import android.app.ActivityOptions
+import android.app.Activity
+import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
 import android.graphics.Bitmap
 import android.graphics.Rect
+import android.hardware.display.DisplayManager
 import android.os.SystemClock
-import android.test.ActivityInstrumentationTestCase2
+import android.os.Bundle
+import android.test.InstrumentationTestCase
 import android.util.Log
 import android.view.InputDevice
 import android.view.MotionEvent
+import android.view.PixelCopy
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.R
+import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.host.HostNavigation
 import io.drivegrowth.app.host.HostSession
@@ -43,20 +53,48 @@ import java.util.concurrent.TimeUnit
 
 /** 일반 Debug Main의 명시 휴식 입력을 같은 프로필 원장과 기존 진행 카드에서 검증한다. */
 @Suppress("DEPRECATION")
-class UnifiedSimulationRestActivityTest :
-    ActivityInstrumentationTestCase2<UnifiedSimulationActivity>(UnifiedSimulationActivity::class.java) {
+class UnifiedSimulationRestActivityTest : InstrumentationTestCase() {
 
     fun testExplicitRestRunPaysAndShowsConfirmedStateInTheMainProfile() = exerciseRestRun(checkViewport = false)
 
     fun testConfirmedRestCanBeReadInTheShallowMainWindow() = exerciseRestRun(checkViewport = true)
 
-    private fun exerciseRestRun(checkViewport: Boolean) {
+    fun testRestSceneStacksInNarrowWindow() = exerciseRestRun(checkViewport = false, narrowScene = true)
+
+    private fun exerciseRestRun(checkViewport: Boolean, narrowScene: Boolean = false) {
         val context = instrumentation.targetContext
         assertTrue("새 격리 시험 패키지가 필요합니다", context.packageName.startsWith("io.drivegrowth.verify."))
         for (name in listOf("unified-simulation.db", "game-ledger-vehicle.db", RestSimulationActivity.DATABASE)) {
             assertFalse("기존 원장을 보존합니다: $name", context.getDatabasePath(name).exists())
         }
-        val main = activity
+        val display = if (checkViewport) null else context.getSystemService(DisplayManager::class.java).displays
+            .singleOrNull { it.name == "Emulator 2D Display" && it.displayId != 0 }
+        val main = instrumentation.startActivitySync(Intent(context, UnifiedSimulationActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), display?.let {
+            ActivityOptions.makeBasic().setLaunchDisplayId(it.displayId).toBundle()
+        }) as UnifiedSimulationActivity
+        if (narrowScene && display != null) {
+            val task = onUi { main.taskId }
+            var current = main
+            val resized = observeReplacement(main) { current = it }
+            onUi { main.application.registerActivityLifecycleCallbacks(resized) }
+            try {
+                val requested = instrumentation.uiAutomation.executeShellCommand("am task resize $task 0 0 600 760")
+                android.os.ParcelFileDescriptor.AutoCloseInputStream(requested).use { it.readBytes() }
+                await("시연 창의 너비가 600px이어야 합니다") { current.window.decorView.width == 600 && !current.isDestroyed }
+                verifyRestRun(context, onUi { current }, checkViewport)
+            } finally {
+                onUi { main.application.unregisterActivityLifecycleCallbacks(resized) }
+                val restored = instrumentation.uiAutomation.executeShellCommand("am task resize $task 0 0 1200 800")
+                android.os.ParcelFileDescriptor.AutoCloseInputStream(restored).use { it.readBytes() }
+            }
+        } else {
+            assertFalse("좁은 창 계측에는 복제 AVD 보조 디스플레이가 필요합니다", narrowScene)
+            verifyRestRun(context, main, checkViewport)
+        }
+    }
+
+    private fun verifyRestRun(context: Context, main: UnifiedSimulationActivity, checkViewport: Boolean) {
         val root = main.window.decorView
         click(root, R.string.onboarding_start)
         click(root, VehicleId("hyundai_casper"))
@@ -80,7 +118,7 @@ class UnifiedSimulationRestActivityTest :
             offer != null
         }
         click(root, checkNotNull(offer))
-        onUi { root.showSimulationControls() }
+        onUi { root.showSimulationControls(main) }
         await("탁송 확정과 휴식 시작이 모두 선택 가능한 상태여야 합니다") {
             root.findViewWithTag<Button>("delivery:confirm")?.isEnabled == true &&
                 root.findViewWithTag<Button>("simulation:rest-start")?.isEnabled == true
@@ -118,15 +156,52 @@ class UnifiedSimulationRestActivityTest :
         assertTrue("휴식 준비와 클릭까지 큐에 들어간 작업이 끝나야 합니다",
             afterClick.await(5, TimeUnit.SECONDS))
         assertNoStoredDeliveryRequest(context, "afterQueuedWork")
-        val monitor = instrumentation.addMonitor(UnifiedSimulationActivity::class.java.name, null, false)
+        assertRestScene(main, "휴게소 도착 · P", "rest-arrived")
+        val beforeRecreation = assertRestScene(main, "휴게소 · 쉬는 중", "rest-parking")
+        var replacement: UnifiedSimulationActivity? = null
+        val lifecycle = observeReplacement(main) { replacement = it }
+        onUi { main.application.registerActivityLifecycleCallbacks(lifecycle) }
         val reopened = try {
             recreateDuringRestParking(main, root)
-            requireNotNull(instrumentation.waitForMonitorWithTimeout(monitor, 15_000)) as UnifiedSimulationActivity
+            await("휴식 도중 새 Activity가 시작되어야 합니다") { replacement != null }
+            onUi { checkNotNull(replacement) }
         } finally {
-            instrumentation.removeMonitor(monitor)
+            onUi { main.application.unregisterActivityLifecycleCallbacks(lifecycle) }
         }
+        verifyAfterRecreation(context, games, identity, reopened, beforeRecreation, checkViewport)
+    }
+
+    private fun observeReplacement(old: UnifiedSimulationActivity, onResumed: (UnifiedSimulationActivity) -> Unit) =
+        object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, state: Bundle?) = Unit
+            override fun onActivityStarted(activity: Activity) = Unit
+            override fun onActivityResumed(activity: Activity) {
+                if (activity is UnifiedSimulationActivity && activity !== old) onResumed(activity)
+            }
+            override fun onActivityPaused(activity: Activity) = Unit
+            override fun onActivityStopped(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        }
+
+    private fun verifyAfterRecreation(context: Context, games: GameSessionFactory,
+        identity: GameIdentity, reopened: UnifiedSimulationActivity,
+        beforeRecreation: Int, checkViewport: Boolean) {
         try {
             val nextRoot = reopened.window.decorView
+            await("재생성된 시연 창이 Android에 배치되어야 합니다") {
+                nextRoot.isShown && nextRoot.width > 0
+            }
+            // 다중 화면에서 재진입하는 사용자의 첫 터치. 주차 장면에는 이 좌표에 조작이 없다.
+            val displayId = onUi { checkNotNull(reopened.display).displayId }
+            if (!onUi { reopened.hasWindowFocus() }) {
+                android.os.ParcelFileDescriptor.AutoCloseInputStream(
+                    instrumentation.uiAutomation.executeShellCommand("input -d $displayId tap 24 80")
+                ).use { it.readBytes() }
+            }
+            await("재생성된 시연 창에 포커스가 돌아와야 합니다") { reopened.hasWindowFocus() }
+            assertTrue("같은 정차의 실제 관측량을 줄이지 않는다",
+                assertRestScene(reopened, "휴게소 · 쉬는 중", "rest-recreated") >= beforeRecreation)
             val end = SystemClock.uptimeMillis() + 90_000
             var saved: RestDemoSaved? = null
             while (SystemClock.uptimeMillis() < end) {
@@ -143,12 +218,12 @@ class UnifiedSimulationRestActivityTest :
             assertEquals(GameMoney(15), result.original.observed.commit.amount)
 
             await("시연 완료 후 기존 진행 메뉴가 다시 허용되어야 합니다") {
-                nextRoot.mainNavigation()?.isEnabled == true
+                nextRoot.mainGameControls()?.isEnabled == true
             }
             val pageField = MainActivity::class.java.getDeclaredField("navigation").apply { isAccessible = true }
             val frameField = MainActivity::class.java.getDeclaredField("progressionFrame").apply { isAccessible = true }
             val expectedLabels = listOf(context.getString(R.string.progress_buff_active),
-                "원장 잔여 1100초", "모의 입력 · 저장된 확정 상태")
+                "보너스 남은 시간 1100초")
             choosePage(nextRoot, HostPage.PROGRESSION) { menu ->
                 val page = (pageField.get(reopened) as HostNavigation).page
                 Log.i("UnifiedRestActivityTest", "progressSelect page=$page " +
@@ -184,6 +259,43 @@ class UnifiedSimulationRestActivityTest :
         } finally {
             onUi { reopened.finish() }
         }
+    }
+
+    private fun assertRestScene(activity: UnifiedSimulationActivity, title: String, image: String): Int {
+        val sceneTag = "simulation:rest-area-scene"
+        await("휴식 연출 $title", 90_000) {
+            activity.hasWindowFocus() && activity.window.decorView.findViewWithTag<View>(sceneTag)?.let { scene ->
+                scene.isShown && tree(scene).filterIsInstance<TextView>().any { it.text == title }
+            } == true
+        }
+        val copied = CountDownLatch(1)
+        var result = PixelCopy.ERROR_UNKNOWN
+        var progressValue = 0
+        val bitmap = onUi {
+            val root = activity.window.decorView
+            val scene = checkNotNull(root.findViewWithTag<View>(sceneTag))
+            val labels = tree(scene).filterIsInstance<TextView>().map { it.text.toString() }
+            assertFalse("게임 장면의 모드 표기 $labels", "모의 입력 · SIMULATION" in labels)
+            assertTrue("출발 전에는 확인 대기를 표시한다", labels.any { "휴식 인정 확인 대기" in it })
+            assertFalse(labels.any { "휴식 보너스 준비됨" in it })
+            val progress = tree(scene).filterIsInstance<ProgressBar>().single()
+            assertTrue(progress.isShown)
+            progressValue = progress.progress
+            assertTrue(if (title.endsWith("· P")) progressValue == 0 else progressValue in 1..progress.max)
+            assertFalse("쉬는 연출에서 게임 메뉴로 진입할 수 없다", root.mainNavigation()?.isShown == true)
+            Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888).also { buffer ->
+                PixelCopy.request(activity.window, buffer, { status -> result = status; copied.countDown() },
+                    android.os.Handler(activity.mainLooper))
+            }
+        }
+        try {
+            assertTrue("휴식 연출 창 캡처 응답", copied.await(5, TimeUnit.SECONDS))
+            assertEquals(PixelCopy.SUCCESS, result)
+            instrumentation.targetContext.openFileOutput("$image.png", Context.MODE_PRIVATE).use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+        } finally { bitmap.recycle() }
+        return progressValue
     }
 
     private fun assertRestVisibleAfterTouchScroll(root: View, context: Context, expected: List<String>) {
@@ -306,35 +418,34 @@ class UnifiedSimulationRestActivityTest :
     }
 
     private fun recreateDuringRestParking(main: UnifiedSimulationActivity, root: View) {
-        val restStage = Regex("""단계 (\d+)/72\b""")
+        val progress = main.getSharedPreferences("unified-simulation-v1", Context.MODE_PRIVATE)
+        val session = main.onRetainNonConfigurationInstance() as HostSession
         // 입력을 소비한 뒤 다음 250ms 대기를 시작한다. 처음 62번의 대기만으로도 15.5초다.
         val deadline = SystemClock.uptimeMillis() + 90_000
-        var lastStatus = ""
+        var lastStage = -1
         while (SystemClock.uptimeMillis() < deadline) {
             val recreated = onUi {
-                lastStatus = root.findViewWithTag<TextView>("simulation:status")?.text?.toString().orEmpty()
-                val stage = restStage.find(lastStatus)?.groupValues?.get(1)?.toIntOrNull()
+                lastStage = progress.getInt("stage", -1)
                 when {
-                    lastStatus.contains("모의 입력 처리 보류") ->
-                        fail("주차 중 재생성 전에 시연 입력 처리가 보류됐습니다. 상태: $lastStatus")
-                    stage != null && stage >= 68 ->
-                        fail("재생성 전에 시험 장소 주차 구간을 지나쳤습니다. 상태: $lastStatus")
-                }
-                if (stage != null && stage in 63..67) {
-                    main.recreate()
-                    true
-                } else {
-                    false
+                    session.simulation?.canRetry == true ->
+                        error("주차 중 재생성 전에 시연 입력 처리가 보류됐습니다. 단계: $lastStage")
+                    lastStage >= 68 ->
+                        error("재생성 전에 시험 장소 주차 구간을 지나쳤습니다. 단계: $lastStage")
+                    lastStage in 63..67 && root.isShown -> {
+                        main.recreate()
+                        true
+                    }
+                    else -> false
                 }
             }
             if (recreated) return
             SystemClock.sleep(50)
         }
-        fail("90초 안에 시험 장소 주차 구간에 도달하지 못했습니다. 마지막 상태: $lastStatus")
+        fail("90초 안에 시험 장소 주차 구간에 도달하지 못했습니다. 마지막 단계: $lastStage")
     }
 
     private fun choosePage(root: View, page: HostPage, beforeSelection: ((Button) -> Unit)? = null) {
-        await("페이지 메뉴가 허용되어야 합니다") { root.mainNavigation()?.isEnabled == true }
+        await("페이지 메뉴가 허용되어야 합니다") { root.mainGameControls()?.isEnabled == true }
         onUi {
             val menu = checkNotNull(root.exposeMainPage(page))
             beforeSelection?.invoke(menu)
@@ -350,8 +461,8 @@ class UnifiedSimulationRestActivityTest :
         assertTrue(onUi { root.findViewWithTag<Button>(tag)?.performClick() == true })
     }
 
-    private fun await(message: String, condition: () -> Boolean) {
-        val end = SystemClock.uptimeMillis() + 15_000
+    private fun await(message: String, timeoutMillis: Long = 15_000, condition: () -> Boolean) {
+        val end = SystemClock.uptimeMillis() + timeoutMillis
         while (SystemClock.uptimeMillis() < end) {
             if (onUi(condition)) return
             SystemClock.sleep(50)

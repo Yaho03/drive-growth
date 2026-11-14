@@ -109,7 +109,7 @@ data class GachaUiState(
 )
 sealed interface GachaEvent {
     data class Draw(val request: GachaRequest) : GachaEvent
-    data class Reload(val token: String) : GachaEvent
+    data class Reload(val token: String, val settlementId: SettlementId? = null) : GachaEvent
     data class OpenGarage(val request: GachaGarageRequest) : GachaEvent
 }
 
@@ -187,10 +187,19 @@ class GachaInteraction(private val onEvent: (GachaEvent) -> Unit, restored: Gach
         val token = UUID.randomUUID().toString(); uiState = uiState.copy(reloadToken = token)
         onEvent(GachaEvent.Reload(token)); return true
     }
+    fun reloadAfterResult(): Boolean {
+        val receipt = (frame?.screen as? GachaScreen.Result)?.value?.settlement ?: return false
+        if (released || !controlsEnabled || uiState.reloadToken != null || uiState.pending != null ||
+            uiState.garagePending != null) return false
+        val token = UUID.randomUUID().toString()
+        uiState = uiState.copy(reloadToken = token)
+        onEvent(GachaEvent.Reload(token, receipt.settlementId))
+        return true
+    }
     fun completeReload(token: String) { if (!released && token == uiState.reloadToken) uiState = uiState.copy(reloadToken = null) }
     fun openGarage(): Boolean {
         val result = (frame?.screen as? GachaScreen.Result)?.value ?: return false
-        if (released || !controlsEnabled || uiState.garagePending != null) return false
+        if (released || !controlsEnabled || uiState.garagePending != null || uiState.reloadToken != null) return false
         val request = GachaGarageRequest(result.settlement.settlementId, result.settlement.changedVehicle!!.ownedVehicleId, UUID.randomUUID().toString())
         uiState = uiState.copy(garagePending = request)
         onEvent(GachaEvent.OpenGarage(request)); return true

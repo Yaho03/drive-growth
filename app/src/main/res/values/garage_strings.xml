@@ -51,6 +51,15 @@
     <string name="garage_discovered">발견 · 보유 이력 없음</string>
     <string name="garage_ever_owned">보유 이력 있음</string>
     <string name="garage_unlock_missing">해금 정보 확인 불가</string>
+    <string name="garage_collection_first_level">가게 Lv%1$d · %2$d종</string>
+    <string name="garage_collection_next_level">가게 Lv%1$d · +%2$d종</string>
+    <string name="garage_collection_entry_missing">수집 기록 확인 불가</string>
+    <string name="garage_held_count">임시 보관함 %1$d대</string>
+    <string name="garage_held_vehicle">%1$s · %2$s</string>
+    <string name="garage_held_deadline">보관 기한 %1$s (한국시간)</string>
+    <string name="garage_held_model_missing">차종 확인 불가</string>
+    <string name="garage_held_unavailable">임시 보관 차량을 확인할 수 없어요</string>
+    <string name="garage_held_open_delivery">탁송에서 보관 차량 확인</string>
     <string name="garage_map_manage">차량 관리</string>
     <string name="garage_map_back">차량 상세로</string>
     <string name="garage_map_max_level">최대 레벨</string>

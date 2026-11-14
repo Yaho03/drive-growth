@@ -1,6 +1,9 @@
 package io.drivegrowth.app.simulation
 
+import io.drivegrowth.app.isMainPageShown
 import io.drivegrowth.app.exposeMainPage
+import io.drivegrowth.app.exposeMainRefresh
+import io.drivegrowth.app.openMainPage
 import android.app.ActivityOptions
 import android.content.Intent
 import android.graphics.Rect
@@ -22,7 +25,6 @@ import io.drivegrowth.app.host.HostPage
 import io.drivegrowth.app.host.garage.CheckpointGarageCommandAdapter
 import io.drivegrowth.app.host.garage.GaragePreparation
 import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
-import io.drivegrowth.app.mainPage
 import io.drivegrowth.app.ui.garage.CollectionView
 import io.drivegrowth.app.ui.garage.GarageEvent
 import io.drivegrowth.app.ui.garage.GarageView
@@ -39,6 +41,7 @@ import io.drivegrowth.core.contract.Settlement
 import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.garage.CollectionKey
 import io.drivegrowth.core.progression.VehicleAction
+import io.drivegrowth.core.rental.Facility
 import java.util.concurrent.FutureTask
 
 /** 공식 창에 실제 시연 Main을 띄워 가게 조작과 확인 전 차량 관리 복원을 검사한다. */
@@ -102,8 +105,8 @@ class FinalOfficialWindowStateTest : InstrumentationTestCase() {
             RequestId("official-window-saved-level"),
         )) as GaragePreparation.Ready
         ok(adapter.save(saved.pending))
+        click(first) { first.root.exposeMainRefresh() }
         select(first, HostPage.COLLECTION)
-        click(first) { button("host:refresh") }
         await("도감에 보유와 미발견 표시, 저장 요청 진입") {
             collectionCount(R.string.garage_ever_owned) == 1 &&
                 collectionCount(R.string.garage_undiscovered) > 0 &&
@@ -122,9 +125,11 @@ class FinalOfficialWindowStateTest : InstrumentationTestCase() {
         val monitor = instrumentation.addMonitor(UnifiedSimulationActivity::class.java.name, null, false)
         val next = try {
             await("도감 새로고침이 실제 Loading으로 전환된 시점에 재생성") {
-                val refresh = button("host:refresh")?.takeIf { it.isEnabled } ?: return@await false
+                val refresh = first.root.exposeMainRefresh() ?: return@await false
                 if (!reveal(refresh)) return@await false
                 assertTrue(refresh.performClick())
+                // 공용 조회 응답이 메인 큐로 돌아오기 전에 도감으로 복귀해 Loading 상태를 검증한다.
+                first.root.openMainPage(HostPage.COLLECTION)
                 assertEquals(1, collectionCount(R.string.garage_collection_loading))
                 first.recreate()
                 true
@@ -136,21 +141,22 @@ class FinalOfficialWindowStateTest : InstrumentationTestCase() {
         try {
             screen = next
             assertNotSame(first, next)
-            await("도감 페이지·최신 발견/보유·공용 대기 요청 복원") {
-                next.root.mainPage(HostPage.COLLECTION)?.isSelected == true &&
+            await("도감 페이지·보유·공용 대기 요청 복원") {
+                next.root.isMainPageShown(HostPage.COLLECTION) &&
                     collectionCount(R.string.garage_ever_owned) == 1 &&
-                    collectionCount(R.string.garage_discovered) == 1 &&
                     collectionCount(R.string.garage_undiscovered) > 0 &&
                     labeledButton("보관한 차량 관리 요청 확인")?.isEnabled == true
             }
-            expose(next, "복원 도감에서 발견 상태까지 스크롤") {
-                collection()?.let { tree ->
-                    views(tree).filterIsInstance<TextView>().firstOrNull {
-                        it.text.toString() == context.getString(R.string.garage_discovered)
-                    }
-                }
+            click(next) { button("collection:filter:DISCOVERED") }
+            await("발견 필터에 별도 차종과 상태 표시") {
+                collectionCount(R.string.garage_discovered) == 1 &&
+                    collectionCount(R.string.garage_undiscovered) > 0
             }
-            expose(next, "복원 도감의 새로고침") { button("host:refresh")?.takeIf { it.isEnabled } }
+            click(next) { next.root.exposeMainRefresh() }
+            await("도감 재조회 뒤 발견 필터와 보관 요청 보존") {
+                collectionCount(R.string.garage_discovered) == 1 &&
+                    labeledButton("보관한 차량 관리 요청 확인")?.isEnabled == true
+            }
             assertEquals("도감 재조회·재생성 뒤 원장과 저장 요청 동일", before, collectionSnapshot())
             click(next) { labeledButton("보관한 차량 관리 요청 확인") }
             expose(next, "원 관리 요청의 결과 확인 진입") { labeledButton("보관 요청 처리 · 결과 확인") }
@@ -191,33 +197,44 @@ class FinalOfficialWindowStateTest : InstrumentationTestCase() {
 
     private fun checkHomeModes(activity: UnifiedSimulationActivity) {
         select(activity, HostPage.HOME)
+        click(activity) { button("shop:map-facilities") }
         click(activity) { button("decoration:activate") }
-        val decorationTag = "shop:preview:decoration:neutral-sign"
-        await("사용 가능한 꾸미기 품목") { button(decorationTag)?.isEnabled == true }
+        val decorationTag = "shop:map-preview:decoration:neutral-sign"
+        await("꾸미기 기능이 연결된 가게의 지도와 보조 메뉴") {
+            shop()?.let { it.findViewWithTag<Button>("shop:map-decorations") != null ||
+                it.findViewWithTag<Button>("shop:map-facilities") != null } == true
+        }
         val before = snapshot()
         for (mode in ShopMode.entries) {
+            if (!ui { button("shop:mode:$mode")?.isShown == true }) click(activity) { button("shop:map-facilities") }
             click(activity) { button("shop:mode:$mode") }
             await("가게 보기 전환 $mode") { shop()?.uiState?.mode == mode && button("shop:mode:$mode")?.isSelected == true }
-            for (label in listOf("가게 레벨 · 1 · 보유 / 공간 · 1 / 3", "확정 잔액 · 1,000 게임머니",
-                "주유소", "보험 시설", "세차장", "꾸미기")) {
-                expose(activity, label) { text(label) }
+            for (facility in Facility.entries) {
+                expose(activity, "시설 메뉴 ${facility.name}") { button("shop:menu-facility:${facility.name}") }
             }
+            click(activity) { button("shop:map-sheet-close") }
+            for (label in listOf("가게 Lv1", "P 1 / 3", "● 1,000")) expose(activity, label) { text(label) }
+
+            click(activity) { button("shop:map-facilities") }
+            click(activity) { button("shop:map-decorations") }
             click(activity) { button(decorationTag) }
-            expose(activity, "꾸미기 확정 버튼") { button("shop:confirm") }
-            await("활성화된 꾸미기 미리보기") {
-                val confirm = button("shop:confirm") ?: return@await false
+            await("활성화된 꾸미기 확인창이 지도보다 앞에 있고 버튼이 가시 영역에 들어온다") {
+                val confirm = button("shop:map-confirm") ?: return@await false
                 if (!reveal(confirm) || !confirm.isEnabled || shop()?.uiState?.selection == null) return@await false
-                val mapBounds = Rect()
+                val overlay = activity.root.findViewWithTag<ViewGroup>("shop:map-overlay") ?: return@await false
+                val card = overlay.getChildAt(0) ?: return@await false
+                val cardBounds = Rect()
                 val buttonBounds = Rect()
-                assertTrue(confirm.getGlobalVisibleRect(buttonBounds))
-                val map = activity.root.findViewWithTag<View>("shop:scene")
-                if (map?.getGlobalVisibleRect(mapBounds) == true) {
-                    assertFalse("마을 전경과 확인 버튼의 화면 영역이 겹치면 안 됩니다", Rect.intersects(mapBounds, buttonBounds))
-                }
+                val map = activity.root.findViewWithTag<View>("shop:scene") ?: return@await false
+                if (!card.getGlobalVisibleRect(cardBounds) || !confirm.getGlobalVisibleRect(buttonBounds)) return@await false
+                assertTrue("확정 버튼 전체가 확인창 안에 있습니다", cardBounds.contains(buttonBounds))
+                assertEquals("확인창 뒤 지도의 접근성 입력을 막습니다",
+                    View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS, map.importantForAccessibility)
                 true
             }
-            click(activity) { button("shop:cancel") }
+            click(activity) { button("shop:map-close") }
             await("선택한 보기에서 꾸미기 취소") { shop()?.uiState?.mode == mode && shop()?.uiState?.selection == null }
+            click(activity) { button("shop:map-close") }
             assertEquals("미리보기·취소 뒤 원장 동일", before, snapshot())
             Log.i(TAG, "HOME mode=$mode summary=visible facilities=3 decoration=preview_cancel ledger=unchanged")
         }
@@ -244,7 +261,7 @@ class FinalOfficialWindowStateTest : InstrumentationTestCase() {
             screen = next
             assertNotSame(first, next)
             await("같은 차고에 준비 요청이 돌아옴") {
-                next.root.mainPage(HostPage.GARAGE)?.isSelected == true &&
+                next.root.isMainPageShown(HostPage.GARAGE) &&
                     garage()?.selectedVehicleId == target &&
                     labeledButton("관리 조건 다시 조회")?.isEnabled == true &&
                     labeledButton("확정") == null
@@ -286,8 +303,8 @@ class FinalOfficialWindowStateTest : InstrumentationTestCase() {
         .firstOrNull { it.text.toString() == label && it.isShown }
 
     private fun select(activity: UnifiedSimulationActivity, page: HostPage) {
-        if (!ui { activity.root.mainPage(page)?.isSelected == true }) click(activity) { activity.root.exposeMainPage(page) }
-        await("현재 $page") { activity.root.mainPage(page)?.isSelected == true }
+        if (!ui { activity.root.isMainPageShown(page) }) click(activity) { activity.root.exposeMainPage(page) }
+        await("현재 $page") { activity.root.isMainPageShown(page) }
     }
 
     private fun click(activity: UnifiedSimulationActivity, find: () -> Button?) {

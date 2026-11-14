@@ -1,6 +1,7 @@
 package io.drivegrowth.app.host.progression
 
 import io.drivegrowth.app.exposeMainRefresh
+import io.drivegrowth.app.isMainPageShown
 import io.drivegrowth.app.exposeMainPage
 import io.drivegrowth.app.mainNavigation
 import io.drivegrowth.app.mainPage
@@ -61,11 +62,16 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
     private fun page(a:MainActivity,target:HostPage) {
         gate(a);instrumentation.runOnMainSync { a.window.decorView.openMainPage(target) }
     }
-    private fun refresh(a:MainActivity) {
-        gate(a);instrumentation.runOnMainSync {
-            val b=checkNotNull(a.window.decorView.exposeMainRefresh())
-            assertTrue(b.isEnabled);b.performClick()
+    private fun refresh(a: MainActivity) {
+        gate(a)
+        val root = a.window.decorView
+        await(a, "가게 설정의 새로고침") {
+            val refresh = root.exposeMainRefresh() ?: return@await false
+            assertTrue(refresh.performClick())
+            true
         }
+        // 퀘스트 페이지로 다시 진입하면 화면별 조회가 실행된다.
+        page(a, HostPage.PROGRESSION)
     }
     private fun <T> ok(r:ContractResult<T>):T {assertTrue(r.toString(),r is ContractResult.Success);return(r as ContractResult.Success).value}
     private fun <T> read(action:(GameSession)->T):T = ok(GameSessionFactory(instrumentation.targetContext).open()).use(action)
@@ -225,6 +231,7 @@ class ProgressionFirstPlayActivityTest : ActivityInstrumentationTestCase2<MainAc
     private fun chooseGatePage(a: MainActivity, name: HostPage, ready: () -> Boolean) {
         await(a, "actual destination $name") {
             if (ready()) return@await true
+            if (a.window.decorView.isMainPageShown(name)) return@await false
             if (a.window.decorView.exposeMainPage(name)?.let { it.isEnabled && it.isLaidOut && !it.isLayoutRequested } != true) return@await false
             a.window.decorView.openMainPage(name)
             false

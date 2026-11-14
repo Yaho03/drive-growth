@@ -5,6 +5,7 @@ import io.drivegrowth.app.ui.garage.CollectionPresentation
 import io.drivegrowth.app.ui.garage.CollectionScreenState
 import io.drivegrowth.app.ui.garage.GarageContent
 import io.drivegrowth.app.ui.garage.GarageScreenState
+import io.drivegrowth.app.ui.garage.HeldVehiclePresentation
 import io.drivegrowth.app.ui.garage.VehiclePresentation
 import io.drivegrowth.app.ui.vehicleInstanceLabels
 import io.drivegrowth.core.contract.ContractError
@@ -40,6 +41,22 @@ class GarageHostMapper {
         val names = snapshot.content.catalog.vehicles.associate { it.vehicleId to it.displayName }
         val instanceLabels = vehicleInstanceLabels(owned.map { it.ownedVehicleId to names.getValue(it.vehicleId) })
         val prices = snapshot.content.vehicles.groupBy { it.vehicleId }
+        val held = when (val result = snapshot.heldVehicles) {
+            is ContractResult.Failure -> result
+            is ContractResult.Success -> {
+                val records = result.value
+                if (records.any { it.source != snapshot.source }) ContractResult.Failure(ContractError.STATE_CONFLICT)
+                else {
+                    val labels = vehicleInstanceLabels(records.map {
+                        it.vehicle.ownedVehicleId to names[it.vehicle.vehicleId].orEmpty()
+                    })
+                    ContractResult.Success(records.map {
+                        HeldVehiclePresentation(it.vehicle, names[it.vehicle.vehicleId],
+                            labels[it.vehicle.ownedVehicleId].orEmpty(), it.deadline)
+                    })
+                }
+            }
+        }
         return GarageScreenState.Content(GarageContent(
             vehicles = owned.map { vehicle ->
                 val detail = detailsById[vehicle.ownedVehicleId]
@@ -68,6 +85,7 @@ class GarageHostMapper {
             },
             capacityLabel = (capacity as? ContractResult.Success)?.value?.takeIf { it >= 0 }?.let { "보유 ${owned.size} / ${it}칸" },
             sourceLabel = sourceLabel(snapshot),
+            heldVehicles = held,
         ))
     }
 
@@ -84,8 +102,11 @@ class GarageHostMapper {
             is ContractResult.Success -> result.value
         }
         val names = snapshot.content.catalog.vehicles.associate { it.vehicleId to it.displayName }
-        return CollectionScreenState.Content(entries.map {
-            CollectionPresentation(it, names.getValue(it.key.vehicleId), unlockLabel = null)
+        val gameVehicles = snapshot.content.vehicles.groupBy { it.vehicleId }
+        return CollectionScreenState.Content(entries.map { entry ->
+            val vehicleId = entry.key.vehicleId
+            val unlockLevel = gameVehicles[vehicleId]?.singleOrNull()?.unlockShopLevel?.takeIf { it > 0 }
+            CollectionPresentation(entry, names.getValue(vehicleId), unlockLevel)
         }, sourceLabel(snapshot))
     }
 

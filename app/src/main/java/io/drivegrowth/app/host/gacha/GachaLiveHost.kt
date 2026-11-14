@@ -56,6 +56,10 @@ class GachaLiveHost(private val source: CheckpointGachaSource, private val worke
             acknowledge { if (it is ContractResult.Success) load(token) else token?.let { key -> deliverReload(key) } }
         } else load(token)
     }
+    fun refreshAfterResult(token: String, settlementId: SettlementId) {
+        val current = (frame.screen as? GachaScreen.Result)?.value?.settlement?.settlementId
+        if (current == settlementId) refresh(token) else deliverReload(token)
+    }
     private fun load(token: String?) {
         if (released || !enabled) { token?.let { deliverReload(it) }; return }
         val expected = original ?: controller?.snapshot()?.pending?.command
@@ -71,7 +75,7 @@ class GachaLiveHost(private val source: CheckpointGachaSource, private val worke
                     else if (!enabled || released) ContractResult.Failure(ContractError.UX_RESTRICTED)
                     else safe { source.commit(pending.value!!) }
             }
-            main.execute {
+            main.execute reply@{
                 busy = false
                 if (!released) {
                     when (result) {
@@ -92,12 +96,17 @@ class GachaLiveHost(private val source: CheckpointGachaSource, private val worke
                                 previous.input.option.requestId?.let { deliverResolve(it) }
                             }
                             request = null
+                            if (!enabled) {
+                                show(GachaScreen.Missing("다시 조회해 다음 뽑기 조건을 확인해 주세요.", true))
+                                token?.let { deliverReload(it) }
+                                return@reply
+                            }
                             val host = GachaHostController(source, { worker.execute(it) }, { main.execute(it) },
                                 { ContractResult.Success(Unit) }, { value, _ -> show(value.screen); if (value.screen is GachaScreen.Result) changed() },
                                 { value, outcome -> deliverComplete(request?.takeIf { it.attemptId == value.attemptId } ?: value, outcome) },
                                 { key -> deliverReload(key) })
                             controller = host; host.setControlsEnabled(enabled)
-                            if (enabled) host.load(token ?: "host-load")
+                            host.load(token ?: "host-load")
                         }
                     }
                     if (result is ContractResult.Failure || result is ContractResult.Success && result.value != null)

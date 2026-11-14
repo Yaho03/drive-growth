@@ -1,17 +1,19 @@
 package io.drivegrowth.app.ui.progress
 
 import android.content.Context
-import android.content.res.ColorStateList
 import android.view.View
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.ScrollView
 import io.drivegrowth.app.R
+import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.core.driving.RestOutcome
+import io.drivegrowth.app.ui.rest.RestStopMotionView
 
 /** 주차 허용 영역에 호스트가 넣는 표시 View. 저장·차량 SDK·경제 계산을 호출하지 않는다. */
 class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearLayout(context) {
+    internal var showHeading = true
+    private val restStopMotion by lazy { RestStopMotionView(context) }
     private val style = ProgressStyle(context)
     private val interaction = ProgressInteraction(onEvent)
     private var wide = false
@@ -47,10 +49,15 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
         val focusedTag = findFocus()?.tag
         scroll = null; removeAllViews(); setPadding(dp(24), dp(16), dp(24), dp(16))
         if (!interaction.controlsEnabled) {
-            addView(text(s(R.string.progress_restricted), 28, bold = true))
-            addView(text(s(R.string.progress_restricted_body))); return@with
+            addView(statusCard(s(R.string.progress_restricted), s(R.string.progress_restricted_body)))
+            return@with
         }
-        addView(text(s(R.string.progress_title), 32, bold = true))
+        if (showHeading) addView(text(s(R.string.progress_title), 28, bold = true).apply {
+            background = surface()
+            setPadding(dp(14), dp(6), dp(14), dp(6))
+            setCompoundDrawables(icon(ReferenceHudIcon.RECORD), null, null, null)
+            compoundDrawablePadding = dp(8)
+        })
         val showingContent = interaction.state is ProgressScreenState.Content
         showingDetail = showingContent && interaction.uiState.selectedKey != null
         val body = column()
@@ -61,20 +68,21 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
             })
         }
         when (val state = interaction.state) {
-            ProgressScreenState.Loading -> add(body, text(s(R.string.progress_loading)))
-            is ProgressScreenState.Empty -> { add(body, text(s(R.string.progress_empty), 26, bold = true)); add(body, text(state.message)) }
-            is ProgressScreenState.Unsupported -> { add(body, text(s(R.string.progress_unsupported), 26, bold = true)); add(body, text(state.message)) }
-            is ProgressScreenState.Failure -> {
-                add(body, text(s(R.string.progress_failure), 26, bold = true)); add(body, text(state.message))
-                if (state.retryAllowed && uiState.pendingConflicts.isEmpty()) add(body, button(s(if (uiState.retryPending) R.string.progress_retry_pending else R.string.progress_retry), !uiState.retryPending) {
+            ProgressScreenState.Loading -> add(body, card().apply { addView(text(s(R.string.progress_loading))) })
+            is ProgressScreenState.Empty -> add(body, statusCard(s(R.string.progress_empty), state.message))
+            is ProgressScreenState.Unsupported -> add(body, statusCard(s(R.string.progress_unsupported), state.message))
+            is ProgressScreenState.Failure -> add(body, statusCard(s(R.string.progress_failure), state.message).apply {
+                if (state.retryAllowed && uiState.pendingConflicts.isEmpty()) add(this, button(s(if (uiState.retryPending) R.string.progress_retry_pending else R.string.progress_retry), !uiState.retryPending) {
                     interaction.retry(); drawScreen()
                 })
-            }
+            })
             is ProgressScreenState.Content -> {
-                add(body, text(state.sourceLabel, 18, amber).apply {
-                    background = shape(inset)
-                    setPadding(dp(12), paddingTop, dp(12), paddingBottom)
-                }, 0)
+                if (state.sourceLabel != "시연 모드" && state.sourceLabel != "차량 입력") {
+                    add(body, text(state.sourceLabel, 18, amber).apply {
+                        background = surface()
+                        setPadding(dp(12), paddingTop, dp(12), paddingBottom)
+                    }, 0)
+                }
                 if (showingDetail) detail(body) else overview(body, state)
             }
         }
@@ -101,6 +109,13 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
         addView(bodyScroll, LayoutParams(-1, 0, 1f))
         if (focusedTag != null) findViewWithTag<View>(focusedTag)?.requestFocus()
     }
+    private fun statusCard(title: String, message: String) = with(style) {
+        card().apply {
+            addView(text(title, 22, bold = true))
+            addView(text(message, 16, muted))
+        }
+    }
+
     private fun overview(body: LinearLayout, state: ProgressScreenState.Content) = with(style) {
         val showActiveRestFirst = !wide && state.rest?.buffPhase == BuffPhase.ACTIVE
         if (showActiveRestFirst) rest(body, state.rest, prioritizeStoredState = true)
@@ -125,14 +140,14 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
         } else { add(body, left); add(body, right) }
         add(body, text(s(R.string.progress_events), 26, bold = true))
         val events = state.entries.filter { it.group == ProgressGroup.EVENT }
-        if (events.isEmpty()) add(body, text(state.eventsNote, color = muted)) else items(body, events)
+        if (events.isEmpty()) add(body, card().apply { addView(text(state.eventsNote, color = muted)) }) else items(body, events)
         if (!showActiveRestFirst) rest(body, state.rest)
     }
     private fun items(parent: LinearLayout, entries: List<ProgressItem>) = with(style) {
-        if (entries.isEmpty()) add(parent, text(s(R.string.progress_group_empty), color = muted))
+        if (entries.isEmpty()) add(parent, card().apply { addView(text(s(R.string.progress_group_empty), color = muted)) })
         for (item in entries) {
             val enabled = interaction.canClaim(item)
-            val card = if (enabled) card(amber) else card()
+            val card = if (enabled) card(selected = true) else card()
             add(card, text(item.title, 24, bold = true), 0)
             add(card, statusText(item, enabled), 0)
             progress(card, item)
@@ -147,12 +162,9 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
     private fun progress(parent: LinearLayout, item: ProgressItem) = with(style) {
         add(parent, text(item.progressLabel ?: s(R.string.progress_unknown_progress), color = muted), 0)
         item.progressPercent?.let { percent ->
-            val bar = ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
-                max = 100; progress = percent; progressTintList = ColorStateList.valueOf(green)
-                progressBackgroundTintList = ColorStateList.valueOf(inset)
+            parent.addView(track(percent).apply {
                 contentDescription = item.progressLabel ?: s(R.string.progress_unknown_progress)
-            }
-            add(parent, bar, 4)
+            }, LayoutParams(-1, dp(16)).apply { topMargin = dp(4) })
         }
     }
     private fun detail(parent: LinearLayout) = with(style) {
@@ -161,7 +173,7 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
             add(parent, text(s(R.string.progress_missing), 26, bold = true)); add(parent, text(s(R.string.progress_missing_body)))
         } else {
             val enabled = interaction.canClaim()
-            val card = if (enabled) card(amber) else card()
+            val card = if (enabled) card(selected = true) else card()
             add(card, text(item.title, 28, bold = true), 0); add(card, statusText(item, enabled)); progress(card, item)
             add(card, text(s(R.string.progress_confirm_title), 24, bold = true))
             add(card, text(item.rewardLabel ?: s(R.string.progress_unknown_reward), 24))
@@ -184,7 +196,10 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
             item.status == RewardStatus.CLAIMED && !interaction.isPending(item) -> green
             else -> muted
         }
-        text(status(item, canClaim), color = color)
+        text(status(item, canClaim), 16, color = color, bold = true).apply {
+            background = surface(selected = canClaim)
+            setPadding(dp(12), dp(6), dp(12), dp(6))
+        }
     }
     private fun status(item: ProgressItem, canClaim: Boolean): String = s(if (interaction.isPending(item)) R.string.progress_pending else when (item.status) {
         RewardStatus.LOCKED -> R.string.progress_locked
@@ -199,7 +214,18 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
     })
     private fun rest(parent: LinearLayout, value: RestPresentation?, prioritizeStoredState: Boolean = false) = with(style) {
         add(parent, text(s(R.string.progress_rest_title), 26, bold = true))
-        val card = if (value?.buffPhase == BuffPhase.ACTIVE) card(amber) else card()
+        val card = if (value?.buffPhase == BuffPhase.ACTIVE) card(selected = true) else card()
+        val sceneLabel = when {
+            value?.recognition == RestOutcome.ACCEPTED && value.buffPhase == BuffPhase.NEXT_DEPARTURE ->
+                value.effectLabel ?: s(R.string.progress_buff_ready)
+            value?.recognition == RestOutcome.PARKING_TOO_SHORT -> s(R.string.progress_rest_parking)
+            else -> null
+        }
+        if (sceneLabel != null) {
+            (restStopMotion.parent as? android.view.ViewGroup)?.removeView(restStopMotion)
+            restStopMotion.bind(sceneLabel)
+            card.addView(restStopMotion, LayoutParams(-1, dp(220)))
+        }
         if (value == null) add(card, text(s(R.string.progress_rest_missing)), 0)
         else {
             val recognition = when (value.recognition) {
@@ -226,7 +252,7 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
             val effect = text(value.effectLabel ?: s(R.string.progress_unknown_effect))
             if (!prioritizeStoredState) add(card, effect)
             add(card, text(value.remainingLabel ?: s(R.string.progress_unknown_remaining)))
-            value.note?.let { add(card, text(it, color = muted)) }
+            value.note?.takeUnless { it == "모의 입력" || it == "차량 입력" }?.let { add(card, text(it, color = muted)) }
             if (prioritizeStoredState) add(card, effect)
         }
         add(card, text(s(R.string.progress_rest_note), 18, muted)); add(parent, card)

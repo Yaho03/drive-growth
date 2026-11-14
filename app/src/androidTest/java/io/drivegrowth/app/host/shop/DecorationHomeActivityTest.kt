@@ -1,7 +1,7 @@
 package io.drivegrowth.app.host.shop
 
+import io.drivegrowth.app.isMainPageShown
 import io.drivegrowth.app.mainNavigation
-import io.drivegrowth.app.mainPage
 import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.host.HostPage
 import android.app.Activity
@@ -77,7 +77,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
     })
     private fun currentShopShown(a: MainActivity, id: String): Boolean {
         val children=tree(shop(a))
-        val sign=when(id) { "neutral-sign"->"기본 간판 · 시연"; "blue-sign"->"간판 색상 · 시연"; else->error("시험 기대 외 품목") }
+        val sign=when(id) { "neutral-sign"->a.getString(R.string.shop_scene_default_sign); "blue-sign"->"간판 색상"; else->error("시험 기대 외 품목") }
         return children.any { it is ShopSceneView && it.isShown && sign in it.contentDescription?.toString().orEmpty() }
     }
     private fun awaitState(a: MainActivity,id:String) {
@@ -113,9 +113,9 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
             instrumentation.runOnMainSync {
                 current.window.decorView.openMainPage(HostPage.GARAGE)
             }
-            await(current,"차고 탐색") { current.window.decorView.mainPage(HostPage.GARAGE)?.isSelected == true }
+            await(current,"차고 탐색") { current.window.decorView.isMainPageShown(HostPage.GARAGE) }
             instrumentation.runOnMainSync { current.onBackPressed() }
-            await(current,"Back HOME") { current.window.decorView.mainPage(HostPage.HOME)?.isSelected == true && shop(current).isShown }
+            await(current,"Back HOME") { current.window.decorView.isMainPageShown(HostPage.HOME) && shop(current).isShown }
             assertEquals(expected,read{it.identity to ok(it.store.decorations.state(it.identity.profileId))})
         } finally {instrumentation.removeMonitor(monitor);next?.let{n->instrumentation.runOnMainSync{n.finish()}}}
     }
@@ -311,7 +311,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
             onMain {
                 fresh.window.decorView.openMainPage(HostPage.GARAGE)
             }
-            await(fresh, "다른 화면 탐색과 gate") { fresh.window.decorView.mainPage(HostPage.GARAGE)?.isSelected == true }
+            await(fresh, "다른 화면 탐색과 gate") { fresh.window.decorView.isMainPageShown(HostPage.GARAGE) }
             assertEquals(HostPage.GARAGE.name, save(fresh).getString("page"))
             finish(fresh)
 
@@ -320,7 +320,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
                 putString("page", HostPage.GARAGE.name)
                 putBundle("shopUi", ShopUiStateBundle.encode(shopState, validFacility))
             })
-            await(healthy, "정상 Bundle의 차고 진입") { healthy.window.decorView.mainPage(HostPage.GARAGE)?.isSelected == true }
+            await(healthy, "정상 Bundle의 차고 진입") { healthy.window.decorView.isMainPageShown(HostPage.GARAGE) }
             val healthyShop = save(healthy).getBundle("shopUi")
             assertEquals(ContractResult.Success(shopState), ShopUiStateBundle.decodePresent(healthyShop))
             assertEquals(ContractResult.Success(validFacility), ShopUiStateBundle.decodeFacility(healthyShop))

@@ -186,6 +186,37 @@ class DeliveryHostControllerTest {
         assertEquals(listOf(request), h.completed)
     }
 
+    @Test fun `페이지에서 실제 표시한 구매 후보만 순서대로 저장한다`() {
+        val h = Harness()
+        val first = h.offers().offers.single() as DeliveryOffer.Purchase
+        val second = first.copy(id = DeliveryOfferId("offer-1"))
+        val original = requireNotNull(h.proposal)
+        val proposed = original.copy(list = original.list.copy(offers = listOf(first, second), nextOfferNumber = 2),
+            offers = listOf(first, second))
+        h.proposal = proposed
+        h.screen = DeliveryScreen.Offers(DeliveryHostMapper.proposal(proposed, emptyMap(),
+            "목적지", GameMoney(1000), h.identity.source))
+        h.start()
+        val version = requireNotNull(h.frame).version
+
+        h.host.acknowledgeDisplayed(version - 1, setOf(second.id))
+        h.host.acknowledgeDisplayed(version, setOf(DeliveryOfferId("unknown")))
+        h.drain()
+        assertTrue(h.shown.isEmpty())
+        h.host.acknowledgeDisplayed(version, setOf(first.id))
+        h.drain()
+        assertEquals(listOf(first), h.shown.single().offers)
+        assertEquals(listOf(second), h.host.state?.displayedProposal?.offers)
+        h.host.acknowledgeDisplayed(version, setOf(first.id))
+        h.host.acknowledgeDisplayed(version, setOf(second.id))
+        h.drain()
+
+        assertEquals(listOf(listOf(first), listOf(second)), h.shown.map { it.offers })
+        assertTrue(h.shown.all { it.list == proposed.list })
+        assertNull(h.host.state?.displayedProposal)
+        assertEquals(version, h.frame?.version)
+    }
+
     @Test fun `발견 실패 뒤 재시도는 이미 표시한 원목록을 저장한다`() {
         val h = Harness()
         val original = h.offers()

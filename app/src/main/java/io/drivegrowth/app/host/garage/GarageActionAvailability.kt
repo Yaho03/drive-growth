@@ -24,7 +24,7 @@ object GarageActionAvailability {
                     action == VehicleAction.SELL && !care.canSell((accidents as ContractResult.Success).value) -> "사고 3회 이상 차량은 판매할 수 없고 폐차만 가능합니다"
                     else -> null
                 }
-                ActionPresentation(reason == null, reason ?: "실제 저장 상태로 비용과 결과를 먼저 확인합니다")
+                ActionPresentation(reason == null, reason ?: "누르면 비용과 결과를 먼저 보여 드려요")
             })
         }))
     }

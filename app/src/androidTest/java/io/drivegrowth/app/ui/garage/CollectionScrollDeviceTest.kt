@@ -1,9 +1,12 @@
 package io.drivegrowth.app.ui.garage
 
 import android.content.Intent
+import android.app.ActivityOptions
+import android.hardware.display.DisplayManager
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
 
@@ -14,8 +17,12 @@ class CollectionScrollDeviceTest : InstrumentationTestCase() {
 
     override fun setUp() {
         super.setUp()
-        host = instrumentation.startActivitySync(Intent(instrumentation.targetContext,
-            CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as CollectionScrollTestActivity
+        val context = instrumentation.targetContext
+        val display = context.getSystemService(DisplayManager::class.java).displays
+            .singleOrNull { it.displayId != 0 && it.name == "Emulator 2D Display" }
+        val options = display?.let { ActivityOptions.makeBasic().setLaunchDisplayId(it.displayId).toBundle() }
+        host = instrumentation.startActivitySync(Intent(context,
+            CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options) as CollectionScrollTestActivity
         waitForLayout()
     }
 
@@ -27,7 +34,6 @@ class CollectionScrollDeviceTest : InstrumentationTestCase() {
 
     private fun descendants(view: View): List<View> = listOf(view) +
         if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()
-    private fun scroll() = descendants(host.collection).filterIsInstance<ScrollView>().single()
     private fun <T> onUi(block: () -> T): T {
         var result: T? = null
         var failure: Throwable? = null
@@ -41,8 +47,9 @@ class CollectionScrollDeviceTest : InstrumentationTestCase() {
     private fun waitForLayout() {
         repeat(150) {
             instrumentation.waitForIdleSync()
-            if (onUi { !host.collection.isLayoutRequested && descendants(host.collection)
-                    .filterIsInstance<ScrollView>().all { it.isLaidOut } }) return
+            if (onUi { host.collection.isAttachedToWindow && !host.collection.isLayoutRequested && descendants(host.collection)
+                    .filterIsInstance<ScrollView>().all { it.isLaidOut } &&
+                    (host.collection.findViewWithTag<Button>("collection:next")?.isLaidOut != false) }) return
             Thread.sleep(20)
         }
         fail("도감의 실제 layout이 완료되지 않았다")
@@ -51,60 +58,79 @@ class CollectionScrollDeviceTest : InstrumentationTestCase() {
         onUi { host.collection.render(state, enabled) }
         waitForLayout()
     }
-    private fun scrollToSavedPosition(): Int {
-        onUi { scroll().scrollTo(0, 700) }
-        instrumentation.waitForIdleSync()
-        val position = onUi { scroll().scrollY }
-        assertEquals("시험에 사용할 Content가 실제로 스크롤되어야 한다", 700, position)
-        return position
+    private fun pageLabel() = host.collection.findViewWithTag<TextView>("collection:page")?.text?.toString()
+
+    private fun advance(): String {
+        val before = onUi { pageLabel() }
+        onUi {
+            val next = host.collection.findViewWithTag<Button>("collection:next")
+            assertTrue(next.isEnabled)
+            assertTrue(next.performClick())
+        }
+        waitForLayout()
+        return checkNotNull(onUi { pageLabel() }).also { assertTrue(it != before) }
     }
 
-    fun testLoadingLayoutPreservesContentPosition() {
-        val before = scrollToSavedPosition()
+    fun testLoadingLayoutPreservesPage() {
+        val before = advance()
         render(CollectionScreenState.Loading)
-        assertEquals(0, onUi { scroll().scrollY })
+        assertNull(onUi { pageLabel() })
         render(GaragePreviewStates.collection)
-        assertEquals(before, onUi { scroll().scrollY })
+        assertEquals(before, onUi { pageLabel() })
     }
 
-    fun testErrorLayoutPreservesContentPosition() {
-        val before = scrollToSavedPosition()
+    fun testErrorLayoutPreservesPage() {
+        val before = advance()
         render(GaragePreviewStates.collectionError)
-        assertEquals(0, onUi { scroll().scrollY })
+        assertNull(onUi { pageLabel() })
         render(GaragePreviewStates.collection)
-        assertEquals(before, onUi { scroll().scrollY })
+        assertEquals(before, onUi { pageLabel() })
     }
 
-    fun testConsecutiveContentRendersPreservePosition() {
-        val before = scrollToSavedPosition()
+    fun testConsecutiveContentRendersPreservePage() {
+        val before = advance()
         onUi {
             host.collection.render(GaragePreviewStates.collection, true)
             host.collection.render(GaragePreviewStates.collection, true)
         }
         waitForLayout()
-        assertEquals(before, onUi { scroll().scrollY })
+        assertEquals(before, onUi { pageLabel() })
     }
 
-    fun testRestrictedScreenHidesContentAndPreservesPositionOnReturn() {
-        val before = scrollToSavedPosition()
+    fun testRestrictedScreenHidesContentAndPreservesPageOnReturn() {
+        val before = advance()
         render(GaragePreviewStates.collection, false)
-        assertFalse(onUi { descendants(host.collection).filterIsInstance<TextView>().any { it.text == "캐스퍼" } })
+        assertNull(onUi { pageLabel() })
+        assertFalse(onUi { descendants(host.collection).any { it.contentDescription?.contains("보유 이력 있음") == true } })
         render(GaragePreviewStates.collection)
-        assertEquals(before, onUi { scroll().scrollY })
+        assertEquals(before, onUi { pageLabel() })
     }
 
-    fun testShorterContentClampsPositionAndKeepsThatPosition() {
-        scrollToSavedPosition()
+    fun testShorterContentClampsPageAndKeepsThatPosition() {
+        advance()
+        advance()
         render(CollectionScreenState.Loading)
         val shorter = GaragePreviewStates.collection.copy(entries = GaragePreviewStates.collection.entries.take(4))
         render(shorter)
-        val bounded = onUi {
-            val current = scroll()
-            val available = (current.getChildAt(0).height - current.height + current.paddingTop + current.paddingBottom).coerceAtLeast(0)
-            current.scrollY to available
-        }
-        assertEquals(minOf(700, bounded.second), bounded.first)
+        assertEquals("1 / 1", onUi { pageLabel() })
+        assertFalse(onUi { host.collection.findViewWithTag<Button>("collection:next").isEnabled })
+        assertFalse(onUi { host.collection.findViewWithTag<Button>("collection:previous").isEnabled })
+
         render(GaragePreviewStates.collection)
-        assertEquals(bounded.first, onUi { scroll().scrollY })
+        assertTrue(onUi { pageLabel()?.startsWith("1 / ") == true })
+    }
+
+    fun testReturningToSameViewAfterLeavingKeepsFilterAndPage() {
+        onUi { host.collection.findViewWithTag<Button>("collection:filter:DISCOVERED").performClick() }
+        val before = advance()
+        onUi {
+            host.setContentView(View(host))
+            assertFalse(host.collection.isAttachedToWindow)
+            host.collection.render(GaragePreviewStates.collection, true)
+            host.setContentView(host.collection)
+        }
+        waitForLayout()
+        assertEquals(before, onUi { pageLabel() })
+        assertTrue(onUi { host.collection.findViewWithTag<Button>("collection:filter:DISCOVERED").isSelected })
     }
 }

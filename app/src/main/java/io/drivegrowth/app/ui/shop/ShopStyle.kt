@@ -9,36 +9,44 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import io.drivegrowth.app.ui.pixel.PixelStyle
+import io.drivegrowth.app.ui.pixel.MapPanelStyle
+
+internal fun String.displayShopSign() = when (this) {
+    "기본 간판 · 시연" -> "기본 간판"
+    "간판 색상 · 시연" -> "간판 색상"
+    else -> this
+}
 
 /** #229의 공통 색과 기존 차량 화면의 Native 조작 크기를 사용한다. */
 internal class ShopStyle(private val context: Context) {
+    private val mapPanel = MapPanelStyle(context)
     val base = PixelStyle.background
-    val panel = PixelStyle.panel
-    val inset = PixelStyle.inset
-    val ink = PixelStyle.text
-    val muted = PixelStyle.muted
-    val blue = PixelStyle.primary
-    val accent = PixelStyle.gold
+    val page = 0xfffbefcf.toInt()
+    val ink get() = mapPanel.ink
+    val muted get() = mapPanel.muted
+    val accent get() = mapPanel.accent
+    val scrim = 0x75172716
+    fun surface() = mapPanel.card()
+    fun infoSurface() = mapPanel.chip()
     fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
     fun column() = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     fun row() = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
     fun shape(fill: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = dp(PixelStyle.panelRadiusDp).toFloat() }
-    fun text(value: CharSequence, size: Int = 20, color: Int = ink, bold: Boolean = false) = TextView(context).apply {
+    fun text(value: CharSequence, size: Int = 16, color: Int = ink, bold: Boolean = false) = TextView(context).apply {
         text = value; textSize = size.toFloat(); setTextColor(color)
         if (bold) setTypeface(typeface, Typeface.BOLD)
         setPadding(0, dp(4), 0, dp(4))
     }
     fun card() = column().apply {
-        background = shape(panel); setPadding(dp(PixelStyle.panelPaddingDp), dp(16), dp(PixelStyle.panelPaddingDp), dp(16))
+        background = surface(); setPadding(dp(PixelStyle.panelPaddingDp), dp(16), dp(PixelStyle.panelPaddingDp), dp(16))
     }
-    fun button(label: String, enabled: Boolean = true, primary: Boolean = false, action: () -> Unit) = Button(context).apply {
-        text = label; textSize = 24f; isAllCaps = false; isEnabled = enabled
-        setTextColor(if (enabled) ink else muted)
-        background = shape(if (primary && enabled) blue else inset)
-        minHeight = dp(64); minimumHeight = dp(64)
-        setPadding(dp(16), dp(12), dp(16), dp(12))
-        setOnClickListener { if (isEnabled) action() }
-    }
+    fun button(label: String, enabled: Boolean = true, primary: Boolean = false, action: () -> Unit) =
+        mapPanel.styleButton(Button(context).apply {
+            text = label
+            isAllCaps = false
+            isEnabled = enabled
+            setOnClickListener { if (isEnabled) action() }
+        }, primary)
     fun add(parent: LinearLayout, child: View, gap: Int = PixelStyle.gapDp) {
         parent.addView(child, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(gap) })
     }

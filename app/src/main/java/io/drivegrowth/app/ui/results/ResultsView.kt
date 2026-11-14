@@ -10,11 +10,13 @@ import io.drivegrowth.app.R
 import io.drivegrowth.app.data.RentalIncomeKind
 import io.drivegrowth.app.runtime.rental.product.RentalCity
 import io.drivegrowth.app.ui.pixel.PixelStyle
+import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.app.ui.presentation.RewardCelebrationKind
 import io.drivegrowth.app.ui.presentation.RewardCelebrationView
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.rental.RentalCategory
+import java.math.BigInteger
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -22,6 +24,7 @@ import java.util.Locale
 
 /** 호스트가 준 확정 사실을 표시한다. 차량 SDK·DB·보상 계산을 호출하지 않는다. */
 class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLayout(context) {
+    internal var showHeading = true
     private val style = ResultsStyle(context)
     private val sprites = VehicleSprites(context)
     private val interaction = ResultsInteraction(onEvent)
@@ -85,7 +88,12 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
             addView(scroll(message(s(R.string.results_restricted), s(R.string.results_restricted_body)), 0), LayoutParams(-1, -1))
             return@with
         }
-        addView(text(s(R.string.results_title), 32, bold = true))
+        if (showHeading) addView(text(s(R.string.results_title), 24, bold = true).apply {
+            background = surface()
+            setPadding(dp(14), dp(6), dp(14), dp(6))
+            setCompoundDrawables(icon(ReferenceHudIcon.SETTLEMENT), null, null, null)
+            compoundDrawablePadding = dp(8)
+        })
         when (val current = interaction.state) {
             ResultsScreenState.Loading -> addView(scroll(message(if (uiState.scope == ResultsScope.ALL) "정산 이력을 불러오고 있어요" else s(R.string.results_loading)), 0), LayoutParams(-1, 0, 1f))
             is ResultsScreenState.Error -> addView(scroll(problem(s(R.string.results_error), current.message, true), 0), LayoutParams(-1, 0, 1f))
@@ -94,7 +102,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
             }, 0), LayoutParams(-1, 0, 1f))
             is ResultsScreenState.Unsupported -> addView(scroll(problem(s(R.string.results_unsupported), current.message, false), 0), LayoutParams(-1, 0, 1f))
             is ResultsScreenState.Content -> {
-                addView(text(s(if (current.origin == ResultsOrigin.FIXTURE) R.string.results_fixture else R.string.results_stored), color = accent))
+                if (current.origin == ResultsOrigin.FIXTURE) addView(text(s(R.string.results_fixture), color = accent))
                 val area = if (wide) row() else column()
                 addView(area, LayoutParams(-1, 0, 1f))
                 if (wide || selectedSettlementId == null) {
@@ -123,53 +131,87 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
 
     private fun resultList(state: ResultsScreenState.Content) = with(style) {
         column().apply {
-            add(this, card().apply {
-                addView(text(context.getString(R.string.results_summary,
-                    state.results.count { interaction.readState(it.settlement.settlementId) != ResultsReadState.Done }, state.results.size), 28, bold = true))
-                addView(text(if (state.historyAvailable) "열람한 정산도 전체 기록에 보관돼요." else s(R.string.results_history_unsupported), color = muted))
+            val results = interaction.visibleResults
+            val unread = uiState.scope == ResultsScope.UNVIEWED
+            val unreadCount = state.results.count { interaction.readState(it.settlement.settlementId) != ResultsReadState.Done }
+            val card = card().apply {
+                addView(text(if (unread) "아직 안 본 결과 ${unreadCount}건" else "전체 정산 ${results.size}건", 22, bold = true))
+                if (!state.historyAvailable) addView(text(s(R.string.results_history_unsupported), color = muted))
                 if (state.historyAvailable) add(this, row().apply {
                     ResultsScope.entries.forEachIndexed { index, scope ->
                         addView(button(if (scope == ResultsScope.ALL) "전체 기록" else "미확인", primary = uiState.scope == scope) {
                             interaction.scope(scope); drawScreen()
                         }.apply { tag = "results:scope:${scope.name}" }, LayoutParams(0, -2, 1f).apply {
-                            if (index > 0) marginStart = dp(PixelStyle.gapDp)
+                            if (index > 0) marginStart = dp(8)
                         })
                     }
+                }, gap = 8)
+                if (results.isEmpty()) add(this, card(inset = true, paddingDp = 12).apply {
+                    addView(text(if (unread) s(R.string.results_empty) else "저장된 정산 기록이 없어요", 20, bold = true))
+                    addView(text(if (unread) "영업이나 탁송 결과가 생기면 여기에 모여요." else "현재 필터에서 표시할 정산이 없어요.",
+                        15, muted))
                 })
-            })
-            if (interaction.visibleResults.isEmpty()) add(this, message(
-                if (state.historyAvailable && uiState.scope == ResultsScope.ALL) "저장된 정산 기록이 없어요" else s(R.string.results_empty),
-                if (state.historyAvailable) "현재 필터에서 표시할 정산이 없어요." else s(R.string.results_empty_body)))
-            interaction.visibleResults.forEach { value ->
-                val settlement = value.settlement
-                add(this, card(selected = selectedSettlementId == settlement.settlementId).apply {
-                    addView(text(kind(settlement.transaction.kind), 24, bold = true))
-                    addView(text(s(R.string.results_confirmed), color = accent))
-                    addView(text(moneyChange(settlement), 30, amountColor(settlement), bold = true))
-                    settlement.changedVehicle?.let { car ->
-                        add(this, row().apply {
+                results.forEachIndexed { index, value ->
+                    val settlement = value.settlement
+                    add(this, card(selected = selectedSettlementId == settlement.settlementId, inset = true,
+                        paddingDp = 12).apply {
+                        addView(row().apply {
+                            isBaselineAligned = false
                             gravity = Gravity.CENTER_VERTICAL
-                            vehicleArt(car.vehicleId)?.let { addView(it, LayoutParams(dp(76), dp(56))) }
-                            addView(text(value.vehicleName ?: s(R.string.results_vehicle_name_missing)), LayoutParams(0, -2, 1f).apply {
-                                if (childCount != 0) marginStart = dp(PixelStyle.gapDp)
-                            })
+                            addView(chip(kind(settlement.transaction.kind)), LayoutParams(-2, -2))
+                            addView(text(moneyChange(settlement), 18, amountColor(settlement), bold = true).apply {
+                                gravity = Gravity.END
+                            }, LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
                         })
-                    }
-                    addView(text(pair(R.string.results_settlement_id, settlement.settlementId.value), color = muted))
-                    addView(text(pair(R.string.results_time, time(settlement)), color = muted))
-                    if (interaction.readState(settlement.settlementId) == ResultsReadState.Done) addView(text(s(R.string.results_mark_done)))
-                    add(this, button(s(R.string.results_open), primary = selectedSettlementId == settlement.settlementId) {
-                        if (selectedSettlementId != settlement.settlementId) { detailY = 0; detailScroll = null }
-                        openedResult = settlement.settlementId
-                        interaction.select(settlement.settlementId)
-                        drawScreen()
-                    }.apply {
-                        tag = "results:open:${settlement.settlementId.value}"
-                        contentDescription = context.getString(R.string.results_open_accessibility, kind(settlement.transaction.kind), settlement.settlementId.value)
-                    })
+                        settlement.changedVehicle?.let { car ->
+                            add(this, row().apply {
+                                gravity = Gravity.CENTER_VERTICAL
+                                vehicleArt(car.vehicleId)?.let { addView(it, LayoutParams(dp(56), dp(42))) }
+                                addView(text(value.vehicleName ?: s(R.string.results_vehicle_name_missing)), LayoutParams(0, -2, 1f).apply {
+                                    if (childCount != 0) marginStart = dp(8)
+                                })
+                            }, gap = 4)
+                        }
+                        addView(text(time(settlement), 14, muted))
+                        if (interaction.readState(settlement.settlementId) == ResultsReadState.Done) addView(text(s(R.string.results_mark_done)))
+                        add(this, button(s(R.string.results_open), primary = selectedSettlementId == settlement.settlementId) {
+                            if (selectedSettlementId != settlement.settlementId) { detailY = 0; detailScroll = null }
+                            openedResult = settlement.settlementId
+                            interaction.select(settlement.settlementId)
+                            drawScreen()
+                        }.apply {
+                            tag = "results:open:${settlement.settlementId.value}"
+                            contentDescription = "목록 ${index + 1}번 · " + context.getString(
+                                R.string.results_open_accessibility, kind(settlement.transaction.kind), time(settlement)
+                            )
+                        }, gap = 6)
+                    }, gap = 10)
+                }
+                if (unread && results.isNotEmpty()) add(this, row().apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    background = surface(selected = true)
+                    setPadding(dp(16), dp(12), dp(16), dp(12))
+                    addView(text("미확인 재화 변화 합계", 16, bold = true), LayoutParams(0, -2, 1f))
+                    addView(text(unreadTotal(results), 22, accent, bold = true), LayoutParams(0, -2, 1.2f).apply { marginStart = dp(8) })
                 })
             }
+            addView(card)
         }
+    }
+
+    private fun unreadTotal(results: List<ResultPresentation>): String {
+        val total = results.fold(BigInteger.ZERO) { sum, row ->
+            val change = row.settlement.transaction.money ?: return@fold sum
+            val amount = BigInteger.valueOf(change.amount.units)
+            if (change.direction == MoneyDirection.CREDIT) sum.add(amount) else sum.subtract(amount)
+        }
+        val formatted = NumberFormat.getIntegerInstance(Locale.KOREA).format(total.abs())
+        val sign = when (total.signum()) {
+            1 -> "+"
+            -1 -> "−"
+            else -> ""
+        }
+        return context.getString(R.string.results_money, sign + formatted)
     }
 
     private fun detail() = with(style) {
@@ -194,29 +236,28 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                 addView(text(kind(settlement.transaction.kind), 32, bold = true))
                 addView(text(s(R.string.results_confirmed), color = accent))
                 add(this, card().apply {
-                    background = shape(inset)
+                    background = surface(selected = settlement.transaction.money?.direction == MoneyDirection.CREDIT)
                     addView(text(s(R.string.results_money_change), color = muted))
-                    addView(text(moneyChange(settlement), 48, amountColor(settlement), bold = true))
+                    addView(text(moneyChange(settlement), 36, amountColor(settlement), bold = true).apply {
+                        setCompoundDrawables(icon(ReferenceHudIcon.COIN), null, null, null)
+                        compoundDrawablePadding = dp(8)
+                    })
                 })
-                add(this, card().apply {
-                    background = shape(inset)
-                    addView(text(pair(R.string.results_balance, money(settlement.balance)), 26, bold = true))
+                add(this, card(inset = true, paddingDp = 12).apply {
+                    addView(text(pair(R.string.results_balance, money(settlement.balance)), 19, bold = true))
                 })
             }))
             add(this, card().apply {
-                addView(text(pair(R.string.results_settlement_id, id.value), color = muted))
-                addView(text(pair(R.string.results_transaction_id, settlement.transaction.transactionId.value), color = muted))
-                addView(text(pair(R.string.results_request_id, settlement.transaction.requestId.value), color = muted))
-                addView(text(pair(R.string.results_rule, settlement.transaction.ruleVersion.value), color = muted))
-                addView(text(pair(R.string.results_source, s(if (settlement.transaction.source == InputSource.VEHICLE)
-                    R.string.results_source_vehicle else R.string.results_source_simulation)), color = muted))
+                if ((interaction.state as? ResultsScreenState.Content)?.origin == ResultsOrigin.FIXTURE) {
+                    addView(text(pair(R.string.results_source, s(if (settlement.transaction.source == InputSource.VEHICLE)
+                        R.string.results_source_vehicle else R.string.results_source_simulation)), color = muted))
+                }
                 addView(text(pair(R.string.results_time, time(settlement)), color = muted))
             })
             add(this, vehicle(value))
             if (value.rental != null) add(this, rentalDetails(value))
             else add(this, text(if ((interaction.state as? ResultsScreenState.Content)?.historyAvailable == true)
                 "추가 상세 정보는 확인할 수 없어요." else s(R.string.results_details_unsupported), color = muted))
-            add(this, text(s(R.string.results_mark_note), color = muted))
             val read = interaction.readState(id)
             when (read) {
                 ResultsReadState.Pending -> add(this, text(s(R.string.results_mark_pending), bold = true))
@@ -341,7 +382,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
         ImageView(context).apply {
             tag = "results:vehicle-art:${id.value}"
             setImageDrawable(art)
-            background = style.shape(PixelStyle.inset)
+            background = style.surface()
             clipToOutline = true
             scaleType = ImageView.ScaleType.FIT_CENTER
             val inset = style.dp(6)
@@ -351,7 +392,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
     }
 
     private fun amountColor(settlement: Settlement) =
-        if (settlement.transaction.money?.direction == MoneyDirection.CREDIT) PixelStyle.gold else PixelStyle.text
+        if (settlement.transaction.money?.direction == MoneyDirection.CREDIT) style.accent else style.ink
 
     private fun basisTime(value: EpochMillis) = SimpleDateFormat("yyyy.MM.dd HH:mm:ss.SSS 'UTC'", Locale.KOREA).apply {
         timeZone = java.util.TimeZone.getTimeZone("UTC")

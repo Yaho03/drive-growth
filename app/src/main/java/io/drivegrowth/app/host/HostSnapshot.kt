@@ -7,6 +7,7 @@ import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.InputSource
 import io.drivegrowth.core.contract.OwnedVehicle
 import io.drivegrowth.core.contract.Settlement
+import io.drivegrowth.core.delivery.HeldVehicle
 import io.drivegrowth.core.garage.CollectionKey
 import io.drivegrowth.core.contract.ContentVersion
 import io.drivegrowth.core.contract.RuleVersion
@@ -22,6 +23,7 @@ data class HostSnapshot(
     val unviewedSettlements: List<Settlement>,
     val collectionHistory: ContractResult<CollectionHistory> = ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
     val garageState: ContractResult<StoredGarageState> = ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
+    val heldVehicles: ContractResult<List<HeldVehicle>> = ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
 )
 
 /** 현재 보유 목록과 별도로 공급해야 하는 처분 포함 획득·발견 이력이다. */

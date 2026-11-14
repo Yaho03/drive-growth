@@ -1,6 +1,7 @@
 package io.drivegrowth.app.host.garage
 
 import io.drivegrowth.app.exposeMainPage
+import io.drivegrowth.app.exposeMainRefresh
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.Process
@@ -81,7 +82,8 @@ class FinalVehicleCommandRestorationTest :
         assertTrue("잔액 부족과 구분할 수 있어야 합니다", full.balance.units >= 500)
         selectPage(HostPage.GACHA)
         assertFullGachaUi()
-        click { it.tag == "host:refresh" }
+        refreshFromHome()
+        selectPage(HostPage.GACHA)
         assertFullGachaUi()
         val rejected = read {
             GachaPull(ok(it.content)).prepare(it.store, RequestId("final-full-probe"), GachaTicketUse.PURCHASED)
@@ -100,12 +102,20 @@ class FinalVehicleCommandRestorationTest :
     fun testColdMaterialThenCommitRepair() {
         restore(VehicleAction.USE_MATERIAL)
         prepareDamagedCar()
-        click { it.tag == "host:refresh" }
+        refreshFromHome()
         commitManagement(VehicleAction.REPAIR, 50)
     }
 
     fun testColdRepairKeepsOriginalReceipt() {
         restore(VehicleAction.REPAIR)
+    }
+
+    private fun refreshFromHome() {
+        awaitUi("가게 설정의 새로고침") {
+            val refresh = root.exposeMainRefresh() ?: return@awaitUi false
+            assertTrue(refresh.performClick())
+            true
+        }
     }
 
     private fun assertFullGachaUi() = awaitUi("가챠 만차 안내와 유료 선택 차단") {

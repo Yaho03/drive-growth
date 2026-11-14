@@ -4,6 +4,7 @@ import android.content.Context
 import android.widget.LinearLayout
 import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.garage.VehicleArtwork
+import io.drivegrowth.app.ui.pixel.MapPanelStyle
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.VehicleRef
 
@@ -11,26 +12,40 @@ import io.drivegrowth.core.garage.VehicleRef
 class GarageCommandView(context: Context, private val confirm: () -> Unit, private val cancel: () -> Unit,
     private val retry: () -> Unit, private val cancelPending: () -> Unit, private val choose: (VehicleRef) -> Unit, private val done: () -> Unit) : LinearLayout(context) {
     private val style = GarageStyle(context, pixelPanel = true)
+    private val mapStyle = MapPanelStyle(context)
     private val artwork = VehicleArtwork(context, style)
     private var generation = 0L
-    init { orientation = VERTICAL; setBackgroundColor(style.base) }
+    init { orientation = VERTICAL; setBackgroundColor(0xffffedbd.toInt()) }
+
     fun render(state: GarageCommandState, enabled: Boolean) = with(style) {
+        fun text(label: String, size: Int = 16, bold: Boolean = false) =
+            style.text(label, size, mapStyle.ink, bold)
         generation++; val token = generation
         removeAllViews(); setPadding(dp(24), dp(16), dp(24), dp(16))
-        if (!enabled) { addView(text("주차 후 조작이 허용되면 이용할 수 있습니다.")); return@with }
+        if (!enabled) {
+            addView(text("주차 후 조작이 허용되면 이용할 수 있습니다."))
+            return@with
+        }
         val content = column(); addView(scroll(content), LayoutParams(-1,-1))
         content.addView(text("차량 관리", 30, bold = true))
         fun action(label: String, ready: Boolean = true, primary: Boolean = false, callback: () -> Unit) {
-            add(content, button(label, enabled = ready, primary = primary) { if(token == generation) callback() })
+            add(content, mapStyle.styleButton(button(label, enabled = ready, primary = primary) {
+                if (token == generation) callback()
+            }, primary))
         }
         fun pending(p: GaragePending) {
-            val details = card()
+            val details = column().apply {
+                background = mapStyle.chip()
+                setPadding(dp(12), dp(10), dp(12), dp(12))
+            }
             add(content, details)
             val title = p.name ?: if (p.command is GarageCommand.Material) "보관한 강화 대상 차량" else p.request.id.value
             details.addView(text(title, 24, bold = true))
             p.vehicle?.let {
-                details.addView(artwork.view(it.vehicleId, it.rarity, 96), LayoutParams(-1, dp(96)))
-                details.addView(text(rarity(it.rarity), 16, rarityColor(it.rarity), bold = true))
+                details.addView(artwork.view(it.vehicleId, it.rarity, 120, showRing = false).apply {
+                    background = null
+                }, LayoutParams(-1, dp(120)))
+                details.addView(text(rarity(it.rarity), 16, bold = true))
                 details.addView(text("조회 당시 Lv.${it.level} · 진행 ${it.levelProgressPercent}% · 실제 취득액 ${it.acquisitionCost.units} 게임머니"))
             }
             details.addView(text(p.balance?.let { "조회 잔액 ${it.units} 게임머니" } ?: "실행 결과에서 당시 잔액을 확인합니다"))
@@ -52,7 +67,7 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
                     details.addView(text("수리 성공 시 활동을 대기로 회복하며 사고 이력과 실제 취득액은 보존합니다"))
                 }
             }
-            details.addView(text("확인한 비용과 대상은 같은 요청으로 처리합니다", 16, color = muted))
+            details.addView(style.text("확인한 비용과 대상은 같은 요청으로 처리합니다", 15, mapStyle.muted))
         }
         when(state) {
             GarageCommandState.Idle -> Unit

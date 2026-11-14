@@ -8,6 +8,7 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.ScrollView
 import android.widget.TextView
+import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.core.contract.SettlementId
 
@@ -40,15 +41,17 @@ class ResultsViewTest : InstrumentationTestCase() {
         val view = onUi { ResultsView(instrumentation.targetContext) {}.apply { render(ResultsPreviewStates.normal, true) } }
         layout(view, 480, 500)
         onUi { open(view, "fixture-result-1") }
-        val shown = onUi { texts(view).joinToString("\n") }
+        val labels = onUi { texts(view) }
+        val shown = labels.joinToString("\n")
         assertTrue(shown.contains("−350 게임머니"))
         assertTrue(shown.contains("정산 후 확정 잔액 · 이번 수익 합계 아님\n9,001 게임머니"))
         assertTrue(shown.contains("실제 취득 기준액\n0 게임머니"))
-        assertTrue(shown.contains("fixture-request-1"))
-        assertTrue(shown.contains("ui-fixture-v1"))
+        assertFalse(shown.contains("fixture-request-1"))
+        assertFalse(shown.contains("ui-fixture-v1"))
+        assertNotNull(onUi { view.findViewWithTag<Button>("results:mark:fixture-result-1") })
         assertTrue(shown.contains("모의 입력"))
         assertTrue(shown.contains("고정 시험 입력"))
-        assertTrue(shown.contains("제공되지 않았어요"))
+        assertTrue(instrumentation.targetContext.getString(R.string.results_details_unsupported) in labels)
         assertFalse(shown.contains("+9,001"))
     }
 

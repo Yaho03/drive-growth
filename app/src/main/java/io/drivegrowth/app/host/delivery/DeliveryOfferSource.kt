@@ -38,10 +38,21 @@ class DeliveryOfferSource(private val queries: DeliveryHostQueries,
             current.held, stored, navigation = nav))
     }
     fun displayed(identity: GameIdentity, proposed: DeliveryProposed): ContractResult<Unit> {
-        if (displayed != (identity to proposed)) return ContractResult.Failure(ContractError.STATE_CONFLICT)
+        val (owner, original) = displayed ?: return ContractResult.Failure(ContractError.STATE_CONFLICT)
+        if (owner != identity || !original.containsDisplayedOffers(proposed)) return ContractResult.Failure(ContractError.STATE_CONFLICT)
         val lists = when (val read = queries.lists(identity, proposed.list.createdOn)) { is ContractResult.Failure -> return read; is ContractResult.Success -> read.value }
         if (proposed.list !in lists || proposed.estimated.source != identity.source || proposed.list.source != identity.source)
             return ContractResult.Failure(ContractError.STATE_CONFLICT)
-        return queries.discover(identity, proposed).also { if (it is ContractResult.Success) displayed = null }
+        return queries.discover(identity, proposed).also {
+            if (it is ContractResult.Success) {
+                val remaining = original.offers.filterNot { offer -> offer in proposed.offers }
+                displayed = remaining.takeIf { it.any { offer -> offer is DeliveryOffer.Purchase } }
+                    ?.let { identity to original.copy(offers = it) }
+            }
+        }
     }
 }
+
+internal fun DeliveryProposed.containsDisplayedOffers(shown: DeliveryProposed) =
+    destination == shown.destination && estimated == shown.estimated && list == shown.list &&
+        shown.offers.distinct().size == shown.offers.size && offers.containsAll(shown.offers)

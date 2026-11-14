@@ -11,10 +11,10 @@ internal object RankingAggregation {
     private fun invalid() = RankingValue.Failure(ContractError.STORAGE_FAILURE)
     fun owned(history: List<OwnedVehicle>): RankingValue {
         if (history.map { it.ownedVehicleId }.toSet().size != history.size) return invalid()
-        return RankingValue.Available(history.count { it.lifecycle == VehicleLifecycle.OWNED }.toBigDecimal(), "현재 OWNED 개체 · 중복 차종 각각 포함")
+        return RankingValue.Available(history.count { it.lifecycle == VehicleLifecycle.OWNED }.toBigDecimal(), "현재 보유한 차량 · 같은 차종도 한 대씩 집계")
     }
     fun collection(entries: List<CollectionEntry>, definition: CollectionCountDefinition?): RankingValue {
-        if (definition == null) return RankingValue.Missing("도감 수집 집계 기준이 아직 공급되지 않았습니다.")
+        if (definition == null) return RankingValue.Missing("도감 수집을 세는 기준을 확인할 수 없어요.")
         if (entries.map { it.key }.toSet().size != entries.size) return invalid()
         val count = entries.count { it.state == CollectionState.OWNED || definition == CollectionCountDefinition.SEEN_OR_OBTAINED && it.state == CollectionState.DISCOVERED }
         return RankingValue.Available(count.toBigDecimal(), if (definition == CollectionCountDefinition.OBTAINED) "획득 이력의 차종×희귀도 칸 · 처분 후 유지" else "발견 또는 획득한 차종×희귀도 칸")
@@ -31,7 +31,7 @@ internal object RankingAggregation {
         return RankingValue.Available(values.maxOrNull()!!, "현재 보유 차종 게임가격 × 개별 희귀도 수익 배율 · 취득액/매각가 아님")
     }
     fun income(rows: List<RankingIncome>, definition: RankingIncomeDefinition?, source: InputSource): RankingValue {
-        if (definition == null) return RankingValue.Missing("누적 수익에 포함할 거래 원인 기준이 아직 공급되지 않았습니다.")
+        if (definition == null) return RankingValue.Missing("누적 수익에 어떤 거래가 포함되는지 확인할 수 없어요.")
         val unique = linkedMapOf<RequestId, RankingIncome>()
         for (row in rows) {
             if (row.source != source || unique[row.requestId]?.let { it != row } == true) return invalid()
@@ -44,7 +44,7 @@ internal object RankingAggregation {
             "확정 수익 누적 · $basis")
     }
     fun week(rows: List<RankingDayDistance>, definition: RankingWeekDefinition?, source: InputSource, asOf: EpochMillis): RankingValue {
-        if (definition == null) return RankingValue.Missing("주 시작 요일·시간대 기준이 아직 공급되지 않았습니다.")
+        if (definition == null) return RankingValue.Missing("주간 기록이 시작되는 요일과 시간대를 확인할 수 없어요.")
         if (asOf.value < 0) return invalid()
         val today = Instant.ofEpochMilli(asOf.value).atZone(definition.zone).toLocalDate()
         val start = today.with(TemporalAdjusters.previousOrSame(definition.firstDay)); val end = start.plusDays(7)

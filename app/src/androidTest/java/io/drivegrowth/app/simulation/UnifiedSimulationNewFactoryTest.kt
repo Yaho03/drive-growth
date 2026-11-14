@@ -1,5 +1,6 @@
 package io.drivegrowth.app.simulation
 
+import io.drivegrowth.app.mainGameControls
 import io.drivegrowth.app.mainNavigation
 import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.showSimulationControls
@@ -82,7 +83,7 @@ class UnifiedSimulationNewFactoryTest : ActivityInstrumentationTestCase2<Unified
             assertEquals(SimulationTimeline().clock.epoch,original.grant.confirmedAt)
             game.identity
         }
-        awaitUi(first,"기존 화면 선택") { first.window.decorView.mainNavigation()?.isEnabled == true }
+        awaitUi(first,"기존 화면 선택") { first.window.decorView.mainGameControls()?.isEnabled == true }
         instrumentation.runOnMainSync {
             first.window.decorView.openMainPage(HostPage.DELIVERY)
         }
@@ -98,11 +99,11 @@ class UnifiedSimulationNewFactoryTest : ActivityInstrumentationTestCase2<Unified
         }
         click(first,"delivery:offer:${income.id.value}");click(first,"delivery:confirm");click(first,"delivery:acknowledge")
         val route=read { game ->checkNotNull(ok(game.store.delivery.inProgress())).also { assertEquals(initial.source,it.active.proposed.estimated.source) } }
-        instrumentation.runOnMainSync { first.window.decorView.showSimulationControls() }
+        instrumentation.runOnMainSync { first.window.decorView.showSimulationControls(first) }
         click(first,"simulation:start")
         awaitUi(first,"시나리오 입력 종료와 모의 주차") {
             context.getSharedPreferences("unified-simulation-v1",0).getInt("stage",0)==65 &&
-                first.window.decorView.mainNavigation()?.isEnabled == true
+                first.window.decorView.mainGameControls()?.isEnabled == true
         }
         awaitStored("기존 원장의 세 정산과 첫 보상") { read { game ->
             val results=ok(game.store.listUnviewedSettlements())
@@ -181,7 +182,7 @@ class UnifiedSimulationNewFactoryTest : ActivityInstrumentationTestCase2<Unified
             assertFalse("확정 입력 재연결이 실패로 바뀌지 않아야 한다: ${simulator.status}", simulator.canRetry)
             assertTrue("확정 결과를 UI에서 확인할 수 있어야 한다: ${simulator.status}", simulator.controlsAllowed)
             awaitUi(fresh, "새 owner의 기존 화면 조작") {
-                fresh.window.decorView.mainNavigation()?.isEnabled == true
+                fresh.window.decorView.mainGameControls()?.isEnabled == true
             }
             instrumentation.runOnMainSync {
                 fresh.window.decorView.openMainPage(HostPage.DELIVERY)

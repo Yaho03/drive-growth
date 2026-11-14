@@ -1,43 +1,90 @@
 package io.drivegrowth.app
 
 import android.content.Context
+import android.graphics.Typeface
 import android.text.TextUtils
+import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import io.drivegrowth.app.host.HostPage
 import io.drivegrowth.app.ui.garage.GarageStyle
+import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
+import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 
-/** 게임의 공통 하단 메뉴다. */
+/** HOME 지도 위에 독립된 픽셀 표지판 여섯 개를 배치한다. */
 internal class MainNavigationBar(
     context: Context,
-    page: HostPage,
     select: (HostPage) -> Unit,
 ) : LinearLayout(context) {
+    private val style = ReferenceHudStyle(context)
+    private val buttons: List<Button>
+
     init {
-        val style = GarageStyle(context, pixelPanel = true)
         tag = "host:destination"
-        setBackgroundColor(style.panel)
-        setPadding(style.dp(6), style.dp(4), style.dp(6), style.dp(4))
-        val section = when (page) {
-            HostPage.COLLECTION -> HostPage.GARAGE
-            HostPage.PROGRESSION, HostPage.RANKING -> HostPage.RESULTS
-            else -> page
-        }
-        for ((target, label) in listOf(
-            HostPage.HOME to "가게",
-            HostPage.GARAGE to "차고",
-            HostPage.DELIVERY to "탁송",
-            HostPage.GACHA to "뽑기",
-            HostPage.RESULTS to "기록",
-        )) {
-            val selected = target == section
-            val button = style.button(label, primary = selected) { select(target) }.apply {
+        gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        minimumWidth = style.dp(312)
+        val items = listOf(
+            Triple(HostPage.GARAGE, "차고", ReferenceHudIcon.GARAGE),
+            Triple(HostPage.COLLECTION, "도감", ReferenceHudIcon.COLLECTION),
+            Triple(HostPage.GACHA, "뽑기", ReferenceHudIcon.GACHA),
+            Triple(HostPage.DELIVERY, "탁송", ReferenceHudIcon.TRUCK),
+            Triple(HostPage.RESULTS, "정산", ReferenceHudIcon.SETTLEMENT),
+            Triple(HostPage.RANKING, "기록", ReferenceHudIcon.RECORD),
+        )
+        buttons = items.map { (target, label, icon) ->
+            Button(context).apply {
                 tag = "host:page:${target.name}"
-                isSelected = selected
-                compact(style)
+                text = label
+                isAllCaps = false
+                gravity = Gravity.CENTER
+                textSize = 14f
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(style.signInk)
+                setSingleLine()
+                ellipsize = TextUtils.TruncateAt.END
+                setCompoundDrawablesRelative(null, style.icon(icon, 30), null, null)
+                compoundDrawablePadding = style.dp(1)
+                minWidth = 0
+                minimumWidth = 0
+                minHeight = style.dp(56)
+                minimumHeight = minHeight
+                backgroundTintList = null
+                background = style.signButton()
+                setPadding(style.dp(2), style.dp(4), style.dp(2), style.dp(4))
+                setOnClickListener { if (isEnabled) select(target) }
+            }.also { button ->
+                addView(button, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginStart = style.dp(2)
+                    marginEnd = style.dp(2)
+                })
             }
-            addView(button, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = style.dp(4) })
         }
+    }
+
+    fun showUnviewedSettlements(count: Int?) {
+        val results = buttons.first { it.tag == "host:page:${HostPage.RESULTS.name}" }
+        val description = count?.takeIf { it > 0 }?.let { "정산 · 읽지 않은 기록 ${it}건" } ?: "정산"
+        if (results.contentDescription != description) results.contentDescription = description
+        val label = if (count != null && count > 0) "정산 •" else "정산"
+        if (results.text != label) results.text = label
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val wide = MeasureSpec.getSize(widthMeasureSpec) >= style.dp(600)
+        for (button in buttons) {
+            val pixels = style.dp(if (wide) 48 else 32)
+            button.compoundDrawablesRelative[1]?.let { draw ->
+                if (draw.bounds.width() != pixels) {
+                    draw.setBounds(0, 0, pixels, pixels)
+                    button.setCompoundDrawablesRelative(null, draw, null, null)
+                }
+            }
+            val labelSize = if (wide) 18f else 14f
+            if (button.textSize != android.util.TypedValue.applyDimension(
+                    android.util.TypedValue.COMPLEX_UNIT_SP, labelSize, resources.displayMetrics,
+                )) button.textSize = labelSize
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 }
 

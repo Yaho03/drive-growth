@@ -1,5 +1,8 @@
 package io.drivegrowth.app.ui.garage
 
+import io.drivegrowth.core.contract.ContractError
+import io.drivegrowth.core.contract.ContractResult
+import io.drivegrowth.core.contract.EpochMillis
 import io.drivegrowth.core.contract.OwnedVehicle
 import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.contract.Revision
@@ -25,12 +28,19 @@ data class ActionPresentation(val enabled: Boolean, val explanation: String)
 data class CollectionPresentation(
     val entry: CollectionEntry,
     val name: String,
-    val unlockLabel: String?,
+    val unlockShopLevel: Int?,
+)
+data class HeldVehiclePresentation(
+    val vehicle: OwnedVehicle,
+    val modelName: String?,
+    val instanceLabel: String,
+    val deadline: EpochMillis,
 )
 data class GarageContent(
     val vehicles: List<VehiclePresentation>,
     val capacityLabel: String?,
     val sourceLabel: String,
+    val heldVehicles: ContractResult<List<HeldVehiclePresentation>> = ContractResult.Failure(ContractError.DATA_UNAVAILABLE),
 )
 sealed interface GarageScreenState {
     data object Loading : GarageScreenState
@@ -45,6 +55,7 @@ sealed interface CollectionScreenState {
 sealed interface GarageEvent {
     data class SelectVehicle(val id: OwnedVehicleId) : GarageEvent
     data object CloseDetail : GarageEvent
+    data object OpenHeldDeliveries : GarageEvent
     data object Retry : GarageEvent
     /** 실제 변경 명령이 아니라 효과·비용 확인을 여는 준비 요청이다. */
     data class RequestAction(val id: OwnedVehicleId, val revision: Revision, val action: VehicleAction) : GarageEvent
@@ -101,6 +112,13 @@ class GarageInteraction(private val onEvent: (GarageEvent) -> Unit) {
 
     /** 확인 취소·준비 결과·확정 결과를 받은 호스트가 명시적으로 해제한다. */
     fun completeRequest() { requestPending = false }
+
+    fun openHeldDeliveries(expected: GarageContent) {
+        val current = (state as? GarageScreenState.Content)?.data ?: return
+        val held = current.heldVehicles as? ContractResult.Success ?: return
+        if (controlsEnabled && selectedId == null && current === expected && held.value.isNotEmpty())
+            onEvent(GarageEvent.OpenHeldDeliveries)
+    }
 
     fun retry(): Boolean {
         if (!controlsEnabled || retryPending || state !is GarageScreenState.Error) return false

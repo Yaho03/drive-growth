@@ -47,6 +47,7 @@ internal data class DeliverySceneDetails(
     val purchase: Boolean,
     val expectedReward: GameMoney?,
     val confirmedReward: GameMoney? = null,
+    val confirmedBalance: GameMoney? = null,
 )
 
 internal data class DeliveryScene(val key: DeliverySceneKey, val kind: DeliverySceneKind, val details: DeliverySceneDetails)
@@ -151,7 +152,7 @@ internal class DeliveryPresentation(seenKeys: Set<DeliverySceneKey> = emptySet()
                 val reward = settlement?.transaction?.money?.takeIf { it.direction == MoneyDirection.CREDIT }?.amount ?: return null
                 val details = prior?.takeIf { it.active.offer is DeliveryOffer.Income }?.let(::details)
                     ?: DeliverySceneDetails(null, null, null, null, null, read.identity.source, purchase = false, expectedReward = null)
-                DeliveryScene(key, DeliverySceneKind.INCOME_ARRIVAL, details.copy(confirmedReward = reward))
+                DeliveryScene(key, DeliverySceneKind.INCOME_ARRIVAL, details.copy(confirmedReward = reward, confirmedBalance = settlement.balance))
             }
             is DeliveryOutcome.VehicleDelivered -> {
                 if (!matchesArrival(operation.requestId, read.identity.source, outcome.change, settlement)) return null

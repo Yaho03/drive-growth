@@ -2,52 +2,56 @@ package io.drivegrowth.app.ui.results
 
 import android.content.Context
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.StateListDrawable
+import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import io.drivegrowth.app.ui.pixel.PixelStyle
+import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
+import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
+import io.drivegrowth.app.ui.pixel.MapPanelStyle
 
 /** 정산의 목록과 상세에서 공용 픽셀 팔레트와 여백을 사용한다. */
 internal class ResultsStyle(private val context: Context) {
-    val base = PixelStyle.background
-    val panel = PixelStyle.panel
-    val inset = PixelStyle.inset
-    val ink = PixelStyle.text
-    val muted = PixelStyle.muted
-    val blue = PixelStyle.primary
-    val accent = PixelStyle.gold
+    private val hud = ReferenceHudStyle(context)
+    private val panels = MapPanelStyle(context)
+    val base = 0xfff5e3bd.toInt()
+    val ink get() = hud.signInk
+    val muted get() = panels.muted
+    val accent get() = panels.accent
+
+    fun surface(selected: Boolean = false) = hud.detailSurface(selected)
+    fun icon(icon: ReferenceHudIcon) = hud.icon(icon, 28)
+
     fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
     fun column() = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     fun row() = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-    fun shape(fill: Int, highlighted: Boolean = false) = GradientDrawable().apply {
-        setColor(fill)
-        cornerRadius = dp(PixelStyle.panelRadiusDp).toFloat()
-        setStroke(dp(if (highlighted) 2 else 1), if (highlighted) PixelStyle.focus else PixelStyle.outline)
-    }
-    fun text(value: CharSequence, size: Int = 20, color: Int = ink, bold: Boolean = false) = TextView(context).apply {
+    fun text(value: CharSequence, size: Int = 16, color: Int = ink, bold: Boolean = false) = TextView(context).apply {
         text = value; textSize = size.toFloat(); setTextColor(color)
         if (bold) setTypeface(typeface, Typeface.BOLD)
-        setPadding(0, dp(4), 0, dp(4))
+        setPadding(0, dp(2), 0, dp(2))
     }
-    fun card(selected: Boolean = false) = column().apply {
-        background = shape(panel, selected)
-        val padding = dp(PixelStyle.panelPaddingDp)
+    fun card(selected: Boolean = false, inset: Boolean = false, paddingDp: Int = 18) = column().apply {
+        background = if (selected || inset) surface(selected) else hud.signSurface()
+        val padding = dp(paddingDp)
         setPadding(padding, padding, padding, padding)
     }
+    fun chip(value: String) = text(value, 15, bold = true).apply {
+        gravity = Gravity.CENTER
+        minHeight = dp(32)
+        background = surface()
+        setPadding(dp(12), dp(2), dp(12), dp(2))
+    }
     fun button(label: String, enabled: Boolean = true, primary: Boolean = false, action: () -> Unit) = Button(context).apply {
-        text = label; textSize = 24f; isAllCaps = false; isEnabled = enabled
+        text = label; textSize = 18f; isAllCaps = false; isEnabled = enabled
+        setTypeface(typeface, Typeface.BOLD)
         setTextColor(if (enabled) ink else muted)
-        val fill = if (primary && enabled) blue else inset
-        background = StateListDrawable().apply {
-            addState(intArrayOf(android.R.attr.state_focused), shape(fill, highlighted = true))
-            addState(intArrayOf(), shape(fill))
-        }
-        minHeight = dp(64); minimumHeight = dp(64)
-        setPadding(dp(16), dp(12), dp(16), dp(12))
+        backgroundTintList = null
+        background = hud.signButton(primary)
+        minHeight = dp(52); minimumHeight = dp(52)
+        setPadding(dp(16), dp(8), dp(16), dp(8))
         setOnClickListener { if (isEnabled) action() }
     }
     fun add(parent: LinearLayout, child: View, gap: Int = PixelStyle.gapDp) {

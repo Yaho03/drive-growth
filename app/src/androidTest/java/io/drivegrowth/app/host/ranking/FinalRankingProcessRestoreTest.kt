@@ -145,15 +145,15 @@ class FinalRankingProcessRestoreTest :
             tab.isShown && tab.isEnabled && (tab.isSelected || tab.performClick())
         }
         awaitUi("같은 모의 프로필의 내 기록 조회") { ranking()?.let { view ->
-            texts(view).any { it.startsWith("모의 입력 기록 · 기준 ") }
+            texts(view).any { it.startsWith("조회 기준 ") }
         } == true }
         val mine = onUi {
             val view = checkNotNull(ranking())
             assertEquals(RankingMode.MY_RECORD, view.uiState.mode)
             checkNoPrivateIds(view, privateIds)
             val lines = texts(view)
-            assertTrue(lines.any { it.startsWith("모의 입력 기록 · 기준 ") && it.endsWith(" 한국시간") })
-            assertFalse(lines.any { it.startsWith("차량 입력 기록") || it.startsWith("확인 불가 ·") || it.startsWith("조회 실패 ·") })
+            assertTrue(lines.any { it.startsWith("조회 기준 ") && it.endsWith(" 한국시간") })
+            assertFalse(lines.any { it.contains("입력 기록") || it.startsWith("확인 불가 ·") || it.startsWith("조회 실패 ·") })
             assertMetric(lines, RankingMetric.SHOP_LEVEL, "1 레벨")
             assertMetric(lines, RankingMetric.COLLECTION, "1 칸")
             assertMetric(lines, RankingMetric.OWNED, "1 대")
@@ -164,7 +164,7 @@ class FinalRankingProcessRestoreTest :
             assertFalse(lines.any { it.contains("예시 가게") })
             lines
         }
-        click("시연 랭킹 열기", activityRoot) { it.text.toString() == "시연용 랭킹 (예시 데이터)" }
+        click("시연 랭킹 열기", activityRoot) { it.text.toString() == "예시 랭킹" }
         click("시연 누적 수익 선택", activityRoot) { it.text.toString() == RankingMetric.EARNED.title }
         val demo = onUi {
             val view = checkNotNull(ranking())
@@ -172,8 +172,8 @@ class FinalRankingProcessRestoreTest :
             assertEquals(RankingMetric.EARNED, view.uiState.metric)
             checkNoPrivateIds(view, privateIds)
             val lines = texts(view)
-            assertTrue(lines.contains("시연용 랭킹 (예시 데이터)"))
-            assertFalse(lines.any { it.startsWith("모의 입력 기록 ·") || it.startsWith("차량 입력 기록") || it == "100 게임머니" })
+            assertTrue(lines.contains("예시 랭킹"))
+            assertFalse(lines.any { it.startsWith("조회 기준 ") || it == "100 게임머니" })
             assertEquals(listOf("1위 · 예시 가게 A", "2위 · 예시 가게 B", "2위 · 예시 가게 C", "4위 · 예시 가게 D"),
                 lines.filter { "위 · " in it })
             for ((row, value) in listOf("1위 · 예시 가게 A" to "12500 게임머니", "2위 · 예시 가게 B" to "8500 게임머니",

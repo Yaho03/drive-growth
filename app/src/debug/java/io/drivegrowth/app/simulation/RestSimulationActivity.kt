@@ -13,6 +13,7 @@ import io.drivegrowth.app.host.progression.readStoredRestProgression
 import io.drivegrowth.app.simulation.RestSimulationWorkflow.Action
 import io.drivegrowth.app.simulation.RestSimulationWorkflow.Screen
 import io.drivegrowth.app.ui.garage.GarageStyle
+import io.drivegrowth.app.ui.presentation.PrototypeAudio
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.FirstGrant
 import java.math.BigDecimal
@@ -27,9 +28,13 @@ class RestSimulationActivity : Activity() {
         .apply { tag = "rest-simulation:run" } }
     private val remaining by lazy { style.text("", 22) }
     private var nextAction = Action.START
+    private lateinit var audio: PrototypeAudio
+    private var resumed = false
+    private var simulatedRest = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        audio = PrototypeAudio(applicationContext).also { it.setScene(PrototypeAudio.Scene.REST) }
         setContentView(style.scroll(style.column().apply {
             setBackgroundColor(style.base)
             addView(style.text(RestSimulationScenario.label, 22))
@@ -45,6 +50,32 @@ class RestSimulationActivity : Activity() {
     @Suppress("DEPRECATION")
     override fun onBackPressed() = leaveDemo()
 
+    override fun onResume() {
+        super.onResume()
+        resumed = true
+        updateRestAudio()
+    }
+
+    override fun onPause() {
+        resumed = false
+        updateRestAudio()
+        super.onPause()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (::audio.isInitialized) updateRestAudio()
+    }
+
+    override fun onDestroy() {
+        audio.close()
+        super.onDestroy()
+    }
+
+    private fun updateRestAudio() {
+        audio.setPresentationAllowed(simulatedRest && resumed && hasWindowFocus() && !isFinishing)
+    }
+
     override fun onStop() {
         if (!isChangingConfigurations) pauseRequested = true
         super.onStop()
@@ -52,10 +83,14 @@ class RestSimulationActivity : Activity() {
 
     private fun leaveDemo() {
         pauseRequested = true
+        simulatedRest = false
+        updateRestAudio()
         finish()
     }
 
     private fun load(action: Action) {
+        simulatedRest = false
+        updateRestAudio()
         if (action != Action.READ) pauseRequested = false
         start.isEnabled = false
         status.text = if (action == Action.READ) "시연 원장을 확인 중입니다." else "휴식 시연을 처리 중입니다."
@@ -77,15 +112,21 @@ class RestSimulationActivity : Activity() {
                 canContinue = { !pauseRequested },
                 onPhase = { phase ->
                     runOnUiThread {
-                        if (!isDestroyed && !isFinishing) status.text = when (phase) {
-                            RestSimulationScenario.Phase.DRIVE -> "논리 주행을 기록 중입니다."
-                            RestSimulationScenario.Phase.REST -> "시험 장소의 정차 시간을 기록 중입니다."
-                            RestSimulationScenario.Phase.DEPARTURE -> "시험 장소 출발과 다음 주행을 정산 중입니다."
+                        if (!isDestroyed && !isFinishing) {
+                            simulatedRest = phase == RestSimulationScenario.Phase.REST
+                            updateRestAudio()
+                            status.text = when (phase) {
+                                RestSimulationScenario.Phase.DRIVE -> "논리 주행을 기록 중입니다."
+                                RestSimulationScenario.Phase.REST -> "시험 장소의 정차 시간을 기록 중입니다."
+                                RestSimulationScenario.Phase.DEPARTURE -> "시험 장소 출발과 다음 주행을 정산 중입니다."
+                            }
                         }
                     }
                 })
             runOnUiThread {
                 if (isDestroyed || isFinishing) return@runOnUiThread
+                simulatedRest = false
+                updateRestAudio()
                 when (result) {
                     is Screen.Failure -> {
                         nextAction = result.next

@@ -26,6 +26,14 @@ class OnboardingViewTest : InstrumentationTestCase() {
     private fun button(view: View, text: String) = all(view).filterIsInstance<Button>().first { it.text.toString() == text }
     private fun texts(view: View) = all(view).filterIsInstance<TextView>().map { it.text.toString() }
 
+    fun testIntroKeepsFixtureNoticeWithoutRepeatingSimulationProfileLabel() = onUi {
+        val view = OnboardingView(instrumentation.targetContext) {}
+        view.render(OnboardingPreviewStates.intro.copy(sourceLabel = "모의 입력 프로필"), true)
+        assertFalse(texts(view).any { it == "시연 모드" || it == "모의 입력 프로필" })
+        view.render(OnboardingPreviewStates.intro, true)
+        assertTrue(texts(view).contains(OnboardingPreviewStates.SOURCE))
+    }
+
     fun testPrimaryActionsRemainVisibleInShortAndNarrowWindows() = onUi {
         val context = instrumentation.targetContext
         val density = context.resources.displayMetrics.density

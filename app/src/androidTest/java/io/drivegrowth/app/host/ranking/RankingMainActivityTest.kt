@@ -39,7 +39,7 @@ class RankingMainActivityTest : ActivityInstrumentationTestCase2<MainActivity>(M
         })
         val before=balanceAndVehicles()
         instrumentation.runOnMainSync{assertEquals(RankingMode.MY_RECORD,ranking(first)!!.uiState.mode)}
-        click(first,"시연용 랭킹 (예시 데이터)");click(first,RankingMetric.WEEKLY_DISTANCE.title)
+        click(first,"예시 랭킹");click(first,RankingMetric.WEEKLY_DISTANCE.title)
         val monitor=instrumentation.addMonitor(MainActivity::class.java.name,null,false)
         var next:MainActivity?=null
         try {

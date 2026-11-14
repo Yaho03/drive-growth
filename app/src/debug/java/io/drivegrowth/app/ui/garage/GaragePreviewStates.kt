@@ -53,7 +53,7 @@ object GaragePreviewStates {
                 Rarity.COMMON -> CollectionState.OWNED
                 Rarity.ADVANCED -> CollectionState.DISCOVERED
                 else -> CollectionState.UNDISCOVERED
-            }), name, if (index < 8) "해금됨 · 고정 시험값" else "잠김 · 해금 조건 확인 필요",
+            }), name, unlockShopLevel = index / 5 + 1,
         ) }
     }, "고정 시험 데이터 · 과거 보유 포함 · 실제 기록 아님")
     val emptyCollection = CollectionScreenState.Content(emptyList(), "고정 시험 데이터")

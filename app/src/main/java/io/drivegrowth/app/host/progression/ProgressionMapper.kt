@@ -27,7 +27,7 @@ class ProgressionMapper {
         if (pendingAchievement != null) {
             val milestone = pendingAchievement.command.milestone
             val entry = achievementItem(AchievementProgress(milestone.definition, milestone.measure, milestone), null, false)
-            entries[entry.key] = entry.copy(status = RewardStatus.PENDING, note = "저장된 업적 청구의 원결과를 확인하고 있습니다.")
+            entries[entry.key] = entry.copy(status = RewardStatus.PENDING, note = "이전 업적 보상 결과를 확인하고 있어요.")
         }
         read.resolvedAchievements.forEach { (reference, receipt) ->
             if (receipt != null) {
@@ -38,23 +38,23 @@ class ProgressionMapper {
                 val old = entries[reference.key] ?: previous[reference.key]
                 entries[reference.key] = if (old?.status == RewardStatus.CLAIMED) old else
                     ProgressItem(reference.key, ProgressGroup.ACHIEVEMENT, 0, "이전 업적 청구", null, null, null,
-                        RewardStatus.FAILED, "원장에 확정된 이전 업적 청구가 없습니다.")
+                        RewardStatus.FAILED, "이전 업적 보상 청구의 확정 결과가 없어요.")
             }
         }
         val pending = read.journal as? ProgressionJournalState.Quest
         if (pending != null) {
             val c = pending.command; val key = progressKey(c.definition, c.period)
             entries[key] = item(QuestProgress(c.profileId, c.source, c.definition, c.period, null, null, QuestStatus.UNKNOWN), null, false)
-                .copy(status = RewardStatus.PENDING, note = "저장된 전체 청구 명령을 원장에서 확인·복구하고 있습니다.")
+                .copy(status = RewardStatus.PENDING, note = "이전 퀘스트 보상 결과를 확인하고 있어요.")
         }
         read.resolved.forEach { (reference, receipt) ->
             if (receipt != null) entries[progressKey(receipt.progress)] = item(receipt.progress.copy(status = QuestStatus.CLAIMED), null, false)
             else if (entries[reference.key]?.status != RewardStatus.CLAIMED) {
                 val current = entries[reference.key] ?: previous[reference.key]?.takeIf { it.status == RewardStatus.CLAIMED }
                 if (current?.status == RewardStatus.CLAIMED) { entries[reference.key] = current; return@forEach }
-                entries[reference.key] = current?.copy(status = RewardStatus.FAILED, note = "원장에 확정된 이전 청구 기록이 없습니다. 현재 조건으로 다시 요청할 수 있습니다.")
+                entries[reference.key] = current?.copy(status = RewardStatus.FAILED, note = "이전 보상 청구의 확정 결과가 없어요. 현재 조건으로 다시 요청할 수 있어요.")
                     ?: ProgressItem(reference.key, ProgressGroup.DAILY, 0, "이전 퀘스트 청구", null, null, null,
-                        RewardStatus.FAILED, "원장 조회로 이전 청구의 확정 기록이 없음을 확인했습니다.")
+                        RewardStatus.FAILED, "이전 보상 청구의 확정 결과가 없어요.")
             }
         }
         return screen(read.identity.source, entries.values.toList(), read.rest)
@@ -112,14 +112,13 @@ class ProgressionMapper {
             ClaimOffer(it.requestId.value, allowClaim, if (allowClaim) null else "다른 미확정 청구를 먼저 확인해 주세요.")
         }
         return ProgressItem(achievementKey(definition.metric), ProgressGroup.ACHIEVEMENT, 0, title, label,
-            ratio, "${definition.reward.units} 게임머니", status,
-            if (definition.trial) "조정 가능한 시험 정의 · ${definition.version.value}" else definition.version.value, claim)
+            ratio, "${definition.reward.units} 게임머니", status, claim = claim)
     }
 
     private fun screen(source: InputSource, entries: List<ProgressItem>,
         rest: ContractResult<RestDrivingProjection>?): ProgressScreenState.Content {
         val unsupported = ProgressItem(ProgressKey("unsupported-achievements", "unavailable"), ProgressGroup.ACHIEVEMENT, 0,
-            "업적 조회", null, null, null, RewardStatus.UNSUPPORTED, "실제 업적 조회 연결 미지원")
+            "업적 조회", null, null, null, RewardStatus.UNSUPPORTED, "이 화면에서는 업적을 볼 수 없어요.")
         val displayed = (if (entries.any { it.group == ProgressGroup.ACHIEVEMENT }) entries else entries + unsupported).map { value ->
             val signature = value.copy(revision = 0)
             val last = revisions[value.key] ?: -1
@@ -128,29 +127,29 @@ class ProgressionMapper {
             value.copy(revision = revision)
         }
         return ProgressScreenState.Content(++sequence, Collections.unmodifiableList(displayed),
-            if (source == InputSource.VEHICLE) "차량 입력 프로필 · 원장 기록" else "모의 입력 프로필 · 원장 기록",
-            "Quest 정의에 명시된 기간·시간대 기준", restPresentation(source, rest), "채택 이벤트 조회 연결 미지원")
+            if (source == InputSource.VEHICLE) "차량 입력" else "시연 모드",
+            "각 퀘스트에서 시작일과 시간대를 확인할 수 있어요.", restPresentation(source, rest), "이 화면에서는 이벤트를 볼 수 없어요.")
     }
 
     private fun restPresentation(source: InputSource, read: ContractResult<RestDrivingProjection>?): RestPresentation =
         when (read) {
-            null -> RestPresentation(null, BuffPhase.UNSUPPORTED, note = "휴식 원장 조회 연결 미지원")
+            null -> RestPresentation(null, BuffPhase.UNSUPPORTED, note = "이 화면에서는 휴식 기록을 볼 수 없어요.")
             is ContractResult.Failure -> RestPresentation(null, BuffPhase.UNCONFIRMED, note = when (read.error) {
                 ContractError.DATA_UNAVAILABLE -> "확인 가능한 휴식 기록이 없습니다."
                 ContractError.STORAGE_FAILURE -> "저장된 휴식 상태를 읽지 못했습니다."
-                else -> "휴식 상태를 확인하지 못했습니다. (${read.error})"
+                else -> "휴식 상태를 확인하지 못했어요."
             })
             is ContractResult.Success -> {
                 val stored = read.value
                 when {
-                    stored.pendingDrives != 0 -> RestPresentation(null, BuffPhase.UNCONFIRMED, note = "휴식 원장의 확정을 기다리고 있습니다.")
-                    stored.confirmedDrives == 0L -> RestPresentation(null, BuffPhase.UNCONFIRMED, note = "확정된 휴식 원장 기록이 없습니다.")
+                    stored.pendingDrives != 0 -> RestPresentation(null, BuffPhase.UNCONFIRMED, note = "휴식 결과를 확인하고 있어요.")
+                    stored.confirmedDrives == 0L -> RestPresentation(null, BuffPhase.UNCONFIRMED, note = "확정된 휴식 기록이 없어요.")
                     else -> {
                         val confirmed = stored.confirmed
                         val remaining = BigDecimal.valueOf(confirmed.remainingMs, 3).stripTrailingZeros().toPlainString()
                         RestPresentation(null, if (confirmed.isActive) BuffPhase.ACTIVE else BuffPhase.INACTIVE,
-                            remainingLabel = "원장 잔여 ${remaining}초",
-                            note = if (source == InputSource.SIMULATION) "모의 입력 · 저장된 확정 상태" else "차량 입력 · 저장된 확정 상태")
+                            remainingLabel = "보너스 남은 시간 ${remaining}초",
+                            note = if (source == InputSource.SIMULATION) "모의 입력" else "차량 입력")
                     }
                 }
             }
@@ -171,13 +170,13 @@ class ProgressionMapper {
             QuestAction.VEHICLE_LEVEL_UP -> "차량 레벨 올리기"
             QuestAction.RENTAL_COMPLETED -> "영업 완료하기"
         }
-        val note = if (!known) "기간 또는 사건 기록 완전성 확인 대기 · 조작 불가"
-            else "${p.period.start} · ${p.period.zone.id}${if (p.definition.trial) " · 조정 가능한 시험 정의" else ""}"
+        val note = if (!known) "퀘스트 기간이나 활동 기록을 아직 확인할 수 없어요."
+            else "시작일 ${p.period.start} · ${p.period.zone.id}"
         return ProgressItem(progressKey(p), if (p.definition.cadence == QuestCadence.DAILY) ProgressGroup.DAILY else ProgressGroup.WEEKLY,
             0, action, if (known) "${p.count} / ${p.definition.goal}회" else "진행 확인 불가", percent,
             "${p.definition.reward.units} 게임머니", status, note,
             command?.takeIf { known && p.status == QuestStatus.CLAIMABLE }?.let {
-                ClaimOffer(it.requestId.value, allowClaim, if (allowClaim) null else "공통 청구 저장 연결 또는 다른 미확정 요청을 확인해 주세요.")
+                ClaimOffer(it.requestId.value, allowClaim, if (allowClaim) null else "지금은 보상을 받을 수 없어요. 확인 중인 요청이 있다면 결과를 먼저 확인해 주세요.")
             })
     }
 }

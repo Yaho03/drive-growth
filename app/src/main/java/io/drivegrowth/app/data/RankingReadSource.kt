@@ -44,7 +44,7 @@ class RankingReadSource(private val store: SqliteGameChangeStore, private val so
                 it.integer(0,1,Int.MAX_VALUE.toLong())
             }
             if(level.toInt()!=shop.progress.shopLevel) throw SQLiteException("가게 레벨 불일치")
-            RankingValue.Available(level.toBigDecimal(),"현재 같은 원장의 가게 레벨")
+            RankingValue.Available(level.toBigDecimal(),"현재 가게 레벨")
         }
         values[RankingMetric.OWNED] = historyValue { RankingAggregation.owned(it) }
         values[RankingMetric.HIGHEST_VALUE] = historyValue { RankingAggregation.highest(it,content.vehicles.associate { c->c.vehicleId to c.price }) }

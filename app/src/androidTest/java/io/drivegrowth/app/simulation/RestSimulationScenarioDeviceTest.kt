@@ -71,8 +71,8 @@ class RestSimulationScenarioDeviceTest : InstrumentationTestCase() {
             assertEquals(1_100_000L, projection.confirmed.remainingMs)
             val screen = ProgressionMapper().content(read)
             assertEquals(BuffPhase.ACTIVE, screen.rest?.buffPhase)
-            assertEquals("원장 잔여 1100초", screen.rest?.remainingLabel)
-            assertTrue(screen.sourceLabel.contains("모의 입력"))
+            assertEquals("보너스 남은 시간 1100초", screen.rest?.remainingLabel)
+            assertEquals("시연 모드", screen.sourceLabel)
             val questUnavailable = GameSessionFactory(context, mapOf(InputSource.SIMULATION to name),
                 InputSource.SIMULATION, { ContractResult.Failure(ContractError.POLICY_UNRESOLVED) })
             val blocked = FactoryProgressionSource(questUnavailable, now, ::readStoredRestProgression).read(emptySet())
@@ -87,7 +87,7 @@ class RestSimulationScenarioDeviceTest : InstrumentationTestCase() {
                 labels = texts(view)
             }
             assertTrue(labels.any { it.contains("SIMULATION") && it.contains("시험 장소") })
-            assertTrue(labels.contains("원장 잔여 1100초"))
+            assertTrue(labels.contains("보너스 남은 시간 1100초"))
 
             assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT), RestSimulationScenario.run(reopened))
             ok(reopened.open()).use { game ->

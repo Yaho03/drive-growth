@@ -22,7 +22,7 @@
     <string name="progress_confirm_body">아래는 청구 예정 보상이에요. 수령 결과가 확인되기 전에는 지급 완료가 아니에요.</string>
     <string name="progress_claim">보상 청구 요청</string>
     <string name="progress_no_claim">청구할 수 없어요</string>
-    <string name="progress_claim_unconnected">청구 연결 또는 허용 정보를 확인할 수 없어요.</string>
+    <string name="progress_claim_unconnected">지금 보상을 받을 수 있는지 확인할 수 없어요.</string>
     <string name="progress_pending">청구 결과 확인 중</string>
     <string name="progress_pending_body">요청한 보상의 확정 결과를 기다리고 있어요. 다시 청구하지 않아요.</string>
     <string name="progress_close">목록으로</string>
@@ -47,8 +47,8 @@
     <string name="progress_buff_ready">다음 출발 적용 대기</string>
     <string name="progress_buff_active">저장된 활성 버프</string>
     <string name="progress_buff_unconfirmed">버프 적용 여부 확인 불가</string>
-    <string name="progress_buff_unsupported">버프 연결 미지원</string>
-    <string name="progress_rest_note">휴식 중에는 시간이 소모되지 않아요. 이 화면은 출발을 요청하거나 알림을 보내지 않아요.</string>
+    <string name="progress_buff_unsupported">이 화면에서는 휴식 보너스를 확인할 수 없어요.</string>
+    <string name="progress_rest_note">휴식 중에는 보너스 시간이 줄지 않아요.</string>
     <string name="progress_condition_yes">충족 · %1$s</string>
     <string name="progress_condition_no">미충족 · %1$s</string>
     <string name="progress_condition_unknown">확인 불가 · %1$s</string>

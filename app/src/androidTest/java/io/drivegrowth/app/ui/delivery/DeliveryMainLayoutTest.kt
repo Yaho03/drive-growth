@@ -62,7 +62,6 @@ class DeliveryMainLayoutTest :
         await("시연 목적지 확인 전 Main의 최초 탁송 조회 완료") {
             if (laidOutButton(root, "delivery:destination")?.isEnabled != true) return@await false
             val confirm = laidOutButton(root, "simulation:destination")?.takeIf { it.isEnabled } ?: return@await false
-            scrollIntoView(confirm)
             assertTrue("시연 목적지 확인 버튼 전체 표시", fullyVisible(confirm))
             assertFalse("확인 전 시연 목적지", simulation.getBoolean("destinationConfirmed", false))
             val revision = simulation.getLong("destinationRevision", 0)
@@ -73,6 +72,10 @@ class DeliveryMainLayoutTest :
             true
         }
 
+        await("구매 탭 열기") {
+            val tab = laidOutButton(root, "delivery:tab:purchase") ?: return@await false
+            tab.isSelected || tab.performClick()
+        }
         await("시연 목적지 확인 저장 뒤 구매 후보 표시") {
             views(root).filterIsInstance<TextView>().any { it.text.toString().startsWith("구매 결제 예정") }
         }
@@ -87,15 +90,11 @@ class DeliveryMainLayoutTest :
         awaitDiscovery(factory, offer)
         val detailsTag = "delivery:offer:${offer.id.value}"
         await("현재 구매 카드의 배치") {
-            val details = laidOutButton(root, detailsTag) ?: return@await false
-            val parent = details.parent as ViewGroup
-            val card = parent.getChildAt(parent.indexOfChild(details) - 1) as ViewGroup
+            if (laidOutButton(root, detailsTag) == null) return@await false
+            val card = root.findViewWithTag<View>("delivery:offer-card:${offer.id.value}") ?: return@await false
             val labels = views(card).filterIsInstance<TextView>().toList()
             if (!isLaidOutIn(root, card) || labels.any { !isLaidOutIn(root, it) }) return@await false
-
-            assertEquals("후보 유형·이름·희귀도·가격·안내", 5, labels.size)
-            val fields = labels.subList(1, 4)
-            assertEquals(expectedFields, fields.map { it.text.toString() })
+            val fields = expectedFields.map { field -> labels.single { it.text.toString() == field } }
             val scroll = scrollIntoView(fields.first())
             assertTrue("구매 카드 3필드 동시 가시성: 뷰포트 ${scroll.height}px, " +
                 "차종·희귀도·가격이 온전히 보여야 한다", fields.all(::fullyVisible))
@@ -108,11 +107,13 @@ class DeliveryMainLayoutTest :
             val confirm = laidOutButton(root, "delivery:confirm") ?: return@await false
             val parent = close.parent as ViewGroup
             assertSame("확인 버튼은 현재 상세 본문에 있어야 한다", parent, confirm.parent)
-            val card = parent.getChildAt(parent.indexOfChild(close) + 1) as ViewGroup
-            if (!isLaidOutIn(root, card)) return@await false
-            val labels = views(card).filterIsInstance<TextView>().map { it.text.toString() }.toList()
-            assertEquals("구매 상세의 유형·이름·희귀도·가격·안내", 5, labels.size)
-            assertEquals("탭한 구매 후보의 차종·희귀도·결제 예정 금액", expectedFields, labels.subList(1, 4))
+            val card = root.findViewWithTag<View>("delivery:review-vehicle") ?: return@await false
+            val facts = root.findViewWithTag<View>("delivery:review-facts") ?: return@await false
+            if (!isLaidOutIn(root, card) || !isLaidOutIn(root, facts)) return@await false
+            val labels = views(card).filterIsInstance<TextView>()
+            val fields = expectedFields.map { field -> labels.single { it.text.toString() == field } }
+            assertTrue("기본 가로 창에서 확정 조건과 버튼이 함께 보여야 한다",
+                (fields + listOf(facts, close, confirm)).all(::fullyVisible))
             main.onBackPressed()
             true
         }

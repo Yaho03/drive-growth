@@ -57,13 +57,37 @@ class MapVehicleDetailViewTest : InstrumentationTestCase() {
 
         layout(view, 1000, 340)
         assertEquals(dp(view, 1000) - dp(view, 12), panel.right)
-        assertEquals(dp(view, 360), panel.width)
-        assertTrue(panel.height <= dp(view, 340) - 2 * dp(view, 12))
+        assertEquals(dp(view, 1000) / 2 - dp(view, 12), panel.width)
+        assertEquals(dp(view, 340) - 2 * dp(view, 12), panel.height)
         view.findViewWithTag<Button>("map:vehicle-manage").performClick()
         layout(view, 320, 360)
         val scroll = view.findViewWithTag<ScrollView>("map:vehicle-detail-scroll")
         assertTrue(scroll.getChildAt(0).height > scroll.height)
         assertTrue(view.findViewWithTag<Button>("map:vehicle-close").bottom <= panel.height)
+    }
+
+    fun testSummaryKeepsKnownAndMissingFactsReadOnlyInTheNarrowPanel() = onUi {
+        val view = MapVehicleDetailView(instrumentation.targetContext) { fail("요약에서 차량 관리 요청 발생") }
+        val state = GaragePreviewStates.normal
+        val selected = state.data.vehicles.first().copy(accidentLabel = null, modelPriceLabel = null)
+        view.render(state.copy(data = state.data.copy(vehicles = listOf(selected))),
+            selected.vehicle.ownedVehicleId, controlsEnabled = true, actionsBlocked = false)
+        layout(view, 320, 360)
+
+        val labels = texts(view)
+        assertTrue(labels.any { it.startsWith("취득 기준액 · ") })
+        assertTrue(labels.contains("게임 내 사고 이력 확인 불가"))
+        assertTrue(labels.contains("게임 차종 가격 확인 불가"))
+        for (tag in listOf("map:vehicle-artwork", "map:vehicle-exp")) {
+            val info = view.findViewWithTag<View>(tag)
+            assertNotNull(info)
+            assertTrue(info.width > 0 && info.height > 0)
+            assertFalse(info.isClickable)
+            assertFalse(info.isFocusable)
+        }
+        val close = view.findViewWithTag<Button>("map:vehicle-close")
+        val panel = view.findViewWithTag<View>("map:vehicle-detail")
+        assertTrue(close.bottom <= panel.height)
     }
 
     fun testCloseAndManageAreEntirelyVisibleInAttachedCompactPanel() {
@@ -112,7 +136,8 @@ class MapVehicleDetailViewTest : InstrumentationTestCase() {
         previous.performClick()
         assertTrue(events.isEmpty())
         assertTrue(texts(view).contains("수리 필요"))
-        assertTrue(texts(view).contains("레벨 진행량 · 75%"))
+        assertTrue(texts(view).contains("75%"))
+        assertTrue(hasContentDescription(view, "레벨 진행량 · 75%"))
 
         view.findViewWithTag<Button>("map:vehicle-manage").performClick()
         val repair = view.findViewWithTag<Button>(VehicleAction.REPAIR)
@@ -191,6 +216,10 @@ class MapVehicleDetailViewTest : InstrumentationTestCase() {
             View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.EXACTLY))
         view.layout(0, 0, widthPx, heightPx)
     }
+
+    private fun hasContentDescription(view: View, label: String): Boolean =
+        view.contentDescription?.toString() == label ||
+            (view is ViewGroup && (0 until view.childCount).any { hasContentDescription(view.getChildAt(it), label) })
 
     private fun texts(view: View): List<String> = when (view) {
         is TextView -> listOf(view.text.toString())

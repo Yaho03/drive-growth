@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rest_scene_description">비 오는 휴게소에 세운 트럭 운전석의 담요와 잠자는 모습</string>
+    <string name="rest_scene_preview">휴게소 연출 미리보기</string>
+    <string name="rest_scene_preview_note">연출 미리보기 · 휴식과 보너스는 게임에서 확인해요.</string>
+    <string name="rest_scene_close">닫기</string>
+    <string name="rest_scene_skip">건너뛰기</string>
+</resources>

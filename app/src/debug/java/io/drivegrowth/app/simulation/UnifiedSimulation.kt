@@ -7,10 +7,14 @@ import android.util.Log
 import io.drivegrowth.app.data.*
 import io.drivegrowth.app.host.*
 import io.drivegrowth.app.host.driving.*
+import io.drivegrowth.app.host.rest.RestAreaProof
 import io.drivegrowth.app.runtime.rental.RentalClock
 import io.drivegrowth.app.runtime.rental.RentalRuntimeSnapshot
 import io.drivegrowth.app.runtime.rental.product.*
+import io.drivegrowth.app.ui.rest.RestAreaScene
+import io.drivegrowth.core.Gear
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.driving.RestPlace
 import java.util.concurrent.Executor
 import kotlin.random.Random
 
@@ -36,6 +40,15 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
     private var accept: ((DrivingFrame, () -> Unit) -> Unit)? = null
     private var generation = 0L
     private var inFlight = false
+    @Volatile private var emittedFrame: DrivingFrame? = null
+    private var restParking: RestParking? = null
+    private var restValidatedForAttachment = false
+    private var restPresentationFocused = false
+    private var pendingRestAdvance: SimulationTimeline? = null
+    private var lastRestMotion: VehicleObservation? = null
+    private val requiredParkingMs by lazy {
+        (AssetTrialDefinitionProvider(context.assets).load() as? ContractResult.Success)?.value?.rest?.minParkedMs
+    }
     private var completedTerminal: SimulationTimeline? = null
     @Volatile private var failure: String? = when {
         progress == null -> "진행 기록을 읽지 못했습니다. 기존 원장은 보존합니다."
@@ -49,6 +62,24 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
     override var changed: (() -> Unit)? = null
     override val policy = RecordingPolicy(60_000, 60_000, 1000, 3000, 0.1, 0.5)
     override val controlsAllowed get() = failure == null && !inFlight && progress?.controlsAllowed == true
+    override val parkedRestScene: RestAreaScene.Parked?
+        get() = restParking?.takeIf { cached -> restValidatedForAttachment && failure == null && progress?.let {
+            it.inRestArea && (inFlight || it.elapsedMs == cached.proof.elapsedMs)
+        } == true }?.scene
+    override fun takeRestArrival(stopId: String): Boolean {
+        val current = restParking ?: return false
+        if (current.scene.stopId != stopId || !current.animateArrival ||
+            current.scene.phase != RestAreaScene.Phase.ARRIVED) return false
+        restParking = current.copy(animateArrival = false)
+        return true
+    }
+    override fun setRestPresentationFocused(focused: Boolean) {
+        restPresentationFocused = focused
+        if (!focused) return
+        val pending = pendingRestAdvance ?: return
+        pendingRestAdvance = null
+        advanceAfter(pending, generation)
+    }
     override val canRetry get() = progress != null && failure != null && !inFlight && !lostRestInput
     override val inputState: SimulationInputState
         get() = when {
@@ -57,11 +88,12 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
             accept != null && (inFlight || progress?.controlsAllowed == false) -> SimulationInputState.PROCESSING
             else -> SimulationInputState.READY
         }
-    override val status get() = "SIMULATION · 실제 SDK/차량 입력 아님\n" + (failure ?: notice ?: progress?.let {
-        val step = "논리 UTC ${java.time.Instant.ofEpochMilli(it.clock.epoch.value)} · 단계 ${it.stage}"
-        if (it.restRun) "$step/72\n모의 휴식 시험 장소 · 논리 주행·주차·출발"
-        else "$step/65\n모의 1시간 이동·명시 도착·연속 주차 / 시연 고객: 보유차량·1시간·무사고"
-    }.orEmpty())
+    override val status get() = failure ?: notice ?: when (inputState) {
+        SimulationInputState.PROCESSING -> "모의주행을 진행하고 있어요."
+        SimulationInputState.UNAVAILABLE -> "모의 입력을 확인할 수 없어요."
+        SimulationInputState.RETRYABLE_FAILURE -> "진행을 멈췄어요. 다시 시도해 주세요."
+        SimulationInputState.READY -> if (progress?.terminal == true) "모의주행을 마쳤어요." else "모의주행을 시작할 수 있어요."
+    }
     override fun clock(): ContractResult<RentalClock> = progress?.let { ContractResult.Success(it.clock) }
         ?: ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
     override fun navigation(games: GameSessionFactory, main: Executor): HostDeliveryNavigation {
@@ -122,7 +154,46 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
         }
     }
 
-    private fun failed(error: ContractError) { android.util.Log.w("DriveGrowthSimulation", "simulation_input_deferred code=$error stage=${progress?.stage}"); failure = "모의 입력 처리 보류 ($error). 같은 단계·시각을 보존합니다." }
+    override fun restInputRecorded(frame: DrivingFrame, recorded: DrivingRecordingResult) {
+        val current = progress ?: return
+        if (!current.restRun || emittedFrame !== frame || recorded.waiting != null || recorded.state.anchor != frame.observation) return
+        val proof = (restSample(frame)?.area as? Observation.Available)?.value
+        val required = requiredParkingMs
+        handler.post {
+            if (emittedFrame !== frame || accept == null || failure != null) return@post
+            updateRestParking(frame.observation, proof, required)
+        }
+    }
+
+    private data class RestParking(val scene: RestAreaScene.Parked, val proof: RestAreaProof,
+        val beganAt: Long, val animateArrival: Boolean)
+
+    private fun updateRestParking(raw: VehicleObservation, area: RestAreaProof?, required: Long?) {
+        val speed = (raw.speedMps as? Observation.Available)?.value
+        val moving = raw.gear == Observation.Available(Gear.DRIVE) &&
+            raw.uxRestricted is Observation.Available && speed != null && speed.isFinite() && speed >= policy.movingMps
+        val fromDrive = lastRestMotion?.let { raw.receivedElapsedMs - it.receivedElapsedMs in 1..policy.maxGapMs } == true
+        lastRestMotion = raw.takeIf { moving }
+        val prior = restParking
+        restParking = null
+        if (raw.source != InputSource.SIMULATION || area == null || !area.inside || area.source != raw.source ||
+            area.elapsedMs != raw.receivedElapsedMs || area.utc != raw.receivedAt ||
+            area.kind !in setOf(RestPlace.SERVICE_AREA, RestPlace.DROWSY_SHELTER) ||
+            raw.gear != Observation.Available(Gear.PARK) || raw.uxRestricted != Observation.Available(false) ||
+            speed == null || !speed.isFinite() || kotlin.math.abs(speed) > policy.stationaryMps || required == null) return
+        val continuous = prior?.takeIf { previous ->
+            previous.proof.copy(elapsedMs = area.elapsedMs, utc = area.utc) == area &&
+                area.elapsedMs - previous.proof.elapsedMs in 0..policy.maxGapMs &&
+                area.utc.value - previous.proof.utc.value == area.elapsedMs - previous.proof.elapsedMs
+        }
+        val began = continuous?.beganAt ?: area.elapsedMs
+        val scene = RestAreaScene.Parked(raw.source, "${area.areaId}:$began", area.kind, null,
+            RestAreaScene.ObservedParking(area.elapsedMs - began, required))
+        restParking = RestParking(scene, area, began, continuous?.animateArrival ?: fromDrive)
+        restValidatedForAttachment = true
+    }
+
+    private fun failed(error: ContractError) { android.util.Log.w("DriveGrowthSimulation", "simulation_input_deferred code=$error stage=${progress?.stage}"); failure = "모의주행을 잠시 멈췄어요. 같은 지점에서 다시 시도할 수 있어요." }
     override fun rentalResult(result: ContractResult<RentalRuntimeSnapshot>) {
         val current = progress ?: return
         if (current.stage == 0) return
@@ -167,21 +238,43 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
         val token = generation
         if (!prefs.edit().putLong("elapsed", current.elapsedMs).putInt("stage", current.stage)
                 .putBoolean("restRun", current.restRun).putBoolean("restRecording", restRecording).commit()) {
-            failure = "시연 진행을 저장하지 못했습니다. 원장/진행을 초기화하지 않습니다."; changed?.invoke(); return
+            failure = "진행을 저장하지 못했어요. 기존 기록은 보존했어요."; changed?.invoke(); return
         }
         android.util.Log.i("DriveGrowthSimulation", "simulation_input source=SIMULATION stage=${current.stage} elapsedMs=${current.elapsedMs} utcMs=${current.clock.epoch.value}")
         inFlight = true; changed?.invoke()
-        consumer(current.frame()) {
+        val frame = current.frame()
+        emittedFrame = frame
+        consumer(frame) {
             if (token != generation || accept == null) return@consumer
             inFlight = false
             if (failure == null && current.terminal) completedTerminal = current
             changed?.invoke()
-            if (failure == null && current.next() != null) handler.postDelayed({
-                if (token == generation && accept != null) { progress = current.next(); emit() }
-            }, 250) // wall 시간은 화면 재생 간격뿐. 게임에는 논리 clock만 전달한다.
+            if (failure == null && current.next() != null) advanceAfter(current, token)
         }
     }
-    override fun stop() { generation++; accept = null; inFlight = false; handler.removeCallbacksAndMessages(null) }
+
+    private fun advanceAfter(current: SimulationTimeline, token: Long) {
+        val delay = when {
+            current.inRestArea && (current.stage == 62 || current.stage == 67) -> 1_450L
+            current.inRestArea -> 550L
+            else -> 250L
+        }
+        handler.postDelayed({
+            if (token != generation || accept == null || progress != current) return@postDelayed
+            if (current.inRestArea && !restPresentationFocused) {
+                pendingRestAdvance = current
+                return@postDelayed
+            }
+            progress = current.next()
+            emit()
+        }, delay) // 벽시계는 화면 재생 간격에만 사용한다.
+    }
+    override fun stop() {
+        generation++; accept = null; inFlight = false
+        emittedFrame = null; restValidatedForAttachment = false; lastRestMotion = null
+        pendingRestAdvance = null
+        handler.removeCallbacksAndMessages(null)
+    }
 
     /** 입력용 seed를 기존 planner로 고른다. 가격/분포/사고 계산이나 지급을 복제하지 않는다. */
     override fun rentalRandom(games: GameSessionFactory, authority: RentalPreparationInputs): Random {
@@ -198,7 +291,7 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
                 val target = owned.firstOrNull {
                     it.lifecycle == VehicleLifecycle.OWNED && (authority.definition.demand[it.vehicleId] ?: 0) > 0
                 }?.vehicleId
-                if (target == null) { notice = "수요 대상 보유 차량 없음 · 일반 모의 고객의 미배정 결과를 사용합니다."; return Random.Default }
+                if (target == null) { notice = "대여할 차량을 찾지 못했어요."; return Random.Default }
                 val planner = RentalVisitPlanner()
                 (0..100_000).first { candidate ->
                     val draft = (planner.prepare(game.identity, authority.catalog, authority.definition,

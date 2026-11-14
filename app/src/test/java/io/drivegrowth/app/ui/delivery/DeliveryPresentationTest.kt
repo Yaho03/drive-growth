@@ -203,6 +203,7 @@ class DeliveryPresentationTest {
         val scene = presentation.scene!!
         assertEquals(DeliverySceneKind.INCOME_ARRIVAL, scene.kind)
         assertEquals(data.income.reward, scene.details.confirmedReward)
+        assertEquals(receipt.settlement?.balance, scene.details.confirmedBalance)
         assertEquals(data.income.vehicleId, scene.details.vehicleId)
         assertNull(scene.details.rarity)
     }

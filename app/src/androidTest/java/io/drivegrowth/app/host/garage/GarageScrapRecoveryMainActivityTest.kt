@@ -15,6 +15,7 @@ import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
 import io.drivegrowth.app.mainNavigation
+import io.drivegrowth.app.exposeMainRefresh
 import io.drivegrowth.app.mainPage
 import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.MainActivity
@@ -189,15 +190,7 @@ class GarageScrapRecoveryMainActivityTest :
         assertEquals(before.copy(checkpoint = null), snapshot())
         selectPage("도감", HostPage.COLLECTION)
         awaitUi("폐차한 캐스퍼의 일반 희귀도 보유 이력") {
-            val heading = views(activityRoot()).filterIsInstance<TextView>().firstOrNull { it.text.toString() == "캐스퍼" }
-            val groups = heading?.parent as? ViewGroup ?: return@awaitUi false
-            val next = groups.getChildAt(groups.indexOfChild(heading) + 1) ?: return@awaitUi false
-            (next as? ViewGroup)?.let { row ->
-                (0 until row.childCount).map(row::getChildAt).any { card ->
-                    val texts = views(card).filterIsInstance<TextView>().map { it.text.toString() }.toSet()
-                    "일반" in texts && "보유 이력 있음" in texts
-                }
-            } == true
+            views(activityRoot()).any { it.contentDescription?.toString() == "캐스퍼 일반 · 보유 이력 있음" }
         }
         report("ACK", saved.profileId, snapshot())
     }
@@ -237,7 +230,9 @@ class GarageScrapRecoveryMainActivityTest :
 
     private fun assertRestriction(id: OwnedVehicleId, activity: VehicleActivity, label: String, enabled: Set<VehicleAction>) {
         assertEquals(activity, read { ok(it.store.rental.activity(id)) })
+        awaitUi("가게 설정의 새로고침 노출") { activityRoot().exposeMainRefresh() != null }
         tapTag("host:refresh")
+        selectPage("보유 차량", HostPage.GARAGE)
         awaitUi("차고에서 현재 활동과 허용 행동 표시: $activity") {
             label in labels() && VehicleAction.entries.filter {
                 activityRoot().findViewWithTag<Button>(it)?.isEnabled == true
