@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rest_scene_description">휴게소에 세운 트럭 운전석에서 사장님이 담요를 덮고 자는 장면</string>
+    <string name="rest_scene_chip_resting">휴식 중</string>
+    <string name="rest_scene_chip_pending">휴식 준비 중</string>
+    <string name="rest_scene_bonus">출발하면 20분 동안 기본 수익 1.5배</string>
+    <string name="rest_scene_pending">조금만 더 쉬면 휴식 보너스가 준비돼요</string>
+    <string name="rest_scene_unknown">이 환경에서는 휴게소를 확인할 수 없어요</string>
+    <string name="rest_scene_close">닫기</string>
+    <string name="rest_scene_skip">건너뛰기</string>
+</resources>

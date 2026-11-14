@@ -18,7 +18,7 @@ import kotlin.math.sin
 internal class PrototypeAudio(context: Context) : AutoCloseable {
     enum class Scene(val fileName: String) {
         TITLE("title.mp3"), SHOP("shop.mp3"), GACHA("gacha.mp3"),
-        DELIVERY("delivery.mp3"), SETTLE("settle.mp3"),
+        DELIVERY("delivery.mp3"), SETTLE("settle.mp3"), REST("rest.mp3"),
     }
 
     enum class Cue { START, FIRST_GRANT, GACHA, SETTLEMENT, EXPAND, DELIVERY_DEPARTURE, DELIVERY_HELD }

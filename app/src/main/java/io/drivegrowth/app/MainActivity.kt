@@ -1,5 +1,6 @@
 package io.drivegrowth.app
 
+import io.drivegrowth.app.ui.rest.RestStopMotionView
 import android.app.Activity
 import android.content.Intent
 import android.view.Gravity
@@ -151,6 +152,7 @@ open class MainActivity : Activity() {
     private lateinit var headerBalance: TextView
     private var titlePending = false
     private var presentationFocused = false
+    private var restOverlay: FrameLayout? = null   // 휴게소 연출(시연). 대화상자 대신 화면 위에 덮어 창 포커스·브금을 유지한다
     private var active = false
     private val backObservation = BackObservationBoundary()
     private lateinit var panel: LinearLayout
@@ -1104,7 +1106,27 @@ open class MainActivity : Activity() {
         if (::session.isInitialized && ::gameHeader.isInitialized) updatePresentation(allowed())
     }
 
+    /** 휴게소 연출을 화면 전체에 덮어 보여 준다. 주차 중 조작이 허용될 때만 열고, 닫기나 운전 제한으로 닫힌다. */
+    protected fun showRestStopScene() {
+        if (restOverlay != null || !allowed()) return
+        val scene = RestStopMotionView(this) { removeRestStopScene(); updatePresentation(allowed()) }
+        restOverlay = FrameLayout(this).apply {
+            setBackgroundColor(0xff04050a.toInt())
+            isClickable = true   // 아래 화면이 눌리지 않게
+            addView(scene, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
+        }
+        findViewById<FrameLayout>(android.R.id.content).addView(restOverlay, FrameLayout.LayoutParams(-1, -1))
+        scene.play(RestStopMotionView.State.RESTING)
+        updatePresentation(allowed())
+    }
+
+    private fun removeRestStopScene() {
+        restOverlay?.let { (it.parent as? android.view.ViewGroup)?.removeView(it) }
+        restOverlay = null
+    }
+
     private fun updatePresentation(enabled: Boolean) {
+        if (!enabled) removeRestStopScene()
         val showingTitle = enabled && titlePending
         val headerShown = enabled && !showingTitle && navigation.page != HostPage.HOME
         gameHeader.visibility = if (headerShown) View.VISIBLE else View.GONE
@@ -1116,6 +1138,7 @@ open class MainActivity : Activity() {
         presentationAudio.setPresentationAllowed(visible)
         presentationAudio.setScene(when {
             titlePending -> PrototypeAudio.Scene.TITLE
+            restOverlay != null -> PrototypeAudio.Scene.REST
             navigation.page == HostPage.GACHA -> PrototypeAudio.Scene.GACHA
             navigation.page == HostPage.DELIVERY -> PrototypeAudio.Scene.DELIVERY
             navigation.page == HostPage.RESULTS -> PrototypeAudio.Scene.SETTLE

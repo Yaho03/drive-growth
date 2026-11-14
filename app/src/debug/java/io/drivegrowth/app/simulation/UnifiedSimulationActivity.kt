@@ -46,6 +46,9 @@ class UnifiedSimulationActivity : MainActivity() {
             addView(entry, LinearLayout.LayoutParams(0, -2, 1f))
             addView(restInMain, LinearLayout.LayoutParams(0, -2, 1f))
         })
+        // 휴게소 연출만 다시 보기. 게임 상태·원장은 바뀌지 않는다
+        content.addView(style.button("휴게소 연출 보기") { showRestStopScene() }
+            .apply { tag = "simulation:rest-scene" })
     }
 
     @Suppress("DEPRECATION")

@@ -8,11 +8,13 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import io.drivegrowth.app.R
+import io.drivegrowth.app.ui.rest.RestStopMotionView
 import io.drivegrowth.core.driving.RestOutcome
 
 /** 주차 허용 영역에 호스트가 넣는 표시 View. 저장·차량 SDK·경제 계산을 호출하지 않는다. */
 class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearLayout(context) {
     private val style = ProgressStyle(context)
+    private val restScene by lazy { RestStopMotionView(context) }   // 다시 그려도 같은 장면을 이어서 튼다
     private val interaction = ProgressInteraction(onEvent)
     private var wide = false
     private var scroll: ScrollView? = null
@@ -200,6 +202,17 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
     private fun rest(parent: LinearLayout, value: RestPresentation?, prioritizeStoredState: Boolean = false) = with(style) {
         add(parent, text(s(R.string.progress_rest_title), 26, bold = true))
         val card = if (value?.buffPhase == BuffPhase.ACTIVE) card(amber) else card()
+        // 휴게소에서 쉬는 중(인정·출발 대기)이나 5분이 안 된 때만 휴게소 연출을 보여 준다. 다른 상태로 장면을 꾸며 내지 않는다
+        val scene = when {
+            value?.recognition == RestOutcome.ACCEPTED && value.buffPhase == BuffPhase.NEXT_DEPARTURE -> RestStopMotionView.State.RESTING
+            value?.recognition == RestOutcome.PARKING_TOO_SHORT -> RestStopMotionView.State.PENDING
+            else -> null
+        }
+        if (scene != null) {
+            (restScene.parent as? android.view.ViewGroup)?.removeView(restScene)
+            restScene.play(scene)
+            add(card, restScene, 0)
+        }
         if (value == null) add(card, text(s(R.string.progress_rest_missing)), 0)
         else {
             val recognition = when (value.recognition) {
