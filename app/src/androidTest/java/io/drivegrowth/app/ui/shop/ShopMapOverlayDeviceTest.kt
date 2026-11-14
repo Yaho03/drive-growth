@@ -1,7 +1,9 @@
 package io.drivegrowth.app.ui.shop
 
 import android.content.Intent
+import android.os.SystemClock
 import android.test.InstrumentationTestCase
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -16,24 +18,137 @@ import io.drivegrowth.core.rental.Facility
 
 @Suppress("DEPRECATION")
 class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
-    fun testFacilityMenuUsesBottomSheetInPortraitAndSidePanelInLandscape() = onUi {
+    fun testFacilityMenuIsCenteredAndWrapsShortContent() = onUi {
         val context = instrumentation.targetContext
         val sheet = ShopMapSheet(context, TextView(context), 0, true, {})
 
-        assertPanelPosition(sheet, 840, 1060, 8, atBottom = true)
-        assertPanelPosition(sheet, 1360, 900, 8, atBottom = false)
+        assertCenteredPanel(sheet, 840, 1060, 420)
+        assertCenteredPanel(sheet, 1360, 900, 420)
+        assertTrue(sheet.getChildAt(0).height < ShopStyle(context).dp(180))
     }
 
-    fun testExpansionUsesAvailableWidthWhenTheSidePanelDoesNotFit() = onUi {
+    fun testExpansionCentersAndFitsNarrowPortraitAndLandscapeWindows() = onUi {
         val context = instrumentation.targetContext
         val interaction = ShopInteraction({})
         interaction.render(ShopPreviewStates.normal(), true)
         val overlay = ShopMapOverlayView(context, {}, {})
         overlay.render(ShopMapTarget.Expansion, interaction)
 
-        assertPanelPosition(overlay, 698, 425, 16, atBottom = true)
-        assertPanelPosition(overlay, 840, 1060, 16, atBottom = true)
-        assertPanelPosition(overlay, 1360, 900, 16, atBottom = false)
+        assertCenteredPanel(overlay, 300, 240, 276)
+        assertCenteredPanel(overlay, 840, 1060, 376)
+        assertCenteredPanel(overlay, 1360, 900, 376)
+    }
+
+    fun testSelectedFacilityReservesTheOppositeSideAndBackRestoresOverview() = onUi {
+        val view = ShopView(instrumentation.targetContext) { fail("지도 탐색으로 거래 요청 발생") }
+        view.render(ShopPreviewStates.normal(), true)
+        fun layout(width: Int, height: Int) {
+            val density = view.resources.displayMetrics.density
+            val w = (width * density).toInt()
+            val h = (height * density).toInt()
+            view.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
+            view.layout(0, 0, w, h)
+            val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+            try { view.draw(android.graphics.Canvas(bitmap)) } finally { bitmap.recycle() }
+        }
+        fun camera() = checkNotNull(view.findViewWithTag<ShopSceneView>("shop:scene").displayedCamera())
+        for ((w, h) in listOf(960 to 580, 360 to 720)) {
+            layout(w, h)
+            val before = camera()
+            for (facility in listOf(Facility.FUEL_STATION, Facility.CAR_WASH)) {
+                val target = ShopMapTarget.FacilityLot(facility)
+                view.showMapPanel(target)
+                layout(w, h)
+                val overlay = view.findViewWithTag<FrameLayout>("shop:map-overlay")
+                val panel = overlay.getChildAt(0)
+                if (w > h) {
+                    val gap = ShopStyle(view.context).dp(12)
+                    assertEquals(view.width / 2 - gap, panel.width)
+                    assertEquals(view.height - gap * 2, panel.height)
+                }
+                val bounds = checkNotNull(target.focusRegion())
+                val selected = camera()
+                val left = selected.x + bounds.left * selected.scale
+                val right = selected.x + bounds.right * selected.scale
+                val bottom = selected.y + bounds.bottom * selected.scale
+                if (w < h) assertTrue(bottom <= panel.top + 1)
+                else if (facility == Facility.CAR_WASH) assertTrue(left >= panel.right - 1)
+                else assertTrue(right <= panel.left + 1)
+                assertTrue(overlay.findViewWithTag<Button>("shop:map-close").isEnabled)
+                assertTrue(view.handleBack())
+                layout(w, h)
+                assertEquals(before, camera())
+            }
+        }
+    }
+
+    fun testInsuranceCloseSurvivesAnUnchangedHostRenderBetweenDownAndUp() {
+        val host = instrumentation.startActivitySync(Intent(instrumentation.targetContext,
+            CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        try {
+            val state = ShopPreviewStates.normal()
+            lateinit var view: ShopView
+            onUi {
+                view = ShopView(host) { fail("닫기 입력으로 거래 요청 발생") }
+                host.setContentView(view)
+                view.render(state, true)
+                view.showMapPanel(ShopMapTarget.FacilityLot(Facility.INSURANCE))
+            }
+            waitForLayout(view)
+            onUi {
+                val release = pressMapButton(view, "shop:map-close")
+                view.render(state, true)
+                view.completeRetry()
+                release()
+            }
+            instrumentation.waitForIdleSync()
+            onUi {
+                assertNull("같은 화면을 다시 받은 뒤에도 보험 시설이 닫힌다",
+                    view.findViewWithTag<View>("shop:map-overlay"))
+            }
+        } finally {
+            onUi { host.finish() }
+        }
+    }
+
+    fun testExpansionPressIsDiscardedWhenTheHostRestrictsControls() = onUi {
+        val events = mutableListOf<ShopEvent>()
+        val view = ShopView(instrumentation.targetContext) { events += it }
+        val state = ShopPreviewStates.normal()
+        view.render(state, true)
+        layoutMapForTouch(view)
+        view.showMapPanel(ShopMapTarget.Expansion)
+        layoutMapForTouch(view)
+        val release = pressMapButton(view, "shop:map-confirm")
+        view.render(state, false)
+        layoutMapForTouch(view)
+        assertNull(view.findViewWithTag<View>("shop:map-overlay"))
+        release()
+        assertTrue("제한 전 확장 입력으로 거래 요청이 생기지 않는다", events.isEmpty())
+    }
+
+    private fun layoutMapForTouch(view: ShopView) {
+        val width = ShopStyle(view.context).dp(960)
+        val height = ShopStyle(view.context).dp(580)
+        view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+        view.layout(0, 0, width, height)
+    }
+
+    private fun pressMapButton(view: ShopView, tag: String): () -> Unit {
+        val button = view.findViewWithTag<Button>(tag)
+        val bounds = android.graphics.Rect()
+        assertTrue(button.getGlobalVisibleRect(bounds))
+        val time = SystemClock.uptimeMillis()
+        fun send(action: Int) {
+            val event = MotionEvent.obtain(time, SystemClock.uptimeMillis(), action,
+                bounds.exactCenterX(), bounds.exactCenterY(), 0)
+            try { view.dispatchTouchEvent(event) } finally { event.recycle() }
+        }
+        send(MotionEvent.ACTION_DOWN)
+        assertTrue("$tag 버튼이 DOWN을 받았다", button.isPressed)
+        return { send(MotionEvent.ACTION_UP) }
     }
 
     fun testExpansionSendsOnlyCurrentOfferAndWaitsForStoredRefresh() = onUi {
@@ -160,7 +275,7 @@ class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
         assertEquals(1, events.size)
     }
 
-    fun testNarrowAttachedOverlayScrollsWhileCloseRemainsVisible() {
+    fun testNarrowAttachedOverlayScrollsWhileBothActionsRemainVisible() {
         val host = instrumentation.startActivitySync(Intent(instrumentation.targetContext,
             CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         try {
@@ -183,12 +298,16 @@ class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
             }
             waitForLayout(overlay)
             val before = android.graphics.Rect()
+            val confirmBefore = android.graphics.Rect()
             onUi {
                 assertTrue(overlay.isAttachedToWindow)
                 val close = overlay.findViewWithTag<Button>("shop:map-close")
                 val scroll = overlay.findViewWithTag<ScrollView>("shop:map-scroll")
                 assertTrue(close.getGlobalVisibleRect(before))
                 assertEquals(close.height, before.height())
+                val confirm = overlay.findViewWithTag<Button>("shop:map-confirm")
+                assertTrue(confirm.getGlobalVisibleRect(confirmBefore))
+                assertEquals(confirm.height, confirmBefore.height())
                 assertTrue(scroll.canScrollVertically(1))
                 scroll.scrollTo(0, scroll.getChildAt(0).height)
             }
@@ -203,6 +322,7 @@ class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
                 val confirm = overlay.findViewWithTag<Button>("shop:map-confirm")
                 val visibleConfirm = android.graphics.Rect()
                 assertTrue(confirm.getGlobalVisibleRect(visibleConfirm))
+                assertEquals(confirmBefore, visibleConfirm)
                 assertEquals(confirm.width, visibleConfirm.width())
                 assertEquals(confirm.height, visibleConfirm.height())
             }
@@ -211,24 +331,20 @@ class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
         }
     }
 
-    private fun assertPanelPosition(root: FrameLayout, widthDp: Int, heightDp: Int, gapDp: Int, atBottom: Boolean) {
+    private fun assertCenteredPanel(root: FrameLayout, widthDp: Int, heightDp: Int, panelWidthDp: Int) {
         val style = ShopStyle(root.context)
         val width = style.dp(widthDp)
         val height = style.dp(heightDp)
-        val gap = style.dp(gapDp)
+        val gap = style.dp(12)
         root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
         root.layout(0, 0, width, height)
         val panel = root.getChildAt(0)
         val size = "${widthDp}×${heightDp}dp"
-        assertEquals("right gap at $size", gap, width - panel.right)
-        if (atBottom) {
-            assertEquals("left gap at $size", gap, panel.left)
-            assertEquals("bottom gap at $size", gap, height - panel.bottom)
-        } else {
-            assertTrue("side panel at $size", panel.left > width / 2)
-            assertTrue("vertically centered at $size", kotlin.math.abs(panel.top - (height - panel.bottom)) <= 1)
-        }
+        assertTrue("panel width at $size", kotlin.math.abs(style.dp(panelWidthDp) - panel.width) <= 2)
+        assertTrue("horizontal center at $size", kotlin.math.abs(panel.left - (width - panel.right)) <= 1)
+        assertTrue("vertical center at $size", kotlin.math.abs(panel.top - (height - panel.bottom)) <= 1)
+        assertTrue("panel fits vertically at $size", panel.top >= gap && height - panel.bottom >= gap)
     }
 
     private fun text(view: View): String = when (view) {

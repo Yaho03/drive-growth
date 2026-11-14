@@ -1,95 +1,247 @@
 package io.drivegrowth.app.ui.garage
 
 import android.content.Context
+import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import io.drivegrowth.app.R
+import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
+import io.drivegrowth.core.contract.Rarity
+import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.garage.CollectionState
 
-/** 차종 × 희귀도 기록을 스크롤로 표시한다. 보유 이력과 해금은 서로 독립된 입력이다. */
+/** 차종 × 희귀도 기록을 차종 단위로 넘겨 읽는다. */
 class CollectionView(context: Context, private val onRetry: () -> Unit) : LinearLayout(context) {
-    private val style = GarageStyle(context, pixelPanel = true)
+    private val style = GarageStyle(context, pixelPanel = true, creamPanel = true)
     private val artwork = VehicleArtwork(context, style)
+    internal var showHeading = true
     private var state: CollectionScreenState = CollectionScreenState.Loading
-    private var enabled = false
+    private var controlsEnabled = false
     private var retryPending = false
-    private var columns = 1
-    private var scroll: ScrollView? = null
-    private var savedScrollY = 0
-    private var showingContent = false
+    private var filter: CollectionState? = null
+    private val positions = mutableMapOf<CollectionState?, PagePosition>()
+    private var viewportWidth = 0
+    private var viewportHeight = 0
+    private val fontScale get() = resources.configuration.fontScale
+    private val wide get() = viewportWidth >= style.dp(700) && fontScale <= 1.3f
+    private val pageSize get() = if (wide && viewportHeight >= style.dp(395)) 2 else 1
 
-    init { orientation = VERTICAL; setBackgroundColor(style.base) }
+    private data class PagePosition(val vehicle: VehicleId, val index: Int)
+
+    init {
+        orientation = VERTICAL
+        setBackgroundColor(style.base)
+        setPadding(style.dp(12), style.dp(8), style.dp(12), style.dp(8))
+    }
 
     fun render(value: CollectionScreenState, controlsEnabled: Boolean) {
-        state = value; enabled = controlsEnabled; retryPending = false
+        state = value
+        this.controlsEnabled = controlsEnabled
+        retryPending = false
         drawScreen()
     }
 
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        val next = when { w >= style.dp(1100) -> 4; w >= style.dp(600) -> 2; else -> 1 }
-        if (next != columns) { columns = next; post { drawScreen() } }
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val measuredWidth = MeasureSpec.getSize(widthMeasureSpec)
+        val measuredHeight = MeasureSpec.getSize(heightMeasureSpec)
+        if (viewportWidth != measuredWidth || viewportHeight != measuredHeight) {
+            viewportWidth = measuredWidth
+            viewportHeight = measuredHeight
+            drawScreen()
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 
-    private fun s(id: Int) = context.getString(id)
+    private fun s(id: Int, vararg args: Any) = context.getString(id, *args)
+
     private fun drawScreen(): Unit = with(style) {
-        if (showingContent) scroll?.takeIf { it.isLaidOut }?.let { savedScrollY = it.scrollY }
-        showingContent = enabled && state is CollectionScreenState.Content
-        removeAllViews(); setPadding(dp(24), dp(16), dp(24), dp(16))
-        if (!enabled) {
+        val focusedTag = findFocus()?.tag
+        removeAllViews()
+        if (!controlsEnabled) {
             addView(text(s(R.string.garage_restricted), 28, bold = true))
             addView(text(s(R.string.garage_restricted_body), color = muted))
-            scroll = null
             return@with
         }
-        addView(text(s(R.string.garage_collection_title), 32, bold = true))
-        val body = column()
-        val currentScroll = style.scroll(body, savedScrollY)
-        scroll = currentScroll
-        addView(currentScroll, LayoutParams(-1, 0, 1f))
-        when (val current = state) {
+
+        if (showHeading) addView(heading(s(R.string.garage_collection_title), ReferenceHudIcon.COLLECTION))
+        val body = card().apply { setPadding(dp(10), dp(6), dp(10), dp(8)) }
+        val viewport = scroll(body)
+        val current = state
+        if (current is CollectionScreenState.Content && current.entries.isNotEmpty()) {
+            addView(filters(), LayoutParams(-1, -2))
+        }
+        addView(viewport, LayoutParams(-1, 0, 1f).apply { topMargin = dp(6) })
+
+        when (current) {
             CollectionScreenState.Loading -> body.addView(text(s(R.string.garage_collection_loading), 24))
             is CollectionScreenState.Error -> {
-                body.addView(text(s(R.string.garage_error), 28, bold = true))
+                body.addView(text(s(R.string.garage_error), 24, bold = true))
                 body.addView(text(current.message))
                 add(body, button(s(R.string.garage_retry), !retryPending) {
-                    if (!retryPending && enabled) { retryPending = true; drawScreen(); onRetry() }
+                    if (viewport.parent === this@CollectionView && !retryPending) {
+                        retryPending = true
+                        drawScreen()
+                        onRetry()
+                    }
                 })
             }
-            is CollectionScreenState.Content -> {
-                body.addView(text(current.sourceLabel, color = muted))
-                body.addView(text(s(R.string.garage_collection_note), color = muted))
-                if (current.entries.isEmpty()) {
-                    add(body, text(s(R.string.garage_collection_empty), 28, bold = true))
-                    body.addView(text(s(R.string.garage_collection_empty_body), color = muted))
-                }
-                current.entries.groupBy { it.entry.key.vehicleId }.values.forEach { entries ->
-                    add(body, text(entries.first().name, 28, bold = true), 24)
-                    entries.chunked(columns).forEach { chunk ->
-                        val line = row()
-                        chunk.forEachIndexed { index, value ->
-                            line.addView(entryCard(value), LayoutParams(0, -2, 1f).apply { if (index > 0) marginStart = dp(16) })
-                        }
-                        repeat(columns - chunk.size) { line.addView(View(context), LayoutParams(0, 1, 1f).apply { marginStart = dp(16) }) }
-                        add(body, line)
+            is CollectionScreenState.Content -> showContent(body, current)
+        }
+        if (focusedTag != null) findViewWithTag<View>(focusedTag)?.takeIf { it.isEnabled }?.requestFocus()
+    }
+
+    private fun filters() = with(style) {
+        val options = listOf(
+            null to R.string.garage_collection_filter_all,
+            CollectionState.OWNED to R.string.garage_collection_filter_owned,
+            CollectionState.DISCOVERED to R.string.garage_collection_filter_discovered,
+            CollectionState.UNDISCOVERED to R.string.garage_undiscovered,
+        )
+        val columns = if (viewportWidth >= dp(520) && fontScale <= 1.3f) 4 else 2
+        column().apply {
+            options.chunked(columns).forEach { line ->
+                addView(row().apply {
+                    val filterRow = this
+                    line.forEachIndexed { index, (option, label) ->
+                        addView(button(s(label), primary = option == filter) {
+                            if (filterRow.parent?.parent === this@CollectionView && filter != option) {
+                                filter = option
+                                drawScreen()
+                            }
+                        }.apply {
+                            tag = "collection:filter:${option?.name ?: "all"}"
+                            isSelected = option == filter
+                        }, weightedCell(index))
                     }
-                }
+                }, LayoutParams(-1, -2))
             }
         }
     }
 
-    private fun entryCard(value: CollectionPresentation) = with(style) {
-        card().apply {
-            val key = value.entry.key
-            addView(text(rarity(key.rarity), 20, rarityColor(key.rarity), bold = true))
-            addView(artwork.view(key.vehicleId, key.rarity, 76, value.entry.state), LayoutParams(-1, dp(76)))
-            addView(text(s(when (value.entry.state) {
+    private fun showContent(body: LinearLayout, content: CollectionScreenState.Content) = with(style) {
+        sourceText(content.sourceLabel)?.let { body.addView(text(it, 14, muted)) }
+        if (content.entries.isEmpty()) {
+            positions.clear()
+            body.addView(text(s(R.string.garage_collection_empty), 24, bold = true))
+            body.addView(text(s(R.string.garage_collection_empty_body), color = muted))
+            return@with
+        }
+
+        val owned = content.entries.count { it.entry.state == CollectionState.OWNED }
+        body.addView(text(s(R.string.garage_collection_count, owned, content.entries.size), 17, bold = true))
+        body.addView(text(s(R.string.garage_collection_note), 14, muted))
+        val vehicles = content.entries.groupBy { it.entry.key.vehicleId }.values
+            .sortedBy { it.first().unlockShopLevel ?: Int.MAX_VALUE }
+            .filter { cells -> filter == null || cells.any { it.entry.state == filter } }
+        if (vehicles.isEmpty()) {
+            positions.remove(filter)
+            add(body, text(s(R.string.garage_collection_filter_empty), 18, bold = true))
+            return@with
+        }
+
+        val lastPage = (vehicles.size - 1) / pageSize
+        val position = positions[filter]
+        val matched = vehicles.indexOfFirst { it.first().entry.key.vehicleId == position?.vehicle }
+        val index = if (matched >= 0) matched else position?.index ?: 0
+        val page = (index / pageSize).coerceAtMost(lastPage)
+        val start = page * pageSize
+        val anchor = if (matched >= 0) matched else start
+        positions[filter] = PagePosition(vehicles[anchor].first().entry.key.vehicleId, anchor)
+        if (wide) add(body, rarityHeaders(), gap = 4)
+        vehicles.drop(start).take(pageSize).forEach { add(body, vehicleRow(it), gap = 4) }
+        add(this@CollectionView, pager(vehicles, page, lastPage), gap = 6)
+    }
+
+    private fun pager(vehicles: List<List<CollectionPresentation>>, page: Int, lastPage: Int) = with(style) {
+        row().apply {
+            gravity = Gravity.CENTER_VERTICAL
+            fun move(target: Int) {
+                if (parent !== this@CollectionView) return
+                val first = target * pageSize
+                positions[filter] = PagePosition(vehicles[first].first().entry.key.vehicleId, first)
+                drawScreen()
+            }
+            addView(button(s(R.string.garage_collection_previous), page > 0) { move(page - 1) }.apply { tag = "collection:previous" },
+                LayoutParams(0, -2, 1f))
+            addView(text(s(R.string.garage_collection_page, page + 1, lastPage + 1), 16, bold = true).apply {
+                tag = "collection:page"
+                gravity = Gravity.CENTER
+                setPadding(dp(8), 0, dp(8), 0)
+                accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE
+            }, LayoutParams(-2, -2))
+            addView(button(s(R.string.garage_collection_next), page < lastPage) { move(page + 1) }.apply { tag = "collection:next" },
+                LayoutParams(0, -2, 1f))
+        }
+    }
+
+    private fun rarityHeaders() = with(style) {
+        row().apply {
+            addView(text(s(R.string.garage_collection_model), 14, muted, bold = true), modelColumn())
+            Rarity.entries.forEach { rarity ->
+                addView(rarityChip(rarity).apply { gravity = Gravity.CENTER }, weightedCell(1, sameHeight = true))
+            }
+        }
+    }
+
+    private fun vehicleRow(cells: List<CollectionPresentation>) = with(style) {
+        val first = cells.first()
+        val model = column().apply {
+            gravity = Gravity.CENTER_VERTICAL
+            background = shape(inset)
+            setPadding(dp(6), dp(4), dp(6), dp(4))
+            addView(text(first.name, 17, bold = true))
+            val unlock = first.unlockShopLevel
+            addView(text(if (unlock == null) s(R.string.garage_unlock_missing)
+                else s(R.string.garage_collection_unlock_level, unlock), 13, muted))
+        }
+        val columns = when {
+            wide -> 4
+            viewportWidth >= dp(290) -> 2
+            else -> 1
+        }
+        column().apply {
+            if (!wide) addView(model, LayoutParams(-1, -2))
+            Rarity.entries.chunked(columns).forEach { line ->
+                add(this, row().apply {
+                    if (wide) addView(model, modelColumn())
+                    line.forEachIndexed { index, rarity ->
+                        val cell = cells.firstOrNull { it.entry.key.rarity == rarity }
+                        addView(entryCell(first.name, rarity, cell),
+                            weightedCell(if (wide) 1 else index, sameHeight = true))
+                    }
+                }, gap = if (wide) 0 else 4)
+            }
+        }
+    }
+
+    private fun weightedCell(index: Int, sameHeight: Boolean = false) =
+        LayoutParams(0, if (sameHeight) -1 else -2, 1f).apply {
+            if (index > 0) marginStart = style.dp(5)
+        }
+
+    private fun modelColumn() = LayoutParams(style.dp(118), -1)
+
+    private fun entryCell(model: String, rarity: Rarity, value: CollectionPresentation?) = with(style) {
+        column().apply {
+            background = raritySurface(rarity)
+            gravity = Gravity.CENTER
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            val status = s(when (value?.entry?.state) {
                 CollectionState.UNDISCOVERED -> R.string.garage_undiscovered
                 CollectionState.DISCOVERED -> R.string.garage_discovered
                 CollectionState.OWNED -> R.string.garage_ever_owned
-            }), 20, bold = true))
-            addView(text(value.unlockLabel ?: s(R.string.garage_unlock_missing), 16, muted))
+                null -> R.string.garage_collection_entry_missing
+            })
+            contentDescription = "$model ${rarity(rarity)} · $status"
+            if (!wide) addView(text(rarity(rarity), 14, rarityColor(rarity), bold = true).apply {
+                gravity = Gravity.CENTER
+            }, LayoutParams(-1, -2))
+            if (value != null) {
+                addView(artwork.view(value.entry.key.vehicleId, rarity, 44, value.entry.state, showRing = false).apply {
+                    background = null
+                }, LayoutParams(-1, dp(44)))
+            }
+            addView(text(status, 14, ink, bold = true).apply { gravity = Gravity.CENTER }, LayoutParams(-1, -2))
         }
     }
 }

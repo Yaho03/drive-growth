@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
-    <application android:label="드라이브 키우기 · 모의 시연" tools:replace="android:label">
+    <application android:label="르르르 렌터카 · 모의 시연" tools:replace="android:label">
         <activity android:name="io.drivegrowth.app.ui.garage.CollectionScrollTestActivity" android:exported="false" />
         <activity android:name=".simulation.RestSimulationActivity" android:exported="false">
             <meta-data android:name="distractionOptimized" android:value="false" />

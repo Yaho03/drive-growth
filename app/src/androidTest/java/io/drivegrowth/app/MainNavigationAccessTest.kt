@@ -1,9 +1,13 @@
 package io.drivegrowth.app
 
+import android.app.ActivityOptions
 import android.content.Intent
+import android.hardware.display.DisplayManager
 import android.os.SystemClock
-import android.test.ActivityInstrumentationTestCase2
+import android.test.InstrumentationTestCase
+import android.view.View
 import android.widget.Button
+import io.drivegrowth.app.host.HostNavigation
 import io.drivegrowth.app.host.HostPage
 import io.drivegrowth.app.host.HostSession
 import io.drivegrowth.app.host.garage.GarageCommand
@@ -20,22 +24,30 @@ import java.util.concurrent.FutureTask
 
 /** Main의 실제 View와 조작 gate에 시험용 관측·확정 상태를 공급한다. */
 @Suppress("DEPRECATION")
-class MainNavigationAccessTest : ActivityInstrumentationTestCase2<MainActivity>(MainActivity::class.java) {
+class MainNavigationAccessTest : InstrumentationTestCase() {
     fun testOldNavigationCannotActOnAnotherPageOrAfterParkingReturns() {
         assertTrue(instrumentation.targetContext.packageName.startsWith("io.drivegrowth.verify."))
-        setActivityIntent(Intent(instrumentation.targetContext, MainActivity::class.java))
-        val main = activity
+        val context = instrumentation.targetContext
+        val display = context.getSystemService(DisplayManager::class.java).displays
+            .singleOrNull { it.displayId != 0 && it.name == "Emulator 2D Display" }
+        val options = display?.let { ActivityOptions.makeBasic().setLaunchDisplayId(it.displayId).toBundle() }
+        val intent = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val main = instrumentation.startActivitySync(intent, options) as MainActivity
         val task = FutureTask {
+            assertFalse("제어 입력은 실행 중인 Activity에만 공급합니다", main.isDestroyed)
             val root = main.window.decorView
             val interaction = field<ForegroundInteraction>(main, "interaction")
             val controller = field<GarageCommandHost>(main, "management").controller
             val onboarding = field<HostSession>(main, "session").onboarding
+            val navigation = field<HostNavigation>(main, "navigation")
             val update = MainActivity::class.java.getDeclaredMethod("updateAccess").apply { isAccessible = true }
             val render = MainActivity::class.java.getDeclaredMethod("render").apply { isAccessible = true }
+            val openHomeSettings = MainActivity::class.java.getDeclaredMethod("openHomeSettings").apply { isAccessible = true }
             MainActivity::class.java.getDeclaredField("recoveredManagement").apply { isAccessible = true }
                 .setBoolean(main, true)
             val queuedRefresh = onboarding.javaClass.getDeclaredField("refreshRequested").apply { isAccessible = true }
             fun gate(gear: Gear) {
+                // 한 UI 작업 안에서는 실제 SDK 콜백이 끼어들지 않는다. 각 입력 경계에 관측을 공급한다.
                 interaction.reset()
                 val now = SystemClock.elapsedRealtime()
                 val sampleAges = if (gear == Gear.PARK) listOf(3200L, 1600L, 0L) else listOf(0L)
@@ -44,20 +56,27 @@ class MainNavigationAccessTest : ActivityInstrumentationTestCase2<MainActivity>(
                     Observation.Available(gear), Observation.Available(gear != Gear.PARK)))
                 update.invoke(main)
             }
-            fun captureButtons() = listOf(
-                checkNotNull(root.findViewWithTag<Button>("host:back")),
-                checkNotNull(root.findViewWithTag<Button>("host:refresh")),
-                checkNotNull(root.mainPage(HostPage.COLLECTION)),
-            )
+            fun mainButton(page: HostPage) = checkNotNull(root.mainPage(page))
+            fun settingsButton(tag: String) = checkNotNull(root.findViewWithTag<Button>(tag))
             fun assertIgnored(stale: List<Button>) {
                 assertFalse(field<Boolean>(controller, "busy"))
                 assertTrue(field<Boolean>(onboarding, "inFlight"))
+                gate(Gear.PARK)
+                assertEquals("입력 전 실제 화면은 차고여야 합니다", HostPage.GARAGE, navigation.page)
+                assertTrue(root.isMainPageShown(HostPage.GARAGE))
+                assertNull(root.mainNavigation())
                 queuedRefresh.setBoolean(onboarding, false)
-                stale.forEach { assertTrue(it.performClick()) }
-                assertFalse("이전 Back이 확정 요청을 해소하면 안 됩니다", field<Boolean>(controller, "busy"))
-                assertFalse("이전 새로고침이 조회를 예약하면 안 됩니다", queuedRefresh.getBoolean(onboarding))
-                assertTrue("이전 페이지 버튼이 현재 차고를 바꾸면 안 됩니다", root.mainPage(HostPage.GARAGE)?.isSelected == true)
-                assertTrue(controller.state is GarageCommandState.Confirmed)
+                for (button in stale) {
+                    gate(Gear.PARK)
+                    assertFalse("${button.tag}는 이전 화면에서 분리된 버튼이어야 합니다", button.isAttachedToWindow)
+                    assertTrue(button.performClick())
+                    assertEquals("${button.tag}가 현재 페이지를 바꾸면 안 됩니다", HostPage.GARAGE, navigation.page)
+                    assertNull(root.mainNavigation())
+                    assertTrue(root.isMainPageShown(HostPage.GARAGE))
+                    assertFalse("이전 메뉴가 확정 요청을 해소하면 안 됩니다", field<Boolean>(controller, "busy"))
+                    assertFalse("이전 새로고침이 조회를 예약하면 안 됩니다", queuedRefresh.getBoolean(onboarding))
+                    assertTrue(controller.state is GarageCommandState.Confirmed)
+                }
             }
 
             MainActivity::class.java.getDeclaredField("active").apply { isAccessible = true }.setBoolean(main, true)
@@ -66,48 +85,82 @@ class MainNavigationAccessTest : ActivityInstrumentationTestCase2<MainActivity>(
             render.invoke(main)
             val home = checkNotNull(root.mainNavigation())
             assertEquals(
-                listOf(HostPage.HOME, HostPage.GARAGE, HostPage.GACHA, HostPage.RESULTS, HostPage.DELIVERY).toSet(),
-                HostPage.entries.filter { home.mainPage(it) != null }.toSet(),
+                listOf(HostPage.GARAGE, HostPage.COLLECTION, HostPage.GACHA, HostPage.DELIVERY,
+                    HostPage.RESULTS, HostPage.RANKING),
+                (home as android.view.ViewGroup).let { bar ->
+                    (0 until bar.childCount).map { HostPage.valueOf(bar.getChildAt(it).tag.toString().substringAfterLast(':')) }
+                },
             )
-            root.openMainPage(HostPage.GARAGE)
-            val collectionTab = checkNotNull(root.findViewWithTag<Button>("host:section:COLLECTION"))
-            assertTrue(collectionTab.performClick())
-            assertTrue(root.mainPage(HostPage.COLLECTION)?.isSelected == true)
-            root.openMainPage(HostPage.HOME)
-            root.openMainPage(HostPage.RESULTS)
-            for (page in listOf(HostPage.PROGRESSION, HostPage.RANKING, HostPage.RESULTS)) {
-                val tab = checkNotNull(root.findViewWithTag<Button>("host:section:${page.name}"))
-                assertTrue(tab.performClick())
-                assertTrue(root.mainPage(page)?.isSelected == true)
+            for (page in listOf(HostPage.COLLECTION, HostPage.RANKING, HostPage.RESULTS, HostPage.GARAGE,
+                HostPage.DELIVERY, HostPage.GACHA)) {
+                gate(Gear.PARK)
+                val visibleBack = root.findViewWithTag<View>("host:back")
+                assertFalse(visibleBack?.isShown == true)
+                root.openMainPage(page)
+                assertTrue(root.isMainPageShown(page))
+                assertNull(root.mainNavigation())
+                main.onBackPressed()
+                assertTrue(root.isMainPageShown(HostPage.HOME))
             }
-            root.openMainPage(HostPage.HOME)
-            root.openMainPage(HostPage.COLLECTION)
-            val beforePageChange = captureButtons()
-            root.openMainPage(HostPage.GARAGE)
-            controller.javaClass.getDeclaredMethod("show", GarageCommandState::class.java)
-                .apply { isAccessible = true }.invoke(controller, confirmedFixture())
-            assertIgnored(beforePageChange)
 
-            val beforeRestriction = captureButtons()
+            val homeScroll = checkNotNull(root.mainNavigation()).parent as android.widget.HorizontalScrollView
+            val width = (320 * main.resources.displayMetrics.density).toInt()
+            homeScroll.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            homeScroll.layout(0, 0, width, homeScroll.measuredHeight)
+            val ranking = mainButton(HostPage.RANKING)
+            assertTrue("320dp 창에서 기록 버튼 전체가 보입니다", ranking.right <= homeScroll.width)
+            assertTrue(ranking.performClick())
+            assertTrue(root.isMainPageShown(HostPage.RANKING))
+            main.onBackPressed()
+            assertTrue(root.isMainPageShown(HostPage.HOME))
+
+            gate(Gear.PARK)
+            openHomeSettings.invoke(main)
+            val refreshFromSettings = settingsButton("host:refresh")
+            val progressionFromSettings = settingsButton("host:page:PROGRESSION")
+            assertTrue(progressionFromSettings.performClick())
+            assertEquals(HostPage.PROGRESSION, navigation.page)
+            assertNull(root.findViewWithTag<View>("host:settings-panel"))
+            main.onBackPressed()
+            assertTrue(root.isMainPageShown(HostPage.HOME))
+
+            gate(Gear.PARK)
+            val beforeRestriction = mainButton(HostPage.COLLECTION)
             gate(Gear.DRIVE)
             assertNull(root.mainNavigation())
             gate(Gear.PARK)
             render.invoke(main)
-            val active = captureButtons()
-            active.zip(beforeRestriction).forEach { (current, previous) -> assertNotSame(current, previous) }
+            val active = mainButton(HostPage.COLLECTION)
+            assertNotSame(active, beforeRestriction)
             render.invoke(main)
-            assertSame(active[0], root.findViewWithTag<Button>("host:back"))
-            assertIgnored(beforeRestriction)
+            assertSame(active, mainButton(HostPage.COLLECTION))
+            assertTrue(active.performClick())
+            assertTrue(root.isMainPageShown(HostPage.COLLECTION))
+            main.onBackPressed()
+            assertTrue(root.isMainPageShown(HostPage.HOME))
 
-            assertTrue(active[1].performClick())
+            gate(Gear.PARK)
+            openHomeSettings.invoke(main)
+            assertTrue(settingsButton("host:refresh").performClick())
             assertTrue("현재 새로고침은 진행 중 조회 뒤에 다시 조회합니다", queuedRefresh.getBoolean(onboarding))
-            assertTrue(active[2].performClick())
-            assertTrue(root.mainPage(HostPage.COLLECTION)?.isSelected == true)
-            assertTrue(root.findViewWithTag<Button>("host:back").performClick())
-            assertTrue(root.mainPage(HostPage.HOME)?.isSelected == true)
+            assertNull("새로고침이 설정을 닫아야 합니다", root.findViewWithTag<View>("host:settings-panel"))
+            assertTrue(root.isMainPageShown(HostPage.HOME))
+
+            val beforePageChange = mainButton(HostPage.GACHA)
+            root.openMainPage(HostPage.GARAGE)
+            gate(Gear.PARK)
+            controller.javaClass.getDeclaredMethod("show", GarageCommandState::class.java)
+                .apply { isAccessible = true }.invoke(controller, confirmedFixture())
+            // 이 fixture는 디스크에 없는 결과다. 이전 메뉴가 결과를 해소하지 않는지만 검사한다.
+            assertIgnored(listOf(beforePageChange, beforeRestriction, refreshFromSettings, progressionFromSettings))
         }
-        instrumentation.runOnMainSync(task)
-        task.get()
+        try {
+            instrumentation.runOnMainSync(task)
+            task.get()
+        } finally {
+            instrumentation.runOnMainSync { if (!main.isDestroyed) main.finish() }
+        }
     }
 
     private fun confirmedFixture(): GarageCommandState.Confirmed {

@@ -27,14 +27,15 @@ internal class VehicleArtwork(context: Context, private val style: GarageStyle) 
 
     fun hasSprite(id: VehicleId) = sprites.bitmap(id) != null
 
-    fun view(id: VehicleId?, rarity: Rarity?, height: Int, state: CollectionState? = null) =
+    fun view(id: VehicleId?, rarity: Rarity?, height: Int, state: CollectionState? = null,
+        showRing: Boolean = true, fillHeight: Boolean = false) =
         FrameLayout(style.context).apply {
             background = style.shape(style.inset)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             val mystery = id == null || state == CollectionState.UNDISCOVERED
-            val sprite = id?.takeUnless { mystery }?.let(sprites::drawable)
+            val sprite = id?.let(sprites::drawable)
             // 차량 카드에는 그림만 표시하고 도감 셀의 기존 구분은 유지한다.
-            if (state != null && rarity != null && !mystery) {
+            if (showRing && state != null && rarity != null && !mystery) {
                 val width = if (height >= 100) height + 28 else height - 8
                 addView(View(style.context).apply { background = ring(rarity) },
                     FrameLayout.LayoutParams(style.dp(width), style.dp(height / 3), Gravity.CENTER).apply {
@@ -63,12 +64,14 @@ internal class VehicleArtwork(context: Context, private val style: GarageStyle) 
                     setImageResource(R.drawable.garage_vehicle_placeholder)
                 }
                 if (mystery) {
-                    setColorFilter(0xff0c1020.toInt())
+                    setColorFilter(0xff090d17.toInt())
+                    alpha = 0.65f
                 } else if (state == CollectionState.DISCOVERED) {
                     colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
                     alpha = 0.72f
                 }
-            }, FrameLayout.LayoutParams(-1, style.dp(height - 4), Gravity.CENTER))
+            }, FrameLayout.LayoutParams(-1, if (fillHeight) FrameLayout.LayoutParams.MATCH_PARENT else style.dp(height - 4),
+                Gravity.CENTER))
             if (mystery) {
                 addView(style.text("?", 26, color = style.muted, bold = true),
                     FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))

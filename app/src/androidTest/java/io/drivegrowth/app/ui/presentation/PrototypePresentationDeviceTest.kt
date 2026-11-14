@@ -1,8 +1,13 @@
 package io.drivegrowth.app.ui.presentation
 
+import android.app.Dialog
+import android.app.ActivityOptions
+import android.hardware.display.DisplayManager
 import android.content.Intent
 import android.content.res.Configuration
+import android.animation.ValueAnimator
 import android.graphics.Rect
+import android.os.SystemClock
 import android.util.TypedValue
 import android.test.InstrumentationTestCase
 import android.view.View
@@ -23,8 +28,12 @@ class PrototypePresentationDeviceTest : InstrumentationTestCase() {
 
     override fun setUp() {
         super.setUp()
-        host = instrumentation.startActivitySync(Intent(instrumentation.targetContext,
-            CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as CollectionScrollTestActivity
+        val context = instrumentation.targetContext
+        val display = context.getSystemService(DisplayManager::class.java).displays
+            .singleOrNull { it.displayId != 0 && it.name == "Emulator 2D Display" }
+        val options = display?.let { ActivityOptions.makeBasic().setLaunchDisplayId(it.displayId).toBundle() }
+        host = instrumentation.startActivitySync(Intent(context,
+            CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options) as CollectionScrollTestActivity
     }
 
     override fun tearDown() {
@@ -40,15 +49,77 @@ class PrototypePresentationDeviceTest : InstrumentationTestCase() {
             button.performClick()
             title.performClick()
             assertEquals(0, starts)
-            title.setPresentationAllowed(true)
-            button.performClick()
-            title.performClick()
-            assertEquals(2, starts)
-            title.setPresentationAllowed(false)
-            button.performClick()
-            title.performClick()
-            assertEquals("시작 버튼과 타이틀 배경 모두 제한 후 동작하지 않아야 한다", 2, starts)
         }
+        awaitTitleWindow(title)
+        if (ValueAnimator.areAnimatorsEnabled()) {
+            onUi {
+                title.setPresentationAllowed(true)
+                title.performClick()
+                assertEquals("화면 전환이 끝나기 전에는 시작하지 않는다", 0, starts)
+                title.setPresentationAllowed(false)
+            }
+            SystemClock.sleep(540L)
+            onUi { assertEquals("전환 중 허용이 철회되면 시작하지 않는다", 0, starts) }
+        }
+        awaitTitleWindow(title)
+        onUi {
+            val button = title.findViewWithTag<Button>("presentation:start")
+            title.setPresentationAllowed(true)
+            assertTrue("활성 창의 시작 버튼이 입력을 받아야 한다", button.isEnabled)
+            button.performClick()
+            title.performClick()
+        }
+        val deadline = SystemClock.uptimeMillis() + 2000L
+        while (onUi { starts } == 0 && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(30L)
+        onUi {
+            assertEquals("같은 시작 전환은 한 번만 반영된다", 1, starts)
+            title.setPresentationAllowed(false)
+            title.findViewWithTag<Button>("presentation:start").performClick()
+            title.performClick()
+            assertEquals("시작 버튼과 타이틀 배경 모두 제한 후 동작하지 않아야 한다", 1, starts)
+        }
+    }
+
+    fun testAcceptedTitleTapFinishesAfterTransientWindowFocusLoss() {
+        if (!ValueAnimator.areAnimatorsEnabled()) return
+        var starts = 0
+        var animationTime = 1L
+        val title = onUi { PrototypeTitleView(host, uptimeMs = { animationTime }) { starts++ }
+            .also { host.setContentView(it) } }
+        awaitTitleWindow(title)
+        val interruption = onUi {
+            title.setPresentationAllowed(true)
+            assertTrue(title.findViewWithTag<Button>("presentation:start").performClick())
+            Dialog(host).apply {
+                setContentView(TextView(host).apply { text = "창 포커스 전환" })
+                show()
+            }
+        }
+        try {
+            val deadline = SystemClock.uptimeMillis() + 2000L
+            while (onUi { title.hasWindowFocus() } && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(20L)
+            onUi {
+                assertFalse("별도 창에서 포커스를 가져가야 한다", title.hasWindowFocus())
+                animationTime += 500L
+            }
+            instrumentation.waitForIdleSync()
+            onUi { assertEquals("포커스가 없으면 시작 콜백을 보류한다", 0, starts) }
+        } finally {
+            onUi { interruption.dismiss() }
+        }
+        awaitTitleWindow(title)
+        val deadline = SystemClock.uptimeMillis() + 2000L
+        while (onUi { starts } == 0 && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(30L)
+        onUi { assertEquals("처음 접수한 시작을 복귀 뒤 한 번만 완료한다", 1, starts) }
+    }
+
+    private fun awaitTitleWindow(title: PrototypeTitleView) {
+        val deadline = SystemClock.uptimeMillis() + 2000L
+        while (SystemClock.uptimeMillis() < deadline) {
+            if (onUi { title.isAttachedToWindow && title.isShown && title.hasWindowFocus() }) return
+            SystemClock.sleep(30L)
+        }
+        fail("시작 화면이 활성 창을 받지 못했습니다")
     }
 
     fun testTitleStartRemainsInsideNarrowAndLandscapeWindows() {
@@ -74,7 +145,7 @@ class PrototypePresentationDeviceTest : InstrumentationTestCase() {
                 assertTrue(first.left < second.left && first.top < second.top)
                 assertTrue(second.bottom < ribbon.top && ribbon.bottom < button.top)
                 assertEquals("화면을 눌러 시작  ▶", button.text.toString())
-                for ((line, expected) in listOf(first to "드라이브", second to "키우기")) {
+                for ((line, expected) in listOf(first to "르르르", second to "렌터카")) {
                     assertEquals(expected, line.text.toString())
                     val glyphs = Rect().also { line.paint.getTextBounds(expected, 0, expected.length, it) }
                     val top = line.baseline + glyphs.top

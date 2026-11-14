@@ -1,6 +1,8 @@
 package io.drivegrowth.app.host
 
 import io.drivegrowth.app.ui.garage.*
+import io.drivegrowth.core.content.ContentLoad
+import io.drivegrowth.core.content.GameContentLoader
 import io.drivegrowth.core.content.GameContentSnapshot
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.garage.*
@@ -8,6 +10,7 @@ import io.drivegrowth.core.progression.GachaRules
 import io.drivegrowth.core.progression.VehicleAction
 import org.junit.Assert.*
 import org.junit.Test
+import java.io.File
 
 class GarageHostMapperTest {
     private val model = VehicleId("fixture-model")
@@ -60,6 +63,28 @@ class GarageHostMapperTest {
         assertTrue((state as CollectionScreenState.Error).message.contains("이력"))
     }
 
+    @Test fun collectionUsesPackagedUnlockLevelsForEveryRarityOfEachModel() {
+        val assets = File("src/main/assets/content")
+        val packaged = (GameContentLoader.load(
+            File(assets, "vehicle-facts.csv").readText(),
+            File(assets, "game-content.csv").readText(),
+        ) as ContentLoad.Loaded).snapshot
+        val history = CollectionHistory(emptySet(), emptySet(), InputSource.SIMULATION,
+            packaged.catalog.contentVersion, packaged.ruleVersion)
+        val state = mapper.collection(data().copy(content = packaged),
+            ContractResult.Success(history)) as CollectionScreenState.Content
+
+        val entriesByVehicle = state.entries.groupBy { it.entry.key.vehicleId }
+        assertEquals(packaged.vehicles.map { it.vehicleId }.toSet(), entriesByVehicle.keys)
+        assertTrue(packaged.vehicles.map { it.unlockShopLevel }.toSet().size > 1)
+        for (vehicle in packaged.vehicles) {
+            val entries = entriesByVehicle.getValue(vehicle.vehicleId)
+            assertEquals(Rarity.entries.toSet(), entries.map { it.entry.key.rarity }.toSet())
+            assertEquals(setOf(vehicle.unlockShopLevel), entries.map { it.unlockShopLevel }.toSet())
+            assertTrue(entries.all { it.entry.state == CollectionState.UNDISCOVERED })
+        }
+    }
+
     @Test fun collectionUsesOnlyExplicitHistoricalKeysAndKeepsOwnedAfterDisposal() {
         val key = CollectionKey(model, Rarity.RARE)
         val discovered = CollectionKey(model, Rarity.ADVANCED)
@@ -67,7 +92,7 @@ class GarageHostMapperTest {
         val state = mapper.collection(data(), ContractResult.Success(history)) as CollectionScreenState.Content
         assertEquals(CollectionState.OWNED, state.entries.single { it.entry.key == key }.entry.state)
         assertEquals(CollectionState.DISCOVERED, state.entries.single { it.entry.key == discovered }.entry.state)
-        assertNull(state.entries.first().unlockLabel)
+        assertTrue(state.entries.all { it.unlockShopLevel == null })
         val noHistory = mapper.collection(data(vehicle("current")),
             ContractResult.Success(CollectionHistory(emptySet(), emptySet(), InputSource.SIMULATION, content.catalog.contentVersion, content.ruleVersion))) as CollectionScreenState.Content
         assertTrue(noHistory.entries.all { it.entry.state == CollectionState.UNDISCOVERED })

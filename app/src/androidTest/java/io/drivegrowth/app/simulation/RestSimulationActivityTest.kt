@@ -28,7 +28,7 @@ class RestSimulationActivityTest :
         val main = activity
         instrumentation.runOnMainSync {
             assertFalse(button(main.window.decorView, "rest-simulation:entry").isShown)
-            main.window.decorView.showSimulationControls()
+            main.window.decorView.showSimulationControls(main)
         }
         assertEntryHidesWhileRestricted(main)
         assertEntryHidesWhenMainStopsObservingWithoutPausing(main)

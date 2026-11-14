@@ -15,39 +15,51 @@ internal class ShopMapSheet(
     content: View,
     scrollY: Int,
     canClose: Boolean,
+    private val focus: ShopFocusRegion?,
     onClose: () -> Unit,
 ) : FrameLayout(context) {
+    constructor(context: Context, content: View, scrollY: Int, canClose: Boolean, onClose: () -> Unit) :
+        this(context, content, scrollY, canClose, null, onClose)
+
     private val style = ShopStyle(context)
-    val scroll: ScrollView = style.scroll(content, scrollY).apply { tag = "shop:controls-scroll" }
+    val scroll: ScrollView = style.scroll(content, scrollY).apply {
+        tag = "shop:controls-scroll"
+        isFillViewport = false
+    }
     private val card = style.column().apply {
-        background = style.shape(style.panel)
-        setPadding(style.dp(12), style.dp(8), style.dp(12), style.dp(8))
+        background = style.surface()
+        setPadding(style.dp(12), style.dp(10), style.dp(12), style.dp(10))
         isClickable = true
+        addView(scroll, LinearLayout.LayoutParams(-1, -2, 1f))
         addView(style.button("닫기", canClose, action = onClose).apply {
             tag = "shop:map-sheet-close"
-            textSize = 16f
-            minHeight = style.dp(48)
-            minimumHeight = style.dp(48)
-            setPadding(style.dp(12), 0, style.dp(12), 0)
-        }, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.END })
-        addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = style.dp(8) })
     }
 
     init {
         tag = "shop:map-sheet"
-        addView(card, LayoutParams(-1, -1))
+        isClickable = true
+        setBackgroundColor(style.scrim)
+        addView(card, LayoutParams(-1, -2, Gravity.CENTER))
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val height = MeasureSpec.getSize(heightMeasureSpec)
-        val wide = width >= style.dp(720) && width > height
-        val gap = style.dp(8)
+        val gap = style.dp(12)
+        val fit = focus?.let { ShopFocusLayout.fit(width, height, resources.displayMetrics.density) }
+        val panelWidth = fit?.panelWidth ?: minOf(style.dp(420), (width - gap * 2).coerceAtLeast(0))
+        val maxHeight = fit?.maxPanelHeight ?: minOf(style.dp(540), (height - gap * 2).coerceAtLeast(0))
+        card.measure(MeasureSpec.makeMeasureSpec(panelWidth, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(maxHeight, if (fit?.side == true) MeasureSpec.EXACTLY else MeasureSpec.AT_MOST))
         (card.layoutParams as LayoutParams).apply {
-            this.width = if (wide) minOf(style.dp(520), (width * .48f).toInt()) else (width - gap * 2).coerceAtLeast(0)
-            this.height = if (wide) (height - gap * 2).coerceAtLeast(0) else (height * .80f).toInt()
-            gravity = (if (wide) Gravity.CENTER_VERTICAL else Gravity.BOTTOM) or Gravity.END
-            setMargins(gap, 0, gap, if (wide) 0 else gap)
+            this.width = panelWidth
+            this.height = card.measuredHeight
+            if (fit != null) {
+                gravity = if (fit.side) Gravity.CENTER_VERTICAL or (if (focus.panelOnLeft) Gravity.LEFT else Gravity.RIGHT)
+                else Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                setMargins(gap, gap, gap, gap)
+            }
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }

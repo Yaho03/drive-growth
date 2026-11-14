@@ -65,7 +65,7 @@ class DashboardView(context: Context, private val onAction: (String) -> Unit) : 
 
     private fun header() = row().apply {
         addView(column().apply {
-            addView(label("드라이브 키우기", 26, ink, true))
+            addView(label("르르르 렌터카", 26, ink, true))
             addView(label("평소의 이동이, 내 차의 이야기로", 14, muted))
         }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
         addView(label(model.sourceLabel, 14, mint, true).apply {

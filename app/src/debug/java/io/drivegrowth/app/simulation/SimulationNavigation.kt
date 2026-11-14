@@ -15,7 +15,6 @@ internal class SimulationNavigation(private val prefs: SharedPreferences, privat
     private val clock: () -> ContractResult<RentalClock>, private val main: Executor) : HostDeliveryNavigation {
     override var changed: (() -> Unit)? = null
     override val snapshot: io.drivegrowth.app.vehicle.navigation.NavigationSnapshot? get() = null
-    override val description get() = "시연 종착지 · 예상 36,000m · 명시 모의 도착 사용\n실제 내비 조회/SDK 도착 수신이 아닙니다."
     private var enabled = false
     override val port = object : DeliveryNavigationPort {
         override fun chooseDestination(identity: GameIdentity, active: ActiveDelivery?): ContractResult<Unit> {
@@ -36,7 +35,7 @@ internal class SimulationNavigation(private val prefs: SharedPreferences, privat
                 is ContractResult.Success -> read.value
             }
             return ContractResult.Success(DeliveryNavigationSnapshot(if (confirmed) DestinationKey("unified-simulation-destination") else null,
-                "시연 종착지", Observation.Available(EstimatedRouteDistance(36_000, InputSource.SIMULATION)), moved,
+                DESTINATION_NAME, Observation.Available(EstimatedRouteDistance(36_000, InputSource.SIMULATION)), moved,
                 arrival, if (confirmed) {
                     if (!prefs.contains("destinationRevision")) return ContractResult.Failure(ContractError.STORAGE_FAILURE)
                     prefs.getLong("destinationRevision", -1)
@@ -115,5 +114,8 @@ internal class SimulationNavigation(private val prefs: SharedPreferences, privat
         android.util.Log.i("DriveGrowthSimulation", "simulation_arrival source=SIMULATION route=$route utcMs=${timeline.clock.epoch.value}")
         main.execute { changed?.invoke() }
         return ContractResult.Success(Unit)
+    }
+    private companion object {
+        const val DESTINATION_NAME = "렌터카 물류 거점"
     }
 }

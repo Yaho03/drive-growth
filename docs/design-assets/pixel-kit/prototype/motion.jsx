@@ -524,7 +524,7 @@ function Settle({ t, sfx = true, d }) {
 
 
 // ── 시제품용 재생기 ───────────────────────────────────────────────
-const PIECE_DUR = { gacha: null, grant: 1.85, settle: 1.55, expand: 2.3, depart: 2.5, arrive: 2.0, highway: null };   // highway는 반복이라 끝이 없다
+const PIECE_DUR = { gacha: null, grant: 1.85, settle: 1.55, expand: 2.3, depart: 2.5, arrive: 2.0, highway: null, rest: null };   // highway·rest는 반복이라 끝이 없다
 function MotionPlayer({ kind, d, reduced, onEnd, inline }) {
   const [, tick] = React.useState(0);
   const box = React.useRef(null);
@@ -548,7 +548,7 @@ function MotionPlayer({ kind, d, reduced, onEnd, inline }) {
     : kind === 'grant' ? <FirstGrant t={t} d={dd} sfx={false} />
     : kind === 'settle' ? <Settle t={t} d={dd} sfx={false} />
     : kind === 'expand' ? <Expand t={t} d={dd} sfx={false} />
-    : window.DV.PIECES[kind](t, { sfx: false, stripe: C.blue, d: dd });   // 5차 탁송 연출(delivery.jsx)
+    : window.DV.PIECES[kind](t, { sfx: false, stripe: C.blue, d: dd, reduced });   // 5차 탁송(delivery.jsx)·7차 휴게소(rest-stop.jsx)
   if (inline) {   // 화면 안 카드에 넣을 때: 카드 너비에 맞춰 줄인다
     const si = (box.current ? box.current.clientWidth : SW) / SW;
     return <div ref={box} style={{ position: 'relative', width: '100%', aspectRatio: `${SW}/${SH}`, overflow: 'hidden', borderRadius: 22 }}><div style={{ position: 'absolute', left: 0, top: 0, width: SW, height: SH, transform: `scale(${si})`, transformOrigin: '0 0' }}>{body}</div></div>;

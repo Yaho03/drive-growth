@@ -15,6 +15,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.TextView
 import io.drivegrowth.app.ui.garage.CollectionScrollTestActivity
+import io.drivegrowth.core.contract.Rarity
 import kotlin.math.roundToInt
 
 @Suppress("DEPRECATION")
@@ -133,37 +134,172 @@ class RewardCelebrationDeviceTest : InstrumentationTestCase() {
         }
     }
 
+    fun testLegendRevealAddsTwoFlashesAndConfettiOverTheConfirmedVehicle() = onUi {
+        val sprite = Bitmap.createBitmap(20, 12, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GREEN) }
+        val frame = Bitmap.createBitmap(320, 240, Bitmap.Config.ARGB_8888)
+        try {
+            val canvas = Canvas(frame)
+            val effect = RewardCelebrationView(host)
+            effect.layout(0, 0, frame.width, frame.height)
+            fun draw(progress: Float) {
+                frame.eraseColor(Color.TRANSPARENT)
+                effect.drawGachaFrame(canvas, progress)
+            }
+            effect.holdGacha("common", Color.WHITE, sprite, Rarity.COMMON) {}
+            draw(.54f)
+            assertEquals(Color.GREEN, frame.getPixel(160, 137))
+
+            effect.holdGacha("legend", Color.YELLOW, sprite, Rarity.LEGEND) {}
+            draw(.54f)
+            assertTrue(Color.blue(frame.getPixel(160, 137)) > 0)
+            draw(.78f)
+            assertTrue(Color.red(frame.getPixel(160, 137)) > 0)
+
+            draw(.92f)
+            val pixels = IntArray(frame.width * frame.height)
+            frame.getPixels(pixels, 0, frame.width, 0, 0, frame.width, frame.height)
+            assertTrue(pixels.any { it == 0xff5ce4ad.toInt() })
+        } finally {
+            frame.recycle()
+            sprite.recycle()
+        }
+    }
+
+    fun testReferenceConfettiUsesSmallRectanglesAndDropsFromAbove() = onUi {
+        val bitmap = Bitmap.createBitmap(1360, 948, Bitmap.Config.ARGB_8888)
+        try {
+            val canvas = Canvas(bitmap)
+            val effect = RewardCelebrationView(host)
+            effect.referenceConfetti(canvas, .02f, 44, 5)
+            val pixels = IntArray(bitmap.width * bitmap.height)
+            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+            assertTrue(pixels.none { it != Color.TRANSPARENT })
+
+            effect.referenceConfetti(canvas, .45f, 44, 5)
+            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+            val painted = pixels.indices.filter { pixels[it] != Color.TRANSPARENT }
+            assertTrue(painted.isNotEmpty())
+            assertTrue(painted.size <= 44 * 8 * 12)
+            assertTrue(painted.all { it / bitmap.width < 118 })
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    fun testLegendVehicleMovesLeftWithinTheSameReferenceStage() = onUi {
+        val sprite = Bitmap.createBitmap(60, 42, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GREEN) }
+        val bitmap = Bitmap.createBitmap(1360, 948, Bitmap.Config.ARGB_8888)
+        try {
+            val canvas = Canvas(bitmap)
+            val effect = RewardCelebrationView(host)
+            fun center(time: Float): Int {
+                effect.drawReferenceGacha(canvas, time, sprite, Rarity.LEGEND)
+                val row = IntArray(bitmap.width)
+                bitmap.getPixels(row, 0, bitmap.width, 0, 640, bitmap.width, 1)
+                val vehicle = row.indices.filter { row[it] == Color.GREEN }
+                assertTrue(vehicle.size >= 250)
+                return (vehicle.first() + vehicle.last()) / 2
+            }
+            assertTrue(center(4.60f) in 650..730)
+            assertTrue(center(5.60f) in 420..500)
+        } finally {
+            bitmap.recycle()
+            sprite.recycle()
+        }
+    }
+
     fun testGachaRevealWaitsForTapAndAcceptsOnlyOneTap() {
         if (!ValueAnimator.areAnimatorsEnabled()) return
         val parent = FrameLayout(host)
         val effect = RewardCelebrationView(host)
         var starts = 0
-        var finishes = 0
+        val finishes = mutableListOf<Boolean>()
+        var ready = 0
+        var stopped = 0
+        var waitStartedAt = 0L
+        var readyAt = 0L
+        val cues = mutableListOf<Pair<Rarity, Boolean>>()
         onUi { host.setContentView(parent) }
         awaitWindowFocus(parent)
         onUi {
             effect.onStarted = { starts++ }
-            assertTrue(effect.holdGacha("saved-result", Color.MAGENTA, null) { finishes++ })
+            effect.onGachaReady = { ready++; readyAt = SystemClock.uptimeMillis() }
+            effect.onGachaAudio = { rarity, opening ->
+                if (!opening) waitStartedAt = SystemClock.uptimeMillis()
+                cues.add(rarity to opening)
+            }
+            effect.onGachaAudioCancelled = { stopped++ }
+            assertTrue(effect.holdGacha("saved-result", Color.MAGENTA, null, Rarity.LEGEND) { finishes += it })
+            parent.addView(effect.over(View(host), fillHeight = true), FrameLayout.LayoutParams(-1, -1))
+            assertTrue(effect.waitingForReveal)
+            assertFalse(effect.canOpenGacha)
+            assertFalse("셔터 대기 중에는 탭해도 결과를 공개하지 않는다", effect.openGacha())
+        }
+        val deadline = SystemClock.uptimeMillis() + 5000L
+        while (SystemClock.uptimeMillis() < deadline) {
+            var isReady = false
+            onUi { isReady = ready > 0 }
+            if (isReady) break
+            SystemClock.sleep(40L)
+        }
+        onUi {
+            assertEquals("셔터가 실제 활성 창에서 2초를 기다린 뒤 한 번 준비된다 · " +
+                shutterDiagnostics(effect, waitStartedAt, finishes.size), 1, ready)
+            assertTrue(readyAt - waitStartedAt >= 2000L)
+            assertEquals(0, starts)
+            assertTrue(effect.openGacha())
+            assertFalse(effect.openGacha())
+            assertEquals(1, starts)
+            assertEquals(listOf(Rarity.COMMON to false, Rarity.LEGEND to true), cues)
+            effect.onWindowFocusChanged(false)
+            assertFalse(effect.openGacha())
+            assertEquals(1, stopped)
+        }
+        instrumentation.waitForIdleSync()
+        onUi { assertEquals(listOf(false), finishes) }
+    }
+
+    fun testGachaStaysClosedAfterTheFormerAutomaticOpenTime() {
+        if (!ValueAnimator.areAnimatorsEnabled()) return
+        val parent = FrameLayout(host)
+        val effect = RewardCelebrationView(host)
+        var waitingAt = 0L
+        var openedAt = 0L
+        var opened = 0
+        val finishes = mutableListOf<Boolean>()
+        onUi { host.setContentView(parent) }
+        awaitWindowFocus(parent)
+        onUi {
+            effect.onGachaAudio = { _, opening -> if (!opening) waitingAt = SystemClock.uptimeMillis() }
+            effect.onGachaOpened = { opened++; openedAt = SystemClock.uptimeMillis() }
+            assertTrue(effect.holdGacha("automatic-result", Color.MAGENTA, null) { finishes += it })
             parent.addView(effect.over(View(host), fillHeight = true), FrameLayout.LayoutParams(-1, -1))
         }
-        instrumentation.waitForIdleSync()
-        onUi {
-            val bitmap = Bitmap.createBitmap(effect.width, effect.height, Bitmap.Config.ARGB_8888)
-            try {
-                effect.draw(Canvas(bitmap))
-                assertTrue(effect.waitingForReveal)
-                assertEquals(0, starts)
-                assertTrue(effect.openGacha())
-                assertFalse(effect.openGacha())
-                assertEquals(1, starts)
-                effect.onWindowFocusChanged(false)
-                assertFalse(effect.openGacha())
-            } finally {
-                bitmap.recycle()
-            }
+        val deadline = SystemClock.uptimeMillis() + 8_500L
+        while (SystemClock.uptimeMillis() < deadline) {
+            var elapsedPastFormerOpen = false
+            onUi { elapsedPastFormerOpen = waitingAt > 0 && SystemClock.uptimeMillis() - waitingAt >= 6_200L }
+            if (elapsedPastFormerOpen) break
+            SystemClock.sleep(50L)
         }
-        instrumentation.waitForIdleSync()
-        onUi { assertEquals(1, finishes) }
+        onUi {
+            assertTrue("이전 자동 공개 시간 이후를 확인한다", waitingAt > 0 &&
+                SystemClock.uptimeMillis() - waitingAt >= 6_200L)
+            assertEquals("입력 없이 열리지 않는다 · " + shutterDiagnostics(effect, waitingAt, 0), 0, opened)
+            assertTrue(effect.waitingForReveal)
+            assertTrue(effect.openGacha())
+            assertEquals(1, opened)
+            assertTrue(openedAt >= waitingAt + 6_200L)
+            assertFalse(effect.openGacha())
+        }
+        val finishDeadline = SystemClock.uptimeMillis() + 3_000L
+        while (SystemClock.uptimeMillis() < finishDeadline) {
+            var completed = false
+            onUi { completed = finishes.isNotEmpty() }
+            if (completed) break
+            SystemClock.sleep(40L)
+        }
+        onUi { assertEquals(listOf(true), finishes) }
     }
 
     fun testGachaStageRemainsWhenResultIsReopenedWithoutAnEffectKey() = onUi {
@@ -181,7 +317,7 @@ class RewardCelebrationDeviceTest : InstrumentationTestCase() {
         val frame = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
         try {
             stage.draw(Canvas(frame))
-            assertEquals(0xff151a30.toInt(), frame.getPixel(100, 20))
+            assertEquals(0xff141a33.toInt(), frame.getPixel(100, 20))
         } finally {
             frame.recycle()
         }
@@ -212,6 +348,15 @@ class RewardCelebrationDeviceTest : InstrumentationTestCase() {
         }
         instrumentation.waitForIdleSync()
         onUi { assertEquals(1, clicks) }
+    }
+
+    private fun shutterDiagnostics(effect: RewardCelebrationView, waitedAt: Long, finishes: Int): String {
+        val bounds = android.graphics.Rect()
+        val visible = effect.getLocalVisibleRect(bounds)
+        return "display=${effect.display?.displayId} focus=${effect.hasWindowFocus()} " +
+            "attached=${effect.isAttachedToWindow} shown=${effect.isShown} laidOut=${effect.isLaidOut} " +
+            "size=${effect.width}×${effect.height} visible=$visible bounds=$bounds " +
+            "waitStartedAt=$waitedAt waiting=${effect.waitingForReveal} ready=${effect.canOpenGacha} finishes=$finishes"
     }
 
     private fun awaitWindowFocus(view: View) {

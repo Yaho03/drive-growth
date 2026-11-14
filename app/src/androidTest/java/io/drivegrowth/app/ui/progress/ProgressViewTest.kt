@@ -2,7 +2,9 @@ package io.drivegrowth.app.ui.progress
 
 import android.content.res.Configuration
 import android.graphics.Rect
-import android.graphics.drawable.GradientDrawable
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.view.ViewGroup
@@ -16,7 +18,7 @@ import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.app.host.progression.ProgressionJournalState
 import io.drivegrowth.app.host.progression.ProgressionMapper
 import io.drivegrowth.app.host.progression.ProgressionRead
-import io.drivegrowth.app.ui.pixel.PixelStyle
+import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.InputSource
 import io.drivegrowth.core.contract.ProfileId
@@ -59,23 +61,39 @@ class ProgressViewTest : InstrumentationTestCase() {
         val ready = ProgressPreviewStates.normal.entries.single { it.key == ProgressPreviewStates.firstKey }
         val disabled = ready.copy(key = ProgressKey("disabled", ready.key.periodId),
             claim = ClaimOffer("disabled", false))
-        fun buttonColor(key: ProgressKey): Int? {
+        fun fill(drawable: Drawable): Int {
+            val pixels = Bitmap.createBitmap(96, 64, Bitmap.Config.ARGB_8888)
+            val prior = Rect(drawable.bounds)
+            return try {
+                drawable.setBounds(0, 0, pixels.width, pixels.height)
+                drawable.draw(Canvas(pixels))
+                pixels.getPixel(pixels.width / 2, pixels.height / 2)
+            } finally {
+                drawable.bounds = prior
+                pixels.recycle()
+            }
+        }
+        fun buttonColor(key: ProgressKey): Int {
             val button = view.findViewWithTag<Button>(key)
             assertTrue("상세 보기는 계속 열 수 있다", button.isEnabled)
-            return (button.background as GradientDrawable).color?.defaultColor
+            return fill(button.background)
         }
+        val hud = ReferenceHudStyle(context)
+        val normalColor = fill(hud.signButton().apply { state = intArrayOf(android.R.attr.state_enabled) })
+        val primaryColor = fill(hud.signButton(primary = true).apply { state = intArrayOf(android.R.attr.state_enabled) })
+        assertTrue(primaryColor != normalColor)
         val claimable = context.getString(R.string.progress_claimable)
         view.render(ProgressPreviewStates.normal.copy(entries = listOf(ready, disabled)), true)
-        assertEquals(PixelStyle.primary, buttonColor(ready.key))
-        assertEquals(PixelStyle.inset, buttonColor(disabled.key))
+        assertEquals(primaryColor, buttonColor(ready.key))
+        assertEquals(normalColor, buttonColor(disabled.key))
         assertEquals(1, texts(view).count { it == claimable })
 
         select(view)
         assertTrue(claim(view).performClick())
         assertTrue(view.handleBack())
 
-        assertEquals(PixelStyle.inset, buttonColor(ready.key))
-        assertEquals(PixelStyle.inset, buttonColor(disabled.key))
+        assertEquals(normalColor, buttonColor(ready.key))
+        assertEquals(normalColor, buttonColor(disabled.key))
         assertFalse(texts(view).contains(claimable))
         assertTrue(texts(view).contains(context.getString(R.string.progress_pending)))
         assertEquals(1, events.filterIsInstance<ProgressEvent.ClaimReward>().size)
@@ -113,10 +131,10 @@ class ProgressViewTest : InstrumentationTestCase() {
         val context = base.createConfigurationContext(Configuration(base.resources.configuration).apply { fontScale = 1f })
         val view = ProgressView(context) { fail("Reading a rest card must not send an action") }
         val activeLabel = context.getString(R.string.progress_buff_active)
-        val remaining = "원장 잔여 1100초"
-        val source = "모의 입력 · 저장된 확정 상태"
+        val remaining = "보너스 남은 시간 1100초"
+        val source = "모의 입력"
         val content = ProgressPreviewStates.normal.copy(
-            sourceLabel = "모의 입력 프로필 · 원장 기록",
+            sourceLabel = "시연 모드",
             rest = RestPresentation(null, BuffPhase.ACTIVE, remainingLabel = remaining, note = source),
         )
         view.render(content, true)
@@ -136,7 +154,7 @@ class ProgressViewTest : InstrumentationTestCase() {
 
         val scroll = all(view).filterIsInstance<ScrollView>().single()
         assertEquals(viewport, scroll.height)
-        for (label in listOf(activeLabel, remaining, source)) {
+        for (label in listOf(activeLabel, remaining)) {
             val text = all(scroll).filterIsInstance<TextView>().single { it.text.toString() == label }
             val bounds = Rect(0, 0, text.width, text.height)
             scroll.offsetDescendantRectToMyCoords(text, bounds)
@@ -163,7 +181,7 @@ class ProgressViewTest : InstrumentationTestCase() {
         val consumed = RestBonusState(0, 1)
         val activeLabel = context.getString(R.string.progress_buff_active)
         val inactiveLabel = context.getString(R.string.progress_buff_inactive)
-        val source = "모의 입력 · 저장된 확정 상태"
+        val source = "모의 입력"
         for (stored in listOf(active, neverGranted, consumed)) {
             val grant = if (stored == active) RestActiveGrant(1, rules) else null
             val content = mapper.content(ProgressionRead(identity, emptyList(), emptyMap(),
@@ -171,7 +189,7 @@ class ProgressViewTest : InstrumentationTestCase() {
                     RestDrivingProjection(2, stored, stored, 2, 0, grant))))
             val mapped = requireNotNull(content.rest)
             val expectedPhase = if (stored == active) BuffPhase.ACTIVE else BuffPhase.INACTIVE
-            val expectedRemaining = if (stored == active) "원장 잔여 1100초" else "원장 잔여 0초"
+            val expectedRemaining = if (stored == active) "보너스 남은 시간 1100초" else "보너스 남은 시간 0초"
             assertEquals("stored=$stored", expectedPhase, mapped.buffPhase)
             assertEquals(expectedRemaining, mapped.remainingLabel)
             assertEquals(source, mapped.note)
@@ -180,7 +198,7 @@ class ProgressViewTest : InstrumentationTestCase() {
             assertTrue(view.render(content, true))
             val labels = texts(view)
             assertEquals(1, labels.count { it == expectedRemaining })
-            assertEquals(1, labels.count { it == source })
+            assertFalse(source in labels || "시연 모드" in labels)
             assertEquals(stored == active, activeLabel in labels)
             assertEquals(stored != active, inactiveLabel in labels)
             if (stored != active) {

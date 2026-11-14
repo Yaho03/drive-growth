@@ -41,7 +41,7 @@ class ProgressionHostTest {
   val content=ProgressionMapper().content(data())
   assertEquals(6,content.entries.count{it.group==ProgressGroup.DAILY||it.group==ProgressGroup.WEEKLY})
   assertTrue(content.entries.filter{it.group!=ProgressGroup.ACHIEVEMENT}.all{it.rewardLabel!!.contains("50")})
-  assertEquals(BuffPhase.UNSUPPORTED,content.rest!!.buffPhase);assertTrue(content.eventsNote.contains("미지원"))
+  assertEquals(BuffPhase.UNSUPPORTED,content.rest!!.buffPhase);assertEquals("이 화면에서는 이벤트를 볼 수 없어요.",content.eventsNote)
   assertEquals(RewardStatus.UNSUPPORTED,content.entries.single{it.group==ProgressGroup.ACHIEVEMENT}.status)
  }
  @Test fun unknownPeriodIsNeverZeroOrClaimable(){

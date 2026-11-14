@@ -1,6 +1,7 @@
 package io.drivegrowth.app.host.garage
 
-import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.isMainPageShown
+import io.drivegrowth.app.exposeMainRefresh
 import io.drivegrowth.app.host.HostPage
 import android.app.UiAutomation
 import android.content.Context
@@ -53,10 +54,10 @@ class GarageGrowthMainActivityTest :
 
     fun testNewPlayerChoosesFirstExpansionInMainAfterThreeCompletedRentals() {
         val before = prepareFirstExpansion()
-        tapTag("shop:preview:expand")
+        tapTag("shop:map-expansion")
         awaitLabel("레벨 1 → 2 · 공간 3 → 5")
         assertEquals(before, snapshot())
-        tapTag("shop:confirm")
+        tapTag("shop:map-confirm")
         awaitFirstExpansionUi()
         val after = awaitStored("첫 확장의 durable 완료") { it.shopLevel == 2 && it.checkpoint == null }
         assertEquals(5, after.capacity)
@@ -71,7 +72,7 @@ class GarageGrowthMainActivityTest :
 
     fun testFirstExpansionRetriesOriginalRequestAfterStorageFailure() {
         val before = prepareFirstExpansion()
-        tapTag("shop:preview:expand")
+        tapTag("shop:map-expansion")
         awaitLabel("레벨 1 → 2 · 공간 3 → 5")
         assertEquals(before, snapshot())
 
@@ -79,7 +80,7 @@ class GarageGrowthMainActivityTest :
         writeFixtureSql("CREATE TRIGGER $trigger BEFORE UPDATE ON shop " +
             "WHEN OLD.level=1 AND NEW.level=2 BEGIN SELECT RAISE(IGNORE); END")
         val original = try {
-            tapTag("shop:confirm")
+            tapTag("shop:map-confirm")
             awaitUi("저장 실패와 다시 조회 버튼") {
                 activityRoot().findViewWithTag<Button>("shop:retry")?.let { it.isShown && it.isEnabled } == true &&
                     labels().any { it.contains("STORAGE_FAILURE") }
@@ -112,7 +113,7 @@ class GarageGrowthMainActivityTest :
         for (tag in listOf(R.string.onboarding_start, casper, R.string.onboarding_review,
             R.string.onboarding_confirm, R.string.onboarding_to_shop)) tapTag(tag)
         awaitUi("가게로 버튼을 누른 뒤 실제 HOME 선택") {
-            activityRoot().mainPage(HostPage.HOME)?.isSelected == true
+            activityRoot().isMainPageShown(HostPage.HOME)
         }
         read { game ->
             assertEquals(GameMoney(1_000), ok(game.store.balance()))
@@ -130,6 +131,7 @@ class GarageGrowthMainActivityTest :
         // 직접 준비한 대여의 선물도 시험 입력으로 확정해 이후 저장 변화가 확장 명령에서만 나오게 한다.
         val gift = ok(StoredOnboardingHostSource(games).claimGift(read { it.identity }))
         assertEquals(FirstGrant.GIFT_REQUEST_ID, gift.command.requestId)
+        awaitUi("가게 설정의 새로고침 노출") { activityRoot().exposeMainRefresh() != null }
         tapTag("host:refresh")
         val before = snapshot()
         assertEquals(1, before.settlements.count { it.transaction.requestId == FirstGrant.GIFT_REQUEST_ID })
@@ -155,7 +157,9 @@ class GarageGrowthMainActivityTest :
     }
 
     private fun awaitFirstExpansionUi() = awaitUi("첫 확장 Lv2·5칸과 잔액의 확정 화면") {
-        "가게 레벨 · 2 · 보유 / 공간 · 1 / 5" in labels() && "확정 잔액 · 860 게임머니" in labels()
+        "가게 Lv2" in labels() && "P 1 / 5" in labels() &&
+            activityRoot().findViewWithTag<TextView>("shop:map-balance")
+                ?.let { it.isShown && it.text.toString().contains("860") } == true
     }
 
     private fun assign(game: GameSession, car: OwnedVehicle, index: Int, accident: Boolean): RequestId {
@@ -308,7 +312,7 @@ class GarageGrowthMainActivityTest :
     private fun touch(point: TapTarget, target: String) {
         val observed = mutableListOf<TapEvent>()
         val tag = point.button.tag
-        val verify = target == "tag=shop:preview:expand" || target == "tag=shop:confirm" ||
+        val verify = target == "tag=shop:map-expansion" || target == "tag=shop:map-confirm" ||
             tag is VehicleId || tag in listOf(R.string.onboarding_start, R.string.onboarding_review,
                 R.string.onboarding_confirm, R.string.onboarding_to_shop)
         val x = point.x.toInt()

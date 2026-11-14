@@ -113,7 +113,7 @@ class PurchaseDeliveryMainFlowTest :
     fun testPurchaseThenSimulatedArrivalPersistsOneVehicle() {
         requireFresh("io.drivegrowth.verify.purchase28arrival")
         val purchase = buyFromMain()
-        instrumentation.runOnMainSync { activity.window.decorView.showSimulationControls() }
+        instrumentation.runOnMainSync { activity.window.decorView.showSimulationControls(activity) }
         click("simulation:start")
         await("모의 주행 입력이 마지막 주차 단계에 도달", timeoutMs = 75_000) { prefs.getInt("stage", 0) == 65 }
         awaitReceipt("구매 차량 지급이 확정됐어요.")
@@ -285,13 +285,12 @@ class PurchaseDeliveryMainFlowTest :
         var selected: DeliveryOffer.Purchase? = null
         awaitUi("가격과 관측 거리를 공급한 변경 후보") {
             val current = session.delivery.state ?: return@awaitUi false
-            if (current.displayedProposal != null) return@awaitUi false
             val offers = (current.screen as? DeliveryScreen.Offers)?.proposal ?: return@awaitUi false
             assertEquals("관측 30km + 새 예상 36km는 50km 초과 구간", OVER_50_KM_BAND, offers.proposed.list.band)
             val offer = offers.proposed.offers.filterIsInstance<DeliveryOffer.Purchase>()
                 .filter { offers.availability[it.id]?.allowed == true && it.price.units > purchase.offer.price.units }
                 .maxByOrNull { it.price.units } ?: return@awaitUi false
-            val button = enabledButton("delivery:offer:${offer.id.value}") ?: return@awaitUi false
+            val button = showPurchaseCandidate(offer) ?: return@awaitUi false
             selected = offer
             button.performClick()
         }
@@ -306,8 +305,10 @@ class PurchaseDeliveryMainFlowTest :
         val rarityLabels = Rarity.entries.map(style::rarity).toSet()
         val beforeHeading = context.getString(R.string.delivery_before)
         val afterHeading = context.getString(R.string.delivery_after)
-        val beforeDistance = context.getString(R.string.delivery_estimated, purchase.route.active.proposed.estimated.meters)
-        val afterDistance = context.getString(R.string.delivery_estimated, 36_000L)
+        fun expectedDistance(meters: Long) =
+            if (meters < 1_000L) "$meters m" else "${java.math.BigDecimal.valueOf(meters, 3).stripTrailingZeros().toPlainString()} km"
+        val beforeDistance = context.getString(R.string.delivery_estimated, expectedDistance(purchase.route.active.proposed.estimated.meters))
+        val afterDistance = context.getString(R.string.delivery_estimated, "36 km")
         val observed = context.getString(R.string.delivery_observed, "실제 관측 이동 거리 $OBSERVED_METERS m")
         var review: DeliveryScreen.ChangeReview? = null
         awaitUi("변경 전후 거리·차량·희귀도·차액 확인") {
@@ -410,8 +411,7 @@ class PurchaseDeliveryMainFlowTest :
         awaitUi("발견 저장을 마친 구매 목록의 상세 열기") {
             val current = session.delivery.state ?: return@awaitUi false
             val offers = (current.screen as? DeliveryScreen.Offers)?.proposal ?: return@awaitUi false
-            current.displayedProposal == null && offer in offers.proposed.offers &&
-                enabledButton("delivery:offer:${offer.id.value}")?.performClick() == true
+            offer in offers.proposed.offers && showPurchaseCandidate(offer)?.performClick() == true
         }
         click("delivery:confirm")
         awaitReceipt("의뢰 선택이 확정됐어요.")
@@ -459,6 +459,18 @@ class PurchaseDeliveryMainFlowTest :
 
     private fun simulationDay() = Instant.ofEpochMilli(SimulationTimeline().clock.epoch.value)
         .atZone(ZoneId.of("UTC")).toLocalDate()
+
+    private fun showPurchaseCandidate(offer: DeliveryOffer.Purchase): Button? {
+        val tab = enabledButton("delivery:tab:purchase") ?: return null
+        if (!tab.isSelected) {
+            tab.performClick()
+            return null
+        }
+        return enabledButton("delivery:offer:${offer.id.value}") ?: run {
+            enabledButton("delivery:offers:next")?.performClick()
+            null
+        }
+    }
 
     private fun firstPurchase(): DeliveryOffer.Purchase {
         val day = simulationDay()

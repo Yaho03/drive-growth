@@ -6,18 +6,27 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
-import io.drivegrowth.app.ui.pixel.PixelStyle
+import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.app.ui.vehicleDisplayName
+import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.progression.VehicleAction
 import io.drivegrowth.core.progression.VehicleActivity
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /** 호스트가 허용한 영역에 삽입하는 표시 전용 View. 탐색·저장·차량 SDK를 호출하지 않는다. */
 class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayout(context) {
-    private val style = GarageStyle(context, pixelPanel = true)
+    private val style = GarageStyle(context, pixelPanel = true, creamPanel = true)
     private val artwork = VehicleArtwork(context, style)
+    internal var showHeading = true
+    private val heldDeadlineFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.KOREA)
+        .withZone(ZoneId.of("Asia/Seoul"))
     private val interaction = GarageInteraction(onEvent)
-    private var widthClass = 0
+    private var columnCount = 1
+    private var wide = false
     private var listScroll: ScrollView? = null
     private var detailScroll: ScrollView? = null
     private var listY = 0
@@ -46,22 +55,29 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        val next = when { w >= style.dp(1000) -> 2; w >= style.dp(680) -> 1; else -> 0 }
-        if (next != widthClass) { widthClass = next; post { drawScreen() } }
+        val largeText = resources.configuration.fontScale > 1.3f
+        val next = if (largeText) 1 else ((w - style.dp(16)) / style.dp(226)).coerceIn(1, 6)
+        val split = w >= style.dp(760) && !largeText
+        if (next != columnCount || split != wide) {
+            columnCount = next
+            wide = split
+            post { drawScreen() }
+        }
     }
 
-    private fun s(id: Int) = context.getString(id)
+    private fun s(id: Int, vararg args: Any) = context.getString(id, *args)
     private fun drawScreen(): Unit = with(style) {
         listScroll?.takeIf { it.isLaidOut }?.let { listY = it.scrollY }
         detailScroll?.takeIf { it.isLaidOut }?.let { detailY = it.scrollY }
         val focusedTag = findFocus()?.tag
         listScroll = null; detailScroll = null
         removeAllViews()
-        setPadding(dp(24), dp(16), dp(24), dp(16))
+        setPadding(dp(16), dp(10), dp(16), dp(12))
         if (!interaction.controlsEnabled) {
             addView(message(s(R.string.garage_restricted), s(R.string.garage_restricted_body)))
             return@with
         }
+        if (showHeading) addView(heading(s(R.string.garage_title), ReferenceHudIcon.GARAGE))
         when (val state = interaction.state) {
             GarageScreenState.Loading -> addView(message(s(R.string.garage_loading)))
             is GarageScreenState.Error -> addView(message(s(R.string.garage_error), state.message).apply {
@@ -70,73 +86,130 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
                 })
             })
             is GarageScreenState.Content -> {
-                addView(text(s(R.string.garage_title), 32, bold = true))
-                addView(text(state.data.capacityLabel ?: s(R.string.garage_capacity_unknown), color = muted))
-                addView(text(state.data.sourceLabel, color = muted))
-                addView(text(s(R.string.garage_growth_note), color = muted))
-                val area = if (widthClass == 2) row() else column()
-                addView(area, LayoutParams(-1, 0, 1f))
-                if (widthClass == 2 || interaction.selectedId == null) {
-                    val list = vehicleList(state.data)
-                    listScroll = scroll(list, listY)
-                    area.addView(listScroll, if (widthClass == 2) LayoutParams(0, -1, 1f) else LayoutParams(-1, -1))
+                val showDetail = interaction.selectedId != null
+                val showList = wide || !showDetail
+                val area = if (wide) row() else column()
+                addView(area, LayoutParams(-1, 0, 1f).apply { topMargin = dp(8) })
+                if (showList) {
+                    listScroll = scroll(vehicleList(state.data, compact = wide), listY).apply { tag = "garage:list" }
+                    area.addView(listScroll, if (wide) LayoutParams(0, -1, 2f) else LayoutParams(-1, -1))
                 }
-                if (widthClass == 2 || interaction.selectedId != null) {
-                    detailScroll = scroll(detail(), detailY)
-                    area.addView(detailScroll, if (widthClass == 2) LayoutParams(0, -1, 1.4f).apply {
-                        marginStart = dp(24)
-                    } else LayoutParams(-1, -1))
+                if (wide || showDetail) {
+                    detailScroll = scroll(detail(), detailY).apply { tag = "garage:detail" }
+                    area.addView(detailScroll, if (wide) LayoutParams(0, -1, 3f).apply { marginStart = dp(12) }
+                        else LayoutParams(-1, -1))
                 }
             }
         }
         if (focusedTag != null) findViewWithTag<View>(focusedTag)?.takeIf { it.isEnabled }?.requestFocus()
     }
 
-    private fun message(title: String, body: String? = null) = style.column().apply {
+    private fun message(title: String, body: String? = null) = style.card().apply {
         addView(style.text(title, 28, bold = true))
         if (body != null) addView(style.text(body, color = style.muted))
     }
 
-    private fun vehicleList(data: GarageContent): LinearLayout = with(style) {
+    private fun vehicleList(data: GarageContent, compact: Boolean): LinearLayout = with(style) {
         column().apply {
-            if (data.vehicles.isEmpty()) add(this, message(s(R.string.garage_empty), s(R.string.garage_empty_body)))
-            val columns = if (widthClass == 1) 2 else 1
+            addView(text(data.capacityLabel ?: s(R.string.garage_capacity_unknown), 17, bold = true).apply {
+                background = shape(panel)
+                setPadding(dp(16), dp(6), dp(16), dp(6))
+            }, LayoutParams(-2, -2))
+            sourceText(data.sourceLabel)?.let { addView(text(it, 14, muted)) }
+            addView(text(s(R.string.garage_growth_note), 14, muted))
+            if (interaction.selectedId == null) {
+                heldVehiclesCard(data)?.let { add(this, it, gap = 10) }
+            }
+            if (data.vehicles.isEmpty()) {
+                add(this, message(s(R.string.garage_empty), s(R.string.garage_empty_body)).apply {
+                    gravity = Gravity.CENTER
+                    minimumHeight = dp(160)
+                })
+            }
+            val columns = if (compact) 1 else columnCount
             data.vehicles.chunked(columns).forEach { vehicles ->
                 val line = row()
                 vehicles.forEachIndexed { index, vehicle ->
-                    line.addView(vehicleCard(vehicle), LayoutParams(0, -2, 1f).apply { if (index > 0) marginStart = dp(16) })
+                    line.addView(vehicleCard(vehicle, compact), LayoutParams(0, -2, 1f).apply { if (index > 0) marginStart = dp(16) })
                 }
-                if (vehicles.size < columns) line.addView(View(context), LayoutParams(0, 1, 1f).apply { marginStart = dp(16) })
+                repeat(columns - vehicles.size) {
+                    line.addView(View(context), LayoutParams(0, 1, 1f).apply { marginStart = dp(16) })
+                }
                 add(this, line, 16)
             }
         }
     }
 
-    private fun vehicleCard(value: VehiclePresentation): LinearLayout = with(style) {
+    private fun heldVehiclesCard(data: GarageContent): LinearLayout? = with(style) {
+        when (val held = data.heldVehicles) {
+            is ContractResult.Failure -> card().apply {
+                addView(text(s(R.string.garage_held_unavailable), 16, muted))
+            }
+            is ContractResult.Success -> {
+                if (held.value.isEmpty()) return@with null
+                card().apply {
+                    background = shape(inset)
+                    addView(text(s(R.string.garage_held_count, held.value.size), 18, bold = true))
+                    for (record in held.value) {
+                        val name = vehicleDisplayName(
+                            record.modelName ?: s(R.string.garage_held_model_missing), record.instanceLabel)
+                        val deadline = heldDeadlineFormat.format(Instant.ofEpochMilli(record.deadline.value))
+                        addView(text(s(R.string.garage_held_vehicle, name, rarity(record.vehicle.rarity)), 16, bold = true))
+                        addView(text(s(R.string.garage_held_deadline, deadline), 14, muted))
+                    }
+                    add(this, button(s(R.string.garage_held_open_delivery), primary = true) {
+                        interaction.openHeldDeliveries(data)
+                    })
+                }
+            }
+        }
+    }
+
+    private fun vehicleCard(value: VehiclePresentation, compact: Boolean): LinearLayout = with(style) {
         val selected = interaction.selectedId == value.vehicle.ownedVehicleId
+        val selectionEnabled = !interaction.requestPending
         val title = vehicleDisplayName(value.name, value.instanceLabel)
         card(selected).apply {
+            val artHeight = if (compact) 66 else 116
+            val art = artwork.view(value.vehicle.vehicleId, value.vehicle.rarity, artHeight, showRing = false)
+                .apply { background = null }
+            val labels = column().apply {
+                addView(text(title, 20, bold = true))
+                addView(rarityChip(value.vehicle.rarity), LayoutParams(-2, -2))
+                if (compact && selected) {
+                    addView(text(s(R.string.garage_selected), 14, bold = true), LayoutParams(-2, -2))
+                }
+            }
+            if (compact) addView(row().apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(art, LayoutParams(dp(76), dp(artHeight)).apply { marginEnd = dp(8) })
+                addView(labels, LayoutParams(0, -2, 1f))
+            }) else {
+                addView(art, LayoutParams(-1, dp(artHeight)))
+                addView(labels)
+            }
+            if (!artwork.hasSprite(value.vehicle.vehicleId))
+                addView(text(s(R.string.garage_art_placeholder), 14, muted))
+            addView(progressRow(value))
             addView(row().apply {
                 gravity = Gravity.CENTER_VERTICAL
-                addView(artwork.view(value.vehicle.vehicleId, value.vehicle.rarity, 76), LayoutParams(dp(88), dp(76)))
-                addView(column().apply {
-                    addView(text(title, 20, bold = true))
-                    addView(text(rarity(value.vehicle.rarity), 16, rarityColor(value.vehicle.rarity), bold = true))
-                    addView(activityBadge(value))
-                }, LayoutParams(0, -2, 1f).apply { marginStart = dp(PixelStyle.gapDp) })
+                addView(activityBadge(value), LayoutParams(-2, -2))
+                value.accidentLabel?.takeIf { it != "0" }?.let { count ->
+                    addView(text(context.getString(R.string.garage_accidents, count), 14, muted),
+                        LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
+                }
             })
-            if (!artwork.hasSprite(value.vehicle.vehicleId))
-                addView(text(s(R.string.garage_art_placeholder), 16, muted))
-            addView(text(context.getString(R.string.garage_level, value.vehicle.level), 20, bold = true))
-            addView(progressTrack(value.vehicle.levelProgressPercent), LayoutParams(-1, dp(8)))
-            addView(text(progress(value), 16, muted))
-            if (value.activityDetail != null) addView(text(value.activityDetail, color = muted))
-            if (value.informationNote != null) addView(text(value.informationNote, color = muted))
-            if (selected) addView(text(s(R.string.garage_selected), bold = true))
-            add(this, button(s(R.string.garage_select), primary = selected) {
+            if (value.activityDetail != null) addView(text(value.activityDetail, 14, muted))
+            if (value.informationNote != null) addView(text(value.informationNote, 14, muted))
+            add(this, button(s(R.string.garage_select), selectionEnabled, primary = selected) {
+                if (interaction.requestPending) return@button
                 if (interaction.selectedId != value.vehicle.ownedVehicleId) { detailY = 0; detailScroll = null }
                 interaction.select(value.vehicle.ownedVehicleId); drawScreen()
-            }.apply { tag = value.vehicle.ownedVehicleId; isSelected = selected; contentDescription = "$title, ${s(R.string.garage_select)}" })
+            }.apply {
+                tag = value.vehicle.ownedVehicleId
+                isSelected = selected
+                contentDescription = "$title, ${s(R.string.garage_select)}"
+            })
         }
     }
 
@@ -146,56 +219,102 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
                 add(this, message(s(R.string.garage_select_prompt), s(R.string.garage_select_body)))
                 return@apply
             }
-            add(this, button(s(R.string.garage_close)) { closeDetail() })
             val value = interaction.selectedVehicle
             if (value == null) {
+                add(this, button(s(R.string.garage_close)) { closeDetail() })
                 add(this, message(s(R.string.garage_removed), s(R.string.garage_removed_body)))
                 return@apply
             }
-            add(this, card(true).apply {
-                addView(text(rarity(value.vehicle.rarity), color = rarityColor(value.vehicle.rarity), bold = true))
-                addView(activityBadge(value), LayoutParams(-2, -2))
-                if (value.activityDetail != null) addView(text(value.activityDetail, color = muted))
-                if (value.informationNote != null) addView(text(value.informationNote, color = muted))
-                addView(artwork.view(value.vehicle.vehicleId, value.vehicle.rarity, 144), LayoutParams(-1, dp(144)))
+            val facts = card().apply {
+                addView(button(s(R.string.garage_close)) { closeDetail() }, LayoutParams(-2, -2))
+                addView(artwork.view(value.vehicle.vehicleId, value.vehicle.rarity, 166).apply { background = null },
+                    LayoutParams(-1, dp(166)))
                 if (!artwork.hasSprite(value.vehicle.vehicleId))
-                    addView(text(s(R.string.garage_art_placeholder), 16, muted))
-                addView(text(vehicleDisplayName(value.name, value.instanceLabel), 28, bold = true))
-                addView(text(context.getString(R.string.garage_level, value.vehicle.level), 22, bold = true))
-                addView(progressTrack(value.vehicle.levelProgressPercent), LayoutParams(-1, dp(8)))
-                addView(text(progress(value), 16, muted))
-                addView(text(value.accidentLabel?.let { context.getString(R.string.garage_accidents, it) }
-                    ?: s(R.string.garage_accidents_missing)))
-                addView(text(value.modelPriceLabel?.let { context.getString(R.string.garage_model_price, it) }
-                    ?: s(R.string.garage_model_price_missing), color = muted))
-                addView(text(context.getString(R.string.garage_acquisition, "${value.vehicle.acquisitionCost.units} 게임머니"), color = muted))
-            })
-            if (interaction.requestPending) add(this, text(s(R.string.garage_pending), 24, bold = true))
-            add(this, text(s(R.string.garage_action_note), color = muted))
-            listOf(
-                VehicleAction.LEVEL_UP to R.string.garage_action_level,
-                VehicleAction.USE_MATERIAL to R.string.garage_action_material,
-                VehicleAction.REPAIR to R.string.garage_action_repair,
-                VehicleAction.SELL to R.string.garage_action_sell,
-                VehicleAction.SCRAP to R.string.garage_action_scrap,
-            ).forEach { (action, label) ->
-                val info = value.actions[action]
-                val enabled = info?.enabled == true && !interaction.requestPending
-                add(this, button(s(label), enabled, primary = action == VehicleAction.USE_MATERIAL) {
-                    interaction.request(action, value.vehicle.ownedVehicleId, value.vehicle.revision); drawScreen()
-                }.apply { tag = action })
-                addView(text(info?.explanation ?: s(R.string.garage_action_unknown), color = muted))
-                if (info?.enabled == false) addView(text(s(R.string.garage_action_unavailable), color = muted))
+                    addView(text(s(R.string.garage_art_placeholder), 14, muted))
+                addView(text(vehicleDisplayName(value.name, value.instanceLabel), 26, bold = true))
+                addView(row().apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(rarityChip(value.vehicle.rarity), LayoutParams(-2, -2).apply { marginEnd = dp(8) })
+                    addView(activityBadge(value), LayoutParams(-2, -2))
+                })
+                addView(progressRow(value))
+                value.activityDetail?.let { addView(text(it, 14, muted)) }
+                value.informationNote?.let { addView(text(it, 14, muted)) }
+                val fields = listOf(
+                    "사고" to (value.accidentLabel?.let { context.getString(R.string.garage_accidents, it) }
+                        ?: s(R.string.garage_accidents_missing)),
+                    "구매가" to "${value.vehicle.acquisitionCost.units} 게임머니",
+                    "차종 가격" to (value.modelPriceLabel ?: s(R.string.garage_model_price_missing)),
+                )
+                add(this, row().apply {
+                    fields.forEachIndexed { index, (label, number) ->
+                        addView(column().apply {
+                            background = shape(inset)
+                            setPadding(dp(8), dp(6), dp(8), dp(6))
+                            addView(text(label, 13, muted))
+                            addView(text(number, 15, bold = true))
+                        }, LayoutParams(0, -2, 1f).apply { if (index > 0) marginStart = dp(6) })
+                    }
+                })
             }
+            val actions = card().apply {
+                if (interaction.requestPending) add(this, text(s(R.string.garage_pending), 18, bold = true))
+                add(this, text(s(R.string.garage_action_note), 14, muted), 0)
+                listOf(
+                    VehicleAction.LEVEL_UP to R.string.garage_action_level,
+                    VehicleAction.USE_MATERIAL to R.string.garage_action_material,
+                    VehicleAction.REPAIR to R.string.garage_action_repair,
+                    VehicleAction.SELL to R.string.garage_action_sell,
+                    VehicleAction.SCRAP to R.string.garage_action_scrap,
+                ).forEach { (action, label) ->
+                    val info = value.actions[action]
+                    val enabled = info?.enabled == true && !interaction.requestPending
+                    add(this, row().apply {
+                        background = shape(inset)
+                        gravity = Gravity.CENTER_VERTICAL
+                        setPadding(dp(10), dp(6), dp(10), dp(6))
+                        addView(column().apply {
+                            addView(text(s(label), 16, bold = true))
+                            addView(text(info?.explanation ?: s(R.string.garage_action_unknown), 14, muted))
+                            if (info?.enabled == false) addView(text(s(R.string.garage_action_unavailable), 13, muted))
+                        }, LayoutParams(0, -2, 1f).apply { marginEnd = dp(8) })
+                        addView(button(s(label), enabled,
+                            primary = action == VehicleAction.LEVEL_UP || action == VehicleAction.REPAIR) {
+                            interaction.request(action, value.vehicle.ownedVehicleId, value.vehicle.revision)
+                            drawScreen()
+                        }.apply {
+                            tag = action
+                            if (action == VehicleAction.SCRAP && enabled) setTextColor(0xff7d3026.toInt())
+                        }, LayoutParams(-2, -2))
+                    }, 8)
+                }
+            }
+            addView(facts, LayoutParams(-1, -2))
+            add(this, actions, gap = 10)
+        }
+    }
+
+    private fun progressRow(value: VehiclePresentation) = with(style) {
+        row().apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(text(context.getString(R.string.garage_level, value.vehicle.level), 16, bold = true))
+            addView(experienceTrack(value.vehicle.levelProgressPercent),
+                LayoutParams(0, dp(16), 1f).apply {
+                marginStart = dp(8)
+                marginEnd = dp(8)
+            })
+            addView(text("${value.vehicle.levelProgressPercent}%", 15, muted).apply {
+                contentDescription = progress(value)
+            })
         }
     }
 
     private fun activityBadge(value: VehiclePresentation) = with(style) {
         val (fill, foreground) = when (value.activity) {
-            VehicleActivity.IDLE -> 0xff1f3a2c.toInt() to 0xff7ee2a6.toInt()
-            VehicleActivity.RENTED -> 0xff1e2f57.toInt() to PixelStyle.focus
-            VehicleActivity.RETURNING -> 0xff173c3c.toInt() to 0xff7fd8cf.toInt()
-            VehicleActivity.NEEDS_REPAIR -> 0xff4a2026.toInt() to 0xffff9a8a.toInt()
+            VehicleActivity.IDLE -> 0xffe4edbf.toInt() to 0xff28551f.toInt()
+            VehicleActivity.RENTED -> 0xffdbeaf4.toInt() to 0xff254e6f.toInt()
+            VehicleActivity.RETURNING -> 0xffd7ebd9.toInt() to 0xff285a44.toInt()
+            VehicleActivity.NEEDS_REPAIR -> 0xfff8dcc5.toInt() to 0xff7d3026.toInt()
             null -> inset to muted
         }
         text(activity(value), 16, foreground, bold = true).apply {

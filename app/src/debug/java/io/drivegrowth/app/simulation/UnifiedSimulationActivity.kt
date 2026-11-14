@@ -1,6 +1,7 @@
 package io.drivegrowth.app.simulation
 
 import android.content.Intent
+import io.drivegrowth.app.R
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
@@ -24,9 +25,11 @@ class UnifiedSimulationActivity : MainActivity() {
         outState.putBoolean("restDemoOpening", restOpening)
     }
 
+    private var restPreviewButton: Button? = null
+
     override fun addSimulationActions(content: LinearLayout) {
-        val style = GarageStyle(this)
-        val entry = style.button("휴식 시연 (별도)", enabled = false) {
+        val style = GarageStyle(this, pixelPanel = true, creamPanel = true)
+        val entry = style.button("휴식만 보기", enabled = false) {
             if (!restOpening && allowed()) {
                 restOpening = true
                 updateRestEntry()
@@ -42,6 +45,9 @@ class UnifiedSimulationActivity : MainActivity() {
             visibility = View.GONE
         }
         restInMainButton = restInMain
+        restPreviewButton = style.button(getString(R.string.rest_scene_preview), enabled = false, onClick = ::showRestStopPreview)
+            .apply { tag = "simulation:rest-scene"; visibility = View.GONE }
+        content.addView(checkNotNull(restPreviewButton))
         content.addView(style.row().apply {
             addView(entry, LinearLayout.LayoutParams(0, -2, 1f))
             addView(restInMain, LinearLayout.LayoutParams(0, -2, 1f))
@@ -62,6 +68,10 @@ class UnifiedSimulationActivity : MainActivity() {
     private fun updateRestEntry(allowed: Boolean = allowed()) {
         val enabled = !restOpening && allowed
         restButton?.apply {
+            visibility = if (enabled) View.VISIBLE else View.GONE
+            isEnabled = enabled
+        }
+        restPreviewButton?.apply {
             visibility = if (enabled) View.VISIBLE else View.GONE
             isEnabled = enabled
         }

@@ -33,6 +33,7 @@ import io.drivegrowth.app.vehicle.navigation.NavigationSource
 import io.drivegrowth.core.Gear
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.delivery.DeliveryOffer
+import io.drivegrowth.core.delivery.DeliveryOfferId
 import io.drivegrowth.core.driving.VehicleInteractionGate
 import io.drivegrowth.core.garage.CollectionKey
 import org.json.JSONArray
@@ -407,29 +408,45 @@ class Issue37NativeMainPurchaseTest :
             acted
         }
 
-        val shown = awaitUiValue("Main에 실제 표시한 구매 목록") {
+        val shown = awaitUiValue("Main에 공급된 구매 목록") {
             val state = session.delivery.state ?: return@awaitUiValue null
             val offers = (state.screen as? DeliveryScreen.Offers)?.proposal ?: return@awaitUiValue null
-            val purchases = offers.proposed.offers.filterIsInstance<DeliveryOffer.Purchase>()
-            if (purchases.isEmpty() || purchases.any { button("delivery:offer:${it.id.value}") == null }) {
+            if (offers.proposed.offers.none { it is DeliveryOffer.Purchase }) return@awaitUiValue null
+            val tab = button("delivery:tab:purchase") ?: return@awaitUiValue null
+            if (!tab.isSelected) {
+                tab.performClick()
                 return@awaitUiValue null
             }
             assertEquals(identity, state.identity)
             assertEquals(EstimatedRouteDistance(sdkMeters, InputSource.VEHICLE), offers.proposed.estimated)
             assertEquals(offers.proposed.destination, state.navigation?.destination)
             assertEquals(Observation.Missing(MissingReason.NO_DATA), state.navigation?.arrival)
-            val visible = labels()
-            assertTrue(context.getString(R.string.delivery_estimated, sdkMeters) in visible)
-            for (offer in purchases) {
-                assertTrue(offers.vehicleNames.getValue(offer.vehicleId) in visible)
-                assertTrue(GarageStyle(activity).rarity(offer.rarity) in visible)
-                assertTrue(context.getString(R.string.delivery_money,
-                    context.getString(R.string.delivery_purchase_payment), offer.price.units) in visible)
-            }
+            val distance = if (sdkMeters < 1_000L) "$sdkMeters m"
+                else "${java.math.BigDecimal.valueOf(sdkMeters, 3).stripTrailingZeros().toPlainString()} km"
+            assertTrue(context.getString(R.string.delivery_estimated, distance) in labels())
             offers
         }
         val proposed = shown.proposed
         val purchases = proposed.offers.filterIsInstance<DeliveryOffer.Purchase>()
+        val displayed = mutableSetOf<DeliveryOfferId>()
+        awaitUi("구매 페이지별 차종·희귀도·가격") {
+            val visible = labels()
+            val cards = purchases.filter { button("delivery:offer:${it.id.value}") != null }
+            if (cards.isEmpty()) return@awaitUi false
+            for (offer in cards) {
+                assertTrue(shown.vehicleNames.getValue(offer.vehicleId) in visible)
+                assertTrue(GarageStyle(activity).rarity(offer.rarity) in visible)
+                assertTrue(context.getString(R.string.delivery_money,
+                    context.getString(R.string.delivery_purchase_payment), offer.price.units) in visible)
+                displayed += offer.id
+            }
+            if (displayed.size == purchases.size) true
+            else {
+                val allSaved = session.delivery.state?.displayedProposal?.offers.orEmpty().none { it.id in displayed }
+                if (allSaved) button("delivery:offers:next")?.performClick()
+                false
+            }
+        }
         val expectedKeys = purchases.map { CollectionKey(it.vehicleId, it.rarity) }.toSet()
         await("실제 표시 구매 후보만 발견") {
             read { game -> ok(game.store.discoveredVehicles()) == expectedKeys }
@@ -444,7 +461,13 @@ class Issue37NativeMainPurchaseTest :
             "day" to proposed.list.createdOn, "band" to proposed.list.band, "destination" to proposed.destination.value,
             "offerIds" to purchases.map { it.id.value }, "keys" to expectedKeys)
         val offer = purchases.first()
-        awaitUi("구매 상세") { button("delivery:offer:${offer.id.value}")?.performClick() == true }
+        awaitUi("첫 구매 후보 상세") {
+            val detail = button("delivery:offer:${offer.id.value}")
+            if (detail != null) detail.performClick() else {
+                button("delivery:offers:prev")?.performClick()
+                false
+            }
+        }
         awaitUi("구매 상세의 차종·희귀도·가격") {
             val detail = labels()
             val payment = context.getString(R.string.delivery_money,

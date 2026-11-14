@@ -3,6 +3,8 @@ package io.drivegrowth.app.host.delivery
 import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.app.ui.delivery.*
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.delivery.DeliveryOffer
+import io.drivegrowth.core.delivery.DeliveryOfferId
 import java.util.concurrent.Executor
 
 /** 공개 메서드/표시는 UI thread, source는 직렬 worker에서 호출한다. */
@@ -12,6 +14,7 @@ class DeliveryHostController(private val source: DeliveryHostSource, private val
     private var onDiscoverySaved: (() -> Unit)? = null
     private var onOriginalResolved: (() -> Unit)? = null
     private var pendingDiscovery: DeliveryHostRead? = null
+    private var pendingDisplayedIds: Set<DeliveryOfferId>? = null
     @Volatile private var allowed = false
     @Volatile private var released = false
     @Volatile private var epoch = 0L
@@ -50,7 +53,10 @@ class DeliveryHostController(private val source: DeliveryHostSource, private val
     fun refresh() {
         val discovery = pendingDiscovery
         if (discovery == null) launch { recover() }
-        else launch(savingDiscovery = true) { saveDiscovery(discovery) }
+        else {
+            val displayedIds = pendingDisplayedIds
+            launch(savingDiscovery = true) { saveDiscovery(discovery, displayedIds) }
+        }
     }
     private fun recover(): ContractResult<DeliveryHostRead> =
         when (val read = source.read()) {
@@ -146,19 +152,31 @@ class DeliveryHostController(private val source: DeliveryHostSource, private val
     }
     val isSavingDisplayedOffers: Boolean get() = busy && frame.screen is DeliveryScreen.Offers
 
-    /** 기존 View의 실제 render 성공 뒤 같은 frame을 한 번 확인한다. 생성만 한 후보는 기록하지 않는다. */
-    fun acknowledgeDisplayed(frameVersion: Long) {
+    /** 현재 화면 세대에서 표시한 후보만 기록한다. 전체 목록을 표시하는 소비자는 IDs를 생략한다. */
+    fun acknowledgeDisplayed(frameVersion: Long, displayedIds: Set<DeliveryOfferId>? = null) {
         val current = state ?: return
-        if (!valid() || busy || pendingDiscovery != null || current.displayedProposal == null) return
+        val proposal = current.displayedProposal ?: return
+        if (!valid() || busy || pendingDiscovery != null) return
         if (frameVersion != frame.version || frame.screen !is DeliveryScreen.Offers) return
+        val eligible = displayedIds?.let { ids ->
+            proposal.offers.filterIsInstance<DeliveryOffer.Purchase>()
+                .filter { it.id in ids }.mapTo(mutableSetOf()) { it.id }
+        }
+        if (eligible?.isEmpty() == true) return
+        pendingDisplayedIds = eligible
         pendingDiscovery = current
         refresh()
     }
-    private fun saveDiscovery(current: DeliveryHostRead): ContractResult<DeliveryHostRead> {
+    private fun saveDiscovery(current: DeliveryHostRead, displayedIds: Set<DeliveryOfferId>?): ContractResult<DeliveryHostRead> {
         val proposal = requireNotNull(current.displayedProposal)
-        return when (val saved = source.displayed(current.identity, proposal)) {
+        val shown = if (displayedIds == null) proposal else proposal.copy(offers = proposal.offers.filter { it.id in displayedIds })
+        return when (val saved = source.displayed(current.identity, shown)) {
             is ContractResult.Failure -> saved
-            is ContractResult.Success -> ContractResult.Success(current.copy(displayedProposal = null))
+            is ContractResult.Success -> {
+                val remaining = if (displayedIds == null) null else proposal.offers.filterIsInstance<DeliveryOffer.Purchase>()
+                    .filterNot { it.id in displayedIds }.takeIf { it.isNotEmpty() }
+                ContractResult.Success(current.copy(displayedProposal = remaining?.let { proposal.copy(offers = it) }))
+            }
         }
     }
     private fun bind(value: GameIdentity): Boolean {
@@ -194,9 +212,11 @@ class DeliveryHostController(private val source: DeliveryHostSource, private val
                 // 저장 결과는 화면 세대가 달라져도 반영하고, 이전 화면은 아래에서 폐기한다.
                 if (savingDiscovery && result is ContractResult.Success) {
                     pendingDiscovery = null
+                    pendingDisplayedIds = null
                     onDiscoverySaved?.invoke()
                 } else if (discoveryInvalid) {
                     pendingDiscovery = null
+                    pendingDisplayedIds = null
                 } else if (preservingDiscovery && result is ContractResult.Success) {
                     pendingDiscovery = result.value
                     state = result.value

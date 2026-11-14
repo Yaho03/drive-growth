@@ -43,7 +43,7 @@ class RestProgressionMapperTest {
         val stored = RestBonusState(12_345, 1)
         val value = display(ContractResult.Success(RestDrivingProjection(1, stored, stored, 1, 0, RestActiveGrant(1, rules))), InputSource.SIMULATION)
         assertEquals(BuffPhase.ACTIVE, value.buffPhase)
-        assertEquals("원장 잔여 12.345초", value.remainingLabel)
+        assertEquals("보너스 남은 시간 12.345초", value.remainingLabel)
         assertTrue(value.note!!.contains("모의 입력"))
         assertNull(value.recognition)
         assertNull(value.effectLabel)

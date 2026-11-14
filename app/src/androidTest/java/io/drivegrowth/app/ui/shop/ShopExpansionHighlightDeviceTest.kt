@@ -1,9 +1,12 @@
 package io.drivegrowth.app.ui.shop
 
 import android.animation.ValueAnimator
+import android.app.ActivityOptions
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.hardware.display.DisplayManager
+import android.os.SystemClock
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.widget.Button
@@ -18,8 +21,7 @@ class ShopExpansionHighlightDeviceTest : InstrumentationTestCase() {
         val events = mutableListOf<ShopEvent>()
         val before = ShopPreviewStates.normal().copy(origin = ShopOrigin.STORED)
         val after = before.copy(revision = Revision(13), level = 3, capacity = 7)
-        val host = instrumentation.startActivitySync(Intent(instrumentation.targetContext,
-            CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        val host = launchHost()
         try {
             lateinit var view: ShopView
             var starts = 0
@@ -32,11 +34,9 @@ class ShopExpansionHighlightDeviceTest : InstrumentationTestCase() {
                 view.onCelebration = { starts++ }
                 view.render(before, true)
             }
-            instrumentation.waitForIdleSync()
+            confirmExpansion(view)
             onUi {
                 assertTrue(view.hasWindowFocus())
-                view.showMapPanel(ShopMapTarget.Expansion)
-                view.findViewWithTag<Button>("shop:map-confirm").performClick()
                 val request = (events.single() as ShopEvent.Submit).request
                 view.complete(request.copy(requestId = RequestId("different-expansion")), ContractResult.Success(Unit))
                 view.render(after, true)
@@ -44,6 +44,9 @@ class ShopExpansionHighlightDeviceTest : InstrumentationTestCase() {
                 assertEquals(0, starts)
 
                 view.complete(request, ContractResult.Success(Unit))
+            }
+            awaitUi("전체 지도에 돌아온 뒤 확장 강조 시작") { starts == 1 }
+            onUi {
                 val highlighted = sampleSlots(view)
                 assertEquals(1, starts)
                 view.visibility = View.INVISIBLE
@@ -69,8 +72,8 @@ class ShopExpansionHighlightDeviceTest : InstrumentationTestCase() {
     fun testExpansionWaitsForExactStoredSnapshotAndDropsEffectOnRestriction() {
         val events = mutableListOf<ShopEvent>()
         val before = ShopPreviewStates.normal().copy(origin = ShopOrigin.STORED)
-        val host = instrumentation.startActivitySync(Intent(instrumentation.targetContext,
-            CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        val after = before.copy(revision = Revision(13), level = 3, capacity = 7)
+        val host = launchHost()
         try {
             lateinit var view: ShopView
             var starts = 0
@@ -83,15 +86,12 @@ class ShopExpansionHighlightDeviceTest : InstrumentationTestCase() {
                 view.onCelebration = { starts++ }
                 view.render(before, true)
             }
-            instrumentation.waitForIdleSync()
+            confirmExpansion(view)
             onUi {
-                view.showMapPanel(ShopMapTarget.Expansion)
-                view.findViewWithTag<Button>("shop:map-confirm").performClick()
                 view.complete((events.single() as ShopEvent.Submit).request, ContractResult.Success(Unit))
                 sampleSlots(view)
                 assertEquals(0, starts)
 
-                val after = before.copy(revision = Revision(13), level = 3, capacity = 7)
                 view.render(after.copy(revision = before.revision), true)
                 sampleSlots(view)
                 assertEquals(0, starts)
@@ -107,8 +107,9 @@ class ShopExpansionHighlightDeviceTest : InstrumentationTestCase() {
 
                 val refreshedBefore = before.copy(revision = Revision(16))
                 view.render(refreshedBefore, true)
-                view.showMapPanel(ShopMapTarget.Expansion)
-                view.findViewWithTag<Button>("shop:map-confirm").performClick()
+            }
+            confirmExpansion(view)
+            onUi {
                 view.complete((events.last() as ShopEvent.Submit).request, ContractResult.Success(Unit))
                 view.render(after.copy(revision = Revision(17), capacity = 8), true)
                 sampleSlots(view)
@@ -121,6 +122,35 @@ class ShopExpansionHighlightDeviceTest : InstrumentationTestCase() {
         } finally {
             onUi { host.finish() }
         }
+    }
+
+    private fun launchHost(): android.app.Activity {
+        val context = instrumentation.targetContext
+        val display = context.getSystemService(DisplayManager::class.java).displays
+            .singleOrNull { it.displayId != 0 && it.name == "Emulator 2D Display" }
+        val options = display?.let { ActivityOptions.makeBasic().setLaunchDisplayId(it.displayId).toBundle() }
+        return instrumentation.startActivitySync(Intent(context, CollectionScrollTestActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options)
+    }
+
+    private fun confirmExpansion(view: ShopView) {
+        awaitUi("확장 시험 창 포커스") { view.isLaidOut && view.isShown && view.hasWindowFocus() }
+        onUi { view.showMapPanel(ShopMapTarget.Expansion) }
+        awaitUi("카메라 이동 뒤 확장 확인 버튼") {
+            view.findViewWithTag<Button>("shop:map-confirm")
+                ?.takeIf { it.isShown && it.isEnabled && it.hasWindowFocus() }?.performClick() == true
+        }
+    }
+
+    private fun awaitUi(label: String, ready: () -> Boolean) {
+        val deadline = SystemClock.uptimeMillis() + 5_000
+        while (SystemClock.uptimeMillis() < deadline) {
+            var matched = false
+            onUi { matched = ready() }
+            if (matched) return
+            SystemClock.sleep(30)
+        }
+        fail(label)
     }
 
     private fun sampleSlots(view: ShopView): List<Int?> {

@@ -39,19 +39,26 @@ import kotlin.math.roundToInt
 
 /** 주차 상태에서만 시작 화면과 장식용 움직임을 제공한다. */
 @SuppressLint("ViewConstructor")
-internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : FrameLayout(context) {
+internal class PrototypeTitleView(
+    context: Context,
+    private val onStarting: () -> Unit = {},
+    private val uptimeMs: () -> Long = SystemClock::uptimeMillis,
+    private val onStart: () -> Unit,
+) : FrameLayout(context) {
     private var presentationAllowed = false
     private var startedAt = 0L
+    private var exitAt: Long? = null
+    private var startDispatched = false
     private val landscape = TitleLandscape(context)
     private val titleFont = Typeface.createFromAsset(context.assets, "pixel/title/BlackHanSans-Regular.ttf")
     private val badge = label("●  RENT-A-CAR", 0xfffcdc64.toInt()).apply {
         tag = "presentation:title-badge"
         background = pill(0xff1c1e2c.toInt(), 0xfffcdc64.toInt())
     }
-    private val gold = TitleWord(context, "드라이브", titleFont, intArrayOf(
+    private val gold = TitleWord(context, "르르르", titleFont, intArrayOf(
         0xfffff7c8.toInt(), 0xfffcdc64.toInt(), 0xfff6a83c.toInt(),
     )).apply { tag = "presentation:title-first" }
-    private val sky = TitleWord(context, "키우기", titleFont, intArrayOf(
+    private val sky = TitleWord(context, "렌터카", titleFont, intArrayOf(
         Color.WHITE, 0xffcfe4ff.toInt(), 0xff68a0f0.toInt(),
     )).apply { tag = "presentation:title-second" }
     private val ribbon = label("달린 만큼 커지는 우리 동네 렌터카", Color.WHITE).apply {
@@ -108,9 +115,12 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
         setPadding(0, 0, 0, 0)
         setOnClickListener { performClickFromTitle() }
     }
-    private val startGame = onStart
-    private val trial = label("주행·영업 수치는 시험값이에요", Color.WHITE)
-    private val prototype = label("시제품", Color.WHITE)
+    private val sparks = TitleSparks(context)
+    private val flash = View(context).apply {
+        setBackgroundColor(Color.WHITE)
+        alpha = 0f
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
 
     init {
         tag = "presentation:title"
@@ -121,9 +131,9 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
         addView(gold)
         addView(sky)
         addView(ribbon)
+        addView(sparks)
         addView(start)
-        addView(trial)
-        addView(prototype)
+        addView(flash)
         setOnClickListener { performClickFromTitle() }
         isFocusable = false
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -131,13 +141,31 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
     }
 
     private fun performClickFromTitle() {
-        if (presentationAllowed) startGame()
+        if (!canAcceptStart() || exitAt != null || startDispatched) return
+        onStarting()
+        if (!canAnimateScene()) {
+            dispatchStart()
+            return
+        }
+        exitAt = uptimeMs()
+        setPresentationInput(false)
+        updateMotion()
+    }
+
+    private fun dispatchStart() {
+        if (!canAcceptStart() || startDispatched) return
+        startDispatched = true
+        setPresentationInput(false)
+        onStart()
     }
 
     fun setPresentationAllowed(allowed: Boolean) {
         if (presentationAllowed == allowed) return
         presentationAllowed = allowed
-        setPresentationInput(allowed)
+        if (!allowed) {
+            startDispatched = false
+            resetExit()
+        }
         updateMotion()
     }
 
@@ -153,19 +181,16 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
         val scale = layoutScale(width, height)
         val logoWidth = (560 * scale).roundToInt()
         measureAt(landscape, width, height)
+        measureAt(flash, width, height)
+        measureAt(sparks, (650 * scale).roundToInt(), (300 * scale).roundToInt())
         fitLabel(badge, 15 * scale)
         measureAt(badge, (171 * scale).roundToInt(), (32 * scale).roundToInt())
-        val goldWidth = gold.paint.measureText(gold.text.toString()) / gold.textSize.coerceAtLeast(1f)
-        fitLabel(gold, minOf(136f, 316 / goldWidth.coerceAtLeast(1f)) * scale)
+        fitLabel(gold, 136 * scale)
         measureAt(gold, logoWidth, (140 * scale).roundToInt())
         fitLabel(sky, 136 * scale)
         measureAt(sky, logoWidth, (140 * scale).roundToInt())
         fitLabel(ribbon, 24 * scale)
         measureAt(ribbon, (437 * scale).roundToInt(), (49 * scale).roundToInt())
-        fitLabel(trial, 15 * scale)
-        fitLabel(prototype, 15 * scale)
-        measureAt(trial, (228 * scale).roundToInt(), (22 * scale).roundToInt())
-        measureAt(prototype, (48 * scale).roundToInt(), (22 * scale).roundToInt())
         val startSp = maxOf(16f, 28 * scale / resources.displayMetrics.density)
         if (start.textSize != TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, startSp, resources.displayMetrics)) {
             start.setTextSize(TypedValue.COMPLEX_UNIT_SP, startSp)
@@ -184,26 +209,22 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
         val stageY = (height - 720 * scale) / 2
         val inset = minOf(dp(16), width / 12)
         val logoX = maxOf(inset, (stageX + 172 * scale).roundToInt())
-        val logoY = (stageY + 52 * scale).roundToInt()
+        val logoY = maxOf(dp(4), (stageY + 58 * scale).roundToInt())
         place(landscape, 0, 0)
+        place(flash, 0, 0)
+        place(sparks, logoX - (30 * scale).roundToInt(), logoY - (9 * scale).roundToInt())
         place(badge, logoX + (10 * scale).roundToInt(), logoY)
         val firstY = badge.bottom + (6 * scale).roundToInt()
         place(gold, logoX, firstY)
         place(sky, logoX + (64 * scale).roundToInt(), firstY + (126 * scale).roundToInt())
-        place(ribbon, logoX + (40 * scale).roundToInt(), sky.bottom + (14 * scale).roundToInt())
+        place(ribbon, logoX + (40 * scale).roundToInt(), sky.bottom + (18 * scale).roundToInt())
         val bottomGap = (stageY + 74 * scale).roundToInt()
         val roomBelowRibbon = (height - ribbon.bottom).coerceAtLeast(0)
         val startTop = height - minOf(roomBelowRibbon, bottomGap + start.measuredHeight)
         place(start, (width - start.measuredWidth) / 2, startTop.coerceAtMost(height - start.measuredHeight))
-        val footerY = height - (stageY + 22 * scale).roundToInt() - trial.measuredHeight
-        val footerVisibility = if (start.bottom <= footerY) VISIBLE else INVISIBLE
-        trial.visibility = footerVisibility
-        prototype.visibility = footerVisibility
-        place(trial, logoX, footerY)
-        place(prototype, width - logoX - prototype.measuredWidth, footerY)
     }
 
-    private fun layoutScale(width: Int, height: Int) = minOf(width / 960f, height / 720f)
+    private fun layoutScale(width: Int, height: Int) = minOf(maxOf(width / 1280f, height / 720f), width / 960f)
 
     private fun measureAt(view: View, width: Int, height: Int) {
         view.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
@@ -241,6 +262,7 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
     override fun onDetachedFromWindow() {
         removeCallbacks(animateScene)
         startedAt = 0L
+        resetExit()
         super.onDetachedFromWindow()
     }
 
@@ -249,25 +271,66 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
         updateMotion()
     }
 
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        updateMotion()
+    }
+
     private val animateScene = object : Runnable {
         override fun run() {
             if (!canAnimateScene()) return
-            landscape.elapsed = (SystemClock.uptimeMillis() - startedAt) / 1_000f
+            val now = uptimeMs()
+            val exit = exitAt
+            if (exit != null && now - exit >= 480L) {
+                resetExit()
+                dispatchStart()
+                return
+            }
+            val time = (now - startedAt) / 1_000f
+            landscape.elapsed = time
+            val logoOffset = ((kotlin.math.cos(time * 2 * Math.PI / 3.2) - 1) * 3 * layoutScale(width, height)).toFloat()
+            badge.translationY = logoOffset
+            gold.translationY = logoOffset
+            sky.translationY = logoOffset
+            ribbon.translationY = logoOffset
+            gold.elapsed = time
+            sky.elapsed = time
+            sparks.elapsed = time
+            start.alpha = .78f + .22f * kotlin.math.cos(time * 2 * Math.PI.toFloat() / 1.4f)
+            exitAt?.let { begin ->
+                val ms = now - begin
+                alpha = 1f - (ms / 450f).coerceIn(0f, 1f)
+                flash.alpha = 1f - (ms / 140f).coerceIn(0f, 1f)
+                landscape.zoom = (ms / 480f).coerceIn(0f, 1f) * .14f
+            }
             landscape.invalidate()
             postDelayed(this, 33L)
         }
     }
 
-    private fun canAnimateScene() =
-        presentationAllowed && isAttachedToWindow && isShown && windowVisibility == VISIBLE &&
-            ValueAnimator.areAnimatorsEnabled()
+    private fun resetExit() {
+        exitAt = null
+        flash.alpha = 0f
+        landscape.zoom = 0f
+        alpha = 1f
+    }
+
+    private fun canAcceptStart() = presentationAllowed && isAttachedToWindow && isShown &&
+        hasWindowFocus() && windowVisibility == VISIBLE
+
+    private fun canAnimateScene() = canAcceptStart() && ValueAnimator.areAnimatorsEnabled()
 
     private fun updateMotion() {
         removeCallbacks(animateScene)
+        setPresentationInput(canAcceptStart() && exitAt == null && !startDispatched)
         if (canAnimateScene()) {
-            startedAt = SystemClock.uptimeMillis() - (landscape.elapsed * 1_000f).toLong()
+            startedAt = uptimeMs() - (landscape.elapsed * 1_000f).toLong()
             post(animateScene)
         } else if (!ValueAnimator.areAnimatorsEnabled()) {
+            if (canAcceptStart() && exitAt != null) {
+                resetExit()
+                dispatchStart()
+            }
             landscape.elapsed = 0f
             landscape.invalidate()
         }
@@ -279,6 +342,10 @@ internal class PrototypeTitleView(context: Context, onStart: () -> Unit) : Frame
 
 private class TitleWord(context: Context, word: String, font: Typeface, private val colors: IntArray) : TextView(context) {
     private var gradient: LinearGradient? = null
+    private var sheen: LinearGradient? = null
+    private val sheenPosition = android.graphics.Matrix()
+    var elapsed = 0f
+        set(value) { field = value; invalidate() }
 
     init {
         text = word
@@ -294,7 +361,9 @@ private class TitleWord(context: Context, word: String, font: Typeface, private 
         pivotX = 0f
         val metrics = paint.fontMetrics
         gradient = LinearGradient(0f, baseline + metrics.ascent, 0f, baseline + metrics.descent,
-            colors, null, Shader.TileMode.CLAMP)
+            colors, floatArrayOf(.08f, .46f, .92f), Shader.TileMode.CLAMP)
+        sheen = LinearGradient(-textSize * .38f, 0f, textSize * .38f, textSize * .19f,
+            intArrayOf(Color.TRANSPARENT, 0xe6ffffff.toInt(), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -311,12 +380,50 @@ private class TitleWord(context: Context, word: String, font: Typeface, private 
         paint.style = Paint.Style.FILL
         paint.shader = gradient
         canvas.drawText(text, 0f, y, paint)
+        if (elapsed >= 1.2f) {
+            val phase = (elapsed - 1.2f) % 4.2f / (4.2f * .35f)
+            if (phase < 1f) {
+                val span = paint.measureText(text) + textSize
+                sheenPosition.setTranslate(span * phase - textSize * .5f, y - textSize * .6f)
+                sheen?.setLocalMatrix(sheenPosition)
+                paint.shader = sheen
+                canvas.drawText(text, 0f, y, paint)
+            }
+        }
         paint.shader = null
+    }
+}
+
+private class TitleSparks(context: Context) : View(context) {
+    private val paint = Paint().apply { color = 0xfffff7c8.toInt() }
+    private val star = Path().apply {
+        moveTo(0f, -11f); lineTo(2.6f, -2.6f); lineTo(11f, 0f); lineTo(2.6f, 2.6f)
+        lineTo(0f, 11f); lineTo(-2.6f, 2.6f); lineTo(-11f, 0f); lineTo(-2.6f, -2.6f); close()
+    }
+    private val points = arrayOf(floatArrayOf(500f, 30f, 0f), floatArrayOf(-26f, 140f, .7f),
+        floatArrayOf(540f, 236f, 1.2f), floatArrayOf(300f, -6f, .35f))
+    var elapsed = 0f
+        set(value) { field = value; invalidate() }
+
+    override fun onDraw(canvas: Canvas) {
+        val scale = width / 650f
+        for ((x, y, delay) in points) {
+            if (elapsed < delay) continue
+            val amount = .5f - .5f * kotlin.math.cos((elapsed - delay) * 2 * Math.PI.toFloat() / 1.8f)
+            val size = scale * (.2f + .8f * amount)
+            paint.alpha = (amount * 255).toInt()
+            canvas.save()
+            canvas.translate((x + 41) * scale, (y + 20) * scale)
+            canvas.scale(size, size)
+            canvas.drawPath(star, paint)
+            canvas.restore()
+        }
     }
 }
 
 private class TitleLandscape(context: Context) : View(context) {
     var elapsed = 0f
+    var zoom = 0f
     private val town by lazy(LazyThreadSafetyMode.NONE) {
         try {
             context.assets.open("pixel/town.png").use {
@@ -340,11 +447,14 @@ private class TitleLandscape(context: Context) : View(context) {
     private val roadShade = LinearGradient(0f, 533f, 0f, 720f, Color.TRANSPARENT, 0x8c0c1020.toInt(),
         Shader.TileMode.CLAMP)
     private val cloud = Path().apply {
-        moveTo(4f, 9f); lineTo(10f, 9f); lineTo(10f, 7f); lineTo(15f, 7f)
-        lineTo(15f, 5f); lineTo(20f, 5f); lineTo(20f, 4f); lineTo(27f, 4f)
-        lineTo(27f, 6f); lineTo(32f, 6f); lineTo(32f, 8f); lineTo(35f, 8f)
-        lineTo(35f, 10f); lineTo(38f, 10f); lineTo(38f, 13f)
-        lineTo(2f, 13f); lineTo(2f, 11f); lineTo(4f, 11f); close()
+        moveTo(4f, 9f); rLineTo(2f, 0f); rLineTo(0f, -2f); rLineTo(3f, 0f)
+        rLineTo(0f, -2f); rLineTo(2f, 0f); rLineTo(0f, -1f); rLineTo(3f, 0f)
+        rLineTo(0f, -1f); rLineTo(6f, 0f); rLineTo(0f, 1f); rLineTo(2f, 0f)
+        rLineTo(0f, 1f); rLineTo(1f, 0f); rLineTo(0f, 1f); rLineTo(2f, 0f)
+        rLineTo(0f, -1f); rLineTo(5f, 0f); rLineTo(0f, 1f); rLineTo(2f, 0f)
+        rLineTo(0f, 2f); rLineTo(1f, 0f); rLineTo(0f, 2f); rLineTo(2f, 0f)
+        rLineTo(0f, 2f); rLineTo(1f, 0f); rLineTo(0f, 2f); lineTo(2f, 14f)
+        rLineTo(0f, -3f); rLineTo(2f, 0f); close()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -357,19 +467,19 @@ private class TitleLandscape(context: Context) : View(context) {
         canvas.translate((width - 1280 * scale) / 2 - 26 * scale * pan,
             (height - 720 * scale) / 2 - (110 + 10 * pan) * scale)
         canvas.scale(scale * 1280 / scene.width(), scale * 1280 / scene.width())
-        canvas.scale(1 + .04f * pan, 1 + .04f * pan, 768f, 635f)
+        canvas.scale(1 + .04f * pan + zoom, 1 + .04f * pan + zoom, 768f, 635f)
         canvas.drawBitmap(background, null, scene, paint)
         vehicles.forEachIndexed { index, bitmap ->
             val (x, y) = townSlots[index]
             drawVehicle(canvas, bitmap, x.toFloat(), y - 7f, flip = true)
         }
         actors.draw(canvas, elapsed, fuelInstalled = true, washInstalled = true)
-        val firstX = (200f + elapsed * 150f) % 920f - 100f
-        val secondX = (490f + elapsed * 190f) % 920f - 100f
+        val firstX = (320f + elapsed * 150f) % 840f - 120f
+        val secondX = (540f + elapsed * 190f) % 840f - 120f
         canvas.save()
         canvas.clipRect(scene)
-        drawVehicle(canvas, vehicles[0], firstX, 722f + firstX / 2f, flip = false)
-        drawVehicle(canvas, vehicles[1], secondX, 800f + secondX / 2f, flip = false)
+        drawVehicle(canvas, vehicles[0], firstX, 715f + firstX / 2f + kotlin.math.sin(elapsed * 12.5f + firstX), flip = false)
+        drawVehicle(canvas, vehicles[1], secondX, 793f + secondX / 2f + kotlin.math.sin(elapsed * 12.5f + secondX), flip = false)
         canvas.restore()
         canvas.restore()
 
@@ -393,7 +503,7 @@ private class TitleLandscape(context: Context) : View(context) {
 
     private fun drawVehicle(canvas: Canvas, bitmap: Bitmap?, x: Float, y: Float, flip: Boolean) {
         if (bitmap == null) return
-        area.set(x - bitmap.width, y - bitmap.height, x + bitmap.width, y + bitmap.height)
+        area.set(x - bitmap.width * .9f, y - bitmap.height * .9f, x + bitmap.width * .9f, y + bitmap.height * .9f)
         canvas.save()
         if (flip) canvas.scale(-1f, 1f, x, y)
         canvas.drawBitmap(bitmap, null, area, paint)

@@ -156,7 +156,7 @@ class ResultsHostActivityTest : InstrumentationTestCase() {
                     current.onBackPressed()
                     assertNull(results(current).selectedSettlementId)
                     current.onBackPressed()
-                    assertTrue(texts(current).contains("드라이브 키우기"))
+                    assertTrue(texts(current).contains("르르르 렌터카"))
                     current.onBackPressed()
                 }
                 release.countDown()
@@ -176,7 +176,7 @@ class ResultsHostActivityTest : InstrumentationTestCase() {
             ui { current.getSystemService(ActivityManager::class.java).appTasks.first {
                 it.taskInfo.persistentId == current.taskId
             }.moveToFront() }
-            awaitUi(current, "저장 후 사용자 복귀에서 새 gate·조회로 가게를 복원한다") { texts(current).contains("드라이브 키우기") }
+            awaitUi(current, "저장 후 사용자 복귀에서 새 gate·조회로 가게를 복원한다") { texts(current).contains("르르르 렌터카") }
             ui { destination(current, HostPage.ONBOARDING) }; instrumentation.waitForIdleSync()
             screenshot(current, "host-narrow-onboarding.png")
             ui {

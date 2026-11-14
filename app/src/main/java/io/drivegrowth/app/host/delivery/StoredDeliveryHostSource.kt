@@ -109,7 +109,7 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
                         changing = command.active?.let { it to nav.selectionRevision }; changeOffer = null; changeRevision = null
                         changeRoute = data.progress?.route
                         ContractResult.Success(DeliveryHostPrepared(DeliveryScreen.Destination(null, null, sourceLabel(identity.source), false,
-                            "내비게이션에서 목적지를 선택한 뒤 다시 조회해 주세요.")))
+                            "내비게이션에서 목적지를 선택한 뒤 다시 조회해 주세요."), navigation = nav))
                     }
                 }
             }
@@ -192,7 +192,9 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
     override fun finish(identity: GameIdentity, operation: DeliveryHostOperation) = journal.finish(identity, operation)
     override fun displayed(identity: GameIdentity, proposed: DeliveryProposed): ContractResult<Unit> {
         val change = changeOffer
-        return if (change?.proposed == proposed) queries.discoverChange(identity, change) else offers.displayed(identity, proposed)
+        return if (change != null && change.proposed.containsDisplayedOffers(proposed)) {
+            queries.discoverChange(identity, change.copy(proposed = proposed))
+        } else offers.displayed(identity, proposed)
     }
     private fun readNavigation(identity: GameIdentity, data: DeliveryHostData): DeliveryNavigationSnapshot {
         val nav = when (val read = navigation.read(identity)) {

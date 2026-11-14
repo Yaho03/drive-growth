@@ -40,8 +40,16 @@ class GachaLiveHostTest {
             override fun prepare(input:GachaDrawInput):ContractResult<GachaCommand>{assertTrue(onWorker);prepares++;return delegate.prepare(input)}
         },journal)
         var host=newHost()
-        var ui: GachaInteraction = GachaInteraction({ event -> when(event){is GachaEvent.Draw->{host.remember(uiState());host.draw(event.request)};is GachaEvent.Reload->{host.remember(uiState());host.refresh(event.token)};else->Unit}})
-        private fun uiState()=ui.uiState
+        var ui: GachaInteraction = GachaInteraction(::handleEvent)
+        private fun handleEvent(event: GachaEvent) {
+            host.remember(ui.uiState)
+            when (event) {
+                is GachaEvent.Draw -> host.draw(event.request)
+                is GachaEvent.Reload -> if (event.settlementId == null) host.refresh(event.token)
+                    else host.refreshAfterResult(event.token, event.settlementId)
+                is GachaEvent.OpenGarage -> Unit
+            }
+        }
         fun newHost()=GachaLiveHost(source,Executor{tasks.addLast(it)},Executor{replies.addLast(it)}){changes++}
         fun attach(){host.attach({f,e->ui.render(f,e);host.remember(ui.uiState)}, {r,v->ui.complete(r,v);host.remember(ui.uiState)},
             {ui.completeReload(it);host.remember(ui.uiState)},{ui.resolveFailedRequest(it);host.remember(ui.uiState)})}
@@ -128,6 +136,61 @@ class GachaLiveHostTest {
         assertTrue(h.ui.frame!!.screen is GachaScreen.Offers);assertNull(h.pending);assertEquals(1,h.prepares)
         h.draw(GachaOptionKind.PAID);assertEquals(2,h.prepares);assertEquals(GameMoney(0),h.balance)
     }
+    @Test fun `확정 결과에서 다시 뽑기는 후보만 읽고 다음 확정에서 새 키로 한 번 지급한다`() {
+        val h = Harness()
+        h.start()
+        h.draw(GachaOptionKind.PAID)
+        val first = h.pending!!
+        val receipt = (h.ui.frame!!.screen as GachaScreen.Result).value.settlement
+        h.host.refreshAfterResult("stale", SettlementId("different-result"))
+        h.drain()
+        assertEquals(first, h.pending)
+        assertEquals(0, h.finishes)
+
+        assertTrue(h.ui.reloadAfterResult())
+        assertFalse(h.ui.reloadAfterResult())
+        assertFalse(h.ui.openGarage())
+        h.host.refreshAfterResult("second-callback", receipt.settlementId)
+        h.drain()
+        assertTrue(h.ui.frame!!.screen is GachaScreen.Offers)
+        assertNull(h.ui.uiState.reloadToken)
+        assertNull(h.pending)
+        assertEquals(1, h.finishes)
+        assertEquals(1, h.prepares)
+        assertEquals(1, h.executes)
+        assertEquals(GameMoney(500), h.balance)
+        assertEquals(1, (h.store.listOwnedVehicles() as ContractResult.Success).value.size)
+
+        h.draw(GachaOptionKind.PAID)
+        assertNotEquals(first.requestId, h.pending!!.requestId)
+        assertEquals(2, h.prepares)
+        assertEquals(2, h.executes)
+        assertEquals(GameMoney(0), h.balance)
+        assertEquals(2, (h.store.listOwnedVehicles() as ContractResult.Success).value.size)
+    }
+
+    @Test fun `결과 확인 뒤 후보 조회 중 제한되면 다음 주차 때 잠금 없이 새 조건을 확인한다`() {
+        val h = Harness()
+        h.start()
+        h.draw(GachaOptionKind.PAID)
+        assertTrue(h.ui.reloadAfterResult())
+        h.onWorker = true
+        h.tasks.removeFirst().run()
+        h.onWorker = false
+        h.replies.removeFirst().run()
+        assertTrue(h.ui.frame!!.screen is GachaScreen.Loading)
+        h.host.setControlsEnabled(false)
+        h.drain()
+        assertFalse(h.ui.controlsEnabled)
+        assertNull(h.ui.uiState.reloadToken)
+        h.host.setControlsEnabled(true)
+        h.drain()
+        assertTrue(h.ui.frame!!.screen is GachaScreen.Offers)
+        assertTrue(h.ui.select("paid"))
+        assertEquals(1, h.executes)
+        assertEquals(GameMoney(500), h.balance)
+    }
+
     @Test fun `이전 View의 차고 이동 잠금은 detach 후 새 View에 남기지 않는다`() {
         val h=Harness();h.start();h.draw(GachaOptionKind.PAID);assertTrue(h.ui.openGarage());h.host.remember(h.ui.uiState)
         h.host.detach();assertNull(h.host.uiState.garagePending)

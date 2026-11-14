@@ -4,6 +4,7 @@ import io.drivegrowth.app.ui.garage.*
 import io.drivegrowth.core.content.GameContentSnapshot
 import io.drivegrowth.core.content.VehicleGameData
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.delivery.HeldVehicle
 import io.drivegrowth.core.garage.*
 import io.drivegrowth.core.progression.GachaRules
 import io.drivegrowth.core.progression.VehicleActivity
@@ -29,6 +30,39 @@ class StoredGarageReadTest {
         assertTrue(shown.sourceLabel.contains("모의 원장"))
         assertTrue(shown.vehicles.all{v->v.actions.values.all{!it.enabled}})
     }
+    @Test fun heldLookupPreservesRecordsAndKeepsEmptyAndFailureSeparate() {
+        val fixture = GarageReadsFixture()
+        val car = fixture.first.copy(ownedVehicleId = OwnedVehicleId("held-a"),
+            acquisitionSource = VehicleAcquisitionSource.PURCHASE_DELIVERY)
+        val deadline = EpochMillis(86_400_000)
+        val held = HeldVehicle(RequestId("held-a"), fixture.source, car, car.acquisitionCost, EpochMillis(0), deadline)
+        val raw = mutableListOf(held, held.copy(requestId = RequestId("held-b"),
+            vehicle = car.copy(ownedVehicleId = OwnedVehicleId("held-b"))))
+        fun snapshot(result: ContractResult<List<HeldVehicle>>): HostSnapshot {
+            val reads = object : StoredHostReads by fixture {
+                override fun heldVehicles() = result
+            }
+            return ok(readStoredHostSnapshot(fixture.content, fixture.source, reads))
+        }
+        fun garage(value: HostSnapshot) = (mapper.garage(value) as GarageScreenState.Content).data
+
+        val saved = snapshot(ContractResult.Success(raw))
+        raw.clear()
+        val shown = garage(saved)
+        assertEquals(listOf("a", "b"), shown.vehicles.map { it.vehicle.ownedVehicleId.value })
+        val rows = ok(shown.heldVehicles)
+        assertEquals(listOf("held-a", "held-b"), rows.map { it.vehicle.ownedVehicleId.value })
+        assertEquals(listOf("1번", "2번"), rows.map { it.instanceLabel })
+        assertTrue(rows.all { it.modelName == "시험 차량" && it.deadline == deadline && it.vehicle.rarity == Rarity.RARE })
+        assertThrows(UnsupportedOperationException::class.java) { (ok(saved.heldVehicles) as MutableList).clear() }
+        assertTrue(ok(garage(snapshot(ContractResult.Success(emptyList()))).heldVehicles).isEmpty())
+        val failure = ContractResult.Failure(ContractError.STORAGE_FAILURE)
+        assertEquals(failure, garage(snapshot(failure)).heldVehicles)
+        val foreign = held.copy(source = InputSource.VEHICLE)
+        assertEquals(ContractResult.Failure(ContractError.STATE_CONFLICT),
+            garage(snapshot(ContractResult.Success(listOf(held, foreign)))).heldVehicles)
+    }
+
     @Test fun storedHistoryKeepsDisposedOwnershipAndExplicitDiscoveriesWithoutPromotingCurrentOwned() {
         val reads=GarageReadsFixture()
         val snapshot=ok(readStoredHostSnapshot(reads.content,InputSource.SIMULATION,reads))
@@ -151,6 +185,7 @@ internal class GarageReadsFixture:StoredHostReads {
     override fun settlements()=ContractResult.Success(emptyList<Settlement>())
     override fun activity(id:OwnedVehicleId)=activityResults.getValue(id)
     override fun accidents(id:OwnedVehicleId)=accidentResults.getValue(id)
+    override fun heldVehicles() = ContractResult.Success(emptyList<HeldVehicle>())
     override fun capacity()=ContractResult.Success(5)
     override fun listVehicleHistory():ContractResult<List<OwnedVehicle>> = historyFailure?.let{ContractResult.Failure(it)}?:ContractResult.Success(listOf(first,second,sold))
     override fun discoveredVehicles()=ContractResult.Success(setOf(CollectionKey(model,Rarity.ADVANCED)))

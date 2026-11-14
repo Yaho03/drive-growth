@@ -13,6 +13,8 @@
     <string name="shop_fixture">고정 시험 입력 · 실제 저장 결과 아님</string>
     <string name="shop_level">가게 레벨 · %1$s</string>
     <string name="shop_capacity">보유 / 공간 · %1$s / %2$s</string>
+    <string name="shop_map_settings">설정</string>
+    <string name="shop_map_checking_operation">영업 상태 확인 중</string>
     <string name="shop_balance">확정 잔액 · %1$s</string>
     <string name="shop_money">%1$s 게임머니</string>
     <string name="shop_unknown">정보 미제공</string>
@@ -31,7 +33,6 @@
     <string name="shop_condition">조건 · %1$s</string>
     <string name="shop_effect">효과 · %1$s</string>
     <string name="shop_price">요청 비용 · %1$s</string>
-    <string name="shop_trial">조정 가능한 시험값</string>
     <string name="shop_preview">변경안 확인</string>
     <string name="shop_preview_label">미리보기 · 확정 상태와 잔액은 유지됩니다</string>
     <string name="shop_before">변경 전 · %1$s</string>

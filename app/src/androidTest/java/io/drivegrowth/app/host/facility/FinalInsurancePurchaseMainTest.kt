@@ -1,5 +1,7 @@
 package io.drivegrowth.app.host.facility
 
+import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.isMainPageShown
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.Process
@@ -25,7 +27,7 @@ import io.drivegrowth.app.host.GameSession
 import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.host.HostPage
 import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
-import io.drivegrowth.app.mainPage
+import io.drivegrowth.app.exposeMainRefresh
 import io.drivegrowth.app.simulation.SimulationTimeline
 import io.drivegrowth.app.simulation.UnifiedSimulationActivity
 import io.drivegrowth.core.contract.*
@@ -127,19 +129,16 @@ class FinalInsurancePurchaseMainTest :
 
         val root = activity.window.decorView
         awaitUi("모의 주차의 실제 Main 가게 진입") {
-            val home = root.mainPage(HostPage.HOME) ?: return@awaitUi false
-            if (!home.isShown || !home.isEnabled) return@awaitUi false
-            if (home.isSelected) return@awaitUi true
-            assertTrue(home.performClick())
-            false
+            if (!root.isMainPageShown(HostPage.HOME)) root.openMainPage(HostPage.HOME)
+            root.isMainPageShown(HostPage.HOME)
         }
         val effect = context.getString(R.string.shop_effect, "사고 손실 절반 보전")
         for ((facility, price) in expectedPrices) {
             openFacility(root, facility)
-            awaitUi("지도 시설 가격과 시험값 안내 $facility") {
-                val labels = overlayLabels(root)
-                priceLabel(price) in labels && context.getString(R.string.shop_trial) in labels
+            awaitUi("지도 시설 가격 $facility") {
+                priceLabel(price) in overlayLabels(root)
             }
+            assertFalse(onUi { "조정 가능한 시험값" in overlayLabels(root) })
             if (facility == Facility.INSURANCE) {
                 val labels = onUi { overlayLabels(root) }
                 assertTrue(labels.containsAll(listOf(context.getString(R.string.shop_locked), conditionLabel(99), effect)))
@@ -161,7 +160,7 @@ class FinalInsurancePurchaseMainTest :
             }
             assertEquals(1, ok(ledger.completedRentalCount()))
         }
-        click(root, "shop:map-settings")
+        awaitUi("가게 설정의 새로고침 노출") { root.exposeMainRefresh() != null }
         click(root, "host:refresh")
         openFacility(root, Facility.INSURANCE)
         awaitUi("고유 방문 100의 보험 건설 해금") {

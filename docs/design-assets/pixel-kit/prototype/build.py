@@ -22,7 +22,8 @@ IMG["dest"] = "data:image/png;base64," + base64.b64encode((HERE / "dest-town.png
 SPR = {k: list(Image.open(TOWN / p).size) for k, p in imgs.items()}
 html = (HERE / "template.html").read_text(encoding="utf-8")
 html = html.replace("{{img}}", json.dumps(IMG)).replace("{{spr}}", json.dumps(SPR))
-motion = (HERE / "motion.jsx").read_text(encoding="utf-8") + "\n" + (HERE / "delivery.jsx").read_text(encoding="utf-8")
+# 7차 휴게소 연출: 보드의 그림(rest-stop-scene.js)·소리(rest-stop-sound.js)를 그대로 넣고 rest-stop.jsx가 카드와 조립을 맡는다
+motion = "\n".join((HERE / f).read_text(encoding="utf-8") for f in ["motion.jsx", "delivery.jsx", "rest-stop-scene.js", "rest-stop-sound.js", "rest-stop.jsx"])
 html = html.replace("{{motion}}", motion.replace("</script", "<\\/script"))
 (HERE / "prototype.html").write_text(html, encoding="utf-8")
 print(len(html) // 1024, "KB")

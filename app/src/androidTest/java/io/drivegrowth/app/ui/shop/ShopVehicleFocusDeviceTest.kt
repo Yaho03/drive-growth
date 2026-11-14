@@ -26,11 +26,15 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
         val second = first.copy(vehicle = first.vehicle.copy(ownedVehicleId = OwnedVehicleId("focus-second")))
         val before = ShopPreviewStates.normal().copy(vehicles = listOf(first, second).map(::mapVehicle))
         val view = ShopView(instrumentation.targetContext) { fail("지도 표시가 가게 거래를 요청했습니다") }
+        val modalStates = mutableListOf<Boolean>()
+        view.onMapModalChanged = modalStates::add
+        view.onOpenVehicle = { _, _ -> fail("조회한 차량을 지도 상세 대신 차고에서 열었습니다") }
         view.onFocusedVehicleAction = events::add
         view.render(before, true, focusVehicles = listOf(first, second))
 
         mapButton(view, second).performClick()
         assertEquals(second.vehicle.ownedVehicleId, view.focusedVehicleId)
+        assertEquals(listOf(true), modalStates)
         openManagement(view)
         val stale = view.findViewWithTag<Button>(VehicleAction.LEVEL_UP)
         mapButton(view, first).performClick()
@@ -56,6 +60,7 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
         previousAction.performClick()
         assertEquals(1, events.size)
         assertNull(view.findViewWithTag<View>("shop:focus-panel"))
+        assertEquals(listOf(true, false), modalStates)
         view.render(next, true, focusVehicles = listOf(updated, second))
         view.handleBack()
         assertNull(view.focusedVehicleId)
@@ -69,7 +74,7 @@ class ShopVehicleFocusDeviceTest : InstrumentationTestCase() {
     fun testCompactPanelKeepsLongNamesAndUsesOnlyMatchingRestingFacts() = onUi {
         val context = instrumentation.targetContext
         val rests = mutableListOf<FacilityControlsEvent>()
-        val sharedExplanation = "실제 저장 상태로 비용과 결과를 먼저 확인합니다"
+        val sharedExplanation = "누르면 비용과 결과를 먼저 보여 드려요"
         val repairReason = "현재 활동에서는 이 관리를 할 수 없습니다"
         val first = GaragePreviewStates.normal.data.vehicles.first().copy(
             name = "긴 차량 이름이 잘리지 않는지 확인하는 캐스퍼 일렉트릭",

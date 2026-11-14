@@ -8,6 +8,7 @@ import io.drivegrowth.app.data.SqliteGameChangeStore
 import io.drivegrowth.core.content.ContentLoad
 import io.drivegrowth.core.content.GameContentSnapshot
 import io.drivegrowth.core.contract.*
+import io.drivegrowth.core.delivery.HeldVehicle
 import io.drivegrowth.core.garage.CollectionState
 import io.drivegrowth.core.garage.Garage
 import io.drivegrowth.core.garage.VehicleHistoryStore
@@ -83,6 +84,7 @@ internal interface StoredHostReads : VehicleHistoryStore {
     fun settlements(): ContractResult<List<Settlement>>
     fun activity(id: OwnedVehicleId): ContractResult<VehicleActivity>
     fun accidents(id: OwnedVehicleId): ContractResult<Int>
+    fun heldVehicles(): ContractResult<List<HeldVehicle>>
     fun capacity(): ContractResult<Int>
 }
 
@@ -93,6 +95,7 @@ private class LedgerHostReads(private val store: SqliteGameChangeStore) : Stored
     override fun settlements() = store.listUnviewedSettlements()
     override fun activity(id: OwnedVehicleId) = store.rental.activity(id)
     override fun accidents(id: OwnedVehicleId) = store.rental.accidentCount(id)
+    override fun heldVehicles() = store.delivery.held()
     override fun capacity(): ContractResult<Int> = when (val result = store.rental.shop()) {
         is ContractResult.Failure -> result
         is ContractResult.Success -> ContractResult.Success(result.value.capacity)
@@ -134,13 +137,22 @@ internal fun readStoredHostSnapshot(
         StoredVehicleState(vehicle, reads.activity(vehicle.ownedVehicleId), nonNegative(reads.accidents(vehicle.ownedVehicleId)))
     }
     val capacity = nonNegative(reads.capacity())
+    val held = when (val result = reads.heldVehicles()) {
+        is ContractResult.Failure -> result
+        is ContractResult.Success -> {
+            val vehicles = ArrayList(result.value)
+            if (vehicles.any { it.source != expectedSource })
+                ContractResult.Failure(ContractError.STATE_CONFLICT)
+            else ContractResult.Success(Collections.unmodifiableList(vehicles))
+        }
+    }
     // 개체 ID/revision의 조회 중 변경만 감지한다. 활동·잔액·이력 전체의 원자성/전역 revision 보장은 아니다.
     when (val result = reads.owned()) {
         is ContractResult.Failure -> return result
         is ContractResult.Success -> if (owned != result.value) return ContractResult.Failure(ContractError.STATE_CONFLICT)
     }
     return ContractResult.Success(HostSnapshot(content, expectedSource, balance, owned, settlements, history,
-        ContractResult.Success(StoredGarageState(expectedSource, content.catalog.contentVersion, content.ruleVersion, vehicles, capacity))))
+        ContractResult.Success(StoredGarageState(expectedSource, content.catalog.contentVersion, content.ruleVersion, vehicles, capacity)), held))
 }
 
 private fun nonNegative(result: ContractResult<Int>): ContractResult<Int> =

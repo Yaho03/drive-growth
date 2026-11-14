@@ -1,5 +1,6 @@
 package io.drivegrowth.app.simulation
 
+import io.drivegrowth.app.isMainPageShown
 import io.drivegrowth.app.exposeMainPage
 import io.drivegrowth.app.mainPage
 import io.drivegrowth.app.openMainPage
@@ -167,7 +168,7 @@ class DeliveryTerminalRecoveryMainTest :
         fun onCollection(): Boolean {
             val menu = root.exposeMainPage(HostPage.COLLECTION) ?: return false
             if (!menu.isSelected) root.openMainPage(HostPage.COLLECTION)
-            return root.mainPage(HostPage.COLLECTION)?.isSelected == true
+            return root.isMainPageShown(HostPage.COLLECTION)
         }
         awaitUi("수령 확인 전 도감의 보관한 탁송 요청 버튼") { onCollection() && storedDeliveryButton(root) != null }
         awaitUi("도감에서 보관한 탁송 요청 열기") { storedDeliveryButton(root)?.performClick() == true }

@@ -10,16 +10,20 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import io.drivegrowth.app.R
-import io.drivegrowth.app.ui.pixel.PixelStyle
+import io.drivegrowth.app.ui.pixel.MapPanelStyle
+import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
+import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import io.drivegrowth.app.ui.vehicleDisplayName
 import io.drivegrowth.core.contract.MAX_VEHICLE_LEVEL
 import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.contract.VehicleLifecycle
 import io.drivegrowth.core.progression.VehicleAction
+import io.drivegrowth.app.ui.shop.ShopFocusLayout
+import io.drivegrowth.app.ui.shop.ShopFocusRegion
 import io.drivegrowth.core.progression.VehicleActivity
 
 /**
- * 지도와 같은 콘텐츠 영역에 겹쳐 놓는 차량 상세. 바깥쪽 터치는 아래 지도에 전달한다.
+ * 지도와 같은 콘텐츠 영역에 겹쳐 놓는 차량 상세.
  * 선택·조작 허용·거래 확인은 호스트가 관리한다.
  */
 @SuppressLint("ViewConstructor")
@@ -28,16 +32,27 @@ internal class MapVehicleDetailView(
     onEvent: (GarageEvent) -> Unit,
 ) : FrameLayout(context) {
     private val style = GarageStyle(context, pixelPanel = true)
+    private val mapStyle = MapPanelStyle(context)
+    private val signs = ReferenceHudStyle(context)
     private val artwork = VehicleArtwork(context, style)
     private val interaction = GarageInteraction(onEvent)
     private val detailPanel = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        background = style.shape(style.panel, selected = true)
+        background = mapStyle.card()
         val inset = style.dp(12)
         setPadding(inset, inset, inset, inset)
         isClickable = true
         tag = "map:vehicle-detail"
     }
+    private var focusRegion: ShopFocusRegion? = null
+    private var summaryArtwork: View? = null
+
+    internal fun setMapFocus(region: ShopFocusRegion) {
+        focusRegion = region
+        isClickable = true
+        requestLayout()
+    }
+
     private var actionsBlocked = false
     private var showActions = false
     private var restLabel: String? = null
@@ -84,7 +99,7 @@ internal class MapVehicleDetailView(
 
     /** 호스트는 기존 거래 확인 화면의 Back을 먼저 처리한다. */
     fun handleBack(): Boolean {
-        if (visibility != VISIBLE || interaction.requestPending) return false
+        if (visibility == GONE || interaction.requestPending) return false
         if (showActions) {
             showActions = false
             resetScroll()
@@ -98,22 +113,26 @@ internal class MapVehicleDetailView(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val height = MeasureSpec.getSize(heightMeasureSpec)
-        val margin = style.dp(12)
-        val availableWidth = (width - margin * 2).coerceAtLeast(0)
-        val availableHeight = (height - margin * 2).coerceAtLeast(0)
-        val side = usesSidePanel(width, height, resources.displayMetrics.density)
-        val maxHeight = if (side) availableHeight else minOf(availableHeight, height * 3 / 5)
-        val panelWidth = if (side) minOf(style.dp(360), availableWidth) else availableWidth
+        val fit = ShopFocusLayout.fit(width, height, resources.displayMetrics.density)
+        val margin = fit.margin
+        val panelWidth = fit.panelWidth
+        summaryArtwork?.let { artworkPanel ->
+            val desiredHeight = if (fit.side) (fit.maxPanelHeight / 3).coerceIn(style.dp(152), style.dp(260))
+                else style.dp(152)
+            artworkPanel.layoutParams.height = desiredHeight
+        }
         (detailPanel.layoutParams as LayoutParams).apply {
             this.width = panelWidth
             this.height = WRAP_CONTENT
-            gravity = Gravity.END or if (side) Gravity.CENTER_VERTICAL else Gravity.BOTTOM
+            gravity = if (fit.side) Gravity.CENTER_VERTICAL or
+                (if (focusRegion?.panelOnLeft == true) Gravity.LEFT else Gravity.RIGHT)
+            else Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             setMargins(margin, margin, margin, margin)
         }
         // FrameLayout의 WRAP_CONTENT가 앱 영역보다 크게 측정되지 않도록 패널의 최대 높이를 고정한다.
-        if (visibility == VISIBLE) {
+        if (visibility != GONE) {
             detailPanel.measure(MeasureSpec.makeMeasureSpec(panelWidth, MeasureSpec.EXACTLY),
-                MeasureSpec.makeMeasureSpec(maxHeight, MeasureSpec.AT_MOST))
+                MeasureSpec.makeMeasureSpec(fit.maxPanelHeight, if (fit.side) MeasureSpec.EXACTLY else MeasureSpec.AT_MOST))
             detailPanel.layoutParams.height = detailPanel.measuredHeight
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -124,6 +143,7 @@ internal class MapVehicleDetailView(
         val focused = findFocus()?.tag
         val version = ++generation
         contentScroll = null
+        summaryArtwork = null
         detailPanel.removeAllViews()
         val visible = interaction.controlsEnabled && interaction.selectedId != null
         visibility = if (visible) VISIBLE else GONE
@@ -131,18 +151,18 @@ internal class MapVehicleDetailView(
         val selected = interaction.selectedVehicle?.takeIf { it.vehicle.lifecycle == VehicleLifecycle.OWNED }
         val content = column()
         when (val state = interaction.state) {
-            GarageScreenState.Loading -> content.addView(text(s(R.string.garage_loading), 18)
+            GarageScreenState.Loading -> content.addView(text(s(R.string.garage_loading), 18, mapStyle.ink)
                 .apply { tag = "shop:focus-query-status" })
             is GarageScreenState.Error -> {
-                content.addView(text(s(R.string.garage_error), 20, bold = true))
-                content.addView(text(state.message, 16, muted).apply { tag = "shop:focus-query-status" })
+                content.addView(text(s(R.string.garage_error), 20, mapStyle.ink, bold = true))
+                content.addView(text(state.message, 16, mapStyle.muted).apply { tag = "shop:focus-query-status" })
                 add(content, control(s(R.string.garage_retry), "map:vehicle-retry", !interaction.retryPending) {
                     interaction.retry()
                     if (generation == version) drawPanel()
                 }, 6)
             }
             is GarageScreenState.Content -> if (selected == null) {
-                content.addView(text(s(R.string.garage_removed), 20, bold = true))
+                content.addView(text(s(R.string.garage_removed), 20, mapStyle.ink, bold = true))
             } else if (showActions) {
                 showManagement(content, selected, version)
             } else {
@@ -156,7 +176,7 @@ internal class MapVehicleDetailView(
         contentScroll = scroll
         detailPanel.addView(scroll, LinearLayout.LayoutParams(-1, -2, 1f))
         val pending = interaction.requestPending
-        if (pending) add(detailPanel, text(s(R.string.garage_pending), 16, PixelStyle.focus), 4)
+        if (pending) add(detailPanel, text(s(R.string.garage_pending), 16, mapStyle.accent), 4)
         val footer = row()
         if (!showActions && selected != null) {
             footer.addView(control(s(R.string.garage_map_manage), "map:vehicle-manage", !actionsBlocked && !pending, primary = true) {
@@ -173,31 +193,76 @@ internal class MapVehicleDetailView(
 
     private fun showSummary(parent: LinearLayout, value: VehiclePresentation): Unit = with(style) {
         val car = value.vehicle
-        parent.addView(row().apply {
-            gravity = Gravity.CENTER_VERTICAL
-            addView(artwork.view(car.vehicleId, car.rarity, 72), LinearLayout.LayoutParams(dp(86), dp(72)))
-            addView(column().apply {
-                addView(text(vehicleDisplayName(value.name, value.instanceLabel), 20, bold = true))
-                addView(text("${rarity(car.rarity)} · ${context.getString(R.string.garage_level, car.level)}",
-                    16, rarityColor(car.rarity), bold = true))
-                addView(text(activityLabel(value.activity), 16, color = PixelStyle.focus))
-            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
-        })
-        if (car.level == MAX_VEHICLE_LEVEL) {
-            add(parent, text(s(R.string.garage_map_max_level), 16, muted), 4)
-        } else {
-            parent.addView(progressTrack(car.levelProgressPercent), LinearLayout.LayoutParams(-1, dp(8)).apply {
-                topMargin = dp(6)
+        val heading = vehicleDisplayName(value.name, value.instanceLabel)
+        add(parent, column().apply {
+            background = mapStyle.chip()
+            setPadding(dp(12), dp(10), dp(12), dp(12))
+            addView(text(heading, 26, mapStyle.ink, bold = true).apply { isAccessibilityHeading = true })
+            val picture = artwork.view(car.vehicleId, car.rarity, 260, showRing = false, fillHeight = true).apply {
+                background = null
+                tag = "map:vehicle-artwork"
+            }
+            summaryArtwork = picture
+            addView(picture, LinearLayout.LayoutParams(-1, dp(152)))
+            if (!artwork.hasSprite(car.vehicleId)) addView(text(s(R.string.garage_art_placeholder), 14, mapStyle.muted))
+            addView(row().apply {
+                addView(badge("${rarity(car.rarity)} · ${context.getString(R.string.garage_level, car.level)}"),
+                    LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginEnd = dp(6) })
+                addView(badge(activityLabel(value.activity), value.activity == VehicleActivity.IDLE),
+                    LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
             })
-            parent.addView(text(context.getString(R.string.garage_progress, "${car.levelProgressPercent}%"), 16, muted))
+            if (car.level == MAX_VEHICLE_LEVEL) {
+                add(this, text(s(R.string.garage_map_max_level), 15, mapStyle.ink, bold = true), 8)
+            } else {
+                val percent = "${car.levelProgressPercent}%"
+                add(this, row().apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(text("EXP", 15, mapStyle.ink, bold = true))
+                    addView(mapStyle.experienceTrack(car.levelProgressPercent).apply { tag = "map:vehicle-exp" },
+                        LinearLayout.LayoutParams(0, dp(22), 1f).apply {
+                            marginStart = dp(8)
+                            marginEnd = dp(8)
+                        })
+                    addView(text(percent, 15, mapStyle.ink, bold = true).apply {
+                        contentDescription = context.getString(R.string.garage_progress, percent)
+                    })
+                }, 8)
+            }
+        }, 0)
+        val acquisition = context.getString(R.string.shop_money,
+            java.text.NumberFormat.getIntegerInstance(java.util.Locale.KOREA).format(car.acquisitionCost.units))
+        add(parent, column().apply {
+            background = mapStyle.chip()
+            setPadding(dp(12), dp(8), dp(12), dp(10))
+            addView(fact(context.getString(R.string.garage_acquisition, acquisition), ReferenceHudIcon.COIN))
+            addView(fact(value.modelPriceLabel?.let { context.getString(R.string.garage_model_price, it) }
+                ?: s(R.string.garage_model_price_missing), ReferenceHudIcon.GARAGE))
+            addView(fact(value.accidentLabel?.let { context.getString(R.string.garage_accidents, it) }
+                ?: s(R.string.garage_accidents_missing), ReferenceHudIcon.RECORD))
+        }, 8)
+        value.activityDetail?.let { add(parent, text(it, 16, mapStyle.muted), 4) }
+        if (value.activity == null) value.informationNote?.let { add(parent, text(it, 16, mapStyle.muted), 4) }
+    }
+
+    private fun badge(label: String, active: Boolean = false) = with(style) {
+        text(label, 14, mapStyle.ink, bold = true).apply {
+            background = mapStyle.chip(active)
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(6), dp(8), dp(7))
         }
-        value.activityDetail?.let { parent.addView(text(it, 16, muted)) }
-        if (value.activity == null) value.informationNote?.let { parent.addView(text(it, 16, muted)) }
+    }
+
+    private fun fact(label: String, icon: ReferenceHudIcon) = with(style) {
+        text(label, 15, mapStyle.ink).apply {
+            setCompoundDrawablesRelative(signs.icon(icon, 20), null, null, null)
+            compoundDrawablePadding = dp(8)
+        }
     }
 
     private fun showManagement(parent: LinearLayout, selected: VehiclePresentation, version: Long): Unit = with(style) {
         val car = selected.vehicle
-        parent.addView(text(vehicleDisplayName(selected.name, selected.instanceLabel), 20, bold = true))
+        parent.addView(text(vehicleDisplayName(selected.name, selected.instanceLabel), 24, mapStyle.ink, bold = true)
+            .apply { isAccessibilityHeading = true })
         if (onRest != null) add(parent, control(restLabel ?: "영업 쉬기 확인 불가", "shop:focus-rest",
             restLabel != null && restEnabled && !actionsBlocked && !interaction.requestPending) { onRest?.invoke() }, 6)
         for ((action, label) in managementActions) {
@@ -205,7 +270,10 @@ internal class MapVehicleDetailView(
             add(parent, control(s(label), action, info?.enabled == true && !actionsBlocked && !interaction.requestPending) {
                 if (interaction.request(action, car.ownedVehicleId, car.revision) && generation == version) drawPanel()
             }, 6)
-            parent.addView(text(info?.explanation ?: s(R.string.garage_action_unknown), 15, muted))
+            parent.addView(text(info?.explanation ?: s(R.string.garage_action_unknown), 15, mapStyle.muted).apply {
+                background = mapStyle.chip()
+                setPadding(dp(10), dp(6), dp(10), dp(7))
+            })
         }
     }
 
@@ -223,10 +291,7 @@ internal class MapVehicleDetailView(
         style.button(label, enabled, primary, onClick = action).apply {
             val version = generation
             tag = key
-            textSize = 16f
-            minimumHeight = style.dp(48)
-            minHeight = style.dp(48)
-            setPadding(style.dp(8), style.dp(6), style.dp(8), style.dp(6))
+            mapStyle.styleButton(this, primary)
             setOnClickListener {
                 if (isEnabled && version == generation && visibility == VISIBLE &&
                     this@MapVehicleDetailView.visibility == VISIBLE && interaction.controlsEnabled) action()
@@ -243,7 +308,7 @@ internal class MapVehicleDetailView(
 
     companion object {
         internal fun usesSidePanel(width: Int, height: Int, density: Float): Boolean =
-            width >= (760 * density).toInt() && width > height
+            ShopFocusLayout.usesSidePanel(width, height, density)
 
         private val managementActions = listOf(
             VehicleAction.LEVEL_UP to R.string.garage_action_level,

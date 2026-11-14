@@ -1,6 +1,7 @@
 package io.drivegrowth.app.ui.shop
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.SystemClock
 import android.view.Gravity
@@ -26,8 +27,6 @@ import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.contract.Revision
 import io.drivegrowth.core.contract.VehicleLifecycle
 import io.drivegrowth.core.rental.Facility
-import java.text.NumberFormat
-import java.util.Locale
 
 /** 주차 gate·저장·거래는 호스트 책임. 단독 생성해 fixture를 render할 수 있다. */
 class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(context) {
@@ -41,12 +40,27 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     })
 
     private val sprites = VehicleSprites(context)
-    private val townBackground by lazy {
-        requireNotNull(context.assets.open("pixel/town.png").use { BitmapFactory.decodeStream(it) })
-    }
+    private var cachedTown: Pair<TownGrowthArt?, Bitmap>? = null
+
+    private fun townBackground(growth: TownGrowthArt?): Bitmap =
+        cachedTown?.takeIf { it.first == growth }?.second ?: run {
+            val path = growth?.assetPath ?: "pixel/town.png"
+            val bitmap = requireNotNull(context.assets.open(path).use { BitmapFactory.decodeStream(it) })
+            cachedTown = growth to bitmap
+            bitmap
+        }
     private var sceneGeneration = 0L
+    private var displayChanged = true
     internal var facilityPanel: View? = null
+        set(value) {
+            displayChanged = displayChanged || field !== value
+            field = value
+        }
     internal var onActivateDecoration: (() -> Unit)? = null
+        set(value) {
+            displayChanged = displayChanged || (field == null) != (value == null)
+            field = value
+        }
     internal var onOpenVehicle: ((OwnedVehicleId, Revision) -> Unit)? = null
     internal var onFocusedVehicleAction: ((GarageEvent.RequestAction) -> Unit)? = null
     internal var onFocusedVehicleRetry: (() -> Unit)? = null
@@ -67,6 +81,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                 }
             }
             is GarageEvent.SelectVehicle -> Unit
+            GarageEvent.OpenHeldDeliveries -> Unit
         }
     }
     private fun vehicleDetailRequestFinished() { vehicleDetail.completeRequest() }
@@ -82,9 +97,16 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     private var recoveryDismissed = false
     private var managementBusy = false
     private var vehicleActionsBlocked = false
-    private var focusFrom: OwnedVehicleId? = null
-    private var focusStartedAt: Long? = null
+    private var activeCamera: ShopSceneView? = null
+    private var previousCamera: ShopMapCamera? = null
+    private var cameraRegion: ShopFocusRegion? = null
+    private var cameraFrom: ShopMapCamera? = null
+    private var cameraStartedAt: Long? = null
     internal var focusManagementPanel: View? = null
+        set(value) {
+            displayChanged = displayChanged || field !== value
+            field = value
+        }
     private var panelTarget: MapPanel? = null
     private var hostOverlayOpen = false
 
@@ -97,21 +119,25 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     private var dismissedPending: ShopRequest? = null
     private var mapPan = ShopMapOffset()
     private var viewedMode = ShopMode.OVERALL
-    private var unviewedCount: Int? = null
     private var operatingStatus: String? = null
-    private var openResults: (() -> Unit)? = null
     private var openSettings: (() -> Unit)? = null
+    internal var onMapModalChanged: ((Boolean) -> Unit)? = null
+    private var mapModalOpen = false
+
+    private fun updateMapModal(open: Boolean) {
+        if (mapModalOpen == open) return
+        mapModalOpen = open
+        onMapModalChanged?.invoke(open)
+    }
 
     /** 호스트가 확인한 요약만 표시한다. 다음 render에서 같은 화면 세대로 함께 배치한다. */
     internal fun updateMapHud(
-        unviewedCount: Int?,
         operatingStatus: String? = null,
-        onResults: (() -> Unit)? = null,
         onSettings: (() -> Unit)? = null,
     ) {
-        this.unviewedCount = unviewedCount
+        displayChanged = displayChanged || this.operatingStatus != operatingStatus ||
+            (openSettings == null) != (onSettings == null)
         this.operatingStatus = operatingStatus
-        openResults = onResults
         openSettings = onSettings
     }
 
@@ -121,35 +147,32 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         data class Details(val target: ShopMapTarget) : MapPanel
         data object VehicleList : MapPanel
         data object FacilityMenu : MapPanel
-        data object SettingsMenu : MapPanel
     }
 
     private fun openMapPanel(target: MapPanel) {
         if (!interaction.controlsEnabled || interaction.state !is ShopScreenState.Content ||
-            uiState.pending != null || managementBusy
+            uiState.pending != null || managementBusy || hostOverlayOpen
         ) return
         if (interaction.selection != null && panelTarget != target) interaction.cancel()
         panelTarget = target
         focusedVehicleId = null
         focusScene = null
-        focusFrom = null
-        focusStartedAt = null
         controlsY = 0
         controlsScroll = null
         drawScreen()
     }
 
     private var controlsScroll: ScrollView? = null
-    private var sceneY = 0
     private var controlsY = 0
     private var projectedBalance: Map<String, GameMoney> = emptyMap()
 
     internal fun updateMapProjectedBalance(value: Map<String, GameMoney>) {
+        if (projectedBalance == value) return
         projectedBalance = value.toMap()
+        displayChanged = true
     }
 
     val uiState: ShopUiState get() = interaction.uiState.copy(
-        sceneScrollY = sceneY,
         controlsScrollY = controlsScroll?.takeIf { it.isLaidOut }?.scrollY ?: controlsY,
     )
 
@@ -168,10 +191,17 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     ) {
         val stale = state is ShopScreenState.Content &&
             state.revision.value < (interaction.uiState.latestRevision?.value ?: -1)
+        val previousState = interaction.state
+        val previousUi = interaction.uiState
+        val previousAccess = interaction.controlsEnabled
         interaction.render(state, controlsEnabled)
         if (!stale) {
-            this.focusVehicles = focusVehicles?.takeIf { focusError == null }
+            val nextVehicles = focusVehicles?.takeIf { focusError == null }
                 ?.filter { it.vehicle.lifecycle == VehicleLifecycle.OWNED }?.associateBy { it.vehicle.ownedVehicleId }
+            displayChanged = displayChanged || this.focusVehicles != nextVehicles || focusGarageError != focusError ||
+                this.focusRest != focusRest || this.focusRestRecovery != focusRestRecovery ||
+                this.managementBusy != managementBusy || this.vehicleActionsBlocked != vehicleActionsBlocked
+            this.focusVehicles = nextVehicles
             focusGarageError = focusError
             this.focusRest = focusRest
             this.focusRestRecovery = focusRestRecovery
@@ -179,11 +209,13 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             this.managementBusy = managementBusy
             this.vehicleActionsBlocked = vehicleActionsBlocked
         }
-        drawScreen()
+        // 표시가 같으면 터치 중인 자식 View와 카메라를 유지한다.
+        if (displayChanged || previousState != interaction.state || previousUi != interaction.uiState ||
+            previousAccess != interaction.controlsEnabled) drawScreen()
     }
     fun restoreUiState(state: ShopUiState) {
         interaction.restoreUiState(state)
-        sceneY = state.sceneScrollY.coerceAtLeast(0); controlsY = state.controlsScrollY.coerceAtLeast(0)
+        controlsY = state.controlsScrollY.coerceAtLeast(0)
         controlsScroll = null
         drawScreen()
     }
@@ -191,8 +223,6 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         focusedVehicleId = id
         if (id != null) panelTarget = null
         focusScene = null
-        focusFrom = null
-        focusStartedAt = null
         drawScreen()
     }
     internal fun containsManagementPanel(panel: View): Boolean {
@@ -226,7 +256,11 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         }
         drawScreen()
     }
-    fun completeRetry() { interaction.completeRetry(); drawScreen() }
+    fun completeRetry() {
+        if (!interaction.uiState.retryPending) return
+        interaction.completeRetry()
+        drawScreen()
+    }
     /** 부모 탐색 전에 가게 미리보기 또는 지도 차량 선택을 닫는다. */
     fun handleBack(): Boolean {
         if (!interaction.controlsEnabled) return false
@@ -246,11 +280,9 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
 
     private fun selectFocusedVehicle(id: OwnedVehicleId?) {
         if (id == focusedVehicleId) return
-        focusFrom = focusedVehicleId
         if (id != null) panelTarget = null
         focusedVehicleId = id
         if (id == null) focusScene = null
-        focusStartedAt = SystemClock.uptimeMillis()
         drawScreen()
     }
 
@@ -260,11 +292,15 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
 
     private fun focusPanel(c: ShopScreenState.Content, selected: ShopVehicle, generation: Long): View {
         val display = withVehicleLabels(c)
-        val camera = cameraScene(display, generation, onVehicle = { id ->
+        val slot = townSlots[shopSceneModel(c).vehicles.indexOfFirst { it.id == selected.id }]
+        val region = ShopFocusRegion.vehicle(slot)
+        val camera = cameraScene(display, generation, region = region, onVehicle = { id ->
             if (acceptsFocusInput(generation) && !focusRestRecovery && focusVehicles?.containsKey(id) != false) {
                 selectFocusedVehicle(id)
             }
         })
+        camera.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        camera.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
         val facts = focusVehicles?.get(selected.id)
         val canManage = facts != null && interaction.state is ShopScreenState.Content && !vehicleActionsBlocked &&
             !managementBusy && uiState.pending == null
@@ -276,24 +312,23 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         val recovery = facilityPanel?.takeIf { focusRestRecovery }
         if (management != null || recovery != null) {
             vehicleDetail.render(GarageScreenState.Loading, null, false, true)
-            camera.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-            camera.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             val content = management ?: checkNotNull(recovery)
             (content.parent as? ViewGroup)?.removeView(content)
             return FrameLayout(context).apply {
                 tag = "shop:focus-panel"
                 addView(camera, FrameLayout.LayoutParams(-1, -1))
-                val sheet = ShopMapSheet(context, content, controlsY, !managementBusy) {
+                val sheet = ShopMapSheet(context, content, controlsY, !managementBusy, region) {
                     if (acceptsFocusInput(generation)) selectFocusedVehicle(null)
                 }
                 controlsScroll = sheet.scroll
-                addView(sheet, FrameLayout.LayoutParams(-1, -1))
+                addFocusedPanel(sheet, camera)
             }
         }
         if (!managementBusy && !preparingVehicleAction) vehicleDetailRequestFinished()
         val detailState = focusGarageError?.let { GarageScreenState.Error(it) }
             ?: focusVehicles?.values?.toList()?.let { GarageScreenState.Content(GarageContent(it, null, "")) }
             ?: GarageScreenState.Loading
+        vehicleDetail.setMapFocus(region)
         vehicleDetail.render(detailState, selected.id, interaction.controlsEnabled, !canManage)
         vehicleDetail.updateRest(rest?.let { if (it.expected) "영업 쉬기 끄기" else "영업 쉬기 켜기" }, canManage) {
             if (acceptsFocusInput(generation) && canManage && focusedVehicleId == selected.id && rest != null) {
@@ -304,13 +339,30 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         return FrameLayout(context).apply {
             tag = "shop:focus-panel"
             addView(camera, FrameLayout.LayoutParams(-1, -1))
-            addView(vehicleDetail, FrameLayout.LayoutParams(-1, -1))
+            addFocusedPanel(vehicleDetail, camera)
         }
     }
+    private fun FrameLayout.addFocusedPanel(panel: View, camera: ShopSceneView) {
+        val block = FrameLayout(context).apply {
+            isClickable = true
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(panel, FrameLayout.LayoutParams(-1, -1))
+        }
+        addView(block, FrameLayout.LayoutParams(-1, -1))
+        val generation = sceneGeneration
+        val visible = panel.visibility
+        if (visible == View.VISIBLE) panel.visibility = View.INVISIBLE
+        camera.afterCameraSettles(this@ShopView.isAttachedToWindow) {
+            if (sceneGeneration == generation) panel.visibility = visible
+        }
+    }
+
     private fun s(id: Int, vararg args: Any) = context.getString(id, *args)
-    private fun money(value: GameMoney?) = value?.let { s(R.string.shop_money, NumberFormat.getIntegerInstance(Locale.KOREA).format(it.units)) } ?: s(R.string.shop_unknown)
     private fun drawScreen(): Unit = with(style) {
+        displayChanged = false
         controlsScroll?.takeIf { it.isLaidOut }?.let { controlsY = it.scrollY }
+        previousCamera = activeCamera?.displayedCamera()
+        activeCamera = null
         val focus = findFocus()?.tag
         val generation = ++sceneGeneration
         // 교체된 overlay의 버튼도 현재 ShopInteraction으로 명령을 보내지 못하게 한다.
@@ -320,15 +372,18 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         activeSheet = null
         controlsScroll = null; removeAllViews()
         setPadding(0, 0, 0, 0)
+        setBackgroundColor(if (interaction.state is ShopScreenState.Content && interaction.controlsEnabled) base else page)
         if (!interaction.controlsEnabled) {
             vehicleDetail.render(GarageScreenState.Loading, null, false, true)
             focusScene = null
             panelTarget = null
-            focusFrom = null
-            focusStartedAt = null
+            cameraRegion = null
+            cameraFrom = null
+            cameraStartedAt = null
             submittedExpansion = null
             committedExpansion = null
             addView(text(s(R.string.shop_restricted), 28))
+            updateMapModal(false)
             return@with
         }
         val state = interaction.state
@@ -340,6 +395,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         if (focusContent != null && selected != null) {
             focusScene = focusContent
             addView(focusPanel(focusContent, selected, generation), LayoutParams(-1, 0, 1f))
+            updateMapModal(true)
             if (focus != null) findViewWithTag<View>(focus)?.takeIf { it.isEnabled }?.requestFocus()
             return@with
         }
@@ -347,8 +403,6 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         if (selectedId != null && (state is ShopScreenState.Content || focusVehicles?.containsKey(selectedId) == false)) {
             focusedVehicleId = null
             focusScene = null
-            focusFrom = null
-            focusStartedAt = null
         }
         when (state) {
             ShopScreenState.Loading -> {
@@ -362,8 +416,11 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             is ShopScreenState.Empty -> problem(s(R.string.shop_empty), state.message, true)
             is ShopScreenState.Failure -> problem(s(R.string.shop_failure), state.message, true)
             is ShopScreenState.Unsupported -> problem(s(R.string.shop_unsupported), state.message, false)
-            is ShopScreenState.Content -> addView(mapScreen(state, generation, previousOverlayScroll), LayoutParams(-1, 0, 1f))
+            is ShopScreenState.Content -> addView(
+                mapScreen(state, generation, previousOverlayScroll), LayoutParams(-1, 0, 1f),
+            )
         }
+        updateMapModal(activeSheet != null || mapOverlay != null)
         if (focus != null) findViewWithTag<View>(focus)?.takeIf { it.isEnabled }?.requestFocus()
     }
     private fun problem(title: String, body: String, retry: Boolean) = with(style) {
@@ -388,11 +445,20 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         c: ShopScreenState.Content,
         generation: Long,
         onVehicle: ((OwnedVehicleId) -> Unit)?,
+        region: ShopFocusRegion? = null,
         onMapTarget: ((ShopMapTarget) -> Unit)? = null,
     ): ShopSceneView {
-        val scene = ShopSceneView(context, c, uiState.mode, townBackground, sprites, onVehicle,
-            fillViewport = true, initialPan = mapPan, onPan = { mapPan = it }, onMapTarget = onMapTarget)
-        scene.focus(focusedVehicleId, focusFrom, focusStartedAt) { acceptsFocusInput(generation) }
+        if (cameraRegion != region) {
+            cameraRegion = region
+            cameraFrom = previousCamera
+            cameraStartedAt = cameraFrom?.let { SystemClock.uptimeMillis() }
+        }
+        val growth = TownGrowthArt.matching(c.level, c.capacity)
+        val scene = ShopSceneView(context, c, uiState.mode, townBackground(growth), sprites, onVehicle,
+            growthArt = growth, fillViewport = true, initialPan = mapPan, onPan = { mapPan = it }, onMapTarget = onMapTarget)
+        scene.frameSelection(region, cameraFrom)
+        scene.focus(focusedVehicleId, null, cameraStartedAt) { acceptsFocusInput(generation) }
+        activeCamera = scene
         return scene
     }
 
@@ -401,7 +467,10 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         generation: Long,
         previousOverlayScroll: Pair<ShopMapTarget, Int>?,
     ) = with(style) {
-        val frame = FrameLayout(context).apply { tag = "shop:map-screen" }
+        val frame = FrameLayout(context).apply {
+            tag = "shop:map-screen"
+            setBackgroundColor(base)
+        }
         if (viewedMode != uiState.mode) {
             viewedMode = uiState.mode
             mapPan = ShopMapOffset()
@@ -409,21 +478,35 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         val openVehicle: ((OwnedVehicleId) -> Unit)? =
             if (onFocusedVehicleAction == null && onOpenVehicle == null) null else { id ->
                 if (acceptsFocusInput(generation)) {
-                    if (onFocusedVehicleAction != null && shopSceneModel(c).vehicles.any { it.id == id } &&
-                        focusVehicles?.containsKey(id) != false
-                    ) selectFocusedVehicle(id)
-                    else if (onOpenVehicle != null) {
+                    if (onOpenVehicle != null) {
                         panelTarget = null
                         onOpenVehicle?.invoke(id, c.revision)
                         drawScreen()
-                    }
+                    } else if (onFocusedVehicleAction != null && shopSceneModel(c).vehicles.any { it.id == id } &&
+                        focusVehicles?.containsKey(id) != false) selectFocusedVehicle(id)
                 }
             }
+        val review = interaction.selection
+        val pending = uiState.pending
+        val target = when {
+            pending != null -> pending.takeUnless { it == dismissedPending }
+                ?.let { MapPanel.Details(it.selection.option.mapTarget()) }
+            review != null -> MapPanel.Details(review.option.mapTarget())
+            focusRestRecovery && !recoveryDismissed && panelTarget == null -> MapPanel.FacilityMenu
+            else -> panelTarget
+        }
+        val region = (target as? MapPanel.Details)?.target?.focusRegion()
         val display = withVehicleLabels(c)
         val scene = cameraScene(display, generation, onVehicle = { id: OwnedVehicleId ->
-            if (activeSheet == null && mapOverlay == null) openVehicle?.invoke(id) ?: Unit
-        }.takeIf { openVehicle != null }) { target ->
-            if (acceptsFocusInput(generation) && activeSheet == null && mapOverlay == null) showMapPanel(target)
+            if (acceptsFocusInput(generation) && activeSheet == null && mapOverlay == null) {
+                if (onFocusedVehicleAction != null && focusVehicles?.containsKey(id) == true) {
+                    selectFocusedVehicle(id)
+                } else {
+                    openVehicle?.invoke(id)
+                }
+            }
+        }.takeIf { openVehicle != null }, region = region) { mapTarget ->
+            if (acceptsFocusInput(generation) && activeSheet == null && mapOverlay == null) showMapPanel(mapTarget)
         }
         frame.addView(scene, FrameLayout.LayoutParams(-1, -1))
         val request = committedExpansion
@@ -446,15 +529,6 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                 committedExpansion = null
             }
         }
-        val review = interaction.selection
-        val pending = uiState.pending
-        val target = when {
-            pending != null -> pending.takeUnless { it == dismissedPending }
-                ?.let { MapPanel.Details(it.selection.option.mapTarget()) }
-            review != null -> MapPanel.Details(review.option.mapTarget())
-            focusRestRecovery && !recoveryDismissed && panelTarget == null -> MapPanel.FacilityMenu
-            else -> panelTarget
-        }
         if (target != null) {
             scene.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             scene.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
@@ -468,24 +542,18 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                         }
                     },
                     onChanged = { if (sceneGeneration == generation) drawScreen() },
+                    town = townBackground(TownGrowthArt.matching(c.level, c.capacity)),
                 )
                 mapOverlay = overlay
                 overlay.render(target.target, interaction, projectedBalance,
-                    initialScrollY = previousOverlayScroll?.takeIf { it.first == target.target }?.second ?: 0)
-                frame.addView(overlay, FrameLayout.LayoutParams(-1, -1))
+                    initialScrollY = previousOverlayScroll?.takeIf { it.first == target.target }?.second ?: 0,
+                    focus = region)
+                if (region != null) frame.addFocusedPanel(overlay, scene)
+                else frame.addView(overlay, FrameLayout.LayoutParams(-1, -1))
             } else {
                 activeSheet = target
-                val dim = View(context).apply {
-                    setBackgroundColor(0x880d1423.toInt())
-                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-                    isClickable = true
-                }
-                frame.addView(dim, FrameLayout.LayoutParams(-1, -1))
                 val content = when (target) {
                     MapPanel.VehicleList -> vehicleList(display, openVehicle)
-                    MapPanel.SettingsMenu -> style.column().apply {
-                        add(this, mapButton("꾸미기", "shop:map-decorations") { showMapPanel(ShopMapTarget.Decorations) })
-                    }
                     else -> facilityMenu()
                 }
                 val sheet = ShopMapSheet(context, content, controlsY, uiState.pending == null) {
@@ -495,37 +563,9 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                 frame.addView(sheet, FrameLayout.LayoutParams(-1, -1))
             }
         } else {
-            val hud = ShopMapHud(context, c, money(c.balance), operatingStatus, unviewedCount,
-                openResults?.let { action -> { if (acceptsFocusInput(generation)) action() } },
-                {
-                    if (acceptsFocusInput(generation)) {
-                        val settings = openSettings
-                        if (settings != null) settings() else openMapPanel(MapPanel.SettingsMenu)
-                    }
-                })
-            frame.addView(hud, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply {
-                marginStart = dp(8); marginEnd = dp(8); topMargin = dp(8)
-            })
-            val toolbar = row().apply {
-                for (mode in ShopMode.entries) {
-                    val selected = uiState.mode == mode
-                    val button = mapButton(
-                        if (mode == ShopMode.OVERALL) "전체 보기" else "차량 중심 보기",
-                        "shop:mode:$mode", selected,
-                    ) { if (!selected) { interaction.mode(mode); drawScreen() } }
-                    button.isSelected = selected
-                    addView(button, LayoutParams(0, -2, 1f))
-                }
-                addView(mapButton("시설", "shop:map-facilities") {
-                    openMapPanel(MapPanel.FacilityMenu)
-                }, LayoutParams(0, -2, 1f))
-                addView(mapButton("차량 목록", "shop:map-vehicles") {
-                    openMapPanel(MapPanel.VehicleList)
-                }, LayoutParams(0, -2, 1f))
-            }
-            frame.addView(toolbar, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM or Gravity.START).apply {
-                marginStart = dp(8); marginEnd = dp(8); bottomMargin = dp(8)
-            })
+            val hud = ShopMapHud(context, c, operatingStatus,
+                openSettings?.let { guardedMapAction { openSettings?.invoke() } })
+            frame.addView(hud, FrameLayout.LayoutParams(-1, -1))
             val notice = uiState.message ?: uiState.acknowledged
                 ?.takeIf { it.revision == c.revision }?.let { s(R.string.shop_wait_refresh) }
             if (notice != null) {
@@ -534,7 +574,10 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
                     marginEnd = dp(8)
                     bottomMargin = dp(62)
                 }
-                val label = text(notice, 16, accent).apply { background = shape(panel) }
+                val label = text(notice, 16, accent).apply {
+                    background = surface()
+                    setPadding(dp(12), dp(8), dp(12), dp(8))
+                }
                 frame.addView(label, layout)
             }
         }
@@ -550,13 +593,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     }
 
     private fun mapButton(label: String, key: String, selected: Boolean = false, action: () -> Unit) =
-        style.button(label, primary = selected, action = guardedMapAction(action)).apply {
-            tag = key
-            textSize = 15f
-            minHeight = style.dp(48)
-            minimumHeight = style.dp(48)
-            setPadding(style.dp(4), 0, style.dp(4), 0)
-        }
+        style.button(label, primary = selected, action = guardedMapAction(action)).apply { tag = key }
 
     private fun guardedMapAction(action: () -> Unit): () -> Unit {
         val generation = sceneGeneration
@@ -594,10 +631,23 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             }
         }
     }
+    /** 지도 기본 화면에는 주 탐색만 두고 보조 조작은 설정에서 연다. */
+    fun openMapTools() {
+        if (acceptsFocusInput(sceneGeneration)) openMapPanel(MapPanel.FacilityMenu)
+    }
+
     private fun facilityMenu() = style.column().apply {
-        onActivateDecoration?.let { activate ->
+        for (mode in ShopMode.entries) {
+            val selected = uiState.mode == mode
+            style.add(this, mapButton(if (mode == ShopMode.OVERALL) "전체 보기" else "차량 중심 보기",
+                "shop:mode:$mode", selected) {
+                if (!selected) { interaction.mode(mode); drawScreen() }
+            }.apply { isSelected = selected })
+        }
+        style.add(this, mapButton("차량 목록", "shop:map-vehicles") { openMapPanel(MapPanel.VehicleList) })
+        if (onActivateDecoration != null) {
             style.add(this, mapButton("꾸미기 기능 사용 시작", "decoration:activate") {
-                if (activeSheet == MapPanel.FacilityMenu) activate()
+                if (activeSheet == MapPanel.FacilityMenu) onActivateDecoration?.invoke()
             })
         }
         style.add(this, mapButton("가게 확장", "shop:menu-expansion") { showMapPanel(ShopMapTarget.Expansion) })

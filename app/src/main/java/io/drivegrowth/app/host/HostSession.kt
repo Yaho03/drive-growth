@@ -99,9 +99,12 @@ internal class HostSession(
             if (simulated !is ContractResult.Failure) {
                 val rentalResult = rental.observed(receiver, frame, recorded)
                 simulation?.rentalResult(rentalResult)
-                if (simulation != null && recorded is ContractResult.Success &&
-                    rentalResult is ContractResult.Success && rentalSource.issue == null
-                ) simulation.inputConsumed(frame, recorded.value, rentalResult.value)
+                if (simulation != null && recorded is ContractResult.Success) {
+                    if (simulation.restRecording) simulation.restInputRecorded(frame, recorded.value)
+                    if (rentalResult is ContractResult.Success && rentalSource.issue == null) {
+                        simulation.inputConsumed(frame, recorded.value, rentalResult.value)
+                    }
+                }
             }
             recorded
         }, { receiver, at ->

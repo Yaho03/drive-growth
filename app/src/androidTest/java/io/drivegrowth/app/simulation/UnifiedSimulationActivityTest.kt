@@ -1,5 +1,6 @@
 package io.drivegrowth.app.simulation
 
+import io.drivegrowth.app.mainGameControls
 import io.drivegrowth.app.mainNavigation
 import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.showSimulationControls
@@ -67,7 +68,7 @@ class UnifiedSimulationActivityTest : ActivityInstrumentationTestCase2<UnifiedSi
             assertEquals(SimulationTimeline().clock.epoch,original.grant.confirmedAt)
             game.identity
         }
-        awaitUi(first,"기존 화면 선택") { first.window.decorView.mainNavigation()?.isEnabled == true }
+        awaitUi(first,"기존 화면 선택") { first.window.decorView.mainGameControls()?.isEnabled == true }
         instrumentation.runOnMainSync {
             first.window.decorView.openMainPage(HostPage.DELIVERY)
         }
@@ -83,11 +84,11 @@ class UnifiedSimulationActivityTest : ActivityInstrumentationTestCase2<UnifiedSi
         }
         click(first,"delivery:offer:${income.id.value}");click(first,"delivery:confirm");click(first,"delivery:acknowledge")
         val route=read { game ->checkNotNull(ok(game.store.delivery.inProgress())).also { assertEquals(initial.source,it.active.proposed.estimated.source) } }
-        instrumentation.runOnMainSync { first.window.decorView.showSimulationControls() }
+        instrumentation.runOnMainSync { first.window.decorView.showSimulationControls(first) }
         click(first,"simulation:start")
         awaitUi(first,"시나리오 입력 종료와 모의 주차") {
             context.getSharedPreferences("unified-simulation-v1",0).getInt("stage",0)==65 &&
-                first.window.decorView.mainNavigation()?.isEnabled == true
+                first.window.decorView.mainGameControls()?.isEnabled == true
         }
         awaitStored("기존 원장의 세 정산과 첫 보상") { read { game ->
             val results=ok(game.store.listUnviewedSettlements())
@@ -112,7 +113,7 @@ class UnifiedSimulationActivityTest : ActivityInstrumentationTestCase2<UnifiedSi
             instrumentation.runOnMainSync { first.recreate() }
             next=instrumentation.waitForMonitorWithTimeout(monitor,15_000) as? UnifiedSimulationActivity
             assertNotNull(next)
-            awaitUi(next!!,"재생성 후 모의 상태/기존 UI") { next!!.window.decorView.mainNavigation()?.isEnabled==true }
+            awaitUi(next!!,"재생성 후 모의 상태/기존 UI") { next!!.window.decorView.mainGameControls()?.isEnabled == true }
             read { game ->
                 assertEquals(initial,game.identity);assertEquals(saved.first,ok(game.store.balance()))
                 assertEquals(saved.second,ok(game.store.listUnviewedSettlements()))

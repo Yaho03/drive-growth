@@ -8,6 +8,7 @@ import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
+import io.drivegrowth.app.ui.presentation.ReferenceSceneFrame
 import io.drivegrowth.app.R
 import io.drivegrowth.app.data.ArrivalCommit
 import io.drivegrowth.app.data.DeliveryCommit
@@ -39,8 +40,11 @@ class DeliveryViewTest : InstrumentationTestCase() {
     fun testMissingDestinationAndRestrictionNeverShowReadyOrEmitStaleActions() = onUi {
         val requests = mutableListOf<DeliveryRequest>()
         val view = DeliveryView(instrumentation.targetContext, requests::add)
-        val initial = DeliveryFrame(1, DeliveryScreen.Destination(null, null, null, true))
+        val initial = DeliveryFrame(1, DeliveryScreen.Destination(null, "예상 36 km", null, true))
         view.render(initial, true)
+        val labels = nodes(view).filterIsInstance<TextView>()
+        assertTrue(labels.none { "36 km" in it.text })
+        assertNull(view.findViewWithTag<View>("delivery:motion-art"))
         val stale = view.findViewWithTag<Button>("delivery:destination")
         assertNotNull(stale)
         view.render(initial, false)
@@ -86,6 +90,7 @@ class DeliveryViewTest : InstrumentationTestCase() {
         val data = DeliveryPreviewStates
         val view = DeliveryView(instrumentation.targetContext, requests::add)
         view.render(data.offers, true)
+        view.findViewWithTag<Button>("delivery:tab:purchase").performClick()
         view.findViewWithTag<Button>("delivery:offer:offer-1").performClick()
         assertTrue(requests.isEmpty())
         val confirm = view.findViewWithTag<Button>("delivery:confirm")
@@ -98,7 +103,74 @@ class DeliveryViewTest : InstrumentationTestCase() {
         assertTrue(nodes(view).filterIsInstance<TextView>().any { it.text.contains("도착") })
     }
 
-    fun testHostControlsShareOfferScrollAndDisappearWhenRestricted() = onUi {
+    fun testConfirmationActionsStayVisibleAt936And320Dp() = onUi {
+        val context = instrumentation.targetContext
+        val data = DeliveryPreviewStates
+        for (width in listOf(936, 320)) {
+            val view = DeliveryView(context, onRequest = {})
+            layoutAt(view, width, 430)
+            val frame = if (width == 320) data.longText else data.offers
+            for (offer in listOf(data.purchase, data.income)) {
+                view.render(frame, true)
+                val tab = if (offer is DeliveryOffer.Purchase) "purchase" else "income"
+                view.findViewWithTag<Button>("delivery:tab:$tab").performClick()
+                checkNotNull(view.findViewWithTag<Button>("delivery:offer:${offer.id.value}")).performClick()
+                layoutAt(view, width, 430)
+                val back = checkNotNull(view.findViewWithTag<Button>("delivery:back"))
+                val confirm = checkNotNull(view.findViewWithTag<Button>("delivery:confirm"))
+                assertSame(back.parent, confirm.parent)
+                for (button in listOf(back, confirm)) {
+                    val bounds = Rect()
+                    assertTrue(button.getGlobalVisibleRect(bounds))
+                    assertEquals(button.height, bounds.height())
+                }
+                val facts = checkNotNull(view.findViewWithTag<View>("delivery:review-facts"))
+                val labels = nodes(facts).filterIsInstance<TextView>().map { it.text.toString() }
+                assertTrue(context.getString(R.string.delivery_estimated, "12.5 km") in labels)
+                assertNull(view.findViewWithTag<View>("delivery:motion-art"))
+                if (width == 320) {
+                    val scroll = nodes(view).filterIsInstance<ScrollView>().single()
+                    val before = Rect()
+                    val after = Rect()
+                    assertTrue(confirm.getGlobalVisibleRect(before))
+                    scroll.scrollTo(0, scroll.getChildAt(0).height)
+                    assertTrue(scroll.scrollY > 0)
+                    assertTrue(confirm.getGlobalVisibleRect(after))
+                    assertEquals(before, after)
+                }
+                assertTrue(back.performClick())
+            }
+        }
+    }
+
+    fun testPagedOffersRenderOnlyCurrentTypeAndPage() = onUi {
+        val view = DeliveryView(instrumentation.targetContext, onRequest = {})
+        val data = DeliveryPreviewStates
+        view.render(data.offers, true)
+        assertNotNull(view.findViewWithTag<View>("delivery:offer:offer-0"))
+        assertNull(view.findViewWithTag<View>("delivery:offer:offer-1"))
+        view.findViewWithTag<Button>("delivery:tab:purchase").performClick()
+        assertNull(view.findViewWithTag<View>("delivery:offer:offer-0"))
+        assertNotNull(view.findViewWithTag<View>("delivery:offer:offer-1"))
+        view.render(data.many, true)
+        layoutAt(view, 320, 440)
+        val first = checkNotNull(view.findViewWithTag<View>("delivery:offer:offer-0"))
+        val next = checkNotNull(view.findViewWithTag<Button>("delivery:offers:next"))
+        assertFalse(view.findViewWithTag<Button>("delivery:offers:prev").isEnabled)
+        val before = Rect()
+        assertTrue(next.getGlobalVisibleRect(before))
+        val scroll = nodes(view).filterIsInstance<ScrollView>().single()
+        scroll.scrollTo(0, scroll.getChildAt(0).height)
+        val after = Rect()
+        assertTrue(next.getGlobalVisibleRect(after))
+        assertEquals(before, after)
+        next.performClick()
+        assertFalse(first.isShown)
+        assertNotNull(view.findViewWithTag<View>("delivery:offer:offer-1"))
+        assertNull(view.findViewWithTag<View>("delivery:offer:offer-0"))
+    }
+
+    fun testHostNavigationIsOnlyShownForDestinationAndClearedWhenRestricted() = onUi {
         val context = instrumentation.targetContext
         val view = DeliveryView(context, onRequest = {},
             navigationControls = { Button(context).apply { tag = "test:navigation" } },
@@ -106,16 +178,14 @@ class DeliveryViewTest : InstrumentationTestCase() {
         )
         val offers = DeliveryPreviewStates.offers
         view.render(offers, true)
-        val scroll = nodes(view).filterIsInstance<ScrollView>().single()
-        val tags = nodes(scroll).map { it.tag }
-        val offer = tags.indexOf("delivery:offer:offer-1")
-        assertTrue(tags.indexOf("test:receipt") in 0 until offer)
-        assertTrue(tags.indexOf("test:navigation") > offer)
-
-        view.render(offers, false)
+        assertNotNull(view.findViewWithTag<Button>("test:receipt"))
+        assertNull(view.findViewWithTag<Button>("test:navigation"))
+        val destination = DeliveryPreviewStates.missing
+        view.render(destination, true)
+        assertNotNull(view.findViewWithTag<Button>("test:navigation"))
+        view.render(destination, false)
         assertNull(view.findViewWithTag<Button>("test:navigation"))
         assertNull(view.findViewWithTag<Button>("test:receipt"))
-        assertNull(view.findViewWithTag<Button>("delivery:offer:offer-1"))
     }
 
     fun testReviewBackNeverSubmitsAbandonAndMissingAmountsDisableConfirmation() = onUi {
@@ -143,7 +213,12 @@ class DeliveryViewTest : InstrumentationTestCase() {
         view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
         view.layout(0, 0, width, height)
-        assertTrue(nodes(view).all { it.width <= width })
+        val departureArt = checkNotNull(view.findViewWithTag<View>("delivery:motion-art"))
+        assertTrue(departureArt.getGlobalVisibleRect(Rect()))
+        val screenArt = Rect()
+        departureArt.getGlobalVisibleRect(screenArt)
+        assertTrue(screenArt.width() in (width * .95f).toInt()..width)
+        assertTrue(screenArt.height() <= height)
         view.findViewWithTag<Button>("delivery:skip-motion").performClick()
         assertNull(view.findViewWithTag<View>("delivery:scene:DEPARTURE"))
         assertNotNull(view.findViewWithTag<View>("delivery:highway"))
@@ -171,16 +246,39 @@ class DeliveryViewTest : InstrumentationTestCase() {
         assertNotNull(view.findViewWithTag<View>("delivery:highway"))
     }
 
-    fun testActiveHighwayAndStatusPrecedeHostDestinationControls() = onUi {
+    fun testWideActiveRoadSitsLeftOfSummaryAndUsesLessThanHalfTheViewport() = onUi {
+        val view = DeliveryView(instrumentation.targetContext, onRequest = {})
+        val frame = incomeFrame()
+        view.showHeading = false
+        layoutAt(view, 960, 500)
+        view.render(frame, true)
+        layoutAt(view, 960, 500)
+        assertTrue(view.hasActiveRoad)
+        val summary = checkNotNull(view.findViewWithTag<View>("delivery:highway-status"))
+        val road = checkNotNull(view.findViewWithTag<View>("delivery:motion-art"))
+        val summaryBounds = Rect()
+        val roadBounds = Rect()
+        assertTrue(summary.getGlobalVisibleRect(summaryBounds))
+        assertTrue(road.getGlobalVisibleRect(roadBounds))
+        assertTrue(roadBounds.right <= summaryBounds.left)
+        assertTrue(road.height in (view.height / 5)..(view.height / 2))
+        assertNull(view.findViewWithTag<View>("delivery:scene:DEPARTURE"))
+
+        view.render(frame.copy(version = frame.version + 1), false)
+        assertFalse(view.hasActiveRoad)
+        assertNull(view.findViewWithTag<View>("delivery:highway"))
+    }
+
+    fun testActiveHighwayShowsObservedStatusAndFixedActionsWithoutDestinationConfirmation() = onUi {
         val context = instrumentation.targetContext
         val destinationControls = "test:host-destination"
         val view = DeliveryView(context, onRequest = {}, navigationControls = {
             Button(context).apply { tag = destinationControls; text = "시연 목적지 확인" }
-        })
-        layoutAt(view, 700, 320)
+        }).apply { onReturnToShop = {} }
+        layoutAt(view, 700, 440)
         val original = incomeFrame()
         val active = (original.screen as DeliveryScreen.Active).delivery
-        val fullDestination = "긴 목적지 이름과 상세 위치 ".repeat(20).trimEnd()
+        val fullDestination = "긴 목적지 이름과 상세 위치 ".repeat(5).trimEnd()
         val staleDistanceLabel = "출처가 다른 관측값 5000 m"
         val frame = original.copy(screen = DeliveryScreen.Active(active.copy(
             destinationName = fullDestination, observedDistanceLabel = staleDistanceLabel,
@@ -190,28 +288,41 @@ class DeliveryViewTest : InstrumentationTestCase() {
         val nav = DeliveryNavigationSnapshot(null, null, missing, observed, missing, null)
         val read = DeliveryHostRead(GameIdentity(ProfileId("fixture"), InputSource.SIMULATION), frame.screen, navigation = nav)
         view.render(frame, true, read)
-        layoutAt(view, 700, 320)
+        layoutAt(view, 700, 440)
         val status = checkNotNull(view.findViewWithTag<View>("delivery:highway-status"))
         val road = checkNotNull(view.findViewWithTag<View>("delivery:motion-art"))
-        val host = checkNotNull(view.findViewWithTag<View>(destinationControls))
-        assertTrue(visibleWithoutScrolling(status))
+        assertNull(view.findViewWithTag<View>(destinationControls))
+        val visibleStatus = Rect()
         val visibleRoad = Rect()
-        road.getGlobalVisibleRect(visibleRoad)
-        assertTrue("고속도로 bounds=${bounds(road)} visible=$visibleRoad status=${bounds(status)} viewport=${bounds(view)}",
-            visibleWithoutScrolling(road))
-        assertTrue(bounds(status).bottom <= bounds(road).top)
-        assertTrue(bounds(road).bottom <= bounds(host).top)
+        assertTrue(status.getGlobalVisibleRect(visibleStatus))
+        assertTrue("고속도로가 상태 띠 아래에 있어야 한다", road.getGlobalVisibleRect(visibleRoad))
+        assertTrue(visibleStatus.bottom <= visibleRoad.top)
+        val shop = checkNotNull(view.findViewWithTag<Button>("delivery:shop"))
+        val change = checkNotNull(view.findViewWithTag<Button>("delivery:destination"))
+        val abandon = checkNotNull(view.findViewWithTag<Button>("delivery:review-abandon"))
+        val before = Rect()
+        assertTrue(shop.getGlobalVisibleRect(before))
+        val scroll = nodes(view).filterIsInstance<ScrollView>().single()
+        assertSame(shop.parent, change.parent)
+        assertSame(shop.parent, abandon.parent)
+        scroll.scrollTo(0, scroll.getChildAt(0).height)
+        val after = Rect()
+        assertTrue(shop.getGlobalVisibleRect(after))
+        assertEquals(before, after)
         assertEquals(40, nodes(status).filterIsInstance<ProgressBar>().single().progress)
-        val shortName = nodes(status).filterIsInstance<TextView>().single { it.text.toString() == fullDestination }
-        assertEquals(1, shortName.lineCount)
-        assertTrue(shortName.layout.getEllipsisCount(0) > 0)
-        val fullName = nodes(view).filterIsInstance<TextView>().single { it !== shortName && it.text.toString() == fullDestination }
+        assertNotNull(status.findViewWithTag<View>("delivery:progress-truck"))
+        val fullName = nodes(status).filterIsInstance<TextView>().single { it.text.toString() == fullDestination }
         assertTrue(fullName.lineCount > 1)
+        val labels = nodes(status).filterIsInstance<TextView>().map { it.text.toString() }
+        assertTrue(context.getString(R.string.delivery_estimated, "12.5 km") in labels)
+        assertTrue(context.getString(R.string.delivery_observed, "5 km") in labels)
+        assertTrue(context.getString(R.string.delivery_source_simulation) in labels)
         val foreign = Observation.Available(ObservedDistance(5000, InputSource.VEHICLE))
         val foreignRead = read.copy(navigation = nav.copy(observed = foreign))
         view.render(frame.copy(version = frame.version + 1), true, foreignRead)
         val nextStatus = checkNotNull(view.findViewWithTag<View>("delivery:highway-status"))
         assertTrue(nodes(nextStatus).none { it is ProgressBar })
+        assertNull(nextStatus.findViewWithTag<View>("delivery:progress-truck"))
         val unavailable = context.getString(R.string.delivery_observed, context.getString(R.string.delivery_information_missing))
         assertTrue(nodes(nextStatus).filterIsInstance<TextView>().any { unavailable in it.text.toString() })
         assertTrue(nodes(view).filterIsInstance<TextView>().none { staleDistanceLabel in it.text.toString() })
@@ -245,12 +356,12 @@ class DeliveryViewTest : InstrumentationTestCase() {
             val close = checkNotNull(view.findViewWithTag<Button>("delivery:skip-motion"))
             val rewardLabel = context.getString(R.string.delivery_scene_reward)
             assertEquals(context.getString(R.string.delivery_money, rewardLabel,
-                (order.offer as DeliveryOffer.Income).reward.units), reward.text.toString())
-            assertTrue(visibleWithoutScrolling(reward))
-            assertTrue(visibleWithoutScrolling(art))
-            if (width == 1360) assertTrue("공식 가로 도착 그림 너비: ${art.width}/${view.width}",
-                art.width >= view.width * .85f)
-            assertTrue(visibleWithoutScrolling(close))
+                (order.offer as DeliveryOffer.Income).reward.units), reward.contentDescription.toString())
+            assertTrue(reward.getGlobalVisibleRect(Rect()))
+            val artRect = Rect()
+            assertTrue(art.getGlobalVisibleRect(artRect))
+            assertTrue("도착 그림 너비: ${artRect.width()}/${view.width}", artRect.width() >= view.width * .5f)
+            assertTrue(close.getGlobalVisibleRect(Rect()))
             assertTrue(close.performClick())
             assertTrue(requests.isEmpty())
             assertNull(view.findViewWithTag<View>("delivery:confirmed-reward"))
@@ -264,19 +375,6 @@ class DeliveryViewTest : InstrumentationTestCase() {
         view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
         view.layout(0, 0, width, height)
-    }
-
-    private fun bounds(view: View): Rect {
-        val result = Rect(0, 0, view.width, view.height)
-        val root = view.rootView as ViewGroup
-        root.offsetDescendantRectToMyCoords(view, result)
-        return result
-    }
-
-    private fun visibleWithoutScrolling(view: View): Boolean {
-        val visible = Rect()
-        return view.width > 0 && view.height > 0 && view.getGlobalVisibleRect(visible) &&
-            visible.width() == view.width && visible.height() == view.height
     }
 
     private fun incomeFrame(): DeliveryFrame {
@@ -306,7 +404,16 @@ class DeliveryViewTest : InstrumentationTestCase() {
             val h = (440 * view.resources.displayMetrics.density).toInt()
             view.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
             view.layout(0, 0, w, h)
-            assertTrue(nodes(view).all { it.width <= w })
+            for (child in nodes(view)) {
+                val virtualStage = generateSequence(child.parent as? View) { it.parent as? View }
+                    .filterIsInstance<ReferenceSceneFrame>().firstOrNull()
+                if (virtualStage == null) {
+                    assertTrue("${frame.screen.javaClass.simpleName}: ${child.tag} ${child.width}/$w", child.width <= w)
+                } else {
+                    val stage = virtualStage.getChildAt(0)
+                    assertTrue("도로 무대가 좁은 창 너비를 넘지 않아야 한다", stage.width * stage.scaleX <= w + 1)
+                }
+            }
         }
     }
 }

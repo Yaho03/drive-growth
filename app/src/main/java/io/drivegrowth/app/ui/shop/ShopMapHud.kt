@@ -1,57 +1,125 @@
 package io.drivegrowth.app.ui.shop
 
-import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
+import android.text.TextUtils
 import android.view.Gravity
+import android.view.View
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.TextView
 import io.drivegrowth.app.R
+import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
+import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
+import java.text.NumberFormat
+import java.util.Locale
 
-/** 확정 조회로 받은 가게 상태와 지도 밖 화면의 진입점을 표시한다. */
-@SuppressLint("ViewConstructor")
 internal class ShopMapHud(
     context: Context,
     content: ShopScreenState.Content,
-    balance: String,
     operatingStatus: String?,
-    unviewedCount: Int?,
-    onResults: (() -> Unit)?,
     onSettings: (() -> Unit)?,
-) : LinearLayout(context) {
-    private val style = ShopStyle(context)
+) : FrameLayout(context) {
+    private val style = ReferenceHudStyle(context)
+    private val settingsLabel = context.getString(R.string.shop_map_settings)
+    private val operatingUnknown = context.getString(R.string.shop_map_checking_operation)
+    private val balance = content.balance?.let { NumberFormat.getIntegerInstance(Locale.KOREA).format(it.units) }
+    private val status = signColumn().apply {
+        addView(label(operatingStatus ?: operatingUnknown, 14f).apply {
+            maxLines = 2
+            val marker = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(if (operatingStatus == null || operatingStatus == operatingUnknown)
+                    0xffa5834a.toInt() else 0xff3bb548.toInt())
+                setStroke(style.dp(1), style.signInk)
+                setBounds(0, 0, style.dp(10), style.dp(10))
+            }
+            setCompoundDrawablesRelative(marker, null, null, null)
+            compoundDrawablePadding = style.dp(4)
+        })
+        addView(label("가게 Lv${content.level ?: "—"}", 14f).apply {
+            contentDescription = context.getString(R.string.shop_level, content.level?.toString() ?: unknown())
+        })
+        addView(label("P ${content.ownedCount ?: "—"} / ${content.capacity ?: "—"}", 13f).apply {
+            contentDescription = context.getString(R.string.shop_capacity,
+                content.ownedCount?.toString() ?: unknown(), content.capacity?.toString() ?: unknown())
+        })
+    }
+    private val account = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.TOP or Gravity.END
+        addView(label(balance ?: "—", 15f).apply {
+            tag = "shop:map-balance"
+            contentDescription = balance?.let { context.getString(R.string.shop_money, it) } ?: unknown()
+            gravity = Gravity.CENTER
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            setCompoundDrawablesRelative(style.icon(ReferenceHudIcon.COIN, 16), null, null, null)
+            compoundDrawablePadding = style.dp(3)
+            setPadding(style.dp(8), 0, style.dp(8), 0)
+            background = style.signSurface()
+        }, LinearLayout.LayoutParams(-2, style.dp(48)))
+        if (onSettings != null) {
+            addView(Button(context).apply {
+                tag = "shop:map-settings"
+                contentDescription = settingsLabel
+                background = style.signButton()
+                gravity = Gravity.CENTER
+                minWidth = 0
+                minHeight = 0
+                foreground = InsetDrawable(style.icon(ReferenceHudIcon.SETTINGS, 22), style.dp(13))
+                foregroundGravity = Gravity.FILL
+                setOnClickListener { onSettings() }
+            }, LinearLayout.LayoutParams(style.dp(48), style.dp(48)).apply { marginStart = style.dp(4) })
+        }
+    }
 
     init {
         tag = "shop:map-hud"
-        orientation = VERTICAL
-        gravity = Gravity.START
-        val unknown = context.getString(R.string.shop_unknown)
-        addView(style.text(
-            "${content.name} · ${context.getString(R.string.shop_level, content.level?.toString() ?: unknown)}",
-            19, bold = true,
-        ))
-        addView(style.text(
-            context.getString(R.string.shop_capacity, content.ownedCount?.toString() ?: unknown,
-                content.capacity?.toString() ?: unknown) + " · " + context.getString(R.string.shop_balance, balance),
-            16, style.accent,
-        ))
-        if (operatingStatus != null) addView(style.text(operatingStatus, 16))
-        val actions = style.row()
-        if (onResults != null) {
-            val label = unviewedCount?.let { "미확인 정산 ${it}건" } ?: "정산 확인"
-            actions.addView(action(label, "shop:map-results", onResults))
-        }
-        if (onSettings != null) actions.addView(action("설정", "shop:map-settings", onSettings))
-        if (actions.childCount > 0) addView(actions)
-        background = style.shape(style.panel)
-        setPadding(style.dp(12), style.dp(4), style.dp(12), style.dp(4))
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        addView(status, hudParams(Gravity.START))
+        addView(account, hudParams(Gravity.END))
     }
 
-    private fun action(label: String, key: String, onClick: () -> Unit): Button =
-        style.button(label, action = onClick).apply {
-            tag = key
-            textSize = 16f
-            minHeight = style.dp(48)
-            minimumHeight = style.dp(48)
-            setPadding(style.dp(12), 0, style.dp(12), 0)
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val inner = (MeasureSpec.getSize(widthMeasureSpec) - style.dp(24)).coerceAtLeast(0)
+        val statusWidth = (inner * 0.46f).toInt().coerceAtMost(style.dp(210))
+        val accountWidth = (inner - statusWidth).coerceAtMost(style.dp(246))
+        val statusTextWidth = (statusWidth - status.paddingStart - status.paddingEnd).coerceAtLeast(0)
+        for (index in 0 until status.childCount) {
+            val text = status.getChildAt(index) as TextView
+            if (text.maxWidth != statusTextWidth) text.maxWidth = statusTextWidth
         }
+        val settingsSpace = if (account.childCount > 1) style.dp(52) else 0
+        val balanceTextWidth = (accountWidth - settingsSpace).coerceAtLeast(0)
+        val balanceLabel = account.getChildAt(0) as TextView
+        if (balanceLabel.maxWidth != balanceTextWidth) balanceLabel.maxWidth = balanceTextWidth
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    }
+
+    private fun hudParams(edge: Int) = LayoutParams(-2, -2, Gravity.TOP or edge).apply {
+        topMargin = style.dp(8)
+        marginStart = style.dp(8)
+        marginEnd = style.dp(8)
+    }
+
+    private fun signColumn() = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        background = style.signSurface()
+        setPadding(style.dp(10), style.dp(6), style.dp(10), style.dp(7))
+    }
+
+    private fun label(value: String, size: Float) = TextView(context).apply {
+        text = value
+        textSize = size
+        setTextColor(style.signInk)
+        setTypeface(typeface, Typeface.BOLD)
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.END
+    }
+
+    private fun unknown() = context.getString(R.string.shop_unknown)
 }

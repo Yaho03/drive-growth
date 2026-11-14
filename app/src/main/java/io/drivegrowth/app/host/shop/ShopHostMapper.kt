@@ -28,11 +28,11 @@ class ShopHostMapper {
         val details = stored?.vehicles.orEmpty().associateBy { it.vehicle.ownedVehicleId }
         fun unknown(id: String, title: String) = ShopOption(id, title, "현재 저장 조회 연결이 제공되지 않았어요",
             "확정 상태와 거래 조건을 확인한 뒤 사용할 수 있어요", ShopAvailability.UNKNOWN)
-        return ShopScreenState.Content(revision, "드라이브 키우기 · " +
+        return ShopScreenState.Content(revision, "르르르 렌터카 · " +
             if (snapshot.source == InputSource.SIMULATION) "모의 원장" else "차량 원장",
             level = null, ownedCount = owned.size,
             capacity = ((stored?.capacity as? ContractResult.Success)?.value)?.takeIf { it > 0 },
-            balance = snapshot.balance, appearance = ShopAppearance("드라이브 키우기", 0xff58a6ff.toInt()),
+            balance = snapshot.balance, appearance = ShopAppearance("르르르 렌터카", 0xff58a6ff.toInt()),
             vehicles = owned.map { car ->
                 val activity = (details[car.ownedVehicleId]?.activity as? ContractResult.Success)?.value
                 ShopVehicle(car.ownedVehicleId, names.getValue(car.vehicleId), when (activity) {

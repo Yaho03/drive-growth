@@ -46,7 +46,7 @@ class DecorationMapper(appearances: Map<String, ShopAppearance>) {
                 else -> "가게 레벨 ${item.requiredShopLevel}부터 구매할 수 있어요"
             }
             ShopOption("decoration:${item.id}", item.displayName, condition,
-                "간판·가게 표시 변경" + if (facts.definitions.trial) " · 조정 가능한 시연 시험값" else "",
+                "간판·가게 표시 변경",
                 availability, shown?.let { ShopCommand.Decorate(item.id, it) }, command.expectedPrice,
                 facts.definitions.ruleVersion, facts.definitions.trial)
         }

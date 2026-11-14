@@ -1,5 +1,5 @@
 <resources>
-    <string name="results_title">결과 · 기록</string>
+    <string name="results_title">정산</string>
     <string name="results_loading">미확인 결과를 불러오고 있어요</string>
     <string name="results_empty">미확인 정산이 없어요</string>
     <string name="results_empty_body">현재 조회된 목록이 비어 있어요. 과거 기록 전체가 없다는 뜻은 아니에요.</string>
@@ -12,13 +12,12 @@
     <string name="results_retry">다시 조회</string>
     <string name="results_retry_pending">다시 조회하는 중</string>
     <string name="results_fixture">고정 시험 입력 · 실제 수익/저장 결과 아님</string>
-    <string name="results_stored">저장소에서 전달받은 확정 정산</string>
     <string name="results_summary">미확인 %1$d건 · 목록 %2$d건</string>
-    <string name="results_history_unsupported">전체 과거 기록 조회는 현재 연결에서 지원하지 않아요.</string>
-    <string name="results_details_unsupported">주행·탁송·렌트·시설의 세부 내역, 리뷰·단골·가상 사고 정보는 제공되지 않았어요.</string>
+    <string name="results_history_unsupported">이 화면에서는 전체 정산 기록을 볼 수 없어요.</string>
+    <string name="results_details_unsupported">주행·탁송·렌트·시설의 세부 내역과 리뷰·단골·가상 사고 정보를 확인할 수 없어요.</string>
     <string name="results_confirmed">확정 정산</string>
     <string name="results_open">상세 보기</string>
-    <string name="results_open_accessibility">%1$s · 정산 %2$s 상세 보기</string>
+    <string name="results_open_accessibility">%1$s · %2$s · 상세 보기</string>
     <string name="results_close">목록으로</string>
     <string name="results_select_prompt">정산을 선택하면 상세를 볼 수 있어요</string>
     <string name="results_removed">선택한 정산이 현재 목록에 없어요</string>
@@ -27,17 +26,12 @@
     <string name="results_mark_pending">열람 표시 저장 중</string>
     <string name="results_mark_done">열람 표시 저장 완료</string>
     <string name="results_mark_failed">열람 표시를 저장하지 못했어요. 다시 요청할 수 있어요.</string>
-    <string name="results_mark_note">화면을 열어도 재화·차량을 다시 지급하지 않아요. 저장 응답을 받은 뒤 열람 표시만 바뀌어요.</string>
     <string name="results_other_pending">다른 정산의 열람 표시를 저장하고 있어요</string>
     <string name="results_pair">%1$s\n%2$s</string>
     <string name="results_money">%1$s 게임머니</string>
     <string name="results_no_money_change">재화 변경 없음</string>
     <string name="results_money_change">이번 거래의 재화 변화</string>
     <string name="results_balance">정산 후 확정 잔액 · 이번 수익 합계 아님</string>
-    <string name="results_settlement_id">정산 ID</string>
-    <string name="results_transaction_id">거래 ID</string>
-    <string name="results_request_id">요청 ID</string>
-    <string name="results_rule">적용 규칙 버전</string>
     <string name="results_source">요청 입력 출처</string>
     <string name="results_source_vehicle">차량 입력</string>
     <string name="results_source_simulation">모의 입력</string>

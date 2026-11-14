@@ -7,20 +7,26 @@ import android.database.ContentObserver
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.DashPathEffect
+import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
+import android.text.SpannableString
+import android.text.Spanned
 import android.text.TextPaint
 import android.text.TextUtils
+import android.text.style.ForegroundColorSpan
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -29,8 +35,8 @@ import android.view.ViewTreeObserver
 import android.view.animation.PathInterpolator
 import android.widget.Button
 import io.drivegrowth.app.R
-import io.drivegrowth.app.ui.garage.MapVehicleDetailView
 import io.drivegrowth.app.ui.pixel.PixelStyle
+import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.contract.Rarity
@@ -51,8 +57,11 @@ internal class ShopSceneView(
     initialPan: ShopMapOffset = ShopMapOffset(),
     private val onPan: (ShopMapOffset) -> Unit = {},
     onMapTarget: ((ShopMapTarget) -> Unit)? = null,
+    private val growthArt: TownGrowthArt? = null,
 ) : ViewGroup(context) {
     internal val model = shopSceneModel(content)
+    private val sign = content.appearance.sign.displayShopSign()
+    private val defaultSign = sign == "기본 간판"
     private val scene = if (mode == ShopMode.OVERALL) RectF(0f, 0f, 1536f, 1024f)
         else RectF(100f, 546f, 1450f, 986f)
     private val placed = model.vehicles.zip(townSlots).sortedBy { it.second.second }
@@ -77,7 +86,6 @@ internal class ShopSceneView(
         typeface = Typeface.create("sans-serif", Typeface.BOLD)
         textAlign = Paint.Align.CENTER
     }
-    private val dashed = DashPathEffect(floatArrayOf(7f, 5f), 0f)
     private val area = RectF()
     private val fullTown = RectF(0f, 0f, 1536f, 1024f)
     private val shape = Path()
@@ -90,6 +98,9 @@ internal class ShopSceneView(
     private val visibleBounds = Rect()
     private var selectedId: OwnedVehicleId? = null
     private var previousId: OwnedVehicleId? = null
+    private var focusRegion: ShopFocusRegion? = null
+    private var cameraFrom: ShopMapCamera? = null
+    private var onCameraSettled: (() -> Unit)? = null
     private var cameraStart: Long? = null
     private var movingCamera = false
     private var acceptsVehicleTap: () -> Boolean = { true }
@@ -136,7 +147,19 @@ internal class ShopSceneView(
     private fun canAnimateActors() = isAttachedToWindow && isShown && windowVisibility == VISIBLE &&
         hasWindowFocus() && acceptsVehicleTap() && ValueAnimator.areAnimatorsEnabled() && getLocalVisibleRect(visibleBounds)
 
-    private fun canTouchActors() = scale > 0f && !movingCamera && selectedId == null && canAnimateActors()
+    private fun canTouchActors() = scale > 0f && !movingCamera && focusRegion == null && selectedId == null && canAnimateActors()
+
+    internal fun displayedCamera() = if (isLaidOut) ShopMapCamera(scale, offsetX, offsetY) else null
+
+    internal fun frameSelection(region: ShopFocusRegion?, from: ShopMapCamera?) {
+        focusRegion = region
+        cameraFrom = from
+    }
+
+    internal fun afterCameraSettles(awaitTransition: Boolean, reveal: () -> Unit) {
+        if (movingCamera && awaitTransition) onCameraSettled = reveal
+        else reveal()
+    }
 
     internal fun focus(
         selected: OwnedVehicleId?,
@@ -150,7 +173,7 @@ internal class ShopSceneView(
         movingCamera = cameraStart != null
         acceptsVehicleTap = acceptsTap
         if (!acceptsTap()) stopMotion()
-        else if (selected != null) cancelResidentTouch()
+        else if (selected != null || focusRegion != null) cancelResidentTouch()
         invalidate()
     }
 
@@ -215,7 +238,7 @@ internal class ShopSceneView(
     }
 
     private fun canPan() = fillViewport && width > 0 && height > 0 &&
-        !movingCamera && selectedId == null && acceptsVehicleTap()
+        !movingCamera && selectedId == null && focusRegion == null && acceptsVehicleTap()
 
     private fun resetPanGesture() {
         if (panning) parent?.requestDisallowInterceptTouchEvent(false)
@@ -336,7 +359,8 @@ internal class ShopSceneView(
         tag = "shop:scene"
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         contentDescription = buildString {
-            append(context.getString(R.string.shop_scene_description, content.appearance.sign))
+            append(context.getString(R.string.shop_scene_description,
+                if (defaultSign) context.getString(R.string.shop_scene_default_sign) else sign))
             append(". ")
             append(content.capacity?.let { context.getString(R.string.shop_scene_spaces, it) }
                 ?: context.getString(R.string.shop_scene_spaces_unknown))
@@ -364,31 +388,72 @@ internal class ShopSceneView(
             // 차량 선택 타깃은 시설 배지 뒤에 두지 않는다.
             for ((facility, status) in model.facilityStates) {
                 val (x, y) = facilityAnchor(facility)
-                addMapTarget("${facilityName(facility)} · ${facilityStatus(status)}",
-                    "shop:map-facility:${facility.name}", x, y) { onMapTarget(ShopMapTarget.FacilityLot(facility)) }
+                val label = "${facilityName(facility)} · ${mapFacilityStatus(status)}"
+                val icon = when (status) {
+                    ShopAvailability.LOCKED -> MapSignIcon.LOCK
+                    ShopAvailability.INSTALLED -> MapSignIcon.OPEN
+                    else -> null
+                }
+                addMapTarget(label, "shop:map-facility:${facility.name}", x, y, icon) {
+                    onMapTarget(ShopMapTarget.FacilityLot(facility))
+                }
             }
-            addMapTarget("가게 확장", "shop:map-expansion", 1150f, 720f) { onMapTarget(ShopMapTarget.Expansion) }
+            val expansionStatus = content.expansion?.availability ?: ShopAvailability.UNKNOWN
+            val expansionIcon = when (expansionStatus) {
+                ShopAvailability.AVAILABLE -> MapSignIcon.ADD
+                ShopAvailability.LOCKED -> MapSignIcon.LOCK
+                else -> null
+            }
+            val expansionLabel = context.getString(R.string.shop_expand)
+            addMapTarget(expansionLabel, "shop:map-expansion", 1250f, 340f, expansionIcon,
+                description = "$expansionLabel · ${facilityStatus(expansionStatus)}") {
+                onMapTarget(ShopMapTarget.Expansion)
+            }
         }
     }
 
-    private fun addMapTarget(label: String, key: String, x: Float, y: Float, action: () -> Unit) {
+    private fun addMapTarget(
+        label: String,
+        key: String,
+        x: Float,
+        y: Float,
+        icon: MapSignIcon?,
+        description: String = label,
+        action: () -> Unit,
+    ) {
         val style = ShopStyle(context)
+        val hudStyle = ReferenceHudStyle(context)
         val target = Button(context).apply {
             tag = key
-            text = label
-            textSize = 15f
+            contentDescription = description
+            text = if (icon == MapSignIcon.OPEN) SpannableString(label).apply {
+                setSpan(ForegroundColorSpan(0xff146a35.toInt()), label.lastIndexOf('·') + 1,
+                    label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            } else label
+            textSize = 14f
             isAllCaps = false
             isSingleLine = true
             ellipsize = TextUtils.TruncateAt.END
-            setTextColor(0xff18263c.toInt())
-            minimumWidth = style.dp(48)
-            minimumHeight = style.dp(48)
-            setPadding(style.dp(9), 0, style.dp(9), 0)
-            background = style.shape(0xfff8eee0.toInt())
+            gravity = Gravity.CENTER
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(hudStyle.signInk)
+            letterSpacing = 0f
+            minWidth = style.dp(48)
+            minHeight = style.dp(48)
+            minimumWidth = minWidth
+            minimumHeight = minHeight
+            background = hudStyle.signButton()
+            setPadding(style.dp(10), style.dp(8), style.dp(10), style.dp(8))
+            if (icon != null) {
+                val size = style.dp(14)
+                val glyph = MapSignGlyph(icon).apply { setBounds(0, 0, size, size) }
+                setCompoundDrawablesRelative(glyph, null, null, null)
+                compoundDrawablePadding = style.dp(5)
+            }
             setOnClickListener { if (acceptsVehicleTap()) action() }
         }
         mapTargets += Triple(target, x, y)
-        // 그리기와 터치 모두 차량 타깃을 우선한다.
+        // 차량 그림과 선택 영역을 시설 표지판보다 앞에 둔다.
         addView(target, mapTargets.lastIndex)
     }
 
@@ -397,7 +462,7 @@ internal class ShopSceneView(
         val height = resolveSize((width * scene.height() / scene.width()).roundToInt(), heightMeasureSpec)
         setMeasuredDimension(width, height)
         val density = resources.displayMetrics.density
-        val hitSize = (70f * camera(selectedId, width, height).scale).roundToInt()
+        val hitSize = (84f * camera(selectedId, width, height, focusRegion).scale).roundToInt()
             .coerceAtLeast((48f * density).roundToInt())
         val hitSpec = MeasureSpec.makeMeasureSpec(hitSize, MeasureSpec.EXACTLY)
         for (index in 0 until vehicleTargetCount) getChildAt(mapTargets.size + index).measure(hitSpec, hitSpec)
@@ -418,7 +483,7 @@ internal class ShopSceneView(
             val left = (centerX - target.measuredWidth / 2f).roundToInt()
             val top = (centerY - target.measuredHeight / 2f).roundToInt()
             target.layout(left, top, left + target.measuredWidth, top + target.measuredHeight)
-            target.visibility = if (selectedId == null && !movingCamera && mode == ShopMode.OVERALL &&
+            target.visibility = if (selectedId == null && focusRegion == null && !movingCamera && mode == ShopMode.OVERALL &&
                 left >= 0 && top >= 0 && target.right <= width && target.bottom <= height
             ) VISIBLE else INVISIBLE
         }
@@ -435,42 +500,46 @@ internal class ShopSceneView(
     }
 
     private fun updateCamera() {
-        val target = camera(selectedId)
+        val target = camera(selectedId, region = focusRegion)
         val elapsed = cameraStart?.let { SystemClock.uptimeMillis() - it } ?: 720L
         if (movingCamera && (!ValueAnimator.areAnimatorsEnabled() || elapsed >= 720L)) movingCamera = false
         if (!movingCamera) {
             scale = target.scale
             offsetX = target.x
             offsetY = target.y
+            val settled = onCameraSettled
+            onCameraSettled = null
+            settled?.invoke()
             return
         }
-        val start = camera(previousId)
+        val start = cameraFrom ?: camera(previousId)
         val t = cameraEasing.getInterpolation((elapsed / 720f).coerceIn(0f, 1f))
         scale = start.scale + (target.scale - start.scale) * t
         offsetX = start.x + (target.x - start.x) * t
         offsetY = start.y + (target.y - start.y) * t
     }
 
-    private fun camera(id: OwnedVehicleId?, width: Int = this.width, height: Int = this.height): ShopMapCamera {
-        val slot = placed.firstOrNull { it.first.id == id }?.second
+    private fun camera(
+        id: OwnedVehicleId?, width: Int = this.width, height: Int = this.height,
+        region: ShopFocusRegion? = null,
+    ): ShopMapCamera {
         val fit = minOf(width / scene.width(), height / scene.height())
-        if (slot == null && fillViewport) return coverCamera(pan, width, height)
-        if (slot == null) return ShopMapCamera(fit, (width - scene.width() * fit) / 2 - scene.left * fit,
-            (height - scene.height() * fit) / 2 - scene.top * fit)
-        val zoom = maxOf(width / fullTown.width(), height / fullTown.height(), fit * 2.6f)
-        val sidePanel = MapVehicleDetailView.usesSidePanel(width, height, resources.displayMetrics.density)
-        val centerX = width * if (sidePanel) .29f else .50f
-        val centerY = height * if (fillViewport) .34f else .60f
-        return ShopMapCamera(zoom, (centerX - slot.first * zoom).coerceIn(minOf(0f, width - fullTown.width() * zoom), 0f),
-            (centerY - slot.second * zoom).coerceIn(minOf(0f, height - fullTown.height() * zoom), 0f))
+        val overview = if (fillViewport) coverCamera(pan, width, height)
+            else ShopMapCamera(fit, (width - scene.width() * fit) / 2 - scene.left * fit,
+                (height - scene.height() * fit) / 2 - scene.top * fit)
+        val subject = region ?: placed.firstOrNull { it.first.id == id }?.second?.let(ShopFocusRegion::vehicle)
+        if (subject == null || width <= 0 || height <= 0) return overview
+        return ShopFocusLayout.fit(width, height, resources.displayMetrics.density)
+            .camera(width, height, subject, overview.scale)
     }
 
     private fun coverCamera(offset: ShopMapOffset, width: Int = this.width, height: Int = this.height) =
-        ShopMapCamera.cover(width, height, scene.left, scene.top, scene.right, scene.bottom, offset)
+        ShopMapCamera.cover(width, height, scene.left, scene.top, scene.right, scene.bottom, offset,
+            horizontalBias = if (mode == ShopMode.VEHICLES) .10f else .22f)
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        canvas.drawColor(PixelStyle.background)
+        canvas.drawColor(if (focusRegion != null || movingCamera) 0xff47672a.toInt() else PixelStyle.background)
         val now = SystemClock.uptimeMillis()
         val animate = canAnimateActors()
         if (!animate) stopMotion(cancelPan = !canPan())
@@ -479,13 +548,16 @@ internal class ShopSceneView(
         canvas.save()
         canvas.translate(offsetX, offsetY)
         canvas.scale(scale, scale)
-        canvas.clipRect(if (selectedId != null || movingCamera) fullTown else scene)
+        canvas.clipRect(if (selectedId != null || focusRegion != null || movingCamera) fullTown else scene)
         canvas.drawBitmap(background, null, fullTown, paint)
-        model.facilityStates.forEach { (facility, status) -> drawFacility(canvas, facility, status) }
-        drawSign(canvas)
-        townSlots.forEachIndexed { index, (x, y) ->
-            if (index >= (model.slots ?: 0)) drawClosedSlot(canvas, x.toFloat(), y.toFloat())
+        if (!defaultSign) drawSign(canvas)
+        if (growthArt == null) model.slots?.let { slots ->
+            for (index in slots until townSlots.size) {
+                val (x, y) = townSlots[index]
+                drawClosedSlot(canvas, x.toFloat(), y.toFloat())
+            }
         }
+
         if (model.slots == null) {
             badge(canvas, context.getString(R.string.shop_scene_spaces_unknown), 770f, 652f, 360f)
         }
@@ -504,9 +576,23 @@ internal class ShopSceneView(
         }
     }
 
+    override fun dispatchDraw(canvas: Canvas) {
+        val density = resources.displayMetrics.density
+        for ((target, _, _) in mapTargets) {
+            if (target.visibility != VISIBLE) continue
+            val x = (target.left + target.right) * .5f
+            val y = target.bottom.toFloat()
+            paint.color = 0xff483827.toInt()
+            canvas.drawRect(x - 3f * density, y - 8f * density, x + 3f * density, y + 8f * density, paint)
+            paint.color = 0xffcaa267.toInt()
+            canvas.drawRect(x - density, y - 8f * density, x + density, y + 6f * density, paint)
+        }
+        super.dispatchDraw(canvas)
+    }
+
     private fun drawExpansion(canvas: Canvas, now: Long, animate: Boolean) {
         val start = consumeExpansion
-        if (start == null && expansionStartedAt == null) return
+        if (start == null && expansionStartedAt == null || movingCamera) return
         if (!isAttachedToWindow || !isShown || windowVisibility != VISIBLE || !hasWindowFocus() ||
             !getLocalVisibleRect(visibleBounds)
         ) {
@@ -534,31 +620,10 @@ internal class ShopSceneView(
         }
     }
 
-    private fun drawFacility(canvas: Canvas, facility: Facility, status: ShopAvailability) {
-        val (x, y) = facilityAnchor(facility)
-        if (status != ShopAvailability.INSTALLED) {
-            // 합성 원본의 구도를 유지하면서 미설치·미확인 시설을 흐리게 표시한다.
-            val outline = when (facility) {
-                Facility.FUEL_STATION -> fuelCover
-                Facility.INSURANCE -> insuranceCover
-                Facility.CAR_WASH -> washCover
-            }
-            polygon(canvas, outline, 0x99151a28.toInt())
-        }
-        if (selectedId != null || fillViewport) return
-        val ink = when (status) {
-            ShopAvailability.LOCKED -> PixelStyle.gold
-            ShopAvailability.AVAILABLE -> PixelStyle.focus
-            ShopAvailability.INSTALLED -> PixelStyle.text
-            ShopAvailability.UNKNOWN -> PixelStyle.muted
-        }
-        badge(canvas, "${facilityName(facility)} · ${facilityStatus(status)}", x, y, 270f, ink, size = 30f)
-    }
-
     private fun facilityAnchor(facility: Facility) = when (facility) {
-        Facility.FUEL_STATION -> 295f to 154f
-        Facility.INSURANCE -> 377f to 434f
-        Facility.CAR_WASH -> 1355f to 546f
+        Facility.FUEL_STATION -> 288f to 272f
+        Facility.INSURANCE -> 365f to 419f
+        Facility.CAR_WASH -> 1329f to 560f
     }
 
     private fun facilityName(facility: Facility) = context.getString(when (facility) {
@@ -574,33 +639,40 @@ internal class ShopSceneView(
         ShopAvailability.UNKNOWN -> R.string.shop_unknown
     })
 
+    private fun mapFacilityStatus(status: ShopAvailability) = when (status) {
+        ShopAvailability.AVAILABLE -> context.getString(R.string.shop_scene_build_available)
+        else -> facilityStatus(status)
+    }
+
     private fun drawSign(canvas: Canvas) {
         canvas.save()
-        canvas.translate(729f, 284f)
+        // Lv4 간판은 증축된 건물의 2층 파사드에 있다.
+        canvas.translate(729f, if (growthArt == TownGrowthArt.LEVEL_4) 310f else 284f)
         canvas.skew(0f, .40f)
         val fill = content.appearance.accentArgb or Color.BLACK
         paint.color = fill
         canvas.drawRect(0f, 0f, 205f, 45f, paint)
         val luminance = .299f * Color.red(fill) + .587f * Color.green(fill) + .114f * Color.blue(fill)
-        drawText(canvas, content.appearance.sign, 102.5f, 22.5f, 189f, 28f,
+        drawText(canvas, sign, 102.5f, 22.5f, 189f, 28f,
             if (luminance > 152) PixelStyle.background else PixelStyle.text)
         canvas.restore()
     }
 
     private fun drawClosedSlot(canvas: Canvas, x: Float, y: Float) {
-        canvas.save()
-        canvas.translate(x, y)
-        polygon(canvas, closedSlot, 0xff32394a.toInt())
-        if (selectedId == null && model.slots != null) badge(canvas, context.getString(R.string.shop_scene_slot_closed), 0f, 0f, 105f)
-        canvas.restore()
+        paint.color = 0x8c121622.toInt()
+        canvas.drawCircle(x, y - 18f, 17f, paint)
+        paint.style = Paint.Style.STROKE; paint.strokeWidth = 2.5f; paint.color = Color.WHITE
+        canvas.drawArc(x - 6f, y - 29f, x + 6f, y - 15f, 180f, 180f, false, paint)
+        paint.style = Paint.Style.FILL
+        canvas.drawRoundRect(x - 9f, y - 23f, x + 9f, y - 9f, 2f, 2f, paint)
     }
 
     private fun drawVehicle(canvas: Canvas, vehicle: ShopVehicle, x: Float, y: Float) {
         val bitmap = bitmaps[vehicle.id]
         val parked = vehicle.activity == VehicleActivity.IDLE || vehicle.activity == VehicleActivity.NEEDS_REPAIR
         if (bitmap != null && parked) {
-            vehicle.rarity?.let { drawRarity(canvas, it, x, y + 13f) }
-            val drawWidth = if (bitmap.width == 56) 88f else 100f
+            if (vehicle.id == selectedId) drawVehicleSelection(canvas, x, y + 13f)
+            val drawWidth = bitmap.width * 1.8f
             val drawHeight = drawWidth * bitmap.height / bitmap.width
             area.set(x - drawWidth / 2, y - 7f - drawHeight / 2, x + drawWidth / 2, y - 7f + drawHeight / 2)
             canvas.save()
@@ -612,9 +684,37 @@ internal class ShopSceneView(
             }
             canvas.restore()
         }
-        val label = if (vehicle.activity == VehicleActivity.IDLE && bitmap != null) vehicle.name
-            else "${vehicle.name} · ${vehicle.status}"
-        badge(canvas, label, x - 36f, y + 25f, 155f)
+        if (mode == ShopMode.VEHICLES || bitmap == null) {
+            val label = if (vehicle.activity == VehicleActivity.IDLE) vehicle.name else "${vehicle.name} · ${vehicle.status}"
+            badge(canvas, label, x - 30f, y + 27f, 155f, size = 20f)
+        } else {
+            val status = when (vehicle.activity) {
+                VehicleActivity.IDLE -> return
+                VehicleActivity.RENTED -> R.string.shop_scene_rented
+                VehicleActivity.RETURNING -> R.string.shop_scene_returning
+                VehicleActivity.NEEDS_REPAIR -> R.string.shop_scene_needs_repair
+                null -> R.string.shop_scene_activity_unknown
+            }
+            val labelY = if (parked) y - 52f else y - 13f
+            badge(canvas, context.getString(status), x, labelY, 122f, size = 20f)
+        }
+    }
+
+    private fun drawVehicleSelection(canvas: Canvas, x: Float, y: Float) {
+        canvas.save()
+        canvas.rotate(-29f, x, y)
+        area.set(x - 57f, y - 23f, x + 57f, y + 23f)
+        paint.color = 0x6647a9ff
+        canvas.drawOval(area, paint)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 7f
+        paint.color = 0xff40a8ff.toInt()
+        canvas.drawOval(area, paint)
+        paint.strokeWidth = 3f
+        paint.color = 0xffd3faff.toInt()
+        canvas.drawOval(area, paint)
+        paint.style = Paint.Style.FILL
+        canvas.restore()
     }
 
     private fun drawHeadlights(rarity: Rarity?, canvas: Canvas, elapsed: Long) {
@@ -639,24 +739,6 @@ internal class ShopSceneView(
         light(left, area.top + area.height() * .70f)
         light(right, area.top + area.height() * .58f)
         paint.color = Color.WHITE
-    }
-
-    private fun drawRarity(canvas: Canvas, rarity: Rarity, x: Float, y: Float) {
-        canvas.save()
-        canvas.rotate(-29f, x, y)
-        paint.color = PixelStyle.rarityColor(rarity)
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = if (rarity == Rarity.LEGEND) 4f else 2.5f
-        paint.pathEffect = if (rarity == Rarity.COMMON) dashed else null
-        area.set(x - 42f, y - 12f, x + 42f, y + 12f)
-        canvas.drawOval(area, paint)
-        if (rarity == Rarity.RARE) {
-            area.inset(4f, 4f)
-            canvas.drawOval(area, paint)
-        }
-        paint.pathEffect = null
-        paint.style = Paint.Style.FILL
-        canvas.restore()
     }
 
     private fun polygon(canvas: Canvas, coords: FloatArray, color: Int) {
@@ -690,17 +772,53 @@ internal class ShopSceneView(
         canvas.drawText(value, x, y - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
     }
 
+    private enum class MapSignIcon { LOCK, OPEN, ADD }
+
+    private class MapSignGlyph(private val icon: MapSignIcon) : Drawable() {
+        private val ink = Paint()
+        private var glyphAlpha = 255
+
+        override fun draw(canvas: Canvas) {
+            canvas.save()
+            canvas.translate(bounds.left.toFloat(), bounds.top.toFloat())
+            canvas.scale(bounds.width() / 16f, bounds.height() / 16f)
+            ink.color = when (icon) {
+                MapSignIcon.LOCK -> 0xff292e39.toInt()
+                MapSignIcon.OPEN -> 0xff237543.toInt()
+                MapSignIcon.ADD -> 0xff285e35.toInt()
+            }
+            ink.alpha = glyphAlpha
+            when (icon) {
+                MapSignIcon.LOCK -> {
+                    canvas.drawRect(3f, 7f, 13f, 15f, ink)
+                    canvas.drawRect(5f, 3f, 7f, 8f, ink)
+                    canvas.drawRect(9f, 3f, 11f, 8f, ink)
+                    canvas.drawRect(6f, 2f, 10f, 4f, ink)
+                }
+                MapSignIcon.OPEN -> canvas.drawRect(4f, 4f, 12f, 12f, ink)
+                MapSignIcon.ADD -> {
+                    canvas.drawRect(6f, 2f, 10f, 14f, ink)
+                    canvas.drawRect(2f, 6f, 14f, 10f, ink)
+                }
+            }
+            canvas.restore()
+        }
+
+        override fun setAlpha(alpha: Int) {
+            glyphAlpha = alpha
+            invalidateSelf()
+        }
+
+        override fun setColorFilter(colorFilter: ColorFilter?) {
+            ink.colorFilter = colorFilter
+            invalidateSelf()
+        }
+        @Suppress("DEPRECATION")
+        override fun getOpacity() = PixelFormat.TRANSLUCENT
+    }
+
     companion object {
         private val cameraEasing = PathInterpolator(.4f, 0f, .2f, 1f)
-        private val fuelCover = floatArrayOf(
-            72f, 0f, 536f, 0f, 562f, 102f, 487f, 151f, 487f, 238f, 395f, 292f, 322f, 296f, 80f, 237f,
-        )
-        private val insuranceCover = floatArrayOf(
-            225f, 347f, 386f, 281f, 573f, 365f, 590f, 512f, 539f, 554f, 418f, 613f, 170f, 514f, 170f, 475f,
-        )
-        private val washCover = floatArrayOf(
-            1159f, 472f, 1373f, 359f, 1536f, 432f, 1536f, 658f, 1370f, 726f, 1148f, 631f,
-        )
         private val closedSlot = floatArrayOf(-108f, 26f, 40f, -62f, 108f, -29f, -39f, 58f)
     }
 }

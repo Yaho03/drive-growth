@@ -7,6 +7,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
+import io.drivegrowth.app.showSimulationControls
 import io.drivegrowth.app.host.HostSession
 import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.host.onboarding.StoredOnboardingHostSource
@@ -116,15 +117,19 @@ class UnifiedSimulationRestRecoveryTest : InstrumentationTestCase() {
                 val root = activity.window.decorView
                 assertFalse(root.findViewWithTag<Button>("simulation:controls").isSelected)
                 assertFalse(root.findViewWithTag<TextView>("simulation:status").isShown)
-                assertEquals("모의 입력이 중단됐어요. 같은 입력을 다시 시도해 주세요.",
+                assertEquals("진행이 중단됐어요. 설정에서 다시 시도해 주세요.",
                     root.findViewWithTag<TextView>("simulation:blocked").text.toString())
                 assertNull(root.findViewWithTag<View>("host:destination"))
                 val retry = root.findViewWithTag<Button>("simulation:retry")
+                assertFalse(retry.isShown)
+                root.showSimulationControls()
                 assertTrue(retry.isShown && retry.isEnabled)
+                assertFalse(root.findViewWithTag<Button>("simulation:start").isShown)
                 assertTrue(retry.performClick())
                 assertEquals(2, frames.size)
                 assertEquals(frames.first(), frames.last())
-                assertFalse(root.findViewWithTag<Button>("simulation:controls").isSelected)
+                activity.onBackPressed()
+                assertFalse(root.findViewWithTag<Button>("simulation:controls").isShown)
             }
         } finally {
             onUi { activity.finish() }
@@ -154,7 +159,7 @@ class UnifiedSimulationRestRecoveryTest : InstrumentationTestCase() {
             onUi {
                 assertFalse(activity.isFinishing)
                 val root = activity.window.decorView
-                assertEquals("모의 입력을 확인할 수 없어요. 기존 저장 기록은 그대로예요.",
+                assertEquals("진행 상황을 확인할 수 없어요. 기존 저장 기록은 그대로예요.",
                     root.findViewWithTag<TextView>("simulation:blocked").text.toString())
                 assertFalse(root.findViewWithTag<Button>("simulation:retry").isShown)
                 val start = root.findViewWithTag<Button>("simulation:rest-start")
