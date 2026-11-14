@@ -35,6 +35,7 @@ import android.view.ViewTreeObserver
 import android.view.animation.PathInterpolator
 import android.widget.Button
 import io.drivegrowth.app.R
+import io.drivegrowth.app.ui.pixel.CleanUi
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import io.drivegrowth.app.ui.pixel.VehicleSprites
@@ -89,6 +90,7 @@ internal class ShopSceneView(
     private val area = RectF()
     private val fullTown = RectF(0f, 0f, 1536f, 1024f)
     private val shape = Path()
+    private val statusBadge = ReferenceHudStyle(context).signSurface()
     private var scale = 1f
     private var offsetX = 0f
     private var offsetY = 0f
@@ -453,9 +455,9 @@ internal class ShopSceneView(
                 background = StateListDrawable().apply {
                     addState(intArrayOf(android.R.attr.state_focused), GradientDrawable().apply {
                         setColor(Color.TRANSPARENT)
-                        setStroke((resources.displayMetrics.density * 2).roundToInt(), PixelStyle.focus)
+                        setStroke((resources.displayMetrics.density * 2).roundToInt(), CleanUi.SEA_LIGHT)
                     })
-                    addState(intArrayOf(android.R.attr.state_pressed), GradientDrawable().apply { setColor(0x449cc2ff) })
+                    addState(intArrayOf(android.R.attr.state_pressed), GradientDrawable().apply { setColor(0x44bfdcff) })
                 }
                 setOnClickListener { if (acceptsVehicleTap()) onVehicle(vehicle.id) }
             })
@@ -504,7 +506,7 @@ internal class ShopSceneView(
             tag = key
             contentDescription = description
             text = if (icon == MapSignIcon.OPEN) SpannableString(label).apply {
-                setSpan(ForegroundColorSpan(0xff146a35.toInt()), label.lastIndexOf('·') + 1,
+                setSpan(ForegroundColorSpan(CleanUi.SEA_LIGHT), label.lastIndexOf('·') + 1,
                     label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             } else label
             textSize = 14f
@@ -513,12 +515,13 @@ internal class ShopSceneView(
             ellipsize = TextUtils.TruncateAt.END
             gravity = Gravity.CENTER
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(hudStyle.signInk)
+            setTextColor(hudStyle.featureButtonText(primary = false))
             letterSpacing = 0f
             minWidth = style.dp(48)
             minHeight = style.dp(48)
             minimumWidth = minWidth
             minimumHeight = minHeight
+            backgroundTintList = null
             background = hudStyle.signButton()
             setPadding(style.dp(10), style.dp(8), style.dp(10), style.dp(8))
             if (icon != null) {
@@ -856,12 +859,13 @@ internal class ShopSceneView(
         x: Float,
         y: Float,
         width: Float,
-        ink: Int = PixelStyle.text,
+        ink: Int = CleanUi.INK,
         size: Float = 23f,
     ) {
-        paint.color = PixelStyle.panel
         val halfHeight = size * .78f
-        canvas.drawRoundRect(x - width / 2, y - halfHeight, x + width / 2, y + halfHeight, 9f, 9f, paint)
+        statusBadge.setBounds((x - width / 2).roundToInt(), (y - halfHeight).roundToInt(),
+            (x + width / 2).roundToInt(), (y + halfHeight).roundToInt())
+        statusBadge.draw(canvas)
         drawText(canvas, text, x, y, width - 12f, size, ink)
     }
 

@@ -1,15 +1,22 @@
 package io.drivegrowth.app.ui.delivery
 
+import android.app.ActivityOptions
+import android.content.Intent
 import android.graphics.Rect
+import android.hardware.display.DisplayManager
+import android.os.SystemClock
 import android.test.InstrumentationTestCase
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import io.drivegrowth.app.ui.presentation.ReferenceSceneFrame
 import io.drivegrowth.app.R
+import io.drivegrowth.app.ui.garage.CollectionScrollTestActivity
 import io.drivegrowth.app.data.ArrivalCommit
 import io.drivegrowth.app.data.DeliveryCommit
 import io.drivegrowth.app.host.GameIdentity
@@ -101,6 +108,53 @@ class DeliveryViewTest : InstrumentationTestCase() {
         assertFalse(nodes(view).filterIsInstance<TextView>().any { it.text.contains("지급 완료") })
         assertTrue(view.complete(requests.single(), data.activeFrame))
         assertTrue(nodes(view).filterIsInstance<TextView>().any { it.text.contains("도착") })
+    }
+
+    fun testIncomeAcceptanceWaitsForDiscoveryAndRejectsStaleConfirmation() = onUi {
+        val context = instrumentation.targetContext
+        val requests = mutableListOf<DeliveryRequest>()
+        val data = DeliveryPreviewStates
+        var saving = true
+        val view = DeliveryView(context, requests::add, canConfirmOffer = { !saving })
+        view.render(data.offers, true)
+        assertNull(view.findViewWithTag<Button>("delivery:confirm"))
+        val choice = checkNotNull(view.findViewWithTag<Button>("delivery:offer:${data.income.id.value}"))
+        assertEquals(context.getString(R.string.delivery_select_offer), choice.text.toString())
+        assertTrue(choice.performClick())
+        val blocked = checkNotNull(view.findViewWithTag<Button>("delivery:confirm"))
+        assertFalse(blocked.isEnabled)
+        assertTrue(nodes(view).filterIsInstance<TextView>().any {
+            it.text.toString() == context.getString(R.string.delivery_saving_discovery)
+        })
+        saving = false
+        view.render(data.offers, true)
+        blocked.performClick()
+        assertTrue(requests.isEmpty())
+        val confirm = checkNotNull(view.findViewWithTag<Button>("delivery:confirm"))
+        assertTrue(confirm.isEnabled)
+        assertEquals(context.getString(R.string.delivery_confirm_income), confirm.text.toString())
+        confirm.performClick()
+        confirm.performClick()
+        assertEquals(listOf(DeliveryCommand.Select(data.proposed, data.income.id)), requests.map { it.command })
+    }
+
+    fun testUnaffordablePurchaseShowsDisabledConfirmationAndReason() = onUi {
+        val context = instrumentation.targetContext
+        val requests = mutableListOf<DeliveryRequest>()
+        val view = DeliveryView(context, requests::add)
+        val data = DeliveryPreviewStates
+        val reason = "게임머니가 부족해요."
+        val proposal = data.proposal.copy(availability = data.proposal.availability +
+            (data.purchase.id to DeliveryAvailability(false, reason)))
+        view.render(DeliveryFrame(1, DeliveryScreen.Offers(proposal)), true)
+        view.findViewWithTag<Button>("delivery:tab:purchase").performClick()
+        view.findViewWithTag<Button>("delivery:offer:${data.purchase.id.value}").performClick()
+        val confirm = checkNotNull(view.findViewWithTag<Button>("delivery:confirm"))
+        assertEquals(context.getString(R.string.delivery_confirm_purchase), confirm.text.toString())
+        assertFalse(confirm.isEnabled)
+        assertTrue(nodes(view).filterIsInstance<TextView>().any { it.text.toString() == reason })
+        confirm.performClick()
+        assertTrue(requests.isEmpty())
     }
 
     fun testConfirmationActionsStayVisibleAt936And320Dp() = onUi {
@@ -330,21 +384,8 @@ class DeliveryViewTest : InstrumentationTestCase() {
 
     fun testConfirmedIncomeArtworkAndDistinctSceneExitActions() = onUi {
         val context = instrumentation.targetContext
+        val (frame, read) = incomeArrival()
         val order = (incomeFrame().screen as DeliveryScreen.Active).delivery.active
-        val route = RouteId("fixture-route")
-        val time = EpochMillis(1)
-        val rules = DeliverySettlementRules(order.proposed.list.ruleVersion, 100, 100, 5)
-        val evidence = Observation.Available(DeliveryArrivalEvidence(route, InputSource.SIMULATION, time))
-        val outcome = (DeliverySettlement(rules).resolve(DeliveryInProgress(order, route, time), evidence, time, 1)
-            as ContractResult.Success).value as DeliveryOutcome.IncomeCompleted
-        val change = outcome.change
-        val receipt = Settlement(SettlementId("fixture-settlement"),
-            Transaction(TransactionId("fixture-transaction"), change.requestId, change.kind, change.source,
-                change.ruleVersion, change.money), GameMoney(200), null, time)
-        val frame = DeliveryPreviewStates.missing.copy(version = 3)
-        val read = DeliveryHostRead(GameIdentity(ProfileId("fixture"), InputSource.SIMULATION), frame.screen,
-            pending = DeliveryHostOperation.Arrival(rules, order.requestId, evidence, time, order.proposed.list, order.proposed.list),
-            receipt = DeliveryHostReceipt.Arrived(ArrivalCommit(outcome, receipt)))
         for ((width, height, exit) in listOf(
             Triple(320, 440, "skip"), Triple(700, 280, "back"), Triple(1360, 948, "confirm"),
         )) {
@@ -382,6 +423,80 @@ class DeliveryViewTest : InstrumentationTestCase() {
             assertTrue(requests.isEmpty())
             assertNull(view.findViewWithTag<View>("delivery:confirmed-reward"))
         }
+    }
+
+    fun testNarrowSceneActionsHaveVisibleTouchTargetsAndDifferentEffects() {
+        val context = instrumentation.targetContext
+        val display = context.getSystemService(DisplayManager::class.java).displays
+            .singleOrNull { it.displayId != 0 && it.name == "Emulator 2D Display" }
+        val options = display?.let { ActivityOptions.makeBasic().setLaunchDisplayId(it.displayId).toBundle() }
+        val activity = instrumentation.startActivitySync(Intent(context, CollectionScrollTestActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options)
+        try {
+            val (frame, read) = incomeArrival()
+            for (confirm in listOf(false, true)) {
+                val requests = mutableListOf<DeliveryRequest>()
+                var confirmations = 0
+                val view = onUi {
+                    DeliveryView(activity, requests::add).also { delivery ->
+                        delivery.onConfirmSceneResult = { confirmations++ }
+                        val density = activity.resources.displayMetrics.density
+                        activity.setContentView(FrameLayout(activity).apply {
+                            addView(delivery, FrameLayout.LayoutParams((320 * density).toInt(), (300 * density).toInt()))
+                        })
+                    }
+                }
+                instrumentation.waitForIdleSync()
+                onUi {
+                    assertTrue(view.render(frame, true, read))
+                    layoutAt(view, 320, 300)
+                    val art = checkNotNull(view.findViewWithTag<DeliveryMotionView>("delivery:motion-art"))
+                    art.onSceneFrame?.invoke(if (confirm) 1.8f else 0f)
+                    val tag = if (confirm) "delivery:confirm-scene" else "delivery:skip-motion"
+                    val control = checkNotNull(view.findViewWithTag<Button>(tag))
+                    val bounds = Rect()
+                    val minimum = (48 * view.resources.displayMetrics.density).toInt()
+                    assertTrue("실제로 보이는 $tag", control.getGlobalVisibleRect(bounds))
+                    assertTrue("$tag: ${bounds.width()}×${bounds.height()}px", bounds.width() >= minimum && bounds.height() >= minimum)
+                    val root = IntArray(2).also(view::getLocationOnScreen)
+                    val location = IntArray(2).also(control::getLocationOnScreen)
+                    val x = location[0] - root[0] + control.width / 2f
+                    val y = location[1] - root[1] + control.height / 2f
+                    val time = SystemClock.uptimeMillis()
+                    for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
+                        val event = MotionEvent.obtain(time, time, action, x, y, 0)
+                        try { assertTrue(view.dispatchTouchEvent(event)) } finally { event.recycle() }
+                    }
+                }
+                instrumentation.waitForIdleSync()
+                onUi {
+                    assertNull(view.findViewWithTag<View>("delivery:scene:INCOME_ARRIVAL"))
+                    assertTrue(requests.isEmpty())
+                    assertEquals(if (confirm) 1 else 0, confirmations)
+                }
+            }
+        } finally {
+            onUi { activity.finish() }
+        }
+    }
+
+    private fun incomeArrival(): Pair<DeliveryFrame, DeliveryHostRead> {
+        val order = (incomeFrame().screen as DeliveryScreen.Active).delivery.active
+        val route = RouteId("fixture-route")
+        val time = EpochMillis(1)
+        val rules = DeliverySettlementRules(order.proposed.list.ruleVersion, 100, 100, 5)
+        val evidence = Observation.Available(DeliveryArrivalEvidence(route, InputSource.SIMULATION, time))
+        val outcome = (DeliverySettlement(rules).resolve(DeliveryInProgress(order, route, time), evidence, time, 1)
+            as ContractResult.Success).value as DeliveryOutcome.IncomeCompleted
+        val change = outcome.change
+        val receipt = Settlement(SettlementId("fixture-settlement"),
+            Transaction(TransactionId("fixture-transaction"), change.requestId, change.kind, change.source,
+                change.ruleVersion, change.money), GameMoney(200), null, time)
+        val frame = DeliveryPreviewStates.missing.copy(version = 3)
+        val read = DeliveryHostRead(GameIdentity(ProfileId("fixture"), InputSource.SIMULATION), frame.screen,
+            pending = DeliveryHostOperation.Arrival(rules, order.requestId, evidence, time, order.proposed.list, order.proposed.list),
+            receipt = DeliveryHostReceipt.Arrived(ArrivalCommit(outcome, receipt)))
+        return frame to read
     }
 
     private fun layoutAt(view: DeliveryView, widthDp: Int, heightDp: Int) {

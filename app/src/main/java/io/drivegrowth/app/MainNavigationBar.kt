@@ -11,7 +11,7 @@ import io.drivegrowth.app.ui.garage.GarageStyle
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 
-/** HOME 지도 위에 독립된 픽셀 표지판 여섯 개를 배치한다. */
+/** HOME 지도 위에 공용 HUD 메뉴 여섯 개를 배치한다. */
 internal class MainNavigationBar(
     context: Context,
     select: (HostPage) -> Unit,
@@ -37,20 +37,20 @@ internal class MainNavigationBar(
                 text = label
                 isAllCaps = false
                 gravity = Gravity.CENTER
-                textSize = 14f
+                textSize = 17f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(style.signInk)
+                setTextColor(style.featureButtonText(primary = false))
                 setSingleLine()
                 ellipsize = TextUtils.TruncateAt.END
                 setCompoundDrawablesRelative(null, style.icon(icon, 30), null, null)
                 compoundDrawablePadding = style.dp(1)
                 minWidth = 0
                 minimumWidth = 0
-                minHeight = style.dp(56)
+                minHeight = style.dp(64)
                 minimumHeight = minHeight
                 backgroundTintList = null
                 background = style.signButton()
-                setPadding(style.dp(2), style.dp(4), style.dp(2), style.dp(4))
+                setPadding(style.dp(2), style.dp(6), style.dp(2), style.dp(6))
                 setOnClickListener { if (isEnabled) select(target) }
             }.also { button ->
                 addView(button, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
@@ -72,14 +72,14 @@ internal class MainNavigationBar(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val wide = MeasureSpec.getSize(widthMeasureSpec) >= style.dp(600)
         for (button in buttons) {
-            val pixels = style.dp(if (wide) 48 else 32)
+            val pixels = style.dp(if (wide) 48 else 34)
             button.compoundDrawablesRelative[1]?.let { draw ->
                 if (draw.bounds.width() != pixels) {
                     draw.setBounds(0, 0, pixels, pixels)
                     button.setCompoundDrawablesRelative(null, draw, null, null)
                 }
             }
-            val labelSize = if (wide) 18f else 14f
+            val labelSize = if (wide) 22f else 17f
             if (button.textSize != android.util.TypedValue.applyDimension(
                     android.util.TypedValue.COMPLEX_UNIT_SP, labelSize, resources.displayMetrics,
                 )) button.textSize = labelSize

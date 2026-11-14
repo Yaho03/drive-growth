@@ -28,7 +28,7 @@ class UnifiedSimulationActivity : MainActivity() {
     private var restPreviewButton: Button? = null
 
     override fun addSimulationActions(content: LinearLayout) {
-        val style = GarageStyle(this, pixelPanel = true, creamPanel = true)
+        val style = GarageStyle(this, pixelPanel = true, featureWindow = true)
         val entry = style.button("휴식만 보기", enabled = false) {
             if (!restOpening && allowed()) {
                 restOpening = true

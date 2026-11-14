@@ -100,7 +100,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
         detailScroll?.takeIf { it.isLaidOut }?.let { detailY = it.scrollY }
         val focusedTag = findFocus()?.tag
         listScroll = null; detailScroll = null
-        celebration.rebuildContent { removeAllViews() }; setPadding(dp(PixelStyle.panelPaddingDp), dp(PixelStyle.gapDp), dp(PixelStyle.panelPaddingDp), dp(PixelStyle.gapDp))
+        celebration.rebuildContent { removeAllViews() }; setPadding(dp(10), dp(8), dp(10), dp(8))
         if (!interaction.controlsEnabled) {
             celebration.render(null, RewardCelebrationKind.SETTLEMENT)
             openedResult = null
@@ -163,7 +163,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                         })
                     }
                 }, gap = 8)
-                if (results.isEmpty()) add(this, card(inset = true, paddingDp = 12).apply {
+                if (results.isEmpty()) add(this, card(inset = true, paddingDp = 10).apply {
                     addView(text(if (unread) s(R.string.results_empty) else "저장된 정산 기록이 없어요", 20, bold = true))
                     addView(text(if (unread) "영업이나 탁송 결과가 생기면 여기에 모여요." else "현재 필터에서 표시할 정산이 없어요.",
                         15, muted))
@@ -171,12 +171,12 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                 results.forEachIndexed { index, value ->
                     val settlement = value.settlement
                     add(this, card(selected = selectedSettlementId == settlement.settlementId, inset = true,
-                        paddingDp = 12).apply {
+                        paddingDp = 10).apply {
                         addView(row().apply {
                             isBaselineAligned = false
                             gravity = Gravity.CENTER_VERTICAL
                             addView(chip(kind(value)), LayoutParams(-2, -2))
-                            addView(text(moneyChange(settlement), 18, amountColor(settlement), bold = true).apply {
+                            addView(text(moneyChange(settlement), 20, amountColor(settlement), bold = true).apply {
                                 gravity = Gravity.END
                             }, LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
                         })
@@ -189,7 +189,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                                 })
                             }, gap = 4)
                         }
-                        addView(text(time(settlement), 14, muted))
+                        addView(text(time(settlement), 16, muted))
                         if (interaction.readState(settlement.settlementId) == ResultsReadState.Done) addView(text(s(R.string.results_mark_done)))
                         add(this, button(s(R.string.results_open), primary = selectedSettlementId == settlement.settlementId) {
                             if (selectedSettlementId != settlement.settlementId) { detailY = 0; detailScroll = null }
@@ -211,7 +211,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                 if (unread && results.isNotEmpty()) add(this, row().apply {
                     gravity = Gravity.CENTER_VERTICAL
                     background = surface(selected = true)
-                    setPadding(dp(16), dp(12), dp(16), dp(12))
+                    setPadding(dp(12), dp(8), dp(12), dp(8))
                     addView(text("미확인 재화 변화 합계", 16, bold = true), LayoutParams(0, -2, 1f))
                     addView(text(unreadTotal(results), 22, accent, bold = true), LayoutParams(0, -2, 1.2f).apply { marginStart = dp(8) })
                 })
@@ -273,7 +273,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
                     accidentEffect = effect
                     addView(effect, LayoutParams(dp(76), dp(42)))
                 }) else addView(heading)
-                addView(text(time(settlement), 15, muted))
+                addView(text(time(settlement), 16, muted))
                 addView(text(moneyChange(settlement), 30, amountColor(settlement), bold = true).apply {
                     if (settlement.transaction.money != null) {
                         setCompoundDrawables(icon(ReferenceHudIcon.COIN), null, null, null)
@@ -382,7 +382,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
         card().apply {
             val v = checkNotNull(value.settlement.changedVehicle)
             addView(text(s(R.string.results_vehicle), 21, bold = true))
-            vehicleArt(v.vehicleId)?.let { addView(it, LayoutParams(-1, dp(108))) }
+            vehicleArt(v.vehicleId)?.let { addView(it, LayoutParams(-1, dp(72))) }
             addView(text(value.vehicleName ?: s(R.string.results_vehicle_name_missing), 28, bold = true))
             addView(text(s(when (v.rarity) {
                 Rarity.COMMON -> R.string.results_rarity_common

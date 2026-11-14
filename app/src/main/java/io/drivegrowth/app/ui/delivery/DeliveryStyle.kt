@@ -3,8 +3,6 @@ package io.drivegrowth.app.ui.delivery
 import android.content.Context
 import android.graphics.Typeface
 import android.view.Gravity
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.StateListDrawable
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
@@ -15,18 +13,16 @@ import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 
-internal class DeliveryStyle(private val context: Context, private val creamPanel: Boolean = false) {
-    private val layout = GarageStyle(context, pixelPanel = true, featureWindow = creamPanel)
+internal class DeliveryStyle(private val context: Context, private val scene: Boolean = false) {
+    private val layout = GarageStyle(context, pixelPanel = true, featureWindow = true)
     val base get() = layout.base
     val ink get() = layout.ink
     val muted get() = layout.muted
     val inset get() = layout.inset
     val accent get() = layout.blue
-    val moneyInk get() = if (creamPanel) CleanUi.SUN else PixelStyle.gold
+    val moneyInk get() = CleanUi.SUN
 
     fun heading(label: CharSequence) = layout.heading(label, ReferenceHudIcon.TRUCK)
-
-    private val hud = ReferenceHudStyle(context)
 
     fun dp(value: Int) = layout.dp(value)
     fun column() = layout.column()
@@ -34,7 +30,7 @@ internal class DeliveryStyle(private val context: Context, private val creamPane
     fun scroll(child: View, restoreY: Int) = layout.scroll(child, restoreY)
     fun add(parent: LinearLayout, child: View, gap: Int = PixelStyle.gapDp) = layout.add(parent, child, gap)
 
-    fun text(value: CharSequence, size: Int = 16, color: Int = ink, bold: Boolean = false) = TextView(context).apply {
+    fun text(value: CharSequence, size: Int = 18, color: Int = ink, bold: Boolean = false) = TextView(context).apply {
         text = value
         textSize = size.toFloat()
         setTextColor(color)
@@ -50,39 +46,33 @@ internal class DeliveryStyle(private val context: Context, private val creamPane
             setPadding(dp(padding), dp(padding), dp(padding), dp(padding))
         }
 
-    fun chip(label: String, fill: Int, color: Int) = text(label, 15, color, bold = true).apply {
+    fun chip(label: String, fill: Int, color: Int) = text(label, 16, color, bold = true).apply {
         gravity = Gravity.CENTER
         minHeight = dp(32)
         setPadding(dp(12), dp(2), dp(12), dp(2))
-        background = if (creamPanel) this@DeliveryStyle.layout.shape(fill) else surface(fill, fill, 16)
+        background = this@DeliveryStyle.layout.shape(fill)
     }
 
     fun button(label: String, enabled: Boolean, primary: Boolean = false, onClick: () -> Unit): Button {
-        if (creamPanel) return layout.button(label, enabled, primary, onClick)
+        if (!scene) return layout.button(label, enabled, primary, onClick).apply {
+            textSize = 20f
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+        }
+        val hud = ReferenceHudStyle(context)
         return Button(context).apply {
             text = label
             textSize = 18f
             setTypeface(typeface, Typeface.BOLD)
             isAllCaps = false
-            setTextColor(if (primary && enabled) hud.signInk else if (enabled) ink else muted)
-            val fill = PixelStyle.outline
-            background = if (primary && enabled) hud.signButton() else StateListDrawable().apply {
-                addState(intArrayOf(android.R.attr.state_enabled, android.R.attr.state_focused), surface(fill, PixelStyle.focus, 14, 2))
-                addState(intArrayOf(android.R.attr.state_enabled, android.R.attr.state_pressed), surface(fill, PixelStyle.focus, 14, 2))
-                addState(intArrayOf(), surface(fill, fill, 14))
-            }
+            setTextColor(hud.featureButtonText(primary))
+            backgroundTintList = null
+            background = hud.signButton(primary)
             minHeight = dp(52)
-            minimumHeight = dp(52)
+            minimumHeight = minHeight
             setPadding(dp(14), dp(8), dp(14), dp(8))
             alpha = if (enabled) 1f else .55f
             isEnabled = enabled
             setOnClickListener { if (isEnabled) onClick() }
         }
-    }
-
-    private fun surface(fill: Int, border: Int, radius: Int, stroke: Int = 1) = GradientDrawable().apply {
-        setColor(fill)
-        cornerRadius = dp(radius).toFloat()
-        setStroke(dp(stroke), border)
     }
 }

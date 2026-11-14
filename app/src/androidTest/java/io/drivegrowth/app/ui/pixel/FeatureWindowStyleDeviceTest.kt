@@ -2,17 +2,17 @@ package io.drivegrowth.app.ui.pixel
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.test.InstrumentationTestCase
 import android.view.View
 import android.widget.Button
 import io.drivegrowth.app.ui.garage.GarageStyle
-import io.drivegrowth.core.contract.Rarity
 
 @Suppress("DEPRECATION")
 class FeatureWindowStyleDeviceTest : InstrumentationTestCase() {
     fun testFeatureProgressKeepsZeroSmallAndFullValues() = onUi {
         val context = instrumentation.targetContext
-        val style = MapPanelStyle(context, featureWindow = true)
+        val style = MapPanelStyle(context)
         val inset = ReferenceHudStyle(context).dp(3)
         val width = 200 + 2 * inset
         val height = 20 + 2 * inset
@@ -30,17 +30,17 @@ class FeatureWindowStyleDeviceTest : InstrumentationTestCase() {
         val zero = pixels(0)
         val small = pixels(1)
         val full = pixels(100)
-        assertEquals(CleanUi.CHIP, zero[100])
+        assertEquals(CleanUi.TRACK, zero[100])
         assertEquals(2, zero.indices.count { zero[it] != small[it] })
         assertTrue(zero.indices.all { zero[it] != full[it] })
     }
 
     fun testFeatureButtonUsesEnabledStateAndKeepsTouchSize() = onUi {
         val context = instrumentation.targetContext
-        val style = MapPanelStyle(context, featureWindow = true)
+        val style = MapPanelStyle(context)
         val button = style.styleButton(Button(context), primary = true)
         assertEquals(CleanUi.ON_PRIMARY, button.currentTextColor)
-        assertEquals(ReferenceHudStyle(context).dp(48), button.minimumHeight)
+        assertEquals(ReferenceHudStyle(context).dp(56), button.minimumHeight)
         button.isPressed = true
         assertEquals(CleanUi.ON_PRIMARY, button.currentTextColor)
         button.isPressed = false
@@ -48,34 +48,27 @@ class FeatureWindowStyleDeviceTest : InstrumentationTestCase() {
         assertEquals(CleanUi.MUTED, button.currentTextColor)
     }
 
-    fun testFeatureThemeKeepsPixelRarityFillAndBorder() = onUi {
-        val context = instrumentation.targetContext
-        val cream = GarageStyle(context, pixelPanel = true, creamPanel = true)
-        val feature = GarageStyle(context, pixelPanel = true, featureWindow = true)
-        for (rarity in Rarity.entries) {
-            fun pixels(style: GarageStyle): List<Int> {
-                val bitmap = Bitmap.createBitmap(96, 44, Bitmap.Config.ARGB_8888)
-                return try {
-                    style.raritySurface(rarity).apply { setBounds(0, 0, 96, 44) }.draw(Canvas(bitmap))
-                    listOf(bitmap.getPixel(0, 0), bitmap.getPixel(48, 0), bitmap.getPixel(48, 22))
-                } finally { bitmap.recycle() }
-            }
-            assertEquals(pixels(cream), pixels(feature))
-            assertEquals(cream.rarityColor(rarity), feature.rarityColor(rarity))
-        }
-    }
-
     fun testFeaturePanelUsesReadableDeliveryHostText() = onUi {
         val context = instrumentation.targetContext
         val style = GarageStyle(context, pixelPanel = true, featureWindow = true)
         val hint = style.text("목적지를 확인할 수 없어요.")
         assertEquals(CleanUi.INK, hint.currentTextColor)
+        val hud = ReferenceHudStyle(context)
         val coat = style.shape(style.panel, selected = true)
-        val bitmap = Bitmap.createBitmap(96, 44, Bitmap.Config.ARGB_8888)
+        val width = hud.dp(96)
+        val height = hud.dp(60)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         try {
-            coat.setBounds(0, 0, 96, 44)
+            coat.setBounds(0, 0, width, height)
             coat.draw(Canvas(bitmap))
-            assertEquals(CleanUi.SEA_DEEP, bitmap.getPixel(48, 22))
+            assertEquals(0xff182545.toInt(), bitmap.getPixel(width / 2, height / 2))
+            assertEquals(CleanUi.SEA_LIGHT, bitmap.getPixel(width / 2, 0))
+            assertEquals(Color.TRANSPARENT, bitmap.getPixel(0, 0))
+            assertEquals(0xff09142d.toInt(), bitmap.getPixel(width / 2, bitmap.height - 1))
+            assertEquals(CleanUi.SEA_DEEP, bitmap.getPixel(width / 2, hud.dp(2) * 2))
+            val step = hud.dp(3)
+            assertEquals(Color.TRANSPARENT, bitmap.getPixel(step, 0))
+            assertEquals(CleanUi.SEA_LIGHT, bitmap.getPixel(step, step))
         } finally { bitmap.recycle() }
     }
 

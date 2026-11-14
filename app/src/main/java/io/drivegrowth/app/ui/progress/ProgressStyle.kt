@@ -13,8 +13,8 @@ import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 
 /** 진행과 기록 화면에 공용 도트 패널을 적용한다. */
 internal class ProgressStyle(private val context: Context) {
-    private val hud = ReferenceHudStyle(context, featureWindow = true)
-    private val panels = MapPanelStyle(context, featureWindow = true)
+    private val hud = ReferenceHudStyle(context)
+    private val panels = MapPanelStyle(context)
     val base = CleanUi.CARD_SOFT
     val ink get() = hud.signInk
     val muted get() = panels.muted
@@ -31,12 +31,11 @@ internal class ProgressStyle(private val context: Context) {
     fun text(label: CharSequence, size: Int = 20, color: Int = ink, bold: Boolean = false) = TextView(context).apply {
         text = label; textSize = size.toFloat(); setTextColor(color)
         if (bold) setTypeface(typeface, Typeface.BOLD)
-        setPadding(0, dp(6), 0, dp(6))
+        setPadding(0, dp(2), 0, dp(2))
     }
     fun card(selected: Boolean = false) = column().apply {
         background = if (selected) surface(true) else hud.signSurface()
-        val padding = dp(PixelStyle.panelPaddingDp)
-        setPadding(padding, dp(16), padding, dp(16))
+        setPadding(dp(12), dp(10), dp(12), dp(10))
     }
     fun button(label: String, enabled: Boolean = true, primary: Boolean = false, action: () -> Unit) = Button(context).apply {
         text = label; textSize = 22f; isAllCaps = false; isEnabled = enabled
@@ -44,7 +43,7 @@ internal class ProgressStyle(private val context: Context) {
         backgroundTintList = null
         background = hud.signButton(primary)
         setTypeface(typeface, Typeface.BOLD)
-        minHeight = dp(64); minimumHeight = dp(64); setPadding(dp(16), dp(12), dp(16), dp(12))
+        minHeight = dp(64); minimumHeight = minHeight; setPadding(dp(12), dp(8), dp(12), dp(8))
         setOnClickListener { if (isEnabled) action() }
     }
     fun add(parent: LinearLayout, child: android.view.View, gap: Int = PixelStyle.gapDp) {

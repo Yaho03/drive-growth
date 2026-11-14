@@ -18,9 +18,7 @@ import io.drivegrowth.core.progression.VehicleAction
 class GarageCommandView(context: Context, private val confirm: () -> Unit, private val cancel: () -> Unit,
     private val retry: () -> Unit, private val cancelPending: () -> Unit, private val choose: (VehicleRef) -> Unit, private val done: () -> Unit) : LinearLayout(context) {
     private val style = GarageStyle(context, pixelPanel = true)
-    private val homeStyle = MapPanelStyle(context)
-    private val featureStyle = MapPanelStyle(context, featureWindow = true)
-    private var featureWindow = false
+    private val mapStyle = MapPanelStyle(context)
     private val artwork = VehicleArtwork(context, style)
     private val careMotion = GarageCareMotion()
     private val careScene = GarageCareMotionView(context)
@@ -28,7 +26,7 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
     private var controlsEnabled = false
     private var startMotion: Runnable? = null
     private var generation = 0L
-    init { orientation = VERTICAL; setBackgroundColor(0xffffedbd.toInt()) }
+    init { orientation = VERTICAL; setBackgroundColor(CleanUi.CARD_SOFT) }
 
     private fun canPlayCareMotion() = controlsEnabled && isAttachedToWindow && isShown &&
         windowVisibility == VISIBLE && hasWindowFocus() && ValueAnimator.areAnimatorsEnabled()
@@ -62,16 +60,8 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
         if (!hasWindowFocus) dismissMotion()
     }
 
-    fun render(state: GarageCommandState, enabled: Boolean) = render(state, enabled, featureWindow = false)
-
-    internal fun render(state: GarageCommandState, enabled: Boolean, featureWindow: Boolean) = with(style) {
-        val themeChanged = this@GarageCommandView.featureWindow != featureWindow
-        if (state == renderedState && enabled == controlsEnabled && !themeChanged) return@with
-        if (themeChanged) {
-            this@GarageCommandView.featureWindow = featureWindow
-            setBackgroundColor(if (featureWindow) CleanUi.CARD_SOFT else 0xffffedbd.toInt())
-        }
-        val mapStyle = if (featureWindow) featureStyle else homeStyle
+    fun render(state: GarageCommandState, enabled: Boolean) = with(style) {
+        if (state == renderedState && enabled == controlsEnabled) return@with
         renderedState = state
         controlsEnabled = enabled
         val effect = careMotion.observe(state, canPlayCareMotion())

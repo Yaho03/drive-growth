@@ -2,14 +2,15 @@ package io.drivegrowth.app.ui.shop
 
 import android.content.Context
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import io.drivegrowth.app.ui.pixel.CleanUi
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.MapPanelStyle
+import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 
 internal fun String.displayShopSign() = when (this) {
     "기본 간판 · 시연" -> "기본 간판"
@@ -20,18 +21,18 @@ internal fun String.displayShopSign() = when (this) {
 /** #229의 공통 색과 기존 차량 화면의 Native 조작 크기를 사용한다. */
 internal class ShopStyle(private val context: Context) {
     private val mapPanel = MapPanelStyle(context)
-    val base = PixelStyle.background
-    val page = 0xfffbefcf.toInt()
+    val base = CleanUi.CARD_SOFT
+    val page = CleanUi.CARD_SOFT
     val ink get() = mapPanel.ink
     val muted get() = mapPanel.muted
     val accent get() = mapPanel.accent
-    val scrim = 0x75172716
+    val scrim = CleanUi.SCRIM
     fun surface() = mapPanel.card()
     fun infoSurface() = mapPanel.chip()
     fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
     fun column() = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     fun row() = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-    fun shape(fill: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = dp(PixelStyle.panelRadiusDp).toFloat() }
+    fun shape(fill: Int) = ReferenceHudStyle(context).panel(fill)
     fun text(value: CharSequence, size: Int = 16, color: Int = ink, bold: Boolean = false) = TextView(context).apply {
         text = value; textSize = size.toFloat(); setTextColor(color)
         if (bold) setTypeface(typeface, Typeface.BOLD)

@@ -34,6 +34,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.TextView
+import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.core.contract.VehicleId
 import java.io.IOException
@@ -98,16 +99,15 @@ internal class PrototypeTitleView(
     }
     private val start = Button(context).apply {
         tag = "presentation:start"
-        text = SpannableString("화면을 눌러 시작  ▶").apply {
-            setSpan(ForegroundColorSpan(0xffffd65e.toInt()), length - 1, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        }
+        text = "화면을 눌러 시작  ▶"
         contentDescription = "게임 시작"
         isAllCaps = false
         typeface = titleFont
         letterSpacing = .08f
-        setTextColor(Color.WHITE)
+        val style = ReferenceHudStyle(context)
+        setTextColor(style.featureButtonText(primary = true))
         backgroundTintList = null
-        background = null
+        background = style.signButton(primary = true)
         stateListAnimator = null
         minHeight = 0
         minimumHeight = 0
@@ -198,7 +198,7 @@ internal class PrototypeTitleView(
         fitLabel(ribbon, 28 * k)
         val ribbonWidth = ceil(ribbon.paint.measureText(ribbon.text.toString())).toInt() + (240 * k).roundToInt()
         measureAt(ribbon, ribbonWidth.coerceAtMost(width), (48 * k).roundToInt().coerceAtLeast(1))
-        val startSp = max(16f, 34 * k / resources.displayMetrics.density)
+        val startSp = max(20f, 38 * k / resources.displayMetrics.density)
         if (start.textSize != TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, startSp, resources.displayMetrics)) {
             start.setTextSize(TypedValue.COMPLEX_UNIT_SP, startSp)
         }
@@ -206,7 +206,7 @@ internal class PrototypeTitleView(
             ceil(start.paint.measureText(start.text.toString())).toInt() + dp(32)).coerceAtMost(width)
         start.measure(MeasureSpec.makeMeasureSpec(startWidth, MeasureSpec.EXACTLY),
             MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
-        val startHeight = max(dp(48), start.measuredHeight + dp(12))
+        val startHeight = max(dp(56), start.measuredHeight + dp(12))
         measureAt(start, startWidth, startHeight.coerceAtMost(height))
     }
 
@@ -350,7 +350,6 @@ internal class PrototypeTitleView(
             start.visibility = ctaVisibility
             start.isEnabled = isClickable && ctaVisibility == VISIBLE
         }
-        start.setShadowLayer(16 * k + 4, 0f, 0f, 0xe6ffaa50.toInt())
         scene.invalidate()
         overlay.invalidate()
     }

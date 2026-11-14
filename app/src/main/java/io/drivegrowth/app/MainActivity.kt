@@ -40,7 +40,7 @@ import io.drivegrowth.app.ui.shop.ShopEvent
 import io.drivegrowth.app.ui.shop.FacilityControlsEvent
 import io.drivegrowth.app.ui.shop.ShopMode
 import io.drivegrowth.app.ui.shop.ShopUiState
-import io.drivegrowth.app.ui.pixel.PixelStyle
+import io.drivegrowth.app.ui.pixel.CleanUi
 import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.app.ui.gacha.GachaView
@@ -162,7 +162,6 @@ open class MainActivity : Activity() {
     private lateinit var session: HostSession
     private lateinit var style: GarageStyle
     private lateinit var featureStyle: GarageStyle
-    private lateinit var deliveryFeatureStyle: GarageStyle
     private lateinit var garage: GarageView
     private lateinit var collection: CollectionView
     private lateinit var body: FrameLayout
@@ -208,8 +207,7 @@ open class MainActivity : Activity() {
             }
         }
         style = GarageStyle(this, pixelPanel = true)
-        featureStyle = GarageStyle(this, pixelPanel = true, creamPanel = true)
-        deliveryFeatureStyle = GarageStyle(this, pixelPanel = true, featureWindow = true)
+        featureStyle = GarageStyle(this, pixelPanel = true, featureWindow = true)
         titlePending = savedInstanceState?.getBoolean("presentationTitlePending")
             ?: intent.hasCategory(Intent.CATEGORY_LAUNCHER)
         presentationAudio = PrototypeAudio(applicationContext)
@@ -309,7 +307,8 @@ open class MainActivity : Activity() {
                 session.deliveryUi = delivery.saveUiState()
                 session.delivery.onRequest(request)
             }
-        }, session.deliveryUi, navigationControls = ::deliveryNavigationControls, hostStatus = ::deliveryHostStatus,
+        }, session.deliveryUi, navigationControls = ::deliveryNavigationControls,
+            simulationDestinationControls = ::simulationDeliveryDestinationControls, hostStatus = ::deliveryHostStatus,
             canConfirmOffer = { !session.delivery.isSavingDisplayedOffers },
             onPresentationCue = ::playDeliveryCue,
             onPresentationCancelled = presentationAudio::stopEffectPlayback).apply {
@@ -367,11 +366,11 @@ open class MainActivity : Activity() {
             { if (gameControlsAllowed()) management.controller.cancelPending() },
             { if (gameControlsAllowed()) management.controller.chooseMaterial(it) },
             { if (gameControlsAllowed()) management.controller.acknowledge() })
-        panel = style.column().apply { setBackgroundColor(PixelStyle.background) }
+        panel = style.column().apply { setBackgroundColor(CleanUi.CARD_SOFT) }
         if (session.simulation != null) {
             simulationControls = createSimulationControls()
         }
-        val sign = ReferenceHudStyle(this, featureWindow = true)
+        val sign = ReferenceHudStyle(this)
         chrome = style.column()
         body = FrameLayout(this)
         stage = FrameLayout(this).apply {
@@ -386,7 +385,7 @@ open class MainActivity : Activity() {
                 })
             }
         }
-        pageTitle = style.text("", 22).apply {
+        pageTitle = style.text("", 26).apply {
             tag = "host:page-title"
             setTextColor(sign.signInk)
             setTypeface(typeface, Typeface.BOLD)
@@ -416,7 +415,7 @@ open class MainActivity : Activity() {
         pageHeading = object : LinearLayout(this) {
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
                 val width = MeasureSpec.getSize(widthMeasureSpec)
-                val stacked = width < style.dp(560) || resources.configuration.fontScale >= 1.3f
+                val stacked = width < style.dp(620) || resources.configuration.fontScale >= 1.3f
                 val direction = if (stacked) VERTICAL else HORIZONTAL
                 if (orientation != direction) orientation = direction
                 val titleLayout = pageTitle.layoutParams as LayoutParams
@@ -462,7 +461,7 @@ open class MainActivity : Activity() {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         appRoot = FrameLayout(this).apply {
-            setBackgroundColor(PixelStyle.background)
+            setBackgroundColor(CleanUi.CARD_SOFT)
             addView(windowMap, FrameLayout.LayoutParams(-1, -1))
             addView(panel, FrameLayout.LayoutParams(-1, -1))
             addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
@@ -852,7 +851,7 @@ open class MainActivity : Activity() {
                 tag = "simulation:status"
                 addView(this)
             }
-            addView(featureStyle.text(getString(R.string.host_simulation_input_note), 14, featureStyle.muted))
+            addView(featureStyle.text(getString(R.string.host_simulation_input_note), 16, featureStyle.muted))
         }, gap = 4)
         simulationStart = featureStyle.button("모의주행 시작", primary = true) {
             if (!simulationControlsExpanded || !gameControlsAllowed() ||
@@ -904,10 +903,10 @@ open class MainActivity : Activity() {
     private fun Button.simulationButtonStyle(sign: ReferenceHudStyle) {
         backgroundTintList = null
         background = sign.signButton()
-        setTextColor(sign.signInk)
-        minimumHeight = style.dp(44)
+        setTextColor(sign.featureButtonText(primary = false))
+        minimumHeight = style.dp(56)
         minHeight = minimumHeight
-        textSize = 16f
+        textSize = 18f
         setPadding(style.dp(10), 0, style.dp(10), 0)
     }
 
@@ -958,8 +957,8 @@ open class MainActivity : Activity() {
         backgroundTintList = null
         background = sign.signButton()
         setTextColor(sign.featureButtonText(primary = false))
-        textSize = 18f
-        minWidth = style.dp(64)
+        textSize = 20f
+        minWidth = style.dp(72)
         minimumWidth = minWidth
         minHeight = style.dp(56)
         minimumHeight = minHeight
@@ -1041,7 +1040,7 @@ open class MainActivity : Activity() {
         }
         bar = object : android.widget.HorizontalScrollView(this) {
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-                val width = minOf(MeasureSpec.getSize(widthMeasureSpec), style.dp(880))
+                val width = minOf(MeasureSpec.getSize(widthMeasureSpec), style.dp(960))
                 super.onMeasure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY), heightMeasureSpec)
             }
         }.apply {
@@ -1075,7 +1074,7 @@ open class MainActivity : Activity() {
         val overlay = FrameLayout(this).apply {
             tag = "host:settings-panel"
             isClickable = true
-            setBackgroundColor(0x990b101e.toInt())
+            setBackgroundColor(CleanUi.SCRIM)
         }
         val page = navigation.page
         fun isCurrent() = homeSettings === overlay && navigation.page == page && active &&
@@ -1093,7 +1092,7 @@ open class MainActivity : Activity() {
             addView(featureStyle.heading("설정", ReferenceHudIcon.SETTINGS).apply {
                 background = null
                 isAccessibilityHeading = true
-                textSize = 20f
+                textSize = 25f
             }, LinearLayout.LayoutParams(0, -2, 1f))
             addView(close, LinearLayout.LayoutParams(-2, -2))
         }
@@ -1104,7 +1103,7 @@ open class MainActivity : Activity() {
             addView(featureStyle.heading(getString(label), icon).apply {
                 background = null
                 isAccessibilityHeading = true
-                textSize = 17f
+                textSize = 20f
                 setPadding(style.dp(3), style.dp(4), style.dp(3), style.dp(4))
             })
             featureStyle.add(items, this, gap = 6)
@@ -1136,7 +1135,7 @@ open class MainActivity : Activity() {
                 closeHomeSettings()
                 openSimulationTool()
             }
-            featureStyle.add(demo, featureStyle.text(getString(R.string.host_simulation_input_note), 14, featureStyle.muted), gap = 4)
+            featureStyle.add(demo, featureStyle.text(getString(R.string.host_simulation_input_note), 16, featureStyle.muted), gap = 4)
         }
         card.addView(heading)
         card.addView(ScrollView(this).apply {
@@ -1144,7 +1143,7 @@ open class MainActivity : Activity() {
             addView(items)
         }, LinearLayout.LayoutParams(-1, -2, 1f))
         overlay.addView(card, FrameLayout.LayoutParams(
-            minOf(appRoot.width - style.dp(24), style.dp(480)).coerceAtLeast(0),
+            minOf(appRoot.width - style.dp(24), style.dp(560)).coerceAtLeast(0),
             -2, Gravity.CENTER,
         ).apply {
             val inset = style.dp(12)
@@ -1212,7 +1211,7 @@ open class MainActivity : Activity() {
             else -> CollectionScreenState.Loading
         }
         ranking.render(rankingState, gameEnabled && navigation.page == HostPage.RANKING)
-        managementView.render(managementState, gameEnabled, featureWindow = navigation.page == HostPage.GARAGE)
+        managementView.render(managementState, gameEnabled)
         val homeEnabled = gameEnabled && navigation.page == HostPage.HOME && !shopRestoreFailed
         val facility = session.facility.state
         val facilityEnabled = homeEnabled && session.home.facilityControlsEnabled
@@ -1423,7 +1422,7 @@ open class MainActivity : Activity() {
                 isFillViewport = true
                 addView(FrameLayout(this@MainActivity).apply {
                     tag = "host:restricted-screen"
-                    setBackgroundColor(0xffeee1c6.toInt())
+                    setBackgroundColor(CleanUi.CARD_SOFT)
                     addView(card, FrameLayout.LayoutParams(
                         -1, -2, Gravity.CENTER,
                     ).apply { setMargins(0, style.dp(12), 0, style.dp(12)) })
@@ -1638,7 +1637,7 @@ open class MainActivity : Activity() {
             windowMap.setImageDrawable(BitmapDrawable(resources, map).apply { isFilterBitmap = false })
         }
         windowMap.visibility = if (show) View.VISIBLE else View.GONE
-        panel.background = if (show) ReferenceHudStyle(this, featureWindow = true).signSurface() else null
+        panel.background = if (show) ReferenceHudStyle(this).signSurface() else null
         panel.tag = "host:feature-window".takeIf { show }
         val border = if (show) style.dp(7) else 0
         panel.setPadding(border, border, border, border)
@@ -1696,7 +1695,7 @@ open class MainActivity : Activity() {
             tag = "presentation:title-sound"
             backgroundTintList = null
             background = sign.signButton()
-            setTextColor(sign.signInk)
+            setTextColor(sign.featureButtonText(primary = false))
             compact(style)
             setPadding(style.dp(10), 0, style.dp(10), 0)
         }
@@ -1856,41 +1855,53 @@ open class MainActivity : Activity() {
         session.deliveryUi = delivery.saveUiState()
     }
 
+    private fun simulationDeliveryDestinationControls(changing: Boolean): View? {
+        if (session.simulation == null || session.delivery.state?.readOnly == true) return null
+        val style = featureStyle
+        val details = style.column()
+        val navigationRead = session.delivery.state?.navigation
+        val estimate = (navigationRead?.estimated as? Observation.Available)?.value
+        val name = navigationRead?.destinationName?.takeIf { it.isNotBlank() }
+        if (name == null || estimate == null || estimate.meters <= 0 || estimate.source != InputSource.SIMULATION) {
+            details.addView(style.text("모의 목적지나 예상 거리를 확인할 수 없어요."))
+            details.addView(style.button("모의 목적지 다시 확인") {
+                if (gameControlsAllowed()) { session.deliveryNavigation.refresh(); session.delivery.refresh() }
+            })
+            return details
+        }
+        details.addView(style.text("모의 목적지 · $name"))
+        details.addView(style.text("예상 거리 ${deliveryDistance(estimate.meters)}"))
+        val label = if (changing) "새 모의 목적지 확인" else "이 목적지의 탁송 후보 보기"
+        details.addView(style.button(label, primary = true) {
+            if (gameControlsAllowed() && navigation.page == HostPage.DELIVERY &&
+                session.delivery.state?.readOnly != true && session.deliveryNavigation.confirm() is ContractResult.Success) {
+                session.delivery.refresh()
+            }
+        }.apply { tag = "simulation:destination" })
+        return details
+    }
+
     private fun deliveryNavigationControls(): View? {
         if (session.delivery.state?.readOnly == true) return null
-        val style = deliveryFeatureStyle
+        val style = featureStyle
         val details = style.column()
-        if (session.simulation != null) {
-            val estimate = session.delivery.state?.navigation?.estimated as? Observation.Available
-            if (estimate == null) {
-                details.addView(style.button("모의 목적지 다시 확인") {
-                    if (gameControlsAllowed()) { session.deliveryNavigation.refresh(); session.delivery.refresh() }
-                })
-                return details
-            }
-            details.addView(style.button("목적지 확인") {
+        val raw = session.deliveryNavigation.snapshot
+        val destination = raw?.destination as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
+        val distance = raw?.remainingEstimatedMeters as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
+        if (destination == null || distance == null || destination.stamp != distance.stamp) {
+            details.addView(style.text("목적지를 확인할 수 없어요. 내비에서 목적지를 설정한 뒤 다시 확인해 주세요."))
+        }
+        details.addView(style.button("내비 목적지 다시 조회") { if (gameControlsAllowed()) session.deliveryNavigation.refresh() })
+        if (destination != null && distance != null && destination.stamp == distance.stamp) {
+            val name = destination.value.name ?: destination.value.address ?: "이름 없음"
+            details.addView(style.text("$name · 남은 예상 거리 ${deliveryDistance(distance.value)}"))
+            details.addView(style.button("이 목적지와 남은 예상거리 확인") {
                 if (gameControlsAllowed() && navigation.page == HostPage.DELIVERY &&
-                    session.delivery.state?.readOnly != true && session.deliveryNavigation.confirm() is ContractResult.Success) session.delivery.refresh()
-            }.apply { tag = "simulation:destination" })
-        } else {
-            val raw = session.deliveryNavigation.snapshot
-            val destination = raw?.destination as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
-            val distance = raw?.remainingEstimatedMeters as? io.drivegrowth.app.vehicle.navigation.NavigationField.Value
-            if (destination == null || distance == null || destination.stamp != distance.stamp) {
-                details.addView(style.text("목적지를 확인할 수 없어요. 내비에서 목적지를 설정한 뒤 다시 확인해 주세요."))
-            }
-            details.addView(style.button("내비 목적지 다시 조회") { if (gameControlsAllowed()) session.deliveryNavigation.refresh() })
-            if (destination != null && distance != null && destination.stamp == distance.stamp) {
-                val name = destination.value.name ?: destination.value.address ?: "이름 없음"
-                details.addView(style.text("$name · 남은 예상 거리 ${deliveryDistance(distance.value)}"))
-                details.addView(style.button("이 목적지와 남은 예상거리 확인") {
-                    if (gameControlsAllowed() && navigation.page == HostPage.DELIVERY &&
-                        session.delivery.state?.readOnly != true) when (session.deliveryNavigation.confirm()) {
-                        is ContractResult.Success -> session.delivery.refresh()
-                        is ContractResult.Failure -> { session.deliveryNavigation.refresh(); render() }
-                    }
-                })
-            }
+                    session.delivery.state?.readOnly != true) when (session.deliveryNavigation.confirm()) {
+                    is ContractResult.Success -> session.delivery.refresh()
+                    is ContractResult.Failure -> { session.deliveryNavigation.refresh(); render() }
+                }
+            })
         }
         return details
     }
@@ -1900,7 +1911,7 @@ open class MainActivity : Activity() {
         val heldVehicles = state?.held.orEmpty()
         val canCancel = session.delivery.canCancelUnstarted
         if (heldVehicles.isEmpty() && state?.receipt == null && !canCancel) return null
-        val style = deliveryFeatureStyle
+        val style = featureStyle
         val details = style.column()
         val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
             ?.associate { it.vehicleId to it.displayName }.orEmpty()
@@ -1952,7 +1963,7 @@ open class MainActivity : Activity() {
                 if (child is Button) {
                     child.backgroundTintList = null
                     child.background = sign.signButton()
-                    child.setTextColor(sign.signInk)
+                    child.setTextColor(sign.featureButtonText(primary = false))
                     child.minHeight = style.dp(48)
                     child.minimumHeight = child.minHeight
                 } else if (child is TextView) child.setTextColor(sign.signInk)

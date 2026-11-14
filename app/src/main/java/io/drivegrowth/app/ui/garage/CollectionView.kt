@@ -182,6 +182,8 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
                             }
                         }.apply {
                             tag = "collection:filter:${option?.name ?: "all"}"
+                            textSize = 17f
+                            minimumHeight = maxOf(minimumHeight, dp(50))
                             isSelected = option == filter
                         }, weightedCell(index))
                     }
@@ -199,8 +201,8 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
         }
 
         val owned = content.entries.count { it.entry.state == CollectionState.OWNED }
-        body.addView(text(s(R.string.garage_collection_count, owned, content.entries.size), 17, bold = true))
-        body.addView(text(s(R.string.garage_collection_note), 14, muted))
+        body.addView(text(s(R.string.garage_collection_count, owned, content.entries.size), 20, bold = true))
+        body.addView(text(s(R.string.garage_collection_note), 16, muted))
         val vehicles = content.entries.groupBy { it.entry.key.vehicleId }.values
             .sortedBy { it.first().unlockShopLevel ?: Int.MAX_VALUE }
             .filter { cells -> filter == null || cells.any { it.entry.state == filter } }
@@ -216,7 +218,7 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
 
     private fun rarityHeaders() = with(style) {
         row().apply {
-            addView(text(s(R.string.garage_collection_model), 14, muted, bold = true), modelColumn())
+            addView(text(s(R.string.garage_collection_model), 16, muted, bold = true), modelColumn())
             Rarity.entries.forEach { rarity ->
                 addView(rarityChip(rarity).apply { gravity = Gravity.CENTER }, weightedCell(1, sameHeight = true))
             }
@@ -229,7 +231,7 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
             gravity = Gravity.CENTER_VERTICAL
             background = shape(inset)
             setPadding(dp(6), dp(4), dp(6), dp(4))
-            addView(text(first.name, 17, bold = true))
+            addView(text(first.name, 19, bold = true))
             val unlock = first.unlockShopLevel
             addView(text(if (unlock == null) s(R.string.garage_unlock_missing)
                 else s(R.string.garage_collection_unlock_level, unlock), 13, muted))
@@ -282,9 +284,9 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
                             .apply { background = null }
                     }) { controlsEnabled && takeNewCollectionKey(value.entry.key) }
                 } else image
-                addView(art, LayoutParams(-1, dp(44)))
+                addView(art, LayoutParams(-1, dp(40)))
             }
-            addView(text(status, 14, 0xff163619.toInt(), bold = true).apply { gravity = Gravity.CENTER }, LayoutParams(-1, -2))
+            addView(text(status, 16, rarityColor(rarity), bold = true).apply { gravity = Gravity.CENTER }, LayoutParams(-1, -2))
         }
     }
 }

@@ -16,11 +16,11 @@ internal class CollectionNewArtwork(
     private val take: () -> Boolean,
 ) : FrameLayout(context) {
     private val visibleBounds = Rect()
-    private val style = GarageStyle(context, pixelPanel = true, creamPanel = true)
+    private val style = GarageStyle(context, pixelPanel = true, featureWindow = true)
     private val stamp = style.text("NEW", 14, bold = true).apply {
         contentDescription = "NEW · 도감 등록"
         visibility = INVISIBLE
-        background = style.shape(style.panel)
+        background = style.shape(style.inset)
     }
     private val clearStamp = Runnable { stop() }
     private var animator: ValueAnimator? = null

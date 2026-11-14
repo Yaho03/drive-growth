@@ -42,7 +42,7 @@ class RankingView(context: Context, private val onEvent: (RankingEvent) -> Unit)
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        val next = w >= style.dp(400)
+        val next = w >= style.dp(480) && resources.configuration.fontScale <= 1.3f
         if (next != twoColumns) {
             twoColumns = next
             post { saved = uiState; paint() }
@@ -79,7 +79,7 @@ class RankingView(context: Context, private val onEvent: (RankingEvent) -> Unit)
             addView(text("주차 후 조작이 허용되면 이용할 수 있습니다."))
             return@with
         }
-        val body = column().apply { setPadding(dp(16), dp(12), dp(16), dp(16)) }
+        val body = column().apply { setPadding(dp(12), dp(8), dp(12), dp(8)) }
         if (showHeading) body.addView(text("기록과 랭킹", 24, bold = true).apply {
             background = surface()
             setPadding(dp(12), dp(6), dp(12), dp(6))
@@ -101,35 +101,35 @@ class RankingView(context: Context, private val onEvent: (RankingEvent) -> Unit)
         val card = card().apply { addView(text("내 기록", 22, bold = true)) }
         add(body, card)
         when (val current = state) {
-            RankingState.Loading -> card.addView(text("기록을 조회하고 있습니다.", 16))
+            RankingState.Loading -> card.addView(text("기록을 조회하고 있습니다.", 18))
             is RankingState.Failure -> {
-                card.addView(text("기록을 읽지 못했습니다. 다시 조회해 주세요.", 16))
+                card.addView(text("기록을 읽지 못했습니다. 다시 조회해 주세요.", 18))
                 retry(card)
             }
             is RankingState.Content -> {
                 val data = current.snapshot
-                card.addView(text("조회 기준 ${timestamp.format(Instant.ofEpochMilli(data.asOf.value))} 한국시간", 15, muted))
+                card.addView(text("조회 기준 ${timestamp.format(Instant.ofEpochMilli(data.asOf.value))} 한국시간", 16, muted))
                 RankingMetric.entries.chunked(if (twoColumns) 2 else 1).forEach { metrics ->
                     val cells = row().apply { isBaselineAligned = false }
                     metrics.forEachIndexed { index, metric ->
                         val item = tile().apply {
-                            addView(text(metric.title, 15, muted, bold = true))
+                            addView(text(metric.title, 18, muted, bold = true))
                             when (val value = data.metrics[metric]) {
                                 is RankingValue.Available -> {
-                                    addView(text("${value.amount.stripTrailingZeros().toPlainString()} ${metric.unit}", 22, bold = true))
-                                    addView(text(value.basis, 14, muted))
+                                    addView(text("${value.amount.stripTrailingZeros().toPlainString()} ${metric.unit}", 24, bold = true))
+                                    addView(text(value.basis, 16, muted))
                                 }
-                                is RankingValue.Empty -> addView(text(value.reason, 15))
-                                is RankingValue.Missing -> addView(text("확인 불가 · ${value.reason}", 15))
-                                is RankingValue.Failure -> addView(text("조회 실패 · 기록을 확인할 수 없습니다.", 15))
-                                null -> addView(text("확인 불가 · 이 기록을 확인할 수 없어요.", 15))
+                                is RankingValue.Empty -> addView(text(value.reason, 17))
+                                is RankingValue.Missing -> addView(text("확인 불가 · ${value.reason}", 17))
+                                is RankingValue.Failure -> addView(text("조회 실패 · 기록을 확인할 수 없습니다.", 17))
+                                null -> addView(text("확인 불가 · 이 기록을 확인할 수 없어요.", 17))
                             }
                         }
                         cells.addView(item, LayoutParams(0, -1, 1f).apply {
                             if (index != 0) marginStart = dp(10)
                         })
                     }
-                    add(card, cells, gap = 10)
+                    add(card, cells, gap = 8)
                 }
                 retry(card)
             }
@@ -147,11 +147,11 @@ class RankingView(context: Context, private val onEvent: (RankingEvent) -> Unit)
         add(body, tabStrip(selectors), gap = 8)
         add(body, card().apply {
             addView(text("${saved.metric.title} 순위", 22, bold = true))
-            addView(text("예시 랭킹", 15, ink, bold = true).apply {
+            addView(text("예시 랭킹", 17, ink, bold = true).apply {
                 background = surface(selected = true)
                 setPadding(dp(12), dp(6), dp(12), dp(6))
             }, LayoutParams(-2, -2))
-            addView(text("예시 데이터로 만든 순위예요. 점수가 같으면 같은 순위로 표시해요.", 14, muted))
+            addView(text("예시 데이터로 만든 순위예요. 점수가 같으면 같은 순위로 표시해요.", 16, muted))
             val rows = demo.rows(saved.metric)
             val tied = rows.groupingBy { it.rank }.eachCount()
             rows.forEach { entry ->
@@ -159,22 +159,22 @@ class RankingView(context: Context, private val onEvent: (RankingEvent) -> Unit)
                     isBaselineAligned = false
                     gravity = Gravity.CENTER_VERTICAL
                     background = surface()
-                    setPadding(dp(12), dp(8), dp(12), dp(8))
-                    addView(text("${entry.rank}위 · ${entry.entry.label}", 17, bold = true).apply {
+                    setPadding(dp(10), dp(6), dp(10), dp(6))
+                    addView(text("${entry.rank}위 · ${entry.entry.label}", 18, bold = true).apply {
                         if ((tied[entry.rank] ?: 0) > 1) contentDescription = "공동 ${entry.rank}위 · ${entry.entry.label}"
                     }, LayoutParams(0, -2, 1f))
-                    addView(text("${entry.value.stripTrailingZeros().toPlainString()} ${saved.metric.unit}", 16, bold = true)
+                    addView(text("${entry.value.stripTrailingZeros().toPlainString()} ${saved.metric.unit}", 18, bold = true)
                         .apply { gravity = Gravity.END }, LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
-                }, gap = 10)
+                }, gap = 8)
             }
         })
     }
 
     private fun addTab(row: LinearLayout, label: String, selected: Boolean, action: () -> Unit) = with(style) {
         val tab = button(label, primary = selected, action = action).apply {
-            textSize = 16f
+            textSize = 18f
             setTypeface(typeface, Typeface.BOLD)
-            minHeight = dp(48)
+            minHeight = dp(52)
             minimumHeight = minHeight
             setPadding(dp(14), dp(6), dp(14), dp(6))
             isSelected = selected
@@ -189,7 +189,7 @@ class RankingView(context: Context, private val onEvent: (RankingEvent) -> Unit)
 
     private fun tile() = style.column().apply {
         background = style.surface()
-        setPadding(style.dp(12), style.dp(8), style.dp(12), style.dp(8))
+        setPadding(style.dp(10), style.dp(6), style.dp(10), style.dp(6))
     }
 
     private fun retry(body: LinearLayout): Unit = with(style) {

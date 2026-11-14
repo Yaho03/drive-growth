@@ -20,6 +20,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import io.drivegrowth.app.ui.pixel.CleanUi
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import io.drivegrowth.app.ui.pixel.VehicleSprites
@@ -230,10 +231,10 @@ private class DriveProgressTrackView(context: Context) : View(context) {
         set(value) { field = value; invalidate() }
 
     override fun onDraw(canvas: Canvas) {
-        paint.color = 0xffdcc68e.toInt()
+        paint.color = CleanUi.CHIP
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
         fraction?.let {
-            paint.color = 0xff396b28.toInt()
+            paint.color = CleanUi.SEA
             canvas.drawRect(0f, 0f, width * it, height.toFloat(), paint)
         }
     }

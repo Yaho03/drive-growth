@@ -1,99 +1,51 @@
 package io.drivegrowth.app.ui.pixel
 
+import android.R.attr.state_enabled
+import android.R.attr.state_focused
+import android.R.attr.state_pressed
 import android.content.Context
 import android.content.res.ColorStateList
-import android.graphics.drawable.LayerDrawable
-import android.view.Gravity
 import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.LinearGradient
-import android.graphics.Paint
-import android.graphics.PixelFormat
-import android.graphics.Rect
-import android.graphics.RectF
 import android.graphics.Shader
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 
-/** 지도 HUD와 탐색 도크에 사용하는 시안의 공통 색·외곽선. */
-internal class ReferenceHudStyle(
-    private val context: Context,
-    private val featureWindow: Boolean = false,
-) {
-    val outline = 0xffc7e7fa.toInt()
+/** 지도 HUD, 기능 창과 조작 버튼의 공통 표면. */
+internal class ReferenceHudStyle(private val context: Context) {
+    val signInk = CleanUi.INK
+
     fun dp(value: Int) = (value * context.resources.displayMetrics.density + .5f).toInt()
 
-    fun surface(radius: Int = 12, selected: Boolean = false, focused: Boolean = false) = GradientDrawable(
-        GradientDrawable.Orientation.TOP_BOTTOM,
-        if (selected) intArrayOf(0xff26b7ff.toInt(), 0xff0076ed.toInt())
-        else intArrayOf(0xff26334f.toInt(), 0xff101b31.toInt()),
-    ).apply {
-        cornerRadius = dp(radius).toFloat()
-        setStroke(dp(if (focused) 2 else 1), if (selected || focused) 0xff88d8ff.toInt() else outline)
-    }
-
-    fun buttonSurface(selected: Boolean = false, outlined: Boolean = true) = StateListDrawable().apply {
-        addState(intArrayOf(android.R.attr.state_focused), surface(selected = selected, focused = true))
-        addState(intArrayOf(android.R.attr.state_pressed), surface(selected = true))
-        addState(intArrayOf(), if (selected || outlined) surface(selected = selected)
-            else GradientDrawable().apply { setColor(0x00101b31) })
-    }
-
-    val signInk = if (featureWindow) CleanUi.INK else 0xff163619.toInt()
-
-    fun signSurface(focused: Boolean = false): Drawable =
-        if (featureWindow) FeaturePanelDrawable(context.resources.displayMetrics.density, focused)
-        else PixelSignDrawable(dp(3).coerceAtLeast(1), focused)
+    fun signSurface(focused: Boolean = false): Drawable = panel(CleanUi.CARD, focused)
 
     fun detailSurface(active: Boolean, fill: Int? = null): Drawable =
-        if (featureWindow && fill == null) {
-            val color = if (active) CleanUi.SEA_DEEP else CleanUi.CHIP
-            featureSurface(color, color, 8, active)
-        } else PixelSignDrawable(dp(2).coerceAtLeast(1), focused = false, primary = active, detail = true, detailFill = fill)
+        panel(fill ?: if (active) CleanUi.SEA_DEEP else CleanUi.CHIP, active, step = 2)
 
-    fun signButton(primary: Boolean = false): Drawable =
-        if (featureWindow) featureButton(primary) else pixelButton(primary)
+    fun featureHeading(): Drawable = panel(CleanUi.PANEL_TOP)
+
+    fun signButton(primary: Boolean = false): Drawable = StateListDrawable().apply {
+        val fill = if (primary) CleanUi.PRIMARY else CleanUi.CHIP
+        addState(intArrayOf(-state_enabled), panel(CleanUi.DISABLED, line = CleanUi.DISABLED_LINE))
+        addState(intArrayOf(state_pressed), panel(if (primary) CleanUi.PRIMARY_PRESSED else CleanUi.SEA_DEEP, focused = true))
+        addState(intArrayOf(state_focused), panel(fill, focused = true))
+        addState(intArrayOf(), panel(fill))
+    }
 
     fun featureButtonText(primary: Boolean) = ColorStateList(
-        arrayOf(intArrayOf(-android.R.attr.state_enabled), intArrayOf()),
+        arrayOf(intArrayOf(-state_enabled), intArrayOf()),
         intArrayOf(CleanUi.MUTED, if (primary) CleanUi.ON_PRIMARY else CleanUi.INK),
     )
 
-    fun featureHeading(): Drawable = LayerDrawable(arrayOf(
-        featureSurface(0xff1d3d69.toInt(), 0xff142c4f.toInt(), 10),
-        GradientDrawable().apply { setColor(CleanUi.SEA) },
-    )).apply {
-        setLayerGravity(1, Gravity.BOTTOM or Gravity.FILL_HORIZONTAL)
-        setLayerHeight(1, dp(2))
-        setLayerInsetLeft(1, dp(10))
-        setLayerInsetRight(1, dp(10))
-    }
-
-    private fun featureSurface(top: Int, bottom: Int, radius: Int, focus: Boolean = false) =
-        GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(top, bottom)).apply {
-            cornerRadius = dp(radius).toFloat()
-            setStroke(dp(if (focus) 2 else 1).coerceAtLeast(1), if (focus) CleanUi.SEA else CleanUi.LINE)
-        }
-
-    private fun featureButton(primary: Boolean): Drawable = StateListDrawable().apply {
-        val top = if (primary) 0xffffd85a.toInt() else 0xff27497a.toInt()
-        val bottom = if (primary) CleanUi.SUN else 0xff1b365e.toInt()
-        val pressed = if (primary) CleanUi.SUN_DEEP else 0xff0f2442.toInt()
-        addState(intArrayOf(-android.R.attr.state_enabled),
-            featureSurface(0xff223654.toInt(), 0xff1a2b46.toInt(), 10))
-        addState(intArrayOf(android.R.attr.state_pressed), featureSurface(pressed, pressed, 10, true))
-        addState(intArrayOf(android.R.attr.state_focused), featureSurface(top, bottom, 10, true))
-        addState(intArrayOf(), featureSurface(top, bottom, 10))
-    }
-
-    private fun pixelButton(primary: Boolean): Drawable = StateListDrawable().apply {
-        val step = dp(3).coerceAtLeast(1)
-        addState(intArrayOf(-android.R.attr.state_enabled), PixelSignDrawable(step, false, disabled = true))
-        addState(intArrayOf(android.R.attr.state_focused), signSurface(focused = true))
-        addState(intArrayOf(android.R.attr.state_pressed), signSurface(focused = true))
-        addState(intArrayOf(), PixelSignDrawable(step, false, primary = primary))
-    }
+    fun panel(fill: Int, focused: Boolean = false, step: Int = 3, line: Int = CleanUi.LINE): Drawable =
+        PixelSignDrawable(dp(step), fill, if (focused) CleanUi.SEA_LIGHT else line,
+            dp(if (focused) 2 else 1).coerceAtLeast(1),
+            raised = fill == CleanUi.CARD || fill == CleanUi.PANEL_TOP || fill == CleanUi.CHIP ||
+                fill == CleanUi.SEA_DEEP || fill == CleanUi.PRIMARY || fill == CleanUi.PRIMARY_PRESSED || fill == CleanUi.DISABLED)
 
     fun icon(icon: ReferenceHudIcon, size: Int): Drawable = ReferenceHudDrawable(icon).apply {
         setBounds(0, 0, dp(size), dp(size))
@@ -101,75 +53,25 @@ internal class ReferenceHudStyle(
 }
 
 internal object CleanUi {
-    const val INK = 0xfff4f8ff.toInt()
-    const val MUTED = 0xffa6bcd6.toInt()
-    const val SEA = 0xff2cc6ef.toInt()
-    const val SEA_LIGHT = 0xff7ae4ff.toInt()
-    const val SEA_DEEP = 0xff12305a.toInt()
-    const val SUN = 0xffffc52e.toInt()
-    const val SUN_DEEP = 0xfff09a0a.toInt()
-    const val ON_PRIMARY = 0xff1a2338.toInt()
-    const val CARD_SOFT = 0xff0d1d36.toInt()
-    const val PANEL_TOP = 0xff1a3459.toInt()
-    const val CHIP = 0xff253d5e.toInt()
-    const val LINE = 0x59ffffff
-}
-
-/** #300 CleanCard의 PANEL 표면. 창 크기가 바뀔 때만 그라데이션을 계산한다. */
-private class FeaturePanelDrawable(private val density: Float, focused: Boolean) : Drawable() {
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val box = RectF()
-    private val radius = 12f * density
-    private val lift = 2.5f * density
-    private val strokeWidth = (if (focused) 2f else 1f) * density
-    private val strokeColor = if (focused) CleanUi.SEA else CleanUi.LINE
-    private var fill: Shader? = null
-    private var opacity = 255
-
-    override fun onBoundsChange(bounds: Rect) {
-        super.onBoundsChange(bounds)
-        box.set(bounds.left.toFloat(), bounds.top.toFloat(), bounds.right.toFloat(), bounds.bottom - lift)
-        fill = if (box.isEmpty) null else LinearGradient(0f, box.top, 0f, box.bottom,
-            0xeb1a3459.toInt(), 0xeb10233f.toInt(), Shader.TileMode.CLAMP)
-    }
-
-    override fun draw(canvas: Canvas) {
-        val panelFill = fill ?: return
-        paint.color = 0x40000814
-        paint.alpha = 0x40 * opacity / 255
-        canvas.drawRoundRect(box.left, box.top + lift, box.right, box.bottom + lift, radius, radius, paint)
-
-        paint.alpha = opacity
-        paint.shader = panelFill
-        canvas.drawRoundRect(box, radius, radius, paint)
-        paint.shader = null
-
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = strokeWidth
-        paint.color = strokeColor
-        paint.alpha = (strokeColor ushr 24) * opacity / 255
-        val half = strokeWidth / 2
-        canvas.drawRoundRect(box.left + half, box.top + half, box.right - half, box.bottom - half, radius, radius, paint)
-        paint.style = Paint.Style.FILL
-
-        paint.color = CleanUi.SEA
-        paint.alpha = opacity
-        canvas.drawRoundRect(box.left + radius, box.top - density * .5f, box.left + radius + density * 28,
-            box.top + density * 2.5f, density, density, paint)
-    }
-
-    override fun setAlpha(alpha: Int) {
-        opacity = alpha
-        invalidateSelf()
-    }
-
-    override fun setColorFilter(colorFilter: ColorFilter?) {
-        paint.colorFilter = colorFilter
-        invalidateSelf()
-    }
-
-    @Suppress("DEPRECATION")
-    override fun getOpacity() = PixelFormat.TRANSLUCENT
+    const val INK = 0xfff2f6ff.toInt()
+    const val MUTED = 0xffbdcce4.toInt()
+    const val SEA = 0xff8ebcf7.toInt()
+    const val SEA_LIGHT = 0xffbfdcff.toInt()
+    const val SEA_DEEP = 0xff19294c.toInt()
+    const val SUN = 0xffffd45a.toInt()
+    const val SUN_DEEP = 0xffe9af4c.toInt()
+    const val PRIMARY = 0xff2865db.toInt()
+    const val PRIMARY_PRESSED = 0xff1b4fb3.toInt()
+    const val ON_PRIMARY = 0xfff7faff.toInt()
+    const val CARD = 0xff182545.toInt()
+    const val CARD_SOFT = 0xff111b33.toInt()
+    const val PANEL_TOP = 0xff233657.toInt()
+    const val CHIP = 0xff2a3b5e.toInt()
+    const val LINE = SEA
+    const val DISABLED = 0xff414b65.toInt()
+    const val DISABLED_LINE = 0xff667897.toInt()
+    const val TRACK = 0xff475677.toInt()
+    const val SCRIM = 0x99101931.toInt()
 }
 
 /** 좌표가 정해진 작은 색 블록으로 그려 배율이 달라도 아이콘 모양을 유지한다. */
@@ -215,14 +117,14 @@ internal enum class ReferenceHudIcon(private val pixels: List<String>, val accen
         for ((y, row) in pixels.withIndex()) {
             for ((x, tone) in row.withIndex()) {
                 paint.color = when (tone) {
-                    '1' -> 0xff0b1a32.toInt()
+                    '1' -> CleanUi.CARD_SOFT
                     '2' -> accent
                     '3' -> 0xffeef8ff.toInt()
                     '4' -> when (this) {
                         COIN, GACHA, SETTLEMENT -> 0xffffdb6a.toInt()
                         TRUCK, RECORD -> 0xffffeaa1.toInt()
                         GARAGE, COLLECTION -> 0xfff5dab0.toInt()
-                        SETTINGS -> 0xff254623.toInt()
+                        SETTINGS -> CleanUi.INK
                     }
                     '5' -> 0xffed5352.toInt()
                     '6' -> if (this == TRUCK) 0xff88c44e.toInt() else 0xffbc906b.toInt()
@@ -253,25 +155,35 @@ private class ReferenceHudDrawable(private val icon: ReferenceHudIcon) : Drawabl
     override fun getOpacity() = PixelFormat.TRANSLUCENT
 }
 
-
 /** 정수 크기의 모서리와 테두리를 사용하고 바탕 투명도를 유지한다. */
 private class PixelSignDrawable(
     private val step: Int,
-    private val focused: Boolean,
-    private val primary: Boolean = false,
-    private val disabled: Boolean = false,
-    private val detail: Boolean = false,
-    private val detailFill: Int? = null,
+    private val fill: Int,
+    private val line: Int,
+    private val stroke: Int,
+    private val raised: Boolean,
 ) : Drawable() {
     private val paint = Paint()
-    private val shape = android.graphics.Path()
+    private val shape = Path()
+    private var opacity = 255
+    private var sheen: Shader? = null
+
+    override fun onBoundsChange(bounds: android.graphics.Rect) {
+        super.onBoundsChange(bounds)
+        sheen = if (raised && bounds.height() >= 18 * stroke) {
+            LinearGradient(0f, bounds.top.toFloat(), 0f, bounds.bottom.toFloat(),
+                intArrayOf(0x22b1d9ff, 0x00b1d9ff, 0x0004091b, 0x3004091b),
+                floatArrayOf(0f, .34f, .63f, 1f),
+                Shader.TileMode.CLAMP)
+        } else null
+    }
 
     override fun draw(canvas: Canvas) {
         val l = bounds.left.toFloat()
         val t = bounds.top.toFloat()
         val r = bounds.right.toFloat()
         val b = bounds.bottom.toFloat()
-        val p = step.toFloat()
+        val p = minOf(step, (minOf(bounds.width(), bounds.height()) - 2 * stroke) / 4).coerceAtLeast(0).toFloat()
         fun plate(inset: Float, bottom: Float, color: Int) {
             val x = l + inset
             val y = t + inset
@@ -301,29 +213,36 @@ private class PixelSignDrawable(
             shape.lineTo(x + 2 * p, y + p)
             shape.close()
             paint.color = color
+            paint.alpha = (color ushr 24) * opacity / 255
             canvas.drawPath(shape, paint)
         }
-        plate(0f, b, if (detail) 0xffb68654.toInt() else 0xcc183119.toInt())
-        plate(0f, b - p, when {
-            detail -> 0xff916340.toInt()
-            focused || primary -> 0xff2c772f.toInt()
-            disabled -> 0xff8a7969.toInt()
-            else -> 0xff704822.toInt()
-        })
-        plate(p, b, if (primary && !detail) 0xff87a94c.toInt() else 0xffdaa975.toInt())
-        plate(2 * p, b, when {
-            detail -> detailFill ?: if (primary) 0xffe4edbf.toInt() else 0xfff7e1ac.toInt()
-            focused -> 0xffffd985.toInt()
-            primary -> 0xffe0f1b6.toInt()
-            disabled -> 0xffe6ded0.toInt()
-            else -> 0xffffedbd.toInt()
-        })
-        paint.color = 0xfffdf6df.toInt()
-        canvas.drawRect(l + 4 * p, t + 2 * p, r - 4 * p, t + 3 * p, paint)
+        val unit = stroke.toFloat()
+        if (sheen == null) {
+            plate(0f, b, line)
+            plate(unit, b, fill)
+            return
+        }
+        val faceBottom = b - unit
+        plate(0f, b, 0xff09142d.toInt())
+        plate(0f, faceBottom, line)
+        plate(unit, faceBottom, if (fill == CleanUi.DISABLED) CleanUi.DISABLED_LINE else CleanUi.SEA_LIGHT)
+        plate(2 * unit, faceBottom, CleanUi.SEA_DEEP)
+        plate(3 * unit, faceBottom, fill)
+        paint.shader = sheen
+        plate(3 * unit, faceBottom, -1)
+        paint.shader = null
     }
 
-    override fun setAlpha(alpha: Int) = Unit
-    override fun setColorFilter(colorFilter: ColorFilter?) = Unit
+    override fun setAlpha(alpha: Int) {
+        opacity = alpha
+        invalidateSelf()
+    }
+
+    override fun setColorFilter(colorFilter: ColorFilter?) {
+        paint.colorFilter = colorFilter
+        invalidateSelf()
+    }
+
     @Suppress("DEPRECATION")
     override fun getOpacity() = PixelFormat.TRANSLUCENT
 }

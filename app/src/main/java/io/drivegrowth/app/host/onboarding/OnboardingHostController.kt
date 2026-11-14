@@ -60,7 +60,9 @@ class OnboardingHostController(private val source: OnboardingHostSource, private
         }
     }
     fun onEvent(event: OnboardingEvent) {
-        if (!enabled || released || listener == null || inFlight) return
+        if (!enabled || released || listener == null) return
+        // 완료 화면의 가게 이동은 저장 조회 응답을 기다리지 않는다.
+        if (inFlight && event != OnboardingEvent.GoToShop) return
         when (event) {
             OnboardingEvent.StartChoosing -> if (screen is OnboardingScreenState.Intro) updateStep(OnboardingStep.CHOOSING)
             is OnboardingEvent.SelectVehicle -> if (screen is OnboardingScreenState.Choosing && candidates().any { it.vehicle.vehicleId == event.vehicleId && it.selectable }) {

@@ -26,11 +26,12 @@
     <string name="delivery_page">%1$d / %2$d</string>
     <string name="delivery_empty">선택할 탁송 후보가 없어요</string>
     <string name="delivery_empty_body">목적지와 예상 경로 거리를 다시 확인해 주세요.</string>
-    <string name="delivery_details">상세 보기</string>
+    <string name="delivery_select_offer">이 의뢰 선택</string>
     <string name="delivery_close_detail">후보 목록으로</string>
     <string name="delivery_terms_missing">확정 조건을 아직 확인하지 못했어요.</string>
-    <string name="delivery_confirm_purchase">구매 탁송 선택 확정</string>
-    <string name="delivery_confirm_income">수익 탁송 선택 확정</string>
+    <string name="delivery_confirm_purchase">구매 확정</string>
+    <string name="delivery_confirm_income">탁송 수락</string>
+    <string name="delivery_saving_discovery">후보 기록을 저장하고 있어요. 저장이 끝나면 의뢰를 확정할 수 있어요.</string>
     <string name="delivery_vehicle_missing">차량 이름 확인 불가</string>
     <string name="delivery_income_note">차량을 구매하는 의뢰가 아니에요. 실제 이동에 따른 기본 주행 수익과 별도로, 도착 후 확정된 완료 보상을 받아요.</string>
     <string name="delivery_purchase_note">선택 확정 시 결제하고, 도착 확인 후 차량을 받아요.</string>
