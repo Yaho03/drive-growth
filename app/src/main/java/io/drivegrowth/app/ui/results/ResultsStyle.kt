@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.results
 
+import io.drivegrowth.app.ui.pixel.CleanUi
 import android.content.Context
 import android.graphics.Typeface
 import android.view.Gravity
@@ -17,7 +18,7 @@ import io.drivegrowth.app.ui.pixel.MapPanelStyle
 internal class ResultsStyle(private val context: Context) {
     private val hud = ReferenceHudStyle(context)
     private val panels = MapPanelStyle(context)
-    val base = 0xfff5e3bd.toInt()
+    val base = CleanUi.CARD_SOFT
     val ink get() = hud.signInk
     val muted get() = panels.muted
     val accent get() = panels.accent
@@ -47,7 +48,7 @@ internal class ResultsStyle(private val context: Context) {
     fun button(label: String, enabled: Boolean = true, primary: Boolean = false, action: () -> Unit) = Button(context).apply {
         text = label; textSize = 18f; isAllCaps = false; isEnabled = enabled
         setTypeface(typeface, Typeface.BOLD)
-        setTextColor(if (enabled) ink else muted)
+        setTextColor(if (!enabled) muted else if (primary) android.graphics.Color.WHITE else ink)
         backgroundTintList = null
         background = hud.signButton(primary)
         minHeight = dp(52); minimumHeight = dp(52)

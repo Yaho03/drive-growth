@@ -11,8 +11,8 @@ import android.widget.Button
 internal class MapPanelStyle(private val context: Context) {
     private val signs = ReferenceHudStyle(context)
     val ink get() = signs.signInk
-    val muted = 0xff5a4c37.toInt()
-    val accent = 0xff396b28.toInt()
+    val muted = CleanUi.MUTED
+    val accent = CleanUi.SEA
 
     fun card() = signs.signSurface()
 
@@ -25,35 +25,29 @@ internal class MapPanelStyle(private val context: Context) {
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
+            // 둥근 막대 하나: 옅은 바탕 위에 바다색이 차오른다
             val inset = signs.dp(3).toFloat()
             val trackWidth = width - inset * 2
             val trackHeight = height - inset * 2
             if (trackWidth <= 0f || trackHeight <= 0f) return
-            paint.color = 0xff704822.toInt()
-            canvas.drawRect(inset, inset, inset + trackWidth, inset + trackHeight, paint)
-            val gap = signs.dp(1).coerceAtLeast(1).toFloat()
-            val cell = (trackWidth - gap * 11) / 10
-            if (cell <= 0f) return
-            val top = inset + gap
-            val bottom = inset + trackHeight - gap
-            for (index in 0 until 10) {
-                val left = inset + gap + index * (cell + gap)
-                paint.color = 0xffe5c78b.toInt()
-                canvas.drawRect(left, top, left + cell, bottom, paint)
-                val portion = ((percent - index * 10) / 10f).coerceIn(0f, 1f)
-                if (portion > 0f) {
-                    paint.color = accent
-                    canvas.drawRect(left, top, left + cell * portion, bottom, paint)
-                }
+            val radius = trackHeight / 2
+            paint.isAntiAlias = true
+            paint.color = 0xffdbe5f0.toInt()
+            canvas.drawRoundRect(inset, inset, inset + trackWidth, inset + trackHeight, radius, radius, paint)
+            val filled = trackWidth * percent.coerceIn(0, 100) / 100f
+            if (filled > 0f) {
+                paint.shader = android.graphics.LinearGradient(inset, 0f, inset + trackWidth, 0f, CleanUi.SEA_LIGHT, accent, android.graphics.Shader.TileMode.CLAMP)
+                canvas.drawRoundRect(inset, inset, inset + maxOf(filled, trackHeight), inset + trackHeight, radius, radius, paint)
+                paint.shader = null
             }
         }
-    }.apply { background = chip() }
+    }
 
     fun styleButton(button: Button, primary: Boolean) = button.apply {
         backgroundTintList = null
         background = signs.signButton(primary)
-        setTextColor(if (isEnabled) ink else muted)
-        minHeight = signs.dp(48)
+        setTextColor(if (!isEnabled) muted else if (primary) android.graphics.Color.WHITE else ink)
+        minHeight = signs.dp(52)
         minimumHeight = minHeight
         minWidth = 0
         minimumWidth = 0

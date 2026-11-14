@@ -57,7 +57,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
     val selectedVehicleId: VehicleId? get() = interaction.selectedId
     val pendingVehicleId: VehicleId? get() = interaction.pendingSelection
 
-    init { orientation = VERTICAL; setBackgroundColor(0xfff5e3bd.toInt()) }
+    init { orientation = VERTICAL; setBackgroundColor(io.drivegrowth.app.ui.pixel.CleanUi.CARD_SOFT) }
 
     /** false인 늦은/역행 응답은 표시하지 않는다. 호스트는 프로필·requestId·응답 순서도 대조한다. */
     fun render(state: OnboardingScreenState, controlsEnabled: Boolean): Boolean {
@@ -334,7 +334,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             this.tag = tag
             backgroundTintList = null
             background = hud.signButton(primary)
-            setTextColor(if (available) hud.signInk else panels.muted)
+            setTextColor(if (!available) panels.muted else if (primary) android.graphics.Color.WHITE else hud.signInk)
             if (description != null) contentDescription = description
         }, PixelStyle.gapDp)
     }

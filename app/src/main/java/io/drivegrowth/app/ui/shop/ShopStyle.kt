@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.shop
 
+import io.drivegrowth.app.ui.pixel.CleanUi
 import android.content.Context
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -21,11 +22,11 @@ internal fun String.displayShopSign() = when (this) {
 internal class ShopStyle(private val context: Context) {
     private val mapPanel = MapPanelStyle(context)
     val base = PixelStyle.background
-    val page = 0xfffbefcf.toInt()
+    val page = CleanUi.CARD_SOFT
     val ink get() = mapPanel.ink
     val muted get() = mapPanel.muted
     val accent get() = mapPanel.accent
-    val scrim = 0x75172716
+    val scrim = 0x66102033
     fun surface() = mapPanel.card()
     fun infoSurface() = mapPanel.chip()
     fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()

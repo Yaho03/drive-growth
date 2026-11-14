@@ -3,46 +3,51 @@ package io.drivegrowth.app.ui.pixel
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.ColorFilter
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PixelFormat
+import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 
-/** 지도 HUD와 탐색 도크에 사용하는 시안의 공통 색·외곽선. */
+/**
+ * 지도 HUD·탐색 도크·창에 쓰는 공통 표면. 그림(마을·차·사람)은 픽셀 그대로 두고, 창과 버튼은 깔끔한 카드로 그린다.
+ * 흰 카드 + 옅은 그림자 + 남색 글씨 + 바다색 강조 + 노란 주 버튼. 이름(sign…)은 기존 호출부를 바꾸지 않으려고 유지한다.
+ */
 internal class ReferenceHudStyle(private val context: Context) {
-    val outline = 0xffc7e7fa.toInt()
+    val outline = 0xffd5deea.toInt()
     fun dp(value: Int) = (value * context.resources.displayMetrics.density + .5f).toInt()
 
-    fun surface(radius: Int = 12, selected: Boolean = false, focused: Boolean = false) = GradientDrawable(
+    fun surface(radius: Int = 14, selected: Boolean = false, focused: Boolean = false) = GradientDrawable(
         GradientDrawable.Orientation.TOP_BOTTOM,
-        if (selected) intArrayOf(0xff26b7ff.toInt(), 0xff0076ed.toInt())
-        else intArrayOf(0xff26334f.toInt(), 0xff101b31.toInt()),
+        if (selected) intArrayOf(CleanUi.SEA_LIGHT, CleanUi.SEA) else intArrayOf(0xf2ffffff.toInt(), 0xf2f3f7fc.toInt()),
     ).apply {
         cornerRadius = dp(radius).toFloat()
-        setStroke(dp(if (focused) 2 else 1), if (selected || focused) 0xff88d8ff.toInt() else outline)
+        setStroke(dp(if (focused) 2 else 1), if (selected || focused) CleanUi.SEA else outline)
     }
 
     fun buttonSurface(selected: Boolean = false, outlined: Boolean = true) = StateListDrawable().apply {
         addState(intArrayOf(android.R.attr.state_focused), surface(selected = selected, focused = true))
         addState(intArrayOf(android.R.attr.state_pressed), surface(selected = true))
         addState(intArrayOf(), if (selected || outlined) surface(selected = selected)
-            else GradientDrawable().apply { setColor(0x00101b31) })
+            else GradientDrawable().apply { setColor(0x00ffffff) })
     }
 
-    val signInk = 0xff163619.toInt()
+    /** 카드 위 글씨 색(짙은 남색). */
+    val signInk = CleanUi.INK
 
-    fun signSurface(focused: Boolean = false): Drawable = PixelSignDrawable(dp(3).coerceAtLeast(1), focused)
+    fun signSurface(focused: Boolean = false): Drawable = CleanCard(context, CleanCard.Kind.PANEL, focused = focused)
 
-    fun detailSurface(active: Boolean): Drawable =
-        PixelSignDrawable(dp(2).coerceAtLeast(1), focused = false, primary = active, detail = true)
+    fun detailSurface(active: Boolean): Drawable = CleanCard(context, if (active) CleanCard.Kind.CHIP_ACTIVE else CleanCard.Kind.CHIP)
 
     fun signButton(primary: Boolean = false): Drawable = StateListDrawable().apply {
-        val step = dp(3).coerceAtLeast(1)
-        addState(intArrayOf(-android.R.attr.state_enabled), PixelSignDrawable(step, false, disabled = true))
-        addState(intArrayOf(android.R.attr.state_focused), signSurface(focused = true))
-        addState(intArrayOf(android.R.attr.state_pressed), signSurface(focused = true))
-        addState(intArrayOf(), PixelSignDrawable(step, false, primary = primary))
+        addState(intArrayOf(-android.R.attr.state_enabled), CleanCard(context, CleanCard.Kind.DISABLED))
+        addState(intArrayOf(android.R.attr.state_pressed), CleanCard(context, if (primary) CleanCard.Kind.PRIMARY else CleanCard.Kind.BUTTON, pressed = true))
+        addState(intArrayOf(android.R.attr.state_focused), CleanCard(context, if (primary) CleanCard.Kind.PRIMARY else CleanCard.Kind.BUTTON, focused = true))
+        addState(intArrayOf(), CleanCard(context, if (primary) CleanCard.Kind.PRIMARY else CleanCard.Kind.BUTTON))
     }
 
     fun icon(icon: ReferenceHudIcon, size: Int): Drawable = ReferenceHudDrawable(icon).apply {
@@ -50,157 +55,178 @@ internal class ReferenceHudStyle(private val context: Context) {
     }
 }
 
-/** 좌표가 정해진 작은 색 블록으로 그려 배율이 달라도 아이콘 모양을 유지한다. */
-internal enum class ReferenceHudIcon(private val pixels: List<String>, val accent: Int = 0xff8fcaff.toInt()) {
-    GARAGE(listOf(
-        ".......11.......", "......1551......", ".....155551.....", "...1155555511...", "..155555555551..",
-        ".15511111111551.", ".11144444444111.", "..144111111441..", "..141222222141..", "..141233332141..",
-        "..112333333211..", "..121555555121..", "..122222222221..", "...1133113311...", "..111111111111..", "................",
-    ), 0xff2886d4.toInt()),
-    COLLECTION(listOf(
-        "................", "..11111..11111..", ".14444411444441.", ".14666411444441.", ".14444411411141.",
-        ".14666411412141.", ".14444411422241.", ".14666411433341.", ".14444411422241.", ".14666411411141.",
-        ".14444411444441.", ".15444411444451.", "..155551155551..", "...1111111111...", "................", "................",
-    ), 0xff267fca.toInt()),
-    GACHA(listOf(
-        ".....111111.....", "....13333331....", "...1333333331...", "..133322553331..", "..133525255331..",
-        "..133333333331..", "..133522253331..", "...1111111111...", "....12222221....", "....12233221....",
-        "....12232221....", "....11111111....", "....12244221....", "....11111111....", "...1555555551...", "...1111111111...",
-    ), 0xffb05adc.toInt()),
-    TRUCK(listOf(
-        "................", "................", "....11111.......", "...1233321......", "..123333321.....",
-        ".12222222221....", ".12422222421....", ".111111111111...", ".1555555555151..", ".15555555551531.",
-        ".155555555515331", ".155555555515551", ".111111111111111", "..131.....131...", "...1.......1....", "................",
-    ), 0xff35a9ee.toInt()),
-    SETTLEMENT(listOf(
-        "................", "...111111111....", "...133333331....", "...136666331....", "...133333331....",
-        "...136666331....", "...133333331....", "...13666611111..", "..1333331444441.", "..1366631422241.",
-        "..1333331444441.", ".133333331111111", ".133333314444441", ".111111114222241", "........11111111", "................",
-    ), 0xffe3a130.toInt()),
-    RECORD(listOf(
-        "................", "...1111111111...", "..134444444431..", "..134444411131..", "..134444122231..",
-        "..134441221231..", "..134122114431..", "..134111444431..", "..134444422431..", "..134442422431..",
-        "..134242422431..", "..134242422431..", "..134111111431..", "..134444444431..", "...1111111111...", "................",
-    ), 0xff35a96a.toInt()),
-    COIN(listOf("....1111....", "..11444411..", ".1443333441.", ".1432222341.", "143224223341", "143224223341",
-        "143224223341", "143224223341", ".1432222341.", ".1443333441.", "..11444411..", "....1111...."), 0xffffae33.toInt()),
-    SETTINGS(listOf("....1441....", ".11.1441.11.", ".1414444141.", "..14444441..", "11444..44411", "1444....4441",
-        "1444....4441", "11444..44411", "..14444441..", ".1414444141.", ".11.1441.11.", "....1441...."));
-
-    val gridSize get() = pixels.size
-
-    fun draw(canvas: Canvas, paint: Paint) {
-        for ((y, row) in pixels.withIndex()) {
-            for ((x, tone) in row.withIndex()) {
-                paint.color = when (tone) {
-                    '1' -> 0xff0b1a32.toInt()
-                    '2' -> accent
-                    '3' -> 0xffeef8ff.toInt()
-                    '4' -> when (this) {
-                        COIN, GACHA, SETTLEMENT -> 0xffffdb6a.toInt()
-                        TRUCK, RECORD -> 0xffffeaa1.toInt()
-                        GARAGE, COLLECTION -> 0xfff5dab0.toInt()
-                        SETTINGS -> 0xff254623.toInt()
-                    }
-                    '5' -> 0xffed5352.toInt()
-                    '6' -> if (this == TRUCK) 0xff88c44e.toInt() else 0xffbc906b.toInt()
-                    else -> continue
-                }
-                canvas.drawRect(x.toFloat(), y.toFloat(), x + 1f, y + 1f, paint)
-            }
-        }
-    }
+/** 깔끔한 화면의 공통 색. */
+internal object CleanUi {
+    const val INK = 0xff1b2b3f.toInt()
+    const val MUTED = 0xff667689.toInt()
+    const val SEA = 0xff1f7ac4.toInt()
+    const val SEA_LIGHT = 0xff4aa8ea.toInt()
+    const val SEA_DEEP = 0xff0f3d63.toInt()
+    const val SUN = 0xffffc83a.toInt()
+    const val SUN_DEEP = 0xfff2a40c.toInt()
+    const val CARD = 0xffffffff.toInt()
+    const val CARD_SOFT = 0xfff3f7fc.toInt()
+    const val CHIP = 0xffedf3f9.toInt()
+    const val LINE = 0xffd5deea.toInt()
 }
 
-private class ReferenceHudDrawable(private val icon: ReferenceHudIcon) : Drawable() {
-    private val paint = Paint()
+/** 둥근 모서리·옅은 그림자·얇은 테두리의 카드. 버튼·칩·창이 같은 모양을 쓴다. */
+private class CleanCard(
+    context: Context,
+    private val kind: Kind,
+    private val focused: Boolean = false,
+    private val pressed: Boolean = false,
+) : Drawable() {
+    enum class Kind { PANEL, CHIP, CHIP_ACTIVE, BUTTON, PRIMARY, DISABLED }
+
+    private val density = context.resources.displayMetrics.density
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val box = RectF()
 
     override fun draw(canvas: Canvas) {
-        val size = (minOf(bounds.width(), bounds.height()) / icon.gridSize).coerceAtLeast(1).toFloat()
-        val radius = icon.gridSize * size / 2
-        canvas.save()
-        canvas.translate(bounds.exactCenterX() - radius, bounds.exactCenterY() - radius)
-        canvas.scale(size, size)
-        icon.draw(canvas, paint)
-        canvas.restore()
+        val b = bounds
+        if (b.isEmpty) return
+        val radius = density * when (kind) { Kind.PANEL -> 18f; Kind.CHIP, Kind.CHIP_ACTIVE -> 12f; else -> 14f }
+        val lift = if (kind == Kind.PANEL || kind == Kind.PRIMARY || kind == Kind.BUTTON) density * (if (pressed) 1f else 2.5f) else 0f
+        box.set(b.left.toFloat(), b.top.toFloat(), b.right.toFloat(), b.bottom - lift)
+        if (lift > 0f) {   // 아래로 떨어지는 옅은 그림자
+            paint.shader = null
+            paint.color = if (kind == Kind.PRIMARY) 0x551f5a8c else 0x26102a44
+            canvas.drawRoundRect(box.left, box.top + lift, box.right, box.bottom + lift, radius, radius, paint)
+        }
+        val (top, bottom) = when (kind) {
+            Kind.PANEL -> 0xf7ffffff.toInt() to 0xf7f4f8fc.toInt()
+            Kind.CHIP -> CleanUi.CHIP to CleanUi.CHIP
+            Kind.CHIP_ACTIVE -> 0xffe2f1ff.toInt() to 0xffd4e9fb.toInt()
+            Kind.BUTTON -> if (pressed) 0xffe8eef5.toInt() to 0xffe8eef5.toInt() else CleanUi.CARD to 0xffeef3f8.toInt()
+            Kind.PRIMARY -> if (pressed) CleanUi.SEA_DEEP to CleanUi.SEA_DEEP else CleanUi.SEA_LIGHT to CleanUi.SEA
+            Kind.DISABLED -> 0xffe9edf2.toInt() to 0xffe2e7ed.toInt()
+        }
+        paint.color = 0xff000000.toInt()   // 그림자 색의 투명도가 본 판에 남지 않게
+        paint.alpha = alpha
+        paint.shader = LinearGradient(0f, box.top, 0f, box.bottom, top, bottom, Shader.TileMode.CLAMP)
+        canvas.drawRoundRect(box, radius, radius, paint)
+        paint.shader = null
+        val stroke = when {
+            focused -> CleanUi.SEA
+            kind == Kind.PRIMARY -> 0xff1a69ab.toInt()
+            kind == Kind.CHIP_ACTIVE -> 0xff8cc4ee.toInt()
+            kind == Kind.DISABLED -> 0xffd7dde5.toInt()
+            else -> CleanUi.LINE
+        }
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = density * if (focused) 2f else 1f
+        paint.color = stroke
+        val half = paint.strokeWidth / 2
+        canvas.drawRoundRect(box.left + half, box.top + half, box.right - half, box.bottom - half, radius, radius, paint)
+        paint.style = Paint.Style.FILL
+        if (kind == Kind.PRIMARY && !pressed) {   // 위쪽 얇은 빛
+            paint.color = 0x4dffffff
+            canvas.drawRoundRect(box.left + density * 6, box.top + density * 2, box.right - density * 6, box.top + density * 4, density, density, paint)
+        }
     }
 
-    override fun setAlpha(alpha: Int) = Unit
-    override fun setColorFilter(colorFilter: ColorFilter?) = Unit
+    private var alpha = 255
+    override fun getPadding(padding: android.graphics.Rect): Boolean = false
+    override fun setAlpha(alpha: Int) { this.alpha = alpha; invalidateSelf() }
+    override fun setColorFilter(colorFilter: ColorFilter?) { paint.colorFilter = colorFilter }
     @Suppress("DEPRECATION")
     override fun getOpacity() = PixelFormat.TRANSLUCENT
 }
 
+/** 원형 배지 위에 흰 선 그림을 얹은 아이콘. 24 단위 격자로 그린다. */
+internal enum class ReferenceHudIcon(val accent: Int) {
+    GARAGE(0xff2f86d6.toInt()),
+    COLLECTION(0xff2a9d8f.toInt()),
+    GACHA(0xffa25ddc.toInt()),
+    TRUCK(0xff1f7ac4.toInt()),
+    SETTLEMENT(0xffe0951e.toInt()),
+    RECORD(0xff2e9e5b.toInt()),
+    COIN(0xfff2b01e.toInt()),
+    SETTINGS(0xff5b6b80.toInt());
 
-/** 정수 크기의 모서리와 테두리를 사용하고 바탕 투명도를 유지한다. */
-private class PixelSignDrawable(
-    private val step: Int,
-    private val focused: Boolean,
-    private val primary: Boolean = false,
-    private val disabled: Boolean = false,
-    private val detail: Boolean = false,
-) : Drawable() {
-    private val paint = Paint()
-    private val shape = android.graphics.Path()
+    fun draw(canvas: Canvas, paint: Paint, path: Path) {
+        paint.style = Paint.Style.FILL
+        paint.color = accent
+        canvas.drawCircle(12f, 12f, 12f, paint)
+        paint.color = 0x33ffffff
+        canvas.drawCircle(12f, 9.5f, 9f, paint)
+        paint.color = 0xffffffff.toInt()
+        paint.strokeJoin = Paint.Join.ROUND
+        paint.strokeCap = Paint.Cap.ROUND
+        path.rewind()
+        when (this) {
+            GARAGE -> {
+                path.moveTo(5f, 11f); path.lineTo(12f, 5.5f); path.lineTo(19f, 11f); path.lineTo(19f, 18f); path.lineTo(5f, 18f); path.close()
+                canvas.drawPath(path, paint)
+                paint.color = accent; canvas.drawRect(8.5f, 12.5f, 15.5f, 18f, paint)
+                paint.color = 0xffffffff.toInt(); canvas.drawRect(8.5f, 14.5f, 15.5f, 15.3f, paint); canvas.drawRect(8.5f, 16.4f, 15.5f, 17.2f, paint)
+            }
+            COLLECTION -> {
+                canvas.drawRoundRect(5.5f, 6f, 11.6f, 18f, 1.2f, 1.2f, paint)
+                canvas.drawRoundRect(12.4f, 6f, 18.5f, 18f, 1.2f, 1.2f, paint)
+                paint.color = accent
+                canvas.drawRect(7.2f, 9f, 10f, 9.8f, paint); canvas.drawRect(7.2f, 11.4f, 10f, 12.2f, paint)
+                canvas.drawRect(14f, 9f, 16.8f, 9.8f, paint); canvas.drawRect(14f, 11.4f, 16.8f, 12.2f, paint)
+            }
+            GACHA -> {
+                canvas.drawCircle(12f, 11.5f, 6.5f, paint)
+                paint.color = accent; canvas.drawRect(5.5f, 11f, 18.5f, 12.2f, paint)
+                paint.color = 0xffffd65a.toInt(); canvas.drawCircle(12f, 11.6f, 2f, paint)
+                paint.color = 0xffffffff.toInt(); canvas.drawRoundRect(9f, 18.2f, 15f, 19.6f, .7f, .7f, paint)
+            }
+            TRUCK -> {
+                canvas.drawRoundRect(4.5f, 8f, 13.5f, 15.5f, 1.2f, 1.2f, paint)
+                path.moveTo(13.5f, 10f); path.lineTo(17.2f, 10f); path.lineTo(19.5f, 12.8f); path.lineTo(19.5f, 15.5f); path.lineTo(13.5f, 15.5f); path.close()
+                canvas.drawPath(path, paint)
+                paint.color = accent; canvas.drawRect(14.6f, 11f, 16.8f, 12.6f, paint)
+                paint.color = 0xffffffff.toInt(); canvas.drawCircle(8f, 16.5f, 1.9f, paint); canvas.drawCircle(16.5f, 16.5f, 1.9f, paint)
+                paint.color = accent; canvas.drawCircle(8f, 16.5f, .8f, paint); canvas.drawCircle(16.5f, 16.5f, .8f, paint)
+            }
+            SETTLEMENT -> {
+                path.moveTo(6.5f, 5.5f); path.lineTo(17.5f, 5.5f); path.lineTo(17.5f, 18.5f)
+                path.lineTo(15.7f, 17.3f); path.lineTo(13.9f, 18.5f); path.lineTo(12f, 17.3f); path.lineTo(10.1f, 18.5f); path.lineTo(8.3f, 17.3f); path.lineTo(6.5f, 18.5f); path.close()
+                canvas.drawPath(path, paint)
+                paint.color = accent
+                canvas.drawRect(8.6f, 8.5f, 15.4f, 9.4f, paint); canvas.drawRect(8.6f, 11f, 15.4f, 11.9f, paint); canvas.drawRect(8.6f, 13.5f, 12.8f, 14.4f, paint)
+            }
+            RECORD -> {
+                canvas.drawRoundRect(6f, 12.5f, 9f, 18f, .8f, .8f, paint)
+                canvas.drawRoundRect(10.5f, 9f, 13.5f, 18f, .8f, .8f, paint)
+                canvas.drawRoundRect(15f, 6f, 18f, 18f, .8f, .8f, paint)
+            }
+            COIN -> {
+                paint.color = 0xffffe08a.toInt(); canvas.drawCircle(12f, 12f, 8f, paint)
+                paint.style = Paint.Style.STROKE; paint.strokeWidth = 1.4f; paint.color = 0xffc98300.toInt(); canvas.drawCircle(12f, 12f, 5.4f, paint)
+                paint.style = Paint.Style.FILL; canvas.drawRect(11.3f, 8.8f, 12.7f, 15.2f, paint)
+            }
+            SETTINGS -> {
+                for (i in 0 until 8) {
+                    canvas.save(); canvas.rotate(i * 45f, 12f, 12f); canvas.drawRoundRect(10.6f, 4.6f, 13.4f, 8f, .6f, .6f, paint); canvas.restore()
+                }
+                canvas.drawCircle(12f, 12f, 5.6f, paint)
+                paint.color = accent; canvas.drawCircle(12f, 12f, 2.3f, paint)
+            }
+        }
+        paint.style = Paint.Style.FILL
+    }
+}
+
+private class ReferenceHudDrawable(private val icon: ReferenceHudIcon) : Drawable() {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val path = Path()
 
     override fun draw(canvas: Canvas) {
-        val l = bounds.left.toFloat()
-        val t = bounds.top.toFloat()
-        val r = bounds.right.toFloat()
-        val b = bounds.bottom.toFloat()
-        val p = step.toFloat()
-        fun plate(inset: Float, bottom: Float, color: Int) {
-            val x = l + inset
-            val y = t + inset
-            val end = r - inset
-            val floor = bottom - inset
-            if (end - x < 3 * p || floor - y < 3 * p) return
-            shape.rewind()
-            shape.moveTo(x + 2 * p, y)
-            shape.lineTo(end - 2 * p, y)
-            shape.lineTo(end - 2 * p, y + p)
-            shape.lineTo(end - p, y + p)
-            shape.lineTo(end - p, y + 2 * p)
-            shape.lineTo(end, y + 2 * p)
-            shape.lineTo(end, floor - 2 * p)
-            shape.lineTo(end - p, floor - 2 * p)
-            shape.lineTo(end - p, floor - p)
-            shape.lineTo(end - 2 * p, floor - p)
-            shape.lineTo(end - 2 * p, floor)
-            shape.lineTo(x + 2 * p, floor)
-            shape.lineTo(x + 2 * p, floor - p)
-            shape.lineTo(x + p, floor - p)
-            shape.lineTo(x + p, floor - 2 * p)
-            shape.lineTo(x, floor - 2 * p)
-            shape.lineTo(x, y + 2 * p)
-            shape.lineTo(x + p, y + 2 * p)
-            shape.lineTo(x + p, y + p)
-            shape.lineTo(x + 2 * p, y + p)
-            shape.close()
-            paint.color = color
-            canvas.drawPath(shape, paint)
-        }
-        plate(0f, b, if (detail) 0xffb68654.toInt() else 0xcc183119.toInt())
-        plate(0f, b - p, when {
-            detail -> 0xff916340.toInt()
-            focused || primary -> 0xff2c772f.toInt()
-            disabled -> 0xff8a7969.toInt()
-            else -> 0xff704822.toInt()
-        })
-        plate(p, b, if (primary && !detail) 0xff87a94c.toInt() else 0xffdaa975.toInt())
-        plate(2 * p, b, when {
-            detail -> if (primary) 0xffe4edbf.toInt() else 0xfff7e1ac.toInt()
-            focused -> 0xffffd985.toInt()
-            primary -> 0xffe0f1b6.toInt()
-            disabled -> 0xffe6ded0.toInt()
-            else -> 0xffffedbd.toInt()
-        })
-        paint.color = 0xfffdf6df.toInt()
-        canvas.drawRect(l + 4 * p, t + 2 * p, r - 4 * p, t + 3 * p, paint)
+        val size = minOf(bounds.width(), bounds.height()).toFloat()
+        canvas.save()
+        canvas.translate(bounds.exactCenterX() - size / 2, bounds.exactCenterY() - size / 2)
+        canvas.scale(size / 24f, size / 24f)
+        icon.draw(canvas, paint, path)
+        canvas.restore()
     }
 
-    override fun setAlpha(alpha: Int) = Unit
-    override fun setColorFilter(colorFilter: ColorFilter?) = Unit
+    override fun setAlpha(alpha: Int) { paint.alpha = alpha }
+    override fun setColorFilter(colorFilter: ColorFilter?) { paint.colorFilter = colorFilter }
     @Suppress("DEPRECATION")
     override fun getOpacity() = PixelFormat.TRANSLUCENT
 }

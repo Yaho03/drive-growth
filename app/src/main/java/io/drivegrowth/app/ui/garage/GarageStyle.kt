@@ -14,6 +14,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.ScrollView
 import io.drivegrowth.app.R
+import io.drivegrowth.app.ui.pixel.CleanUi
 import io.drivegrowth.app.ui.pixel.MapPanelStyle
 import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
@@ -34,9 +35,9 @@ internal class GarageStyle(
     fun sourceText(label: String): String? =
         label.takeUnless { it.startsWith("모의 원장") || it.startsWith("차량 원장") }
 
-    val base = if (creamPanel) 0xfffbefcf.toInt() else if (pixelPanel) PixelStyle.background else Color.rgb(14, 16, 20)
-    val panel = if (creamPanel) 0xffffedbd.toInt() else if (pixelPanel) PixelStyle.panel else Color.rgb(26, 29, 35)
-    val inset = if (creamPanel) 0xfff7e1ac.toInt() else if (pixelPanel) PixelStyle.inset else Color.rgb(40, 44, 52)
+    val base = if (creamPanel) CleanUi.CARD_SOFT else if (pixelPanel) PixelStyle.background else Color.rgb(14, 16, 20)
+    val panel = if (creamPanel) CleanUi.CARD else if (pixelPanel) PixelStyle.panel else Color.rgb(26, 29, 35)
+    val inset = if (creamPanel) CleanUi.CHIP else if (pixelPanel) PixelStyle.inset else Color.rgb(40, 44, 52)
     val ink = if (creamPanel) map.ink else if (pixelPanel) PixelStyle.text else Color.rgb(242, 243, 245)
     val muted = if (creamPanel) map.muted else if (pixelPanel) PixelStyle.muted else Color.rgb(166, 172, 183)
     val blue = if (creamPanel) map.accent else if (pixelPanel) PixelStyle.primary else Color.rgb(48, 102, 255)
@@ -64,7 +65,8 @@ internal class GarageStyle(
             if (fill == inset) return hud.detailSurface(active = false)
             return GradientDrawable().apply {
                 setColor(fill)
-                setStroke(dp(1).coerceAtLeast(1), 0xff916340.toInt())
+                cornerRadius = dp(12).toFloat()
+                setStroke(dp(1).coerceAtLeast(1), CleanUi.LINE)
             }
         }
         return GradientDrawable().apply {
@@ -119,15 +121,15 @@ internal class GarageStyle(
             max = total
             progress = value
             progressTintList = ColorStateList.valueOf(color)
-            progressBackgroundTintList = ColorStateList.valueOf(if (creamPanel) 0xffbe9968.toInt() else PixelStyle.outline)
+            progressBackgroundTintList = ColorStateList.valueOf(if (creamPanel) 0xffdbe5f0.toInt() else PixelStyle.outline)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
 
     fun raritySurface(value: Rarity) = shape(when (value) {
         Rarity.COMMON -> inset
-        Rarity.ADVANCED -> 0xffe4edbf.toInt()
-        Rarity.RARE -> 0xffdbeaf4.toInt()
-        Rarity.LEGEND -> 0xffffdf8c.toInt()
+        Rarity.ADVANCED -> 0xffe1f0ff.toInt()
+        Rarity.RARE -> 0xfffde4f0.toInt()
+        Rarity.LEGEND -> 0xfffff1c7.toInt()
     })
 
     fun rarityChip(value: Rarity) = text(rarity(value), 14, rarityColor(value), bold = true).apply {
@@ -149,9 +151,9 @@ internal class GarageStyle(
     })
     fun rarityColor(value: Rarity) = if (creamPanel) when (value) {
         Rarity.COMMON -> muted
-        Rarity.ADVANCED -> 0xff28551f.toInt()
-        Rarity.RARE -> 0xff254e6f.toInt()
-        Rarity.LEGEND -> 0xff71420b.toInt()
+        Rarity.ADVANCED -> 0xff1f6fb8.toInt()
+        Rarity.RARE -> 0xffc0357a.toInt()
+        Rarity.LEGEND -> 0xffa86a00.toInt()
     } else if (pixelPanel) PixelStyle.rarityColor(value) else when (value) {
         Rarity.COMMON -> muted
         Rarity.ADVANCED -> Color.rgb(137, 186, 255)

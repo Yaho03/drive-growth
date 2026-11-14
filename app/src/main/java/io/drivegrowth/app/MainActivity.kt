@@ -355,7 +355,7 @@ open class MainActivity : Activity() {
         }
         pageTitle = style.text("", 22).apply {
             tag = "host:page-title"
-            setTextColor(sign.signInk)
+            setTextColor(android.graphics.Color.WHITE)
             setTypeface(typeface, Typeface.BOLD)
             compoundDrawablePadding = style.dp(8)
             isAccessibilityHeading = true
@@ -401,7 +401,12 @@ open class MainActivity : Activity() {
             }
         }.apply {
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(style.dp(12), style.dp(6), style.dp(12), style.dp(6))
+            setPadding(style.dp(14), style.dp(8), style.dp(10), style.dp(8))
+            // 창 위 바다색 머리띠
+            background = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(io.drivegrowth.app.ui.pixel.CleanUi.SEA_LIGHT, io.drivegrowth.app.ui.pixel.CleanUi.SEA)).apply {
+                cornerRadius = style.dp(14).toFloat()
+            }
             addView(pageTitle, LinearLayout.LayoutParams(0, -2, 1f))
             addView(pageActions, LinearLayout.LayoutParams(-2, -2))
         }
@@ -418,7 +423,7 @@ open class MainActivity : Activity() {
         }
         addDriveProgressViews()
         panel.addView(pageHeading)
-        panel.addView(stage, LinearLayout.LayoutParams(-1, 0, 1f))
+        panel.addView(stage, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = style.dp(6) })
         simulationControls?.let { panel.addView(it, LinearLayout.LayoutParams(-1, -2)) }
         windowMap = ImageView(this).apply {
             visibility = View.GONE

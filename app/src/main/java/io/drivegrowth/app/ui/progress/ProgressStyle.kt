@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.progress
 
+import io.drivegrowth.app.ui.pixel.CleanUi
 import android.content.Context
 import android.graphics.Typeface
 import android.widget.Button
@@ -14,11 +15,11 @@ import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 internal class ProgressStyle(private val context: Context) {
     private val hud = ReferenceHudStyle(context)
     private val panels = MapPanelStyle(context)
-    val base = 0xfff5e3bd.toInt()
+    val base = CleanUi.CARD_SOFT
     val ink get() = hud.signInk
     val muted get() = panels.muted
     val green get() = panels.accent
-    val amber = 0xff73430c.toInt()
+    val amber = 0xffb5650a.toInt()
 
     fun icon(icon: ReferenceHudIcon) = hud.icon(icon, 28)
     fun surface(selected: Boolean = false) = hud.detailSurface(selected)
@@ -39,7 +40,7 @@ internal class ProgressStyle(private val context: Context) {
     }
     fun button(label: String, enabled: Boolean = true, primary: Boolean = false, action: () -> Unit) = Button(context).apply {
         text = label; textSize = 22f; isAllCaps = false; isEnabled = enabled
-        setTextColor(if (enabled) ink else muted)
+        setTextColor(if (!enabled) muted else if (primary) android.graphics.Color.WHITE else ink)
         backgroundTintList = null
         background = hud.signButton(primary)
         setTypeface(typeface, Typeface.BOLD)

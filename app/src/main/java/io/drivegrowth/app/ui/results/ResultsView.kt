@@ -403,7 +403,7 @@ class ResultsView(context: Context, onEvent: (ResultsEvent) -> Unit) : LinearLay
         val change = value.transaction.money ?: return s(R.string.results_no_money_change)
         return (if (change.direction == MoneyDirection.CREDIT) "+" else "−") + money(change.amount)
     }
-    private fun time(value: Settlement) = SimpleDateFormat("yyyy.MM.dd HH:mm:ss z", Locale.KOREA).format(Date(value.confirmedAt.value))
+    private fun time(value: Settlement) = SimpleDateFormat("M월 d일 a h:mm", Locale.KOREA).format(Date(value.confirmedAt.value))
     private fun kind(value: TransactionKind) = s(when (value) {
         TransactionKind.DRIVING -> R.string.results_kind_driving
         TransactionKind.DELIVERY -> R.string.results_kind_delivery

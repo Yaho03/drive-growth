@@ -15,7 +15,7 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
     private val mapStyle = MapPanelStyle(context)
     private val artwork = VehicleArtwork(context, style)
     private var generation = 0L
-    init { orientation = VERTICAL; setBackgroundColor(0xffffedbd.toInt()) }
+    init { orientation = VERTICAL; setBackgroundColor(io.drivegrowth.app.ui.pixel.CleanUi.CARD_SOFT) }
 
     fun render(state: GarageCommandState, enabled: Boolean) = with(style) {
         fun text(label: String, size: Int = 16, bold: Boolean = false) =
