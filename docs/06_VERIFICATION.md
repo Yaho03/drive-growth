@@ -2632,6 +2632,12 @@ JDK 17·기존 Android SDK 35에서 `:core:test` 447개와 `:app:testDebugUnitTe
 
 [같은 main 커밋의 원격 CI](https://github.com/Yaho03/drive-growth/actions/runs/43435568841)는 계정 결제 또는 사용 한도로 `repository-checks`가 실행 전에 실패했고 `android-checks`는 건너뛰었다. 이번 실행은 JVM 단위 시험과 정적 검사·빌드 범위다. SQLite 계측·앱 재실행·에뮬레이터·adb는 사용하지 않았다. 기존 저장과 이전 근거는 [02의 저장 연결점](02_SYSTEM_ARCHITECTURE.md#34-저장-확장의-연결점과-기존-데이터-조건)에 연결했다.
 
+2026-11-14 원격 main `e18146c0f80e5dc77735b0be3c7cb28746073deb`에서 [#46 공통 계약 조율](https://github.com/Yaho03/drive-growth/issues/46#issuecomment-6689335223)을 다시 확인했다. 개별 희귀도·진행량·취득액/출처와 생성·변경·당시 정산 재생은 [#104](https://github.com/Yaho03/drive-growth/pull/104), 처분 포함 이력·발견 저장과 앱 소비는 [#116](https://github.com/Yaho03/drive-growth/pull/116)·[#149](https://github.com/Yaho03/drive-growth/pull/149), 공용 Update의 원결과 검증은 [#242](https://github.com/Yaho03/drive-growth/pull/242)의 구현을 사용한다. 현재 계약과 실행 예제는 [02 개체 정보](02_SYSTEM_ARCHITECTURE.md#46-개체-정보-v1과-공통-소비-예제)에 있다. 이번 변경은 재검증 기록에 한정한다.
+
+독립 worktree에서 Temurin 17.0.6·기존 Android SDK 35를 사용했다. `./gradlew --offline --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`로 지정 검사를 실행했다. core 447개(개체 계약 11개·Garage 18개·차량 성장 11개), 앱 단위 884개(저장 조회 12개·Garage 저장 명령 5개 포함)가 실패·오류·생략 없이 통과했다. Debug APK 조립 성공, Lint 오류 0건·경고 125건이다. `python3 scripts/check_repository.py`와 `git diff --check`도 통과했다. 최초 Gradle 시작은 샌드박스의 로컬 소켓 제한으로 중단됐고, 소켓 사용을 허용한 뒤 동일 명령을 다시 실행했다.
+
+[같은 main 커밋의 원격 CI](https://github.com/Yaho03/drive-growth/actions/runs/43578230507)는 결제 또는 사용 한도로 `repository-checks`가 실행 전에 실패했고 `android-checks`는 건너뛰었다. 이번에는 SQLite 계측·앱 재실행·에뮬레이터·adb를 사용하지 않았다. 기존 장치 시험과 지원 스키마 이전 근거는 [02 저장 연결점](02_SYSTEM_ARCHITECTURE.md#34-저장-확장의-연결점과-기존-데이터-조건)을 따른다. 필수 정보 누락의 명시적 실패와 원본 보존을 유지하며 근거 기반 복구·재설치 정책은 [#24](https://github.com/Yaho03/drive-growth/issues/24)에 남아 있다.
+
 ## 대여 정산의 저장된 시간 근거와 화면 검증 — 2026-11-11
 
 정상·감액·상한 제외 시간을 실제 수락 구간과 각 구간에 적용된 당시 정책으로 저장하고 기존 Main 정산 조회→ResultsHostMapper→ResultsView에 연결했다. 금액은 최초 Settlement를 표시하며 시간에서 다시 지급하거나 현재 잔액으로 바꾸지 않는다. 기록이 없는 이전 결과는 확인 불가다. 계약은 [시간 근거 schema18](02_SYSTEM_ARCHITECTURE.md#대여-결과-시간-근거-schema18), 표현은 [시간 상세](09_UI_UX_SPEC.md#영업-정산의-시간-상세)를 따른다.
