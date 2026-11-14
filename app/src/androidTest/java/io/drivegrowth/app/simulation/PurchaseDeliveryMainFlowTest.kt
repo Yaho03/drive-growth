@@ -1,5 +1,6 @@
 package io.drivegrowth.app.simulation
 
+import io.drivegrowth.app.mainNavigation
 import io.drivegrowth.app.mainPage
 import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.showSimulationControls
@@ -328,7 +329,7 @@ class PurchaseDeliveryMainFlowTest :
                 beforeLabels.filter { it in rarityLabels } != listOf(style.rarity(purchase.offer.rarity)) ||
                 afterLabels.filter { it in rarityLabels } != listOf(style.rarity(offer.rarity))) return@awaitUi false
             val labels = visibleLabels()
-            if (expectedMoney !in labels || context.getString(R.string.delivery_difference_note) !in labels)
+            if (expectedMoney !in labels || frame.rarityNotice?.takeIf { it.contains("차액과 포기 수수료는 달라요") } !in labels)
                 return@awaitUi false
             review = frame
             true
@@ -389,7 +390,9 @@ class PurchaseDeliveryMainFlowTest :
 
     private fun buyFromMain(changeFixture: Boolean = false): Purchase {
         for (tag in listOf(R.string.onboarding_start, VehicleId("hyundai_casper"), R.string.onboarding_review,
-            R.string.onboarding_confirm, R.string.onboarding_to_shop)) click(tag)
+            R.string.onboarding_confirm)) click(tag)
+        click(R.string.onboarding_to_shop)
+        awaitUi("첫 차량 지급 확인 뒤 상점 복귀") { activity.window.decorView.mainNavigation()?.isShown == true }
         read { game ->
             assertEquals(InputSource.SIMULATION, game.identity.source)
             assertEquals(GameMoney(1_000), ok(game.store.balance()))
@@ -414,6 +417,11 @@ class PurchaseDeliveryMainFlowTest :
             offer in offers.proposed.offers && showPurchaseCandidate(offer)?.performClick() == true
         }
         click("delivery:confirm")
+        awaitUi("구매 확정 뒤 출발 연출") {
+            activity.window.decorView.findViewWithTag<View>("delivery:scene:DEPARTURE")?.isShown == true
+        }
+        // 장면만 닫고 원명령은 아래에서 대조한 뒤 따로 확인한다.
+        instrumentation.runOnMainSync { activity.onBackPressed() }
         awaitReceipt("의뢰 선택이 확정됐어요.")
 
         val purchase = read { game ->
@@ -488,7 +496,7 @@ class PurchaseDeliveryMainFlowTest :
     private fun openDelivery() {
         val root = activity.window.decorView
         awaitUi("Main 최초 탁송 조회 완료") {
-            if (enabledButton("delivery:destination") != null) return@awaitUi true
+            if (enabledButton("simulation:destination") != null) return@awaitUi true
             val menu = root.mainPage(HostPage.DELIVERY)
                 ?.takeIf { it.isShown && it.isEnabled && it.isLaidOut && !it.isLayoutRequested }
                 ?: return@awaitUi false
@@ -509,7 +517,8 @@ class PurchaseDeliveryMainFlowTest :
     }
 
     private fun requireFresh(packageName: String) {
-        assertEquals(packageName, context.packageName)
+        assertTrue("격리 계측 패키지를 확인한다",
+            context.packageName == packageName || context.packageName.matches(Regex(Regex.escape(packageName) + "\\.verify[0-9]+")))
         assertFalse("DB를 지우지 않고 새 격리 설치로 실행한다", context.getDatabasePath("unified-simulation.db").exists())
         assertFalse(prefs.contains("stage"))
         assertFalse(arrivalEvidence.exists())

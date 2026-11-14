@@ -18,7 +18,6 @@ import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.app.host.progression.ProgressionJournalState
 import io.drivegrowth.app.host.progression.ProgressionMapper
 import io.drivegrowth.app.host.progression.ProgressionRead
-import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.InputSource
 import io.drivegrowth.core.contract.ProfileId
@@ -78,10 +77,8 @@ class ProgressViewTest : InstrumentationTestCase() {
             assertTrue("상세 보기는 계속 열 수 있다", button.isEnabled)
             return fill(button.background)
         }
-        val hud = ReferenceHudStyle(context)
-        val normalColor = fill(hud.signButton().apply { state = intArrayOf(android.R.attr.state_enabled) })
-        val primaryColor = fill(hud.signButton(primary = true).apply { state = intArrayOf(android.R.attr.state_enabled) })
-        assertTrue(primaryColor != normalColor)
+        val normalColor = 0xff2a3b5e.toInt()
+        val primaryColor = 0xff2865db.toInt()
         val claimable = context.getString(R.string.progress_claimable)
         view.render(ProgressPreviewStates.normal.copy(entries = listOf(ready, disabled)), true)
         assertEquals(primaryColor, buttonColor(ready.key))

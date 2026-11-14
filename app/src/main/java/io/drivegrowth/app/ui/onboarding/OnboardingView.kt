@@ -30,9 +30,9 @@ import java.util.Locale
 /** 실제 지급·저장·탐색을 호출하지 않고 호스트가 전달한 단계와 확정 결과만 표시한다. */
 class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : LinearLayout(context) {
     internal var showHeading = true
-    private val hud = ReferenceHudStyle(context, featureWindow = true)
-    private val panels = MapPanelStyle(context, featureWindow = true)
-    private val style = GarageStyle(context, pixelPanel = true, creamActions = true)
+    private val hud = ReferenceHudStyle(context)
+    private val panels = MapPanelStyle(context)
+    private val style = GarageStyle(context, pixelPanel = true)
     internal var onCelebration: ((RewardCelebrationKind) -> Unit)? = null
     private val celebration = RewardCelebrationView(context).apply {
         onStarted = { onCelebration?.invoke(it) }
@@ -286,7 +286,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             addVehicleArt(this, value.vehicle.vehicleId)
             addView(row().apply {
                 gravity = Gravity.CENTER_VERTICAL
-                addView(label(value.vehicle.displayName, 22, bold = true), LayoutParams(0, -2, 1f))
+                addView(label(value.vehicle.displayName, 24, bold = true), LayoutParams(0, -2, 1f))
                 addView(onboardingRarityChip(Rarity.COMMON), LayoutParams(-2, -2))
             })
             addView(label(value.description ?: s(R.string.onboarding_description_missing), 16, panels.muted))
@@ -309,7 +309,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
 
     private fun pixelCard(selected: Boolean = false) = style.column().apply {
         background = if (selected) hud.detailSurface(true) else hud.signSurface()
-        val padding = style.dp(PixelStyle.panelPaddingDp)
+        val padding = style.dp(14)
         setPadding(padding, padding, padding, padding)
     }
 
@@ -329,7 +329,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         }
         art.background = null
         card.addView(if (celebrate) celebration.over(art, fillHeight = true, stage = true) else art,
-            LayoutParams(-1, style.dp(if (celebrate) GRANT_ART_HEIGHT_DP else 120)))
+            LayoutParams(-1, style.dp(if (celebrate) GRANT_ART_HEIGHT_DP else 84)))
     }
 
     private fun action(body: LinearLayout, label: Int, enabled: Boolean = true, primary: Boolean = false,
@@ -337,6 +337,8 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         val available = enabled && !interaction.inputPending && interaction.pendingSelection == null
         add(body, button(s(label), available, primary = primary) { callback(); drawScreen() }.apply {
             this.tag = tag
+            textSize = 18f
+            minimumHeight = maxOf(minimumHeight, dp(52))
             backgroundTintList = null
             background = hud.signButton(primary)
             setTextColor(hud.featureButtonText(primary))

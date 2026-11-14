@@ -192,7 +192,7 @@ internal class RestStopMotionView(
         minHeight = dp(64)
         minimumHeight = minHeight
         minWidth = dp(52)
-        setTextColor(style.signInk)
+        setTextColor(style.featureButtonText(primary = false))
         backgroundTintList = null
         background = style.signButton()
         setOnClickListener { if (isShown && hasWindowFocus()) action() }

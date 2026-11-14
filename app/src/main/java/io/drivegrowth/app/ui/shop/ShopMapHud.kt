@@ -12,6 +12,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import io.drivegrowth.app.R
+import io.drivegrowth.app.ui.pixel.CleanUi
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import java.text.NumberFormat
@@ -28,22 +29,22 @@ internal class ShopMapHud(
     private val operatingUnknown = context.getString(R.string.shop_map_checking_operation)
     private val balance = content.balance?.let { NumberFormat.getIntegerInstance(Locale.KOREA).format(it.units) }
     private val status = signColumn().apply {
-        addView(label(operatingStatus ?: operatingUnknown, 14f).apply {
+        addView(label(operatingStatus ?: operatingUnknown, 17f).apply {
             maxLines = 2
             val marker = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(if (operatingStatus == null || operatingStatus == operatingUnknown)
-                    0xffa5834a.toInt() else 0xff3bb548.toInt())
+                    CleanUi.SUN else 0xff6bdd91.toInt())
                 setStroke(style.dp(1), style.signInk)
                 setBounds(0, 0, style.dp(10), style.dp(10))
             }
             setCompoundDrawablesRelative(marker, null, null, null)
             compoundDrawablePadding = style.dp(4)
         })
-        addView(label("가게 Lv${content.level ?: "—"}", 14f).apply {
+        addView(label("가게 Lv${content.level ?: "—"}", 16f).apply {
             contentDescription = context.getString(R.string.shop_level, content.level?.toString() ?: unknown())
         })
-        addView(label("P ${content.ownedCount ?: "—"} / ${content.capacity ?: "—"}", 13f).apply {
+        addView(label("P ${content.ownedCount ?: "—"} / ${content.capacity ?: "—"}", 15f).apply {
             contentDescription = context.getString(R.string.shop_capacity,
                 content.ownedCount?.toString() ?: unknown(), content.capacity?.toString() ?: unknown())
         })
@@ -51,7 +52,7 @@ internal class ShopMapHud(
     private val account = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.TOP or Gravity.END
-        addView(label(balance ?: "—", 15f).apply {
+        addView(label(balance ?: "—", 19f).apply {
             tag = "shop:map-balance"
             contentDescription = balance?.let { context.getString(R.string.shop_money, it) } ?: unknown()
             gravity = Gravity.CENTER
@@ -61,19 +62,20 @@ internal class ShopMapHud(
             compoundDrawablePadding = style.dp(3)
             setPadding(style.dp(8), 0, style.dp(8), 0)
             background = style.signSurface()
-        }, LinearLayout.LayoutParams(-2, style.dp(48)))
+        }, LinearLayout.LayoutParams(-2, style.dp(56)))
         if (onSettings != null) {
             addView(Button(context).apply {
                 tag = "shop:map-settings"
                 contentDescription = settingsLabel
+                backgroundTintList = null
                 background = style.signButton()
                 gravity = Gravity.CENTER
                 minWidth = 0
                 minHeight = 0
-                foreground = InsetDrawable(style.icon(ReferenceHudIcon.SETTINGS, 22), style.dp(13))
+                foreground = InsetDrawable(style.icon(ReferenceHudIcon.SETTINGS, 26), style.dp(13))
                 foregroundGravity = Gravity.FILL
                 setOnClickListener { onSettings() }
-            }, LinearLayout.LayoutParams(style.dp(48), style.dp(48)).apply { marginStart = style.dp(4) })
+            }, LinearLayout.LayoutParams(style.dp(56), style.dp(56)).apply { marginStart = style.dp(4) })
         }
     }
 
@@ -93,7 +95,7 @@ internal class ShopMapHud(
             val text = status.getChildAt(index) as TextView
             if (text.maxWidth != statusTextWidth) text.maxWidth = statusTextWidth
         }
-        val settingsSpace = if (account.childCount > 1) style.dp(52) else 0
+        val settingsSpace = if (account.childCount > 1) style.dp(60) else 0
         val balanceTextWidth = (accountWidth - settingsSpace).coerceAtLeast(0)
         val balanceLabel = account.getChildAt(0) as TextView
         if (balanceLabel.maxWidth != balanceTextWidth) balanceLabel.maxWidth = balanceTextWidth

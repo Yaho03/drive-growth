@@ -83,6 +83,42 @@ class OnboardingHostControllerTest {
         assertTrue((h.frames.last().first as OnboardingScreenState.Completed).alreadyGranted)
         assertEquals(1, h.source.commits)
     }
+    @Test fun completedViewCanGoToShopWhileRefreshReplyIsPending() {
+        val h = Harness()
+        val input = OnboardingInteraction(h.host::onEvent)
+        h.host.attach({ state, enabled ->
+            h.frames += state to enabled
+            assertTrue(input.render(state, enabled))
+        }, {
+            h.shops++
+            h.host.setControlsEnabled(false)
+        })
+        h.load()
+        h.choose()
+        h.host.onEvent(OnboardingEvent.ConfirmSelection(FirstGrant.CANDIDATES.first()))
+        h.w.run()
+        h.m.run()
+        val saved = h.source.snapshot.initialization
+        assertTrue(input.state is OnboardingScreenState.Completed)
+
+        h.host.refresh()
+        h.w.run()
+        assertEquals(1, h.m.jobs.size)
+        assertTrue(h.frames.last().second)
+        assertTrue(input.goToShop())
+        assertEquals(1, h.shops)
+        assertFalse(input.goToShop())
+
+        val framesAfterNavigation = h.frames.size
+        h.m.run()
+        assertEquals(framesAfterNavigation, h.frames.size)
+        assertEquals(1, h.shops)
+        assertEquals(1, h.source.commits)
+        assertEquals(0, h.source.giftClaims)
+        assertEquals(saved, h.source.snapshot.initialization)
+        assertTrue(h.w.jobs.isEmpty())
+    }
+
     @Test fun twoHostsThatReadNewOnlyCelebrateTheCommittedFirstGrant() {
         val source = Source()
         val first = Harness(source = source)

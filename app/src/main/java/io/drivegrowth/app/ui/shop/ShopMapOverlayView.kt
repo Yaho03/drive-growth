@@ -78,7 +78,7 @@ internal class ShopMapOverlayView(
         this@ShopMapOverlayView.target = target
         this@ShopMapOverlayView.interaction = interaction
         focusRegion = focus
-        setBackgroundColor(if (focus == null) scrim else 0x16172716)
+        setBackgroundColor(if (focus == null) scrim else 0x16101931)
         val token = ++generation
         removeAllViews()
         scroll = null
@@ -105,7 +105,7 @@ internal class ShopMapOverlayView(
                 addView(row().apply {
                     gravity = Gravity.CENTER_VERTICAL
                     addView(lotArtwork(target).apply { background = infoSurface() },
-                        LinearLayout.LayoutParams(0, dp(136), 1f))
+                        LinearLayout.LayoutParams(0, dp(112), 1f))
                     addView(column().apply {
                         setPadding(dp(12), 0, 0, 0)
                         addView(text(title, 30, bold = true).apply { isAccessibilityHeading = true })
@@ -118,10 +118,10 @@ internal class ShopMapOverlayView(
                     }, LinearLayout.LayoutParams(0, -2, 1.2f))
                 })
             } else {
-                addView(lotArtwork(target), LinearLayout.LayoutParams(dp(132), dp(70)).apply {
+                addView(lotArtwork(target), LinearLayout.LayoutParams(dp(116), dp(64)).apply {
                     gravity = Gravity.CENTER_HORIZONTAL
                 })
-                addView(text(title, 21, bold = true).apply {
+                addView(text(title, 24, bold = true).apply {
                     gravity = Gravity.CENTER
                     isAccessibilityHeading = true
                 })
@@ -294,8 +294,8 @@ internal class ShopMapOverlayView(
                 importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
             }, LinearLayout.LayoutParams(dp(42), dp(42)).apply { marginEnd = dp(14) })
             addView(column().apply {
-                addView(text(label, 16, accent, bold = true))
-                addView(text(value, 20, bold = true))
+                addView(text(label, 18, accent, bold = true))
+                addView(text(value, 22, bold = true))
             }, LinearLayout.LayoutParams(0, -2, 1f))
         }, 12)
         val expansion = (option.command as? ShopCommand.Expand)?.offer

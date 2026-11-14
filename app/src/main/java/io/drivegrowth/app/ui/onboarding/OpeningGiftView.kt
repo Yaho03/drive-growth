@@ -32,20 +32,28 @@ internal class OpeningGiftView(context: Context, onGacha: () -> Unit, onClose: (
     private val picture = GiftPicture(context)
 
     init {
-        val style = GarageStyle(context, pixelPanel = true, creamPanel = true)
+        val style = GarageStyle(context, pixelPanel = true, featureWindow = true)
         orientation = VERTICAL
         gravity = Gravity.CENTER_HORIZONTAL
         background = style.shape(style.panel)
         setPadding(style.dp(14), style.dp(10), style.dp(14), style.dp(10))
         tag = "opening-gift:card"
-        addView(style.text("개업 선물", 22, bold = true))
+        addView(style.text("개업 선물", 25, bold = true))
         addView(picture, LayoutParams(style.dp(104), style.dp(68)))
-        addView(style.text("무료 뽑기권 1장을 받았어요.", 16))
+        addView(style.text("무료 뽑기권 1장을 받았어요.", 19))
         with(style) {
             add(this@OpeningGiftView, row().apply {
-                addView(button("닫기", onClick = onClose).apply { tag = "opening-gift:close" },
+                addView(button("닫기", onClick = onClose).apply {
+                    tag = "opening-gift:close"
+                    textSize = 18f
+                    minimumHeight = maxOf(minimumHeight, dp(52))
+                },
                     LayoutParams(0, -2, 1f))
-                addView(button("지금 뽑으러 가기", primary = true, onClick = onGacha).apply { tag = "opening-gift:gacha" },
+                addView(button("지금 뽑으러 가기", primary = true, onClick = onGacha).apply {
+                    tag = "opening-gift:gacha"
+                    textSize = 18f
+                    minimumHeight = maxOf(minimumHeight, dp(52))
+                },
                     LayoutParams(0, -2, 2f).apply { marginStart = dp(8) })
             })
         }

@@ -361,7 +361,7 @@ class GarageViewTest : InstrumentationTestCase() {
             descendants(view).filterIsInstance<ScrollView>().any { filter in descendants(it) })
     }
 
-    fun testCollectionHeadersAndCellsShareSteppedBordersAndKeepRarityColors() = runOnUiTest {
+    fun testCollectionHeadersAndCellsUseNavyPaletteAndRarityColors() = runOnUiTest {
         val base = instrumentation.targetContext
         val context = base.createConfigurationContext(Configuration(base.resources.configuration).apply { fontScale = 1f })
         val view = CollectionView(context) {}
@@ -378,9 +378,13 @@ class GarageViewTest : InstrumentationTestCase() {
             try {
                 drawable.setBounds(0, 0, bitmap.width, bitmap.height)
                 drawable.draw(Canvas(bitmap))
-                assertEquals("모서리는 계단처럼 비워야 합니다", Color.TRANSPARENT, bitmap.getPixel(0, 0))
-                assertEquals("윗변에는 같은 갈색 테두리를 씁니다", 0xff916340.toInt(), bitmap.getPixel(bitmap.width / 2, 0))
-                assertEquals("등급마다 기존 채움색을 유지합니다", expectedFill, bitmap.getPixel(bitmap.width / 2, bitmap.height / 2))
+                assertEquals("계단형 모서리 바깥은 투명하다", Color.TRANSPARENT, bitmap.getPixel(0, 0))
+                val step = (3 * context.resources.displayMetrics.density + .5f).toInt()
+                assertEquals(Color.TRANSPARENT, bitmap.getPixel(step, 0))
+                assertEquals(0xff8ebcf7.toInt(), bitmap.getPixel(step, step))
+                assertEquals(0xff8ebcf7.toInt(), bitmap.getPixel(bitmap.width / 2, 0))
+                val fill = bitmap.getPixel(bitmap.width / 2, bitmap.height / 2)
+                assertEquals(expectedFill, fill)
             } finally {
                 drawable.bounds = previousBounds
                 bitmap.recycle()

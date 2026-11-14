@@ -16,33 +16,36 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import io.drivegrowth.app.ui.pixel.CleanUi
+import io.drivegrowth.app.ui.pixel.ReferenceHudStyle
 import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.core.driving.RestOutcome
 import io.drivegrowth.core.driving.RestPlace
 
 /** PR #292의 장면 2·3. 애니메이션 시간은 그림에만 쓰고 읽기 전용 표시는 받은 값으로 갱신한다. */
 internal class RestAreaSceneView(context: Context) : LinearLayout(context) {
+    private val style = ReferenceHudStyle(context)
     private val artwork = RestAreaArtwork(context).apply {
         background = rounded(Color.BLACK, 12)
         clipToOutline = true
     }
-    private val title = label(20, Color.WHITE).apply {
+    private val title = label(24, style.signInk).apply {
         setTypeface(typeface, Typeface.BOLD)
         setAccessibilityHeading(true)
     }
-    private val status = label(13, 0xffc3b8ff.toInt()).apply {
-        background = rounded(0xff2c2650.toInt(), 16)
+    private val status = label(16, style.signInk).apply {
+        background = style.detailSurface(active = false)
         setPadding(dp(10), dp(3), dp(10), dp(3))
     }
-    private val detail = label(13, 0xffa3adc2.toInt())
-    private val target = label(13, 0xffa3adc2.toInt())
+    private val detail = label(16, CleanUi.MUTED)
+    private val target = label(16, CleanUi.MUTED)
     private val progress = RestTimeTrack(context).apply {
         max = 1000
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
     }
     private val timeRow = LinearLayout(context).apply {
         gravity = Gravity.CENTER_VERTICAL
-        addView(label(13, 0xffa3adc2.toInt()).apply { text = "도착" })
+        addView(label(16, CleanUi.MUTED).apply { text = "도착" })
         addView(progress, LayoutParams(0, dp(18), 1f).apply {
             marginStart = dp(10)
             marginEnd = dp(10)
@@ -61,8 +64,8 @@ internal class RestAreaSceneView(context: Context) : LinearLayout(context) {
     init {
         gravity = Gravity.CENTER_VERTICAL
         visibility = GONE
-        setPadding(dp(18), dp(12), dp(18), dp(12))
-        background = rounded(0xff171c2a.toInt(), 14)
+        setPadding(dp(12), dp(8), dp(12), dp(8))
+        background = style.signSurface()
         addView(artwork, LayoutParams(-2, -2))
         addView(info, LayoutParams(-1, -2))
     }
@@ -76,15 +79,15 @@ internal class RestAreaSceneView(context: Context) : LinearLayout(context) {
         val wide = width > threshold && artwork.visibility != GONE
         orientation = if (wide) HORIZONTAL else VERTICAL
         val art = artwork.layoutParams as LayoutParams
-        art.width = minOf(dp(264), innerWidth)
+        art.width = minOf(dp(if (wide) 264 else 208), innerWidth)
         art.height = art.width / 2
         art.gravity = if (wide) Gravity.CENTER_VERTICAL else Gravity.CENTER_HORIZONTAL
-        art.rightMargin = if (wide && layoutDirection == View.LAYOUT_DIRECTION_LTR) dp(18) else 0
-        art.leftMargin = if (wide && layoutDirection == View.LAYOUT_DIRECTION_RTL) dp(18) else 0
+        art.rightMargin = if (wide && layoutDirection == View.LAYOUT_DIRECTION_LTR) dp(12) else 0
+        art.leftMargin = if (wide && layoutDirection == View.LAYOUT_DIRECTION_RTL) dp(12) else 0
         val copy = info.layoutParams as LayoutParams
         copy.width = if (wide) 0 else -1
         copy.weight = if (wide) 1f else 0f
-        copy.topMargin = if (!wide && artwork.visibility != GONE) dp(12) else 0
+        copy.topMargin = if (!wide && artwork.visibility != GONE) dp(8) else 0
         super.onMeasure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY), heightMeasureSpec)
     }
 
@@ -146,23 +149,23 @@ internal class RestAreaSceneView(context: Context) : LinearLayout(context) {
 /** ProgressBar의 값 계약을 유지하면서 시안의 레일과 끝 눈금을 그린다. */
 private class RestTimeTrack(context: Context) :
     ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal) {
-    private val railPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val railPaint = Paint()
 
     override fun onDraw(canvas: Canvas) {
         val density = resources.displayMetrics.density
-        val radius = 5f * density
+        val halfHeight = 5f * density
         val center = height / 2f
         val left = density
         val right = width - density
         if (right <= left) return
-        railPaint.color = 0xff34394b.toInt()
-        canvas.drawRoundRect(left, center - radius, right, center + radius, radius, radius, railPaint)
+        railPaint.color = CleanUi.CHIP
+        canvas.drawRect(left, center - halfHeight, right, center + halfHeight, railPaint)
         val fill = (right - left) * progress / max
         if (fill > 0f) {
-            railPaint.color = 0xff9a86ff.toInt()
-            canvas.drawRoundRect(left, center - radius, left + fill, center + radius, radius, radius, railPaint)
+            railPaint.color = CleanUi.SEA
+            canvas.drawRect(left, center - halfHeight, left + fill, center + halfHeight, railPaint)
         }
-        railPaint.color = 0xffc3b8ff.toInt()
+        railPaint.color = CleanUi.SEA_LIGHT
         canvas.drawRect(right - density, 0f, right + density, height.toFloat(), railPaint)
     }
 }

@@ -116,8 +116,7 @@ internal class MapVehicleDetailView(
         val margin = fit.margin
         val panelWidth = fit.panelWidth
         summaryArtwork?.let { artworkPanel ->
-            val desiredHeight = if (fit.side) (fit.maxPanelHeight / 3).coerceIn(style.dp(152), style.dp(260))
-                else style.dp(152)
+            val desiredHeight = (fit.maxPanelHeight / 5).coerceIn(style.dp(72), style.dp(128))
             artworkPanel.layoutParams.height = desiredHeight
         }
         (detailPanel.layoutParams as LayoutParams).apply {
@@ -130,8 +129,10 @@ internal class MapVehicleDetailView(
         }
         // FrameLayout의 WRAP_CONTENT가 앱 영역보다 크게 측정되지 않도록 패널의 최대 높이를 고정한다.
         if (visibility != GONE) {
+            val compactSummary = fit.side && summaryArtwork != null
+            val panelHeight = if (compactSummary) minOf(fit.maxPanelHeight, style.dp(460)) else fit.maxPanelHeight
             detailPanel.measure(MeasureSpec.makeMeasureSpec(panelWidth, MeasureSpec.EXACTLY),
-                MeasureSpec.makeMeasureSpec(fit.maxPanelHeight, if (fit.side) MeasureSpec.EXACTLY else MeasureSpec.AT_MOST))
+                MeasureSpec.makeMeasureSpec(panelHeight, if (fit.side) MeasureSpec.EXACTLY else MeasureSpec.AT_MOST))
             detailPanel.layoutParams.height = detailPanel.measuredHeight
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -198,33 +199,34 @@ internal class MapVehicleDetailView(
         add(parent, column().apply {
             background = mapStyle.chip()
             setPadding(dp(12), dp(10), dp(12), dp(12))
-            addView(text(heading, 26, mapStyle.ink, bold = true).apply { isAccessibilityHeading = true })
-            val picture = artwork.view(car.vehicleId, car.rarity, 260, showRing = false, fillHeight = true).apply {
+            val picture = artwork.view(car.vehicleId, car.rarity, 128, showRing = false, fillHeight = true).apply {
                 background = null
                 tag = "map:vehicle-artwork"
             }
             summaryArtwork = picture
-            addView(picture, LinearLayout.LayoutParams(-1, dp(152)))
-            if (!artwork.hasSprite(car.vehicleId)) addView(text(s(R.string.garage_art_placeholder), 14, mapStyle.muted))
             addView(row().apply {
-                addView(badge("${rarity(car.rarity)} · ${context.getString(R.string.garage_level, car.level)}"),
-                    LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginEnd = dp(6) })
-                addView(badge(activityLabel(value.activity), value.activity == VehicleActivity.IDLE),
-                    LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+                gravity = Gravity.CENTER_VERTICAL
+                addView(picture, LinearLayout.LayoutParams(0, dp(128), 1f).apply { marginEnd = dp(12) })
+                addView(column().apply {
+                    addView(text(heading, 28, mapStyle.ink, bold = true).apply { isAccessibilityHeading = true })
+                    addView(badge("${rarity(car.rarity)} · ${context.getString(R.string.garage_level, car.level)}"))
+                    add(this, badge(activityLabel(value.activity), value.activity == VehicleActivity.IDLE), 4)
+                }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 2f))
             })
+            if (!artwork.hasSprite(car.vehicleId)) addView(text(s(R.string.garage_art_placeholder), 16, mapStyle.muted))
             if (car.level == MAX_VEHICLE_LEVEL) {
                 add(this, text(s(R.string.garage_map_max_level), 15, mapStyle.ink, bold = true), 8)
             } else {
                 val percent = "${car.levelProgressPercent}%"
                 add(this, row().apply {
                     gravity = Gravity.CENTER_VERTICAL
-                    addView(text("EXP", 15, mapStyle.ink, bold = true))
-                    addView(mapStyle.experienceTrack(car.levelProgressPercent).apply { tag = "map:vehicle-exp" },
+                    addView(text("EXP", 17, mapStyle.ink, bold = true))
+                    addView(mapStyle.segmentedExperienceTrack(car.levelProgressPercent).apply { tag = "map:vehicle-exp" },
                         LinearLayout.LayoutParams(0, dp(22), 1f).apply {
                             marginStart = dp(8)
                             marginEnd = dp(8)
                         })
-                    addView(text(percent, 15, mapStyle.ink, bold = true).apply {
+                    addView(text(percent, 17, mapStyle.ink, bold = true).apply {
                         contentDescription = context.getString(R.string.garage_progress, percent)
                     })
                 }, 8)
@@ -246,7 +248,7 @@ internal class MapVehicleDetailView(
     }
 
     private fun badge(label: String, active: Boolean = false) = with(style) {
-        text(label, 14, mapStyle.ink, bold = true).apply {
+        text(label, 17, mapStyle.ink, bold = true).apply {
             background = mapStyle.chip(active)
             gravity = Gravity.CENTER
             setPadding(dp(8), dp(6), dp(8), dp(7))
@@ -254,8 +256,8 @@ internal class MapVehicleDetailView(
     }
 
     private fun fact(label: String, icon: ReferenceHudIcon) = with(style) {
-        text(label, 15, mapStyle.ink).apply {
-            setCompoundDrawablesRelative(signs.icon(icon, 20), null, null, null)
+        text(label, 19, mapStyle.ink).apply {
+            setCompoundDrawablesRelative(signs.icon(icon, 24), null, null, null)
             compoundDrawablePadding = dp(8)
         }
     }

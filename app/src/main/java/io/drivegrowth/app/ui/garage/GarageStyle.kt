@@ -6,7 +6,6 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.StateListDrawable
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
@@ -25,23 +24,23 @@ import io.drivegrowth.core.contract.Rarity
 internal class GarageStyle(
     val context: Context,
     private val pixelPanel: Boolean,
-    private val creamActions: Boolean = false,
-    private val creamPanel: Boolean = false,
     private val featureWindow: Boolean = false,
 ) {
     constructor(context: Context) : this(context, pixelPanel = false)
 
     private val hud = ReferenceHudStyle(context)
-    private val map = MapPanelStyle(context, featureWindow)
+    private val map = MapPanelStyle(context)
+    private val themed = pixelPanel || featureWindow
+
     fun sourceText(label: String): String? =
         label.takeUnless { it.startsWith("모의 원장") || it.startsWith("차량 원장") }
 
-    val base = if (featureWindow) CleanUi.CARD_SOFT else if (creamPanel) 0xfffbefcf.toInt() else if (pixelPanel) PixelStyle.background else Color.rgb(14, 16, 20)
-    val panel = if (featureWindow) CleanUi.PANEL_TOP else if (creamPanel) 0xffffedbd.toInt() else if (pixelPanel) PixelStyle.panel else Color.rgb(26, 29, 35)
-    val inset = if (featureWindow) CleanUi.CHIP else if (creamPanel) 0xfff7e1ac.toInt() else if (pixelPanel) PixelStyle.inset else Color.rgb(40, 44, 52)
-    val ink = if (creamPanel || featureWindow) map.ink else if (pixelPanel) PixelStyle.text else Color.rgb(242, 243, 245)
-    val muted = if (creamPanel || featureWindow) map.muted else if (pixelPanel) PixelStyle.muted else Color.rgb(166, 172, 183)
-    val blue = if (creamPanel || featureWindow) map.accent else if (pixelPanel) PixelStyle.primary else Color.rgb(48, 102, 255)
+    val base = if (themed) CleanUi.CARD_SOFT else Color.rgb(14, 16, 20)
+    val panel = if (themed) CleanUi.CARD else Color.rgb(26, 29, 35)
+    val inset = if (themed) CleanUi.CHIP else Color.rgb(40, 44, 52)
+    val ink = if (themed) map.ink else Color.rgb(242, 243, 245)
+    val muted = if (themed) map.muted else Color.rgb(166, 172, 183)
+    val blue = if (themed) map.accent else Color.rgb(48, 102, 255)
     fun heading(value: CharSequence, icon: ReferenceHudIcon) = text(value, 23, bold = true).apply {
         background = if (featureWindow) map.card() else hud.signSurface()
         setCompoundDrawablesRelative(hud.icon(icon, 27), null, null, null)
@@ -60,31 +59,11 @@ internal class GarageStyle(
         setPadding(0, dp(4), 0, dp(4))
     }
     fun shape(fill: Int, selected: Boolean = false): Drawable {
-        if (featureWindow) {
-            if (selected) return map.chip(active = true)
-            if (fill == panel) return map.card()
-            if (fill == inset) return map.chip()
-            return GradientDrawable().apply {
-                setColor(fill)
-                cornerRadius = dp(8).toFloat()
-                setStroke(dp(1).coerceAtLeast(1), CleanUi.LINE)
-            }
-        }
-        if (creamPanel) {
-            if (selected) return hud.signSurface(focused = true)
-            if (fill == panel) return hud.signSurface()
-            if (fill == inset) return hud.detailSurface(active = false)
-            return GradientDrawable().apply {
-                setColor(fill)
-                setStroke(dp(1).coerceAtLeast(1), 0xff916340.toInt())
-            }
-        }
+        if (themed) return hud.panel(fill, focused = selected)
         return GradientDrawable().apply {
             setColor(fill)
-            cornerRadius = dp(if (pixelPanel) PixelStyle.panelRadiusDp else 24).toFloat()
-            if (pixelPanel) setStroke(dp(if (selected) 2 else 1).coerceAtLeast(1),
-                if (selected) PixelStyle.focus else PixelStyle.outline)
-            else if (selected) setStroke(dp(2), ink)
+            cornerRadius = dp(24).toFloat()
+            if (selected) setStroke(dp(2), ink)
         }
     }
     fun card(selected: Boolean = false) = column().apply {
@@ -94,25 +73,23 @@ internal class GarageStyle(
     }
     fun button(label: String, enabled: Boolean = true, primary: Boolean = false, onClick: () -> Unit) = Button(context).apply {
         text = label; textSize = if (pixelPanel) 20f else 24f; isAllCaps = false
-        val cream = creamActions && primary && enabled
-        if (creamPanel || featureWindow) {
-            isEnabled = enabled
+        isEnabled = enabled
+        if (featureWindow) {
             map.styleButton(this, primary)
             setOnClickListener { if (isEnabled) onClick() }
             return@apply
         }
-        setTextColor(if (cream) hud.signInk else if (enabled) ink else muted)
-        val fill = if (primary && enabled) blue else inset
         if (pixelPanel) {
             setTypeface(typeface, Typeface.BOLD)
-            background = if (cream) hud.signButton() else StateListDrawable().apply {
-                addState(intArrayOf(android.R.attr.state_focused), shape(fill, selected = true))
-                addState(intArrayOf(android.R.attr.state_pressed), shape(fill, selected = true))
-                addState(intArrayOf(), shape(fill))
-            }
-        } else background = shape(fill)
+            backgroundTintList = null
+            background = hud.signButton(primary)
+            setTextColor(hud.featureButtonText(primary))
+        } else {
+            setTextColor(if (enabled) ink else muted)
+            background = shape(if (primary && enabled) blue else inset)
+        }
         minHeight = dp(64); minimumHeight = dp(64)
-        setPadding(dp(16), dp(12), dp(16), dp(12)); isEnabled = enabled
+        setPadding(dp(16), dp(12), dp(16), dp(12))
         setOnClickListener { if (isEnabled) onClick() }
     }
     fun add(parent: LinearLayout, child: View, gap: Int = 12) {
@@ -131,29 +108,26 @@ internal class GarageStyle(
             max = total
             progress = value
             progressTintList = ColorStateList.valueOf(color)
-            progressBackgroundTintList = ColorStateList.valueOf(if (featureWindow) CleanUi.CHIP else if (creamPanel) 0xffbe9968.toInt() else PixelStyle.outline)
+            progressBackgroundTintList = ColorStateList.valueOf(if (themed) CleanUi.TRACK else PixelStyle.outline)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
 
-    fun raritySurface(value: Rarity): Drawable {
-        val fill = when (value) {
-            Rarity.COMMON -> if (featureWindow) 0xfff7e1ac.toInt() else inset
-            Rarity.ADVANCED -> 0xffe4edbf.toInt()
-            Rarity.RARE -> 0xffdbeaf4.toInt()
-            Rarity.LEGEND -> 0xffffdf8c.toInt()
-        }
-        return if (creamPanel || featureWindow) hud.detailSurface(active = false, fill = fill) else shape(fill)
-    }
+    fun raritySurface(value: Rarity): Drawable = shape(when (value) {
+        Rarity.COMMON -> if (featureWindow) 0xfff7e1ac.toInt() else inset
+        Rarity.ADVANCED -> 0xffe4edbf.toInt()
+        Rarity.RARE -> 0xffdbeaf4.toInt()
+        Rarity.LEGEND -> 0xffffdf8c.toInt()
+    })
 
     fun rarityChip(value: Rarity) = text(rarity(value), 14, rarityColor(value), bold = true).apply {
-        background = if (creamPanel || featureWindow) raritySurface(value) else GradientDrawable().apply {
+        background = if (featureWindow) raritySurface(value) else GradientDrawable().apply {
             cornerRadius = dp(16).toFloat()
             setColor(inset)
             val stroke = dp(2).coerceAtLeast(1)
             if (value == Rarity.COMMON) setStroke(stroke, rarityColor(value), dp(4).toFloat(), dp(3).toFloat())
             else setStroke(stroke, rarityColor(value))
         }
-        setPadding(dp(if (creamPanel || featureWindow) 7 else 10), dp(4), dp(if (creamPanel || featureWindow) 7 else 10), dp(4))
+        setPadding(dp(if (featureWindow) 7 else 10), dp(4), dp(if (featureWindow) 7 else 10), dp(4))
     }
 
     fun rarity(value: Rarity) = context.getString(when (value) {
@@ -162,7 +136,7 @@ internal class GarageStyle(
         Rarity.RARE -> R.string.garage_rarity_rare
         Rarity.LEGEND -> R.string.garage_rarity_legend
     })
-    fun rarityColor(value: Rarity) = if (creamPanel || featureWindow) when (value) {
+    fun rarityColor(value: Rarity) = if (featureWindow) when (value) {
         Rarity.COMMON -> 0xff5a4c37.toInt()
         Rarity.ADVANCED -> 0xff28551f.toInt()
         Rarity.RARE -> 0xff254e6f.toInt()

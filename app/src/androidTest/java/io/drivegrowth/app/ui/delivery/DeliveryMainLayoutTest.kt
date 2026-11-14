@@ -60,9 +60,9 @@ class DeliveryMainLayoutTest :
         }
         // Main의 최초 조회가 Destination을 그린 뒤에만 확인한다. 조회 중에는 refresh가 합쳐질 수 있다.
         await("시연 목적지 확인 전 Main의 최초 탁송 조회 완료") {
-            if (laidOutButton(root, "delivery:destination")?.isEnabled != true) return@await false
             val confirm = laidOutButton(root, "simulation:destination")?.takeIf { it.isEnabled } ?: return@await false
             assertTrue("시연 목적지 확인 버튼 전체 표시", fullyVisible(confirm))
+            assertNull("모의 입력은 별도 내비 목적지 선택을 표시하지 않는다", root.findViewWithTag<View>("delivery:destination"))
             assertFalse("확인 전 시연 목적지", simulation.getBoolean("destinationConfirmed", false))
             val revision = simulation.getLong("destinationRevision", 0)
             assertTrue("시연 목적지 확인 callback 호출", confirm.performClick())

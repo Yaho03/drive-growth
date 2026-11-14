@@ -7,9 +7,11 @@ import android.content.Intent
 import android.graphics.Rect
 import android.os.SystemClock
 import android.test.InstrumentationTestCase
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import io.drivegrowth.app.ui.garage.CollectionScrollTestActivity
@@ -63,6 +65,27 @@ class GachaViewTest : InstrumentationTestCase() {
         assertFalse(button(view,"gacha:option:free").isEnabled)
         assertTrue(text(view).contains("확정 획득 결과 조회를 기다립니다"));assertTrue(text(view).contains("1,200 게임머니"))
     }
+    fun testNarrowOffersKeepFullWidthActionsWithReadableLabels() = onUi {
+        val view = make()
+        view.render(GachaPreviewStates.ready(), true)
+        val density = view.resources.displayMetrics.density
+        val width = (320 * density).toInt()
+        val height = (340 * density).toInt()
+        view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+        view.layout(0, 0, width, height)
+
+        val free = button(view, "gacha:option:free")
+        val paid = button(view, "gacha:option:paid")
+        assertEquals(free.width, paid.width)
+        for (action in listOf(free, paid)) {
+            assertTrue(action.width > width / 2)
+            assertTrue(action.height >= (52 * density).toInt())
+            val label = checkNotNull(action.layout)
+            assertTrue((0 until label.lineCount).all { label.getEllipsisCount(it) == 0 })
+        }
+    }
+
     fun testConfirmationActionsStayFixedWhileOffersScroll() = onUi {
         val view = make()
         view.render(GachaPreviewStates.ready(), true)
@@ -247,7 +270,7 @@ class GachaViewTest : InstrumentationTestCase() {
         assertEquals("표시와 Back은 원 요청 이외의 이벤트를 보내지 않는다", 1, events.size)
     }
 
-    fun testRareAndLegendRequireExplicitRevealAndDoNotSubmitAgain() {
+    fun testNarrowShutterActionsRequireExplicitInputAndDoNotSubmitAgain() {
         if (!ValueAnimator.areAnimatorsEnabled()) return
         val context = instrumentation.targetContext
         val display = context.getSystemService(DisplayManager::class.java).displays
@@ -256,7 +279,7 @@ class GachaViewTest : InstrumentationTestCase() {
         val activity = instrumentation.startActivitySync(Intent(context,
             CollectionScrollTestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options)
         try {
-            for (rarity in listOf(Rarity.RARE, Rarity.LEGEND)) {
+            for (rarity in listOf(Rarity.COMMON, Rarity.RARE, Rarity.LEGEND)) {
                 val events = mutableListOf<GachaEvent>()
                 val audio = mutableListOf<Pair<Rarity, Boolean>>()
                 var waitStartedAt: Long? = null
@@ -266,7 +289,10 @@ class GachaViewTest : InstrumentationTestCase() {
                             if (!opening) waitStartedAt = SystemClock.uptimeMillis()
                             audio += rank to opening
                         }
-                        activity.setContentView(it)
+                        val density = activity.resources.displayMetrics.density
+                        activity.setContentView(FrameLayout(activity).apply {
+                            addView(it, FrameLayout.LayoutParams((320 * density).toInt(), (340 * density).toInt()))
+                        })
                     }
                 }
                 awaitCondition("가챠 창이 포커스를 받지 못했습니다") { view.isShown && view.hasWindowFocus() }
@@ -290,7 +316,9 @@ class GachaViewTest : InstrumentationTestCase() {
                     assertTrue(audio.none { it.second })
                 }
                 awaitCondition("준비된 셔터의 공개 버튼이 나타나지 않았습니다") {
-                    view.findViewWithTag<Button>("gacha:reveal")?.isEnabled == true
+                    view.findViewWithTag<Button>("gacha:reveal")?.let {
+                        it.isEnabled && it.isShown && it.isLaidOut && !it.isLayoutRequested
+                    } == true
                 }
                 val (reveal, scene) = onUi {
                     val reveal = button(view, "gacha:reveal")
@@ -298,17 +326,34 @@ class GachaViewTest : InstrumentationTestCase() {
                     assertEquals(View.VISIBLE, reveal.visibility)
                     assertTrue("셔터 준비 시간은 등급과 무관하다",
                         SystemClock.uptimeMillis() - checkNotNull(waitStartedAt) >= 1_980L)
+                    assertTouchable(view, reveal)
+                    assertTouchable(view, button(view, "gacha:skip-reveal"))
                     assertTrue(scene.isClickable)
                     assertEquals(listOf(Rarity.COMMON to false), audio)
                     reveal to scene
+                }
+                if (rarity == Rarity.COMMON) {
+                    onUi { tap(view, button(view, "gacha:skip-reveal")) }
+                    awaitCondition("건너뛰기가 정적 결과를 표시하지 않았습니다") {
+                        view.findViewWithTag<View>("gacha:reveal-scene") == null &&
+                            isResultActionLaidOut(view)
+                    }
+                    onUi {
+                        assertTrue(audio.none { it.second })
+                        assertEquals(1, events.size)
+                        assertStaticResultActionsAfterScroll(view)
+                    }
+                    continue
                 }
                 // 과거의 자동 공개 시점을 넘긴 뒤에도 셔터가 닫힌 상태여야 한다.
                 if (rarity == Rarity.LEGEND) SystemClock.sleep(4_500L)
                 onUi {
                     assertEquals(listOf(Rarity.COMMON to false), audio)
                     assertNull(view.findViewWithTag<View>("gacha:garage"))
-                    if (rarity == Rarity.RARE) reveal.performClick() else scene.performClick()
-                    assertEquals(View.GONE, reveal.visibility)
+                    if (rarity == Rarity.RARE) tap(view, reveal) else scene.performClick()
+                }
+                awaitCondition("공개 입력이 셔터에 전달되지 않았습니다") { reveal.visibility == View.GONE }
+                onUi {
                     assertFalse(reveal.isEnabled)
                     assertFalse(scene.isClickable)
                     reveal.performClick()
@@ -318,14 +363,71 @@ class GachaViewTest : InstrumentationTestCase() {
                     if (rarity != Rarity.LEGEND) view.closeReveal()
                 }
                 awaitCondition("열린 셔터의 차량과 결과 카드가 유지되지 않았습니다") {
-                    view.findViewWithTag<Button>("gacha:garage")?.isEnabled == true &&
+                    isResultActionLaidOut(view) &&
                         (rarity != Rarity.LEGEND ||
                             view.findViewWithTag<View>("gacha:reference-card")?.isShown == true)
                 }
-                onUi { assertEquals(1, events.size) }
+                onUi {
+                    assertEquals(1, events.size)
+                    if (rarity == Rarity.RARE) {
+                        assertStaticResultActionsAfterScroll(view)
+                    } else {
+                        assertTouchable(view, button(view, "gacha:draw-again"))
+                        assertTouchable(view, button(view, "gacha:garage"))
+                    }
+                    tap(view, button(view, "gacha:garage"))
+                }
+                awaitCondition("결과의 차고 버튼이 요청을 보내지 않았습니다") {
+                    events.filterIsInstance<GachaEvent.OpenGarage>().size == 1
+                }
+                onUi { assertEquals(1, events.filterIsInstance<GachaEvent.Draw>().size) }
             }
         } finally {
             onUi { activity.finish() }
+        }
+    }
+
+    private fun isResultActionLaidOut(view: GachaView) =
+        view.findViewWithTag<Button>("gacha:garage")?.let {
+            it.isEnabled && it.isShown && it.isLaidOut && !it.isLayoutRequested
+        } == true
+
+    private fun assertStaticResultActionsAfterScroll(view: GachaView) {
+        val scroll = nodes(view).filterIsInstance<ScrollView>().single()
+        val drawAgain = button(view, "gacha:draw-again")
+        val garage = button(view, "gacha:garage")
+        assertTouchable(view, drawAgain)
+        assertTouchable(view, garage)
+        val originalY = garage.top
+        val initialScroll = scroll.scrollY
+        scroll.scrollTo(0, scroll.getChildAt(0).height)
+        assertTrue("좁은 창에서 결과 본문을 스크롤할 수 있어야 합니다", scroll.scrollY > initialScroll)
+        assertEquals("본문 스크롤 중에도 결과 동작 줄의 위치가 고정되어야 합니다", originalY, garage.top)
+        assertTouchable(view, drawAgain)
+        assertTouchable(view, garage)
+    }
+
+    private fun assertTouchable(root: View, control: View) {
+        val visible = Rect()
+        val minimum = (48 * root.resources.displayMetrics.density).toInt()
+        assertTrue("${control.tag}: View=${control.width}×${control.height}px, " +
+            "window=${root.width}×${root.height}px", control.getGlobalVisibleRect(visible))
+        assertTrue("${control.tag}: ${visible.width()}×${visible.height()}px", visible.width() >= minimum && visible.height() >= minimum)
+    }
+
+    private fun tap(root: View, control: View) {
+        val origin = IntArray(2).also(root::getLocationInWindow)
+        val location = IntArray(2).also(control::getLocationInWindow)
+        val x = location[0] - origin[0] + control.width / 2f
+        val y = location[1] - origin[1] + control.height / 2f
+        val now = SystemClock.uptimeMillis()
+        for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
+            val event = MotionEvent.obtain(now, now, action, x, y, 0)
+            try {
+                assertTrue(root.dispatchTouchEvent(event))
+            } finally {
+                event.recycle()
+            }
         }
     }
 

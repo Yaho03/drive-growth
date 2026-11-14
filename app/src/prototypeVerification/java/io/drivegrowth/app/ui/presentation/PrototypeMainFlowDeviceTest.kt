@@ -16,6 +16,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.TextView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.host.HostPage
@@ -45,6 +46,9 @@ import io.drivegrowth.app.ui.shop.ShopView
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.EpochMillis
 import io.drivegrowth.core.contract.RequestId
+import io.drivegrowth.core.contract.GameChange
+import io.drivegrowth.core.contract.MoneyChange
+import io.drivegrowth.core.contract.MoneyDirection
 import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.GachaTicketUse
 import io.drivegrowth.core.contract.InputSource
@@ -521,7 +525,7 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                 !host.isDestroyed && decor.width == width && decor.height == height && host.hasWindowFocus()
             }
         }
-        fun awaitHome() = await("HOME 지도·크림 HUD·메뉴 6개", timeoutMillis = 30_000) {
+        fun awaitHome() = await("HOME 지도·남색 HUD·메뉴 6개", timeoutMillis = 30_000) {
             val root = host.window.decorView
             root.isMainPageShown(HostPage.HOME) && button(host, "shop:map-hud")?.isShown == true &&
                 button(host, "shop:map-settings")?.isShown == true &&
@@ -553,11 +557,15 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                     close.isEnabled && close.getGlobalVisibleRect(bounds) &&
                     bounds.height() >= 48 * close.resources.displayMetrics.density
             }
-            if (page == HostPage.COLLECTION) {
-                await("로드된 차량 행 $name", timeoutMillis = 30_000) {
-                    button(host, "collection:model:hyundai_casper")?.isShown == true ||
-                        button(host, "collection:next")?.isLaidOut == true
-                }
+            val readyTag = when (page) {
+                HostPage.GARAGE -> "garage:list"
+                HostPage.COLLECTION -> "collection:scroll"
+                HostPage.GACHA -> "gacha:option:paid"
+                HostPage.RESULTS -> "results:list"
+                else -> null
+            }
+            if (readyTag != null) {
+                await("조회가 끝난 기능 $page", timeoutMillis = 30_000) { button(host, readyTag)?.isShown == true }
             }
             capture(host, name)
         }
@@ -566,17 +574,42 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             awaitTitle()
             capture(host, "pr300-title-wide")
             touchStart(host)
-            for (tag in listOf(R.string.onboarding_start, VehicleId("hyundai_casper"),
-                R.string.onboarding_review, R.string.onboarding_confirm, R.string.onboarding_to_shop)) {
-                clickOnboarding(host, tag)
-            }
+            clickOnboarding(host, R.string.onboarding_start)
+            await("첫 차량 후보") { button(host, VehicleId("hyundai_casper"))?.isShown == true }
+            capture(host, "pr300-onboarding-wide")
+            for (tag in listOf(VehicleId("hyundai_casper"), R.string.onboarding_review,
+                R.string.onboarding_confirm, R.string.onboarding_to_shop)) clickOnboarding(host, tag)
             awaitHome()
             capture(host, "pr300-home-wide")
+            click(host, "shop:map-settings")
+            await("설정 창과 닫기") {
+                button(host, "host:settings-close")?.isShown == true &&
+                    host.window.decorView.mainNavigation()?.isShown != true
+            }
+            capture(host, "pr300-settings-wide")
+            click(host, "shop:map-facilities")
+            await("설정에서 연 시설과 확장") { button(host, "shop:map-sheet-close")?.isShown == true }
+            capture(host, "pr300-facilities-wide")
+            click(host, "shop:map-sheet-close")
+            awaitHome()
+            var vehicleTag: String? = null
+            await("HOME 차량 지도 터치 대상") {
+                vehicleTag = descendants(host.window.decorView).firstOrNull {
+                    it.isShown && it.tag?.toString()?.startsWith("shop:map-vehicle:") == true
+                }?.tag as? String
+                vehicleTag != null
+            }
+            click(host, checkNotNull(vehicleTag))
+            await("지도 차량 상세") { button(host, "map:vehicle-manage")?.isShown == true }
+            capture(host, "pr300-map-detail-wide")
+            click(host, "map:vehicle-close")
+            awaitHome()
             renderPage("pr300-garage-wide", HostPage.GARAGE)
             renderPage("pr300-collection-wide", HostPage.COLLECTION)
             renderPage("pr300-results-wide", HostPage.RESULTS)
             renderPage("pr300-delivery-wide", HostPage.DELIVERY)
             renderPage("pr300-gacha-wide", HostPage.GACHA)
+            renderPage("pr300-record-wide", HostPage.RANKING)
             resize(480, 700)
             renderPage("pr300-garage-portrait", HostPage.GARAGE)
             renderPage("pr300-collection-portrait", HostPage.COLLECTION)
@@ -1118,6 +1151,146 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
             assertNotNull(host.window.decorView.mainNavigation())
             assertTrue(button(host, "simulation:controls")?.isShown == false)
         }
+    }
+
+    fun testIncomeAndPurchaseDeliveryAcceptThroughVisibleControls() {
+        val context = instrumentation.targetContext
+        checkIsolatedPackage(context.packageName)
+        val preferences = context.getSharedPreferences("unified-simulation-v1", 0)
+        assertFalse("최초 목적지가 미확정인 격리 원장이 필요하다",
+            preferences.getBoolean("destinationConfirmed", false))
+        val games = GameSessionFactory(context,
+            mapOf(InputSource.SIMULATION to "unified-simulation.db"), InputSource.SIMULATION)
+        val startingWithFirstGrant = !context.getDatabasePath("unified-simulation.db").exists() ||
+            (games.open() as? ContractResult.Success)?.value?.use { game ->
+                ok(game.store.listOwnedVehicles()).isEmpty()
+            } != false
+        val host = launchActivity(Intent(context, UnifiedSimulationActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        try {
+            await("탁송 검증에 사용할 상점 또는 첫 안내", timeoutMillis = 30_000) {
+                val start = button(host, "presentation:start")
+                if (start?.isEnabled == true && start.isShown && start.isLaidOut && start.alpha > .55f &&
+                    host.hasWindowFocus()) touchView(host, start)
+                if (startingWithFirstGrant) button(host, R.string.onboarding_start)?.let { it.isEnabled && it.isShown } == true
+                else button(host, "shop:map-balance")?.isShown == true
+            }
+            if (startingWithFirstGrant) {
+                for (tag in listOf(R.string.onboarding_start, VehicleId("hyundai_casper"), R.string.onboarding_review,
+                    R.string.onboarding_confirm, R.string.onboarding_to_shop)) clickOnboarding(host, tag)
+            }
+            await("모의 입력의 주차 조작 허용") {
+                host.window.decorView.isMainPageShown(HostPage.HOME) &&
+                    host.window.decorView.mainNavigation()?.isShown == true &&
+                    button(host, "simulation:blocked")?.isShown != true
+            }
+            val size = onUiValue { "${host.window.decorView.width}x${host.window.decorView.height}" }
+            fun frame(phase: String) = capture(host, "delivery-$size-$phase")
+            fun touch(tag: String) {
+                await("실제 터치 $tag", diagnostic = {
+                    onUiValue {
+                        val view = button(host, tag)
+                        val visible = Rect()
+                        view?.getGlobalVisibleRect(visible)
+                        "모의 제한=${button(host, "simulation:blocked")?.isShown} " +
+                            "버튼=${view?.isShown}/${view?.isEnabled} ${view?.width}×${view?.height} $visible"
+                    }
+                }) {
+                    val view = button(host, tag) ?: return@await false
+                    val visible = Rect()
+                    if (!host.hasWindowFocus() || button(host, "simulation:blocked")?.isShown == true ||
+                        !view.isEnabled || !view.isShown || !view.isLaidOut || !view.getGlobalVisibleRect(visible) ||
+                        visible.width() < view.width || visible.height() < view.height || view.height == 0) return@await false
+                    touchView(host, view)
+                    true
+                }
+            }
+            fun selectedOffer(purchase: Boolean): DeliveryOffer {
+                val delivery = (host.onRetainNonConfigurationInstance() as HostSession).delivery
+                lateinit var selected: DeliveryOffer
+                await("확정 가능한 탁송 후보") {
+                    val current = (delivery.state?.screen as? DeliveryScreen.Offers)?.proposal ?: return@await false
+                    if (delivery.isSavingDisplayedOffers) return@await false
+                    selected = current.proposed.offers.firstOrNull {
+                        (it is DeliveryOffer.Purchase) == purchase && current.availability[it.id]?.allowed == true &&
+                            button(host, "delivery:offer:${it.id.value}")?.isShown == true
+                    } ?: return@await false
+                    true
+                }
+                return selected
+            }
+            assertNull(ok(games.open()).use { game -> ok(game.store.delivery.inProgress()) })
+            openPage(host, HostPage.DELIVERY)
+            await("모의 목적지와 거리", diagnostic = {
+                onUiValue {
+                    val screen = (host.onRetainNonConfigurationInstance() as HostSession).delivery.state?.screen
+                    "탁송=${screen?.javaClass?.simpleName}, 최초확정=${preferences.getBoolean("destinationConfirmed", false)}, " +
+                        "표시=${descendants(host.window.decorView).filterIsInstance<TextView>().filter { it.isShown }.map { it.text }.toList()}"
+                }
+            }) {
+                val labels = descendants(host.window.decorView).filterIsInstance<TextView>()
+                    .filter { it.isShown }.map { it.text.toString() }.toList()
+                button(host, "simulation:blocked")?.isShown != true &&
+                    labels.contains("모의 목적지 · 렌터카 물류 거점") &&
+                    labels.any { it.startsWith("예상 거리 ") && it.contains("36") } &&
+                    button(host, "simulation:destination")?.isShown == true &&
+                    button(host, "delivery:destination") == null
+            }
+            frame("destination")
+            touch("simulation:destination")
+            val income = selectedOffer(purchase = false)
+            frame("income-candidates")
+            touch("delivery:offer:${income.id.value}")
+            frame("income-review")
+            touch("delivery:confirm")
+            await("수익 탁송 출발") { button(host, "delivery:scene:DEPARTURE")?.isShown == true }
+            val incomeRoute = ok(games.open()).use { game ->
+                requireNotNull(ok(game.store.delivery.inProgress())).also { assertEquals(income, it.active.offer) }
+            }
+            frame("income-departure")
+            touch("delivery:confirm-scene")
+            touch("delivery:review-abandon")
+            touch("delivery:abandon")
+            touch("delivery:acknowledge")
+            await("수익 탁송이 닫힘") {
+                button(host, "delivery:tab:purchase")?.isShown == true ||
+                    button(host, "simulation:destination")?.isShown == true
+            }
+            // 구매 버튼을 검증하기 위한 시험 잔액. 앱의 실제 구매 명령은 아래에서 누른다.
+            val balance = ok(games.open()).use { game ->
+                assertNull(ok(game.store.delivery.inProgress()))
+                assertTrue(ok(game.store.listUnviewedSettlements()).none {
+                    it.transaction.requestId == incomeRoute.active.requestId
+                })
+                val credit = GameChange(RequestId("delivery-touch-fixture-credit"), TransactionKind.GARAGE,
+                    InputSource.SIMULATION, ok(game.content).ruleVersion,
+                    MoneyChange(MoneyDirection.CREDIT, GameMoney(10_000)))
+                ok(game.store.commitGameChange(credit)).balance
+            }
+            onUi { host.onBackPressed() }
+            openPage(host, HostPage.DELIVERY)
+            await("구매 후보 진입") {
+                button(host, "delivery:tab:purchase")?.isShown == true ||
+                    button(host, "simulation:destination")?.isShown == true
+            }
+            if (onUiValue { button(host, "simulation:destination")?.isShown == true }) touch("simulation:destination")
+            touch("delivery:tab:purchase")
+            val purchase = selectedOffer(purchase = true) as DeliveryOffer.Purchase
+            frame("purchase-candidates")
+            touch("delivery:offer:${purchase.id.value}")
+            frame("purchase-review")
+            touch("delivery:confirm")
+            await("구매 탁송 출발") { button(host, "delivery:scene:DEPARTURE")?.isShown == true }
+            frame("purchase-departure")
+            ok(games.open()).use { game ->
+                val active = requireNotNull(ok(game.store.delivery.inProgress())).active
+                assertEquals(purchase, active.offer)
+                assertEquals(GameMoney(balance.units - purchase.price.units), ok(game.store.balance()))
+                val payment = ok(game.store.listUnviewedSettlements()).single { it.transaction.requestId == active.requestId }
+                assertEquals(MoneyChange(MoneyDirection.DEBIT, purchase.price), payment.transaction.money)
+                assertNull(payment.changedVehicle)
+            }
+        } finally { finishHost(host) }
     }
 
     private fun verifyDeliveryDeparture(host: UnifiedSimulationActivity, games: GameSessionFactory) {

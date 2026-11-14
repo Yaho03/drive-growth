@@ -124,7 +124,7 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
 
     private fun vehicleList(data: GarageContent, compact: Boolean): LinearLayout = with(style) {
         column().apply {
-            addView(text(data.capacityLabel ?: s(R.string.garage_capacity_unknown), 17, bold = true).apply {
+            addView(text(data.capacityLabel ?: s(R.string.garage_capacity_unknown), 20, bold = true).apply {
                 background = shape(panel)
                 setPadding(dp(16), dp(6), dp(16), dp(6))
             }, LayoutParams(-2, -2))
@@ -148,7 +148,7 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
                 repeat(columns - vehicles.size) {
                     line.addView(View(context), LayoutParams(0, 1, 1f).apply { marginStart = dp(16) })
                 }
-                add(this, line, 16)
+                add(this, line, 10)
             }
         }
     }
@@ -183,11 +183,12 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
         val selectionEnabled = !interaction.requestPending
         val title = vehicleDisplayName(value.name, value.instanceLabel)
         card(selected).apply {
-            val artHeight = if (compact) 66 else 116
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            val artHeight = if (compact) 58 else 92
             val art = artwork.view(value.vehicle.vehicleId, value.vehicle.rarity, artHeight, showRing = false)
                 .apply { background = null }
             val labels = column().apply {
-                addView(text(title, 20, bold = true))
+                addView(text(title, 23, bold = true))
                 addView(rarityChip(value.vehicle.rarity), LayoutParams(-2, -2))
                 if (compact && selected) {
                     addView(text(s(R.string.garage_selected), 14, bold = true), LayoutParams(-2, -2))
@@ -220,6 +221,8 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
                 interaction.select(value.vehicle.ownedVehicleId); drawScreen()
             }.apply {
                 tag = value.vehicle.ownedVehicleId
+                textSize = 18f
+                minimumHeight = maxOf(minimumHeight, dp(52))
                 isSelected = selected
                 contentDescription = "$title, ${s(R.string.garage_select)}"
             })
@@ -238,8 +241,8 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
                 return@apply
             }
             val facts = card().apply {
-                addView(artwork.view(value.vehicle.vehicleId, value.vehicle.rarity, 166).apply { background = null },
-                    LayoutParams(-1, dp(166)))
+                addView(artwork.view(value.vehicle.vehicleId, value.vehicle.rarity, 106).apply { background = null },
+                    LayoutParams(-1, dp(106)))
                 if (!artwork.hasSprite(value.vehicle.vehicleId))
                     addView(text(s(R.string.garage_art_placeholder), 14, muted))
                 addView(text(vehicleDisplayName(value.name, value.instanceLabel), 26, bold = true))

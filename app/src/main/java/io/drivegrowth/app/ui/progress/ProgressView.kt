@@ -36,7 +36,7 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
     }
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        val next = w >= style.dp(1000)
+        val next = w >= style.dp(1000) && resources.configuration.fontScale <= 1.3f
         if (next != wide) { wide = next; post { drawScreen() } }
     }
     private fun s(id: Int) = context.getString(id)
@@ -47,7 +47,7 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
     private fun drawScreen(): Unit = with(style) {
         scroll?.let(::rememberScrollPosition)
         val focusedTag = findFocus()?.tag
-        scroll = null; removeAllViews(); setPadding(dp(24), dp(16), dp(24), dp(16))
+        scroll = null; removeAllViews(); setPadding(dp(12), dp(8), dp(12), dp(8))
         if (!interaction.controlsEnabled) {
             addView(statusCard(s(R.string.progress_restricted), s(R.string.progress_restricted_body)))
             return@with
@@ -112,7 +112,7 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
     private fun statusCard(title: String, message: String) = with(style) {
         card().apply {
             addView(text(title, 22, bold = true))
-            addView(text(message, 16, muted))
+            addView(text(message, 18, muted))
         }
     }
 
@@ -135,7 +135,7 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
         items(right, state.entries.filter { it.group == ProgressGroup.ACHIEVEMENT })
         if (wide) {
             val columns = row()
-            columns.addView(left, LayoutParams(0, -2, 1f).apply { marginEnd = dp(20) })
+            columns.addView(left, LayoutParams(0, -2, 1f).apply { marginEnd = dp(12) })
             columns.addView(right, LayoutParams(0, -2, 1f)); add(body, columns)
         } else { add(body, left); add(body, right) }
         add(body, text(s(R.string.progress_events), 26, bold = true))
@@ -196,9 +196,9 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
             item.status == RewardStatus.CLAIMED && !interaction.isPending(item) -> green
             else -> muted
         }
-        text(status(item, canClaim), 16, color = color, bold = true).apply {
+        text(status(item, canClaim), 18, color = color, bold = true).apply {
             background = surface(selected = canClaim)
-            setPadding(dp(12), dp(6), dp(12), dp(6))
+            setPadding(dp(10), dp(4), dp(10), dp(4))
         }
     }
     private fun status(item: ProgressItem, canClaim: Boolean): String = s(if (interaction.isPending(item)) R.string.progress_pending else when (item.status) {
