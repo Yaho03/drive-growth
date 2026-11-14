@@ -18,6 +18,9 @@ import io.drivegrowth.app.ui.pixel.PixelStyle
 import io.drivegrowth.app.ui.pixel.VehicleSprites
 import io.drivegrowth.core.contract.VehicleId
 
+private const val UPPER_LANE = 7f    // highway.png에서 위 차선 가운데 (Y − X/2)
+private const val LOWER_LANE = 86f   // 아래 차선 가운데. 연석 −33, 점선 47, 연석 125 사이
+
 private val TRAFFIC_IDS = listOf("hyundai_casper", "hyundai_casper_electric", "hyundai_venue", "hyundai_kona", "hyundai_avante",
     "hyundai_sonata", "hyundai_grandeur", "hyundai_ioniq5", "hyundai_ioniq6", "hyundai_ioniq9", "hyundai_nexo", "hyundai_tucson",
     "hyundai_santafe", "hyundai_palisade", "hyundai_staria_tourer", "hyundai_staria_lounge", "genesis_g80", "genesis_g90", "genesis_gv70", "genesis_gv80")
@@ -187,9 +190,9 @@ internal class DeliveryMotionView(
         }
         fun vx(x: Float) = x * sc
         fun vy(y: Float) = top + y * sc
-        fun lane(x: Float) = 774f + x / 2f
+        fun lane(x: Float) = 733f + x / 2f   // 아래 도로 가운데(점선). 차가 도로보다 커서 한 차선에 넣으면 연석 밖으로 나간다
         fun ease(t: Float) = 1f - (1f - t) * (1f - t) * (1f - t)
-        val stop = 430f
+        val stop = 380f   // 트럭 바퀴까지 마을 그림 안에 들어오는 자리
         val truckTown = if (departure) when {
             p < 0.26f -> mix(-300f, stop, ease(phase(p, 0f, 0.26f)))
             p > 0.72f -> mix(stop, 1100f, phase(p, 0.72f, 1f).let { it * it })
@@ -197,16 +200,16 @@ internal class DeliveryMotionView(
         } else mix(-300f, stop, ease(phase(p, 0f, 0.36f)))
         // 정차할 때 앞으로 살짝 쏠렸다 돌아온다
         val lean = if (p in 0.24f..0.34f) -2f * kotlin.math.sin(Math.PI.toFloat() * phase(p, 0.24f, 0.34f)) else 0f
-        val truckX = vx(truckTown); val truckBottom = vy(lane(truckTown)) + 14f + lean
-        val bedX = truckX - 22f; val bedBottom = truckBottom - 22f
+        val truckX = vx(truckTown); val truckBottom = vy(lane(truckTown)) + foot(artwork.truck, 146f) + lean
         val transition = phase(p, if (departure) 0.36f else 0.43f, if (departure) 0.68f else 0.75f)
         val onBed = if (departure) transition else 1f - transition
         val sprite = artwork.vehicle(scene.details.vehicleId)
+        val bedX = truckX - bedDx(146f); val bedBottom = truckBottom - bedDy(146f) + 0.25f * height(sprite, 70f)
         // 땅 위 자리: 출발은 경사판 앞 도로, 구매 도착은 첫 주차 칸, 수익 도착은 건물 앞
         val groundX: Float; val groundBottom: Float
         when (scene.kind) {
-            DeliverySceneKind.VEHICLE_ARRIVAL -> { groundX = vx(253f); groundBottom = vy(635f) + 14f }
-            else -> { val gx = stop - 190f; groundX = vx(gx); groundBottom = vy(lane(gx)) + 12f }
+            DeliverySceneKind.VEHICLE_ARRIVAL -> { groundX = vx(253f); groundBottom = vy(635f) + foot(sprite, 70f) }
+            else -> { val gx = stop - 190f; groundX = vx(gx); groundBottom = vy(lane(gx)) + foot(sprite, 70f) }
         }
         if (onBed < 1f) {
             if (scene.kind == DeliverySceneKind.HELD && p >= 0.75f) {
@@ -288,7 +291,8 @@ internal class DeliveryMotionView(
         }
         val truckX = 221f
         val shake = if (elapsed > 0 && elapsed / 110 % 2 == 0L) 1.5f else 0f
-        val bottom = h * 0.68f - shake
+        val roadTop = (h - 220) / 2f   // highway.png 점 (X,Y)는 화면 y = roadTop + 0.52·(Y − X/2) + x/2 (흐르는 만큼 상쇄)
+        val bottom = roadTop + artScale * UPPER_LANE + truckX / 2f + foot(artwork.truck, 158f) - shake
         if (elapsed > 0) for (index in 0..2) {
             val trail = (elapsed / 650f + index / 3f) % 1f
             val x = truckX - 67f - trail * 40f
@@ -296,15 +300,16 @@ internal class DeliveryMotionView(
             rect(c, x, y, x + 5f, y + 5f, 0xfff0ead8.toInt())
         }
         image(c, artwork.truck, truckX, bottom, 158f)
-        image(c, artwork.vehicle(highway.details.vehicleId), truckX - 25, bottom - 29f, 75f)
-        drawTraffic(c, elapsed, truckX, bottom)   // 아래 차선이 화면 앞쪽이라 트럭 위에 그린다
+        val carried = artwork.vehicle(highway.details.vehicleId)
+        image(c, carried, truckX - bedDx(158f), bottom - bedDy(158f) + 0.25f * height(carried, 75f), 75f)
+        drawTraffic(c, elapsed, roadTop + artScale * LOWER_LANE)   // 아래 차선이 화면 앞쪽이라 트럭 위에 그린다
     }
 
     /**
      * HTML처럼 옆 차선(먼 쪽)에 차종·빠르기가 매번 다른 차가 지나간다. 빠른 차는 뒤에서 와서 앞지르고, 느린 차는 앞에서 나타나 뒤로 처진다.
-     * 앞차에 가까워지면 앞차 빠르기로 따라가고, 달리는 동안 1~2픽셀 떨며 뒤로 작은 먼지를 남긴다. 트럭은 위 차선, 옆 차는 아래 차선(24 아래), 기울기 1/2.
+     * 앞차에 가까워지면 앞차 빠르기로 따라가고, 달리는 동안 1~2픽셀 떨며 뒤로 작은 먼지를 남긴다. 트럭은 위 차선, 옆 차는 아래 차선 가운데를 따라 기울기 1/2로 달린다.
      */
-    private fun drawTraffic(c: Canvas, elapsed: Long, truckX: Float, truckBottom: Float) {
+    private fun drawTraffic(c: Canvas, elapsed: Long, laneY: Float) {
         val dt = if (lastTraffic == 0L || elapsed < lastTraffic) 0f else ((elapsed - lastTraffic) / 1000f).coerceAtMost(0.1f)
         lastTraffic = elapsed
         if (elapsed >= nextCar) {
@@ -319,14 +324,15 @@ internal class DeliveryMotionView(
         traffic.forEach { it.x += it.v * dt }
         traffic.removeAll { it.x < -120f || it.x > 620f }
         for (car in traffic) {
-            val bottom = truckBottom + 24f + (car.x - truckX) / 2f
+            val sprite = artwork.vehicle(VehicleId(car.id))
+            val bottom = laneY + car.x / 2f + foot(sprite, 60f)
             val bob = if (((elapsed / 90 + car.seed).toInt()) % 2 == 0) 1f else 0f
             for (i in 0..2) {   // 먼지
                 val life = ((elapsed / 600f + i / 3f + car.seed) % 1f)
                 val dx = car.x - 30f - life * 26f
                 rect(c, dx, bottom - 6f - life * 12f, dx + 4f, bottom - 2f - life * 12f, (((1f - life) * 170).toInt() shl 24) or 0xf0ead8)
             }
-            image(c, artwork.vehicle(VehicleId(car.id)), car.x, bottom - bob, 60f)
+            image(c, sprite, car.x, bottom - bob, 60f)
         }
     }
 
@@ -335,6 +341,14 @@ internal class DeliveryMotionView(
         rect(c, x - 24, y - 30, x + 24, y - 23, 0xffc39a63.toInt())
         rect(c, x - 4, y - 30, x + 4, y - 18, PixelStyle.gold)
     }
+
+    /** 쿼터뷰 차 그림의 바닥 가운데는 그림 아래끝에서 높이의 0.4 위. 차선 가운데 y에 이만큼 더하면 그림 아래끝이 된다. */
+    private fun foot(bitmap: Bitmap?, width: Float) = 0.4f * height(bitmap, width)
+    private fun height(bitmap: Bitmap?, width: Float) = if (bitmap == null) 0f else bitmap.height * width / bitmap.width
+
+    /** truck.png(132×72) 짐칸 윗면 가운데는 그림 가운데에서 왼쪽 8, 아래끝에서 위로 47. 실은 차는 바퀴가 이 면에 닿게 높이의 0.25만큼 내린다. */
+    private fun bedDx(truckWidth: Float) = 8f * truckWidth / 132f
+    private fun bedDy(truckWidth: Float) = 47f * truckWidth / 132f
 
     private fun image(c: Canvas, bitmap: Bitmap?, x: Float, bottom: Float, width: Float) {
         if (bitmap == null) return
