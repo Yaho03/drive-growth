@@ -556,7 +556,7 @@ const CUE = [[/끽/,"brake"],[/쿵|쾅/,"shutter"],[/덜컹/,"knock"],[/부릉|�
 function sfx(name){ if(SFX[name]) return SFX[name](); for(const [re,k] of CUE){ const m=re.exec(name); if(m) return SFX[k](m[1]&&+m[1]); } }   // 연출의 SFX 자리 글귀도 받는다
 window.sfx = sfx;
 const BGM = {el:Object.assign(new Audio(),{loop:true,volume:.45}), cur:null,
-  of:{title:"title", shop:"shop", garage:"shop", detail:"shop", dex:"shop", rank:"shop", gacha:"gacha", delivery:"delivery", settle:"settle"}};
+  of:{title:"title", shop:"shop", garage:"shop", detail:"shop", dex:"shop", rank:"shop", gacha:"gacha", delivery:"delivery", settle:"settle", rest:"rest"}};
 BGM.el.addEventListener("error", ()=>{ BGM.cur=null; });   // 파일이 없으면 조용히 넘어간다
 function bgm(view){ const name=BGM.of[view]||"shop"; if(!AU.on){ BGM.el.pause(); BGM.cur=null; return; }
   if(BGM.cur===name) return; BGM.cur=name; BGM.el.src=`bgm/${name}.mp3`; BGM.el.play().catch(()=>{}); }   // 첫 손길 전엔 play()가 거부돼도 그냥 넘어간다
@@ -640,7 +640,7 @@ const ACT = {
     window.playMotion("gacha",{tier:TIER_OF[r], name:m.name, car:carData(m.id), isNew:r!=="common", guaranteed:r==="rare", price:String(TICKET),
       pity:"희귀 이상 보장까지 12회", pityAfter:r==="rare"||r==="legend"?"다음 보장까지 30회":"희귀 이상 보장까지 11회", canAgain:false,
       onAgain:()=>{}, onGarage:()=>window.closeMotion()}, {reduced}); },
-  demoRest(k){ if(!canMotion()) return toast("연출을 불러오는 중이에요"); BGM.el.pause(); BGM.cur=null;   // 연출이 빗소리·재즈를 직접 낸다
+  demoRest(k){ if(!canMotion()) return toast("연출을 불러오는 중이에요"); bgm("rest");   // 휴게소 브금(bgm/rest.mp3). 빗소리·와이퍼 같은 효과음은 연출이 직접 낸다
     window.playMotion("rest",{state:k==="blanket"?"ok":k, variant:k==="blanket"?"blanket":"rururu", sound:AU.on, onClose:()=>{ window.closeMotion(); render(); }}); },
   demoMotion(k){ if(!canMotion()) return toast("연출을 불러오는 중이에요"); const close=()=>window.closeMotion();
     if(k==="grant") window.playMotion("grant",{money:1000, name:"캐스퍼", car:carData("hyundai_casper"), onClose:close});

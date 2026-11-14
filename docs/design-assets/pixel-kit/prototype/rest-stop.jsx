@@ -68,7 +68,7 @@ function RestStop({ t, d, reduced }) {
   React.useEffect(() => {
     const g = cv.current && cv.current.getContext('2d'); if (!g) return;
     g.imageSmoothingEnabled = false; g.drawImage(RS.render(T, opts), 0, 0);
-    window.RestStopSound.update(T, true, { reduced, jazz: true });
+    window.RestStopSound.update(T, true, { reduced, jazz: false });   // 재즈는 휴게소 브금 파일이 맡는다
   });
   const appear = RS.cardProgress(T, reduced);
   return (
