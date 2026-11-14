@@ -334,7 +334,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             this.tag = tag
             backgroundTintList = null
             background = hud.signButton(primary)
-            setTextColor(if (!available) panels.muted else if (primary) android.graphics.Color.WHITE else hud.signInk)
+            setTextColor(if (!available) panels.muted else if (primary) io.drivegrowth.app.ui.pixel.CleanUi.ON_PRIMARY else hud.signInk)
             if (description != null) contentDescription = description
         }, PixelStyle.gapDp)
     }

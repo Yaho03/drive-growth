@@ -48,7 +48,7 @@ internal class ResultsStyle(private val context: Context) {
     fun button(label: String, enabled: Boolean = true, primary: Boolean = false, action: () -> Unit) = Button(context).apply {
         text = label; textSize = 18f; isAllCaps = false; isEnabled = enabled
         setTypeface(typeface, Typeface.BOLD)
-        setTextColor(if (!enabled) muted else if (primary) android.graphics.Color.WHITE else ink)
+        setTextColor(if (!enabled) muted else if (primary) CleanUi.ON_PRIMARY else ink)
         backgroundTintList = null
         background = hud.signButton(primary)
         minHeight = dp(52); minimumHeight = dp(52)

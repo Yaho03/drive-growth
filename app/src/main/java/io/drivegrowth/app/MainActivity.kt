@@ -403,10 +403,11 @@ open class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(style.dp(14), style.dp(8), style.dp(10), style.dp(8))
             // 창 위 바다색 머리띠
-            background = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(io.drivegrowth.app.ui.pixel.CleanUi.SEA_LIGHT, io.drivegrowth.app.ui.pixel.CleanUi.SEA)).apply {
-                cornerRadius = style.dp(14).toFloat()
-            }
+            background = android.graphics.drawable.LayerDrawable(arrayOf(
+                android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(0xff1d3d69.toInt(), 0xff142c4f.toInt())).apply { cornerRadius = style.dp(10).toFloat() },
+                android.graphics.drawable.GradientDrawable().apply { setColor(io.drivegrowth.app.ui.pixel.CleanUi.SEA) },
+            )).apply { setLayerGravity(1, Gravity.BOTTOM or Gravity.FILL_HORIZONTAL); setLayerHeight(1, style.dp(2)); setLayerInsetLeft(1, style.dp(10)); setLayerInsetRight(1, style.dp(10)) }
             addView(pageTitle, LinearLayout.LayoutParams(0, -2, 1f))
             addView(pageActions, LinearLayout.LayoutParams(-2, -2))
         }

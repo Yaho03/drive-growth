@@ -19,7 +19,7 @@ internal class ProgressStyle(private val context: Context) {
     val ink get() = hud.signInk
     val muted get() = panels.muted
     val green get() = panels.accent
-    val amber = 0xffb5650a.toInt()
+    val amber = 0xffffc52e.toInt()
 
     fun icon(icon: ReferenceHudIcon) = hud.icon(icon, 28)
     fun surface(selected: Boolean = false) = hud.detailSurface(selected)
@@ -40,7 +40,7 @@ internal class ProgressStyle(private val context: Context) {
     }
     fun button(label: String, enabled: Boolean = true, primary: Boolean = false, action: () -> Unit) = Button(context).apply {
         text = label; textSize = 22f; isAllCaps = false; isEnabled = enabled
-        setTextColor(if (!enabled) muted else if (primary) android.graphics.Color.WHITE else ink)
+        setTextColor(if (!enabled) muted else if (primary) CleanUi.ON_PRIMARY else ink)
         backgroundTintList = null
         background = hud.signButton(primary)
         setTypeface(typeface, Typeface.BOLD)

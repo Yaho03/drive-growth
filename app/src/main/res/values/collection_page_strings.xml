@@ -7,7 +7,4 @@
     <string name="garage_collection_filter_discovered">발견</string>
     <string name="garage_collection_filter_empty">이 상태에 해당하는 차종이 없어요</string>
     <string name="garage_collection_unlock_level">가게 Lv%1$d 해금</string>
-    <string name="garage_collection_previous">‹ 이전</string>
-    <string name="garage_collection_next">다음 ›</string>
-    <string name="garage_collection_page">%1$d / %2$d</string>
 </resources>

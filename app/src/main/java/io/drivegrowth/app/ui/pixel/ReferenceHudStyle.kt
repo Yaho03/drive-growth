@@ -18,22 +18,22 @@ import android.graphics.drawable.StateListDrawable
  * 흰 카드 + 옅은 그림자 + 남색 글씨 + 바다색 강조 + 노란 주 버튼. 이름(sign…)은 기존 호출부를 바꾸지 않으려고 유지한다.
  */
 internal class ReferenceHudStyle(private val context: Context) {
-    val outline = 0xffd5deea.toInt()
+    val outline = CleanUi.LINE
     fun dp(value: Int) = (value * context.resources.displayMetrics.density + .5f).toInt()
 
     fun surface(radius: Int = 14, selected: Boolean = false, focused: Boolean = false) = GradientDrawable(
         GradientDrawable.Orientation.TOP_BOTTOM,
-        if (selected) intArrayOf(CleanUi.SEA_LIGHT, CleanUi.SEA) else intArrayOf(0xf2ffffff.toInt(), 0xf2f3f7fc.toInt()),
+        if (selected) intArrayOf(CleanUi.SUN, CleanUi.SUN_DEEP) else intArrayOf(0xe61a3358.toInt(), 0xe6112645.toInt()),
     ).apply {
         cornerRadius = dp(radius).toFloat()
-        setStroke(dp(if (focused) 2 else 1), if (selected || focused) CleanUi.SEA else outline)
+        setStroke(dp(if (focused) 2 else 1), if (focused) CleanUi.SEA else if (selected) 0xffffe08a.toInt() else outline)
     }
 
     fun buttonSurface(selected: Boolean = false, outlined: Boolean = true) = StateListDrawable().apply {
         addState(intArrayOf(android.R.attr.state_focused), surface(selected = selected, focused = true))
         addState(intArrayOf(android.R.attr.state_pressed), surface(selected = true))
         addState(intArrayOf(), if (selected || outlined) surface(selected = selected)
-            else GradientDrawable().apply { setColor(0x00ffffff) })
+            else GradientDrawable().apply { setColor(0x00000000) })
     }
 
     /** 카드 위 글씨 색(짙은 남색). */
@@ -57,17 +57,22 @@ internal class ReferenceHudStyle(private val context: Context) {
 
 /** 깔끔한 화면의 공통 색. */
 internal object CleanUi {
-    const val INK = 0xff1b2b3f.toInt()
-    const val MUTED = 0xff667689.toInt()
-    const val SEA = 0xff1f7ac4.toInt()
-    const val SEA_LIGHT = 0xff4aa8ea.toInt()
-    const val SEA_DEEP = 0xff0f3d63.toInt()
-    const val SUN = 0xffffc83a.toInt()
-    const val SUN_DEEP = 0xfff2a40c.toInt()
-    const val CARD = 0xffffffff.toInt()
-    const val CARD_SOFT = 0xfff3f7fc.toInt()
-    const val CHIP = 0xffedf3f9.toInt()
-    const val LINE = 0xffd5deea.toInt()
+    /** 판 위 글씨(흰색)와 보조 글씨. */
+    const val INK = 0xfff4f8ff.toInt()
+    const val MUTED = 0xffa6bcd6.toInt()
+    /** 하늘색 강조(수치·선택 테두리·진행 막대). */
+    const val SEA = 0xff2cc6ef.toInt()
+    const val SEA_LIGHT = 0xff7ae4ff.toInt()
+    const val SEA_DEEP = 0xff12305a.toInt()
+    /** 노란 주 버튼과 그 위 글씨. */
+    const val SUN = 0xffffc52e.toInt()
+    const val SUN_DEEP = 0xfff09a0a.toInt()
+    const val ON_PRIMARY = 0xff1a2338.toInt()
+    /** 반투명 남색 판. */
+    const val CARD = 0xeb13284a.toInt()
+    const val CARD_SOFT = 0xff0d1d36.toInt()
+    const val CHIP = 0x2effffff
+    const val LINE = 0x59ffffff
 }
 
 /** 둥근 모서리·옅은 그림자·얇은 테두리의 카드. 버튼·칩·창이 같은 모양을 쓴다. */
@@ -86,21 +91,21 @@ private class CleanCard(
     override fun draw(canvas: Canvas) {
         val b = bounds
         if (b.isEmpty) return
-        val radius = density * when (kind) { Kind.PANEL -> 18f; Kind.CHIP, Kind.CHIP_ACTIVE -> 12f; else -> 14f }
+        val radius = density * when (kind) { Kind.PANEL -> 12f; Kind.CHIP, Kind.CHIP_ACTIVE -> 8f; else -> 10f }
         val lift = if (kind == Kind.PANEL || kind == Kind.PRIMARY || kind == Kind.BUTTON) density * (if (pressed) 1f else 2.5f) else 0f
         box.set(b.left.toFloat(), b.top.toFloat(), b.right.toFloat(), b.bottom - lift)
         if (lift > 0f) {   // 아래로 떨어지는 옅은 그림자
             paint.shader = null
-            paint.color = if (kind == Kind.PRIMARY) 0x551f5a8c else 0x26102a44
+            paint.color = if (kind == Kind.PRIMARY) 0x66a35f00 else 0x40000814
             canvas.drawRoundRect(box.left, box.top + lift, box.right, box.bottom + lift, radius, radius, paint)
         }
         val (top, bottom) = when (kind) {
-            Kind.PANEL -> 0xf7ffffff.toInt() to 0xf7f4f8fc.toInt()
-            Kind.CHIP -> CleanUi.CHIP to CleanUi.CHIP
-            Kind.CHIP_ACTIVE -> 0xffe2f1ff.toInt() to 0xffd4e9fb.toInt()
-            Kind.BUTTON -> if (pressed) 0xffe8eef5.toInt() to 0xffe8eef5.toInt() else CleanUi.CARD to 0xffeef3f8.toInt()
-            Kind.PRIMARY -> if (pressed) CleanUi.SEA_DEEP to CleanUi.SEA_DEEP else CleanUi.SEA_LIGHT to CleanUi.SEA
-            Kind.DISABLED -> 0xffe9edf2.toInt() to 0xffe2e7ed.toInt()
+            Kind.PANEL -> 0xeb1a3459.toInt() to 0xeb10233f.toInt()
+            Kind.CHIP -> 0x24ffffff to 0x14ffffff
+            Kind.CHIP_ACTIVE -> 0x592cc6ef to 0x402cc6ef
+            Kind.BUTTON -> if (pressed) 0xff0f2442.toInt() to 0xff0f2442.toInt() else 0xff27497a.toInt() to 0xff1b365e.toInt()
+            Kind.PRIMARY -> if (pressed) CleanUi.SUN_DEEP to CleanUi.SUN_DEEP else 0xffffd85a.toInt() to CleanUi.SUN
+            Kind.DISABLED -> 0x99223654.toInt() to 0x991a2b46.toInt()
         }
         paint.color = 0xff000000.toInt()   // 그림자 색의 투명도가 본 판에 남지 않게
         paint.alpha = alpha
@@ -109,9 +114,9 @@ private class CleanCard(
         paint.shader = null
         val stroke = when {
             focused -> CleanUi.SEA
-            kind == Kind.PRIMARY -> 0xff1a69ab.toInt()
-            kind == Kind.CHIP_ACTIVE -> 0xff8cc4ee.toInt()
-            kind == Kind.DISABLED -> 0xffd7dde5.toInt()
+            kind == Kind.PRIMARY -> 0xffffe08a.toInt()
+            kind == Kind.CHIP_ACTIVE -> CleanUi.SEA
+            kind == Kind.DISABLED -> 0x33ffffff
             else -> CleanUi.LINE
         }
         paint.style = Paint.Style.STROKE
@@ -120,8 +125,12 @@ private class CleanCard(
         val half = paint.strokeWidth / 2
         canvas.drawRoundRect(box.left + half, box.top + half, box.right - half, box.bottom - half, radius, radius, paint)
         paint.style = Paint.Style.FILL
+        if (kind == Kind.PANEL) {
+            paint.color = CleanUi.SEA
+            canvas.drawRoundRect(box.left + radius, box.top - density * .5f, box.left + radius + density * 28, box.top + density * 2.5f, density, density, paint)
+        }
         if (kind == Kind.PRIMARY && !pressed) {   // 위쪽 얇은 빛
-            paint.color = 0x4dffffff
+            paint.color = 0x80ffffff.toInt()
             canvas.drawRoundRect(box.left + density * 6, box.top + density * 2, box.right - density * 6, box.top + density * 4, density, density, paint)
         }
     }

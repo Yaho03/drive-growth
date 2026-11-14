@@ -48,8 +48,7 @@ class CollectionScrollDeviceTest : InstrumentationTestCase() {
         repeat(150) {
             instrumentation.waitForIdleSync()
             if (onUi { host.collection.isAttachedToWindow && !host.collection.isLayoutRequested && descendants(host.collection)
-                    .filterIsInstance<ScrollView>().all { it.isLaidOut } &&
-                    (host.collection.findViewWithTag<Button>("collection:next")?.isLaidOut != false) }) return
+                    .filterIsInstance<ScrollView>().all { it.isLaidOut } }) return
             Thread.sleep(20)
         }
         fail("도감의 실제 layout이 완료되지 않았다")
@@ -58,71 +57,48 @@ class CollectionScrollDeviceTest : InstrumentationTestCase() {
         onUi { host.collection.render(state, enabled) }
         waitForLayout()
     }
-    private fun pageLabel() = host.collection.findViewWithTag<TextView>("collection:page")?.text?.toString()
+    private fun scroller() = host.collection.findViewWithTag<ScrollView>("collection:scroll")
+    private fun scrollY() = scroller()?.scrollY
 
-    private fun advance(): String {
-        val before = onUi { pageLabel() }
-        onUi {
-            val next = host.collection.findViewWithTag<Button>("collection:next")
-            assertTrue(next.isEnabled)
-            assertTrue(next.performClick())
-        }
+    /** 도감을 아래로 내리고 그 위치를 돌려준다. 칸이 화면보다 길어 실제로 내려가야 한다. */
+    private fun scrollDown(): Int {
+        onUi { scroller().scrollTo(0, scroller().getChildAt(0).height) }
         waitForLayout()
-        return checkNotNull(onUi { pageLabel() }).also { assertTrue(it != before) }
+        return checkNotNull(onUi { scrollY() }).also { assertTrue("도감이 스크롤되지 않았다", it > 0) }
     }
 
-    fun testLoadingLayoutPreservesPage() {
-        val before = advance()
+    fun testAllVehiclesAreInOneScrollWithoutPager() {
+        assertNull(onUi { host.collection.findViewWithTag<Button>("collection:next") })
+        assertTrue(onUi { descendants(host.collection).filterIsInstance<TextView>().any { it.text.toString() == "GV80" } })
+    }
+
+    fun testLoadingLayoutPreservesScroll() {
+        val before = scrollDown()
         render(CollectionScreenState.Loading)
-        assertNull(onUi { pageLabel() })
         render(GaragePreviewStates.collection)
-        assertEquals(before, onUi { pageLabel() })
+        assertEquals(before, onUi { scrollY() })
     }
 
-    fun testErrorLayoutPreservesPage() {
-        val before = advance()
+    fun testErrorLayoutPreservesScroll() {
+        val before = scrollDown()
         render(GaragePreviewStates.collectionError)
-        assertNull(onUi { pageLabel() })
         render(GaragePreviewStates.collection)
-        assertEquals(before, onUi { pageLabel() })
+        assertEquals(before, onUi { scrollY() })
     }
 
-    fun testConsecutiveContentRendersPreservePage() {
-        val before = advance()
-        onUi {
-            host.collection.render(GaragePreviewStates.collection, true)
-            host.collection.render(GaragePreviewStates.collection, true)
-        }
-        waitForLayout()
-        assertEquals(before, onUi { pageLabel() })
-    }
-
-    fun testRestrictedScreenHidesContentAndPreservesPageOnReturn() {
-        val before = advance()
+    fun testRestrictedScreenHidesContentAndPreservesScrollOnReturn() {
+        val before = scrollDown()
         render(GaragePreviewStates.collection, false)
-        assertNull(onUi { pageLabel() })
+        assertNull(onUi { scroller() })
         assertFalse(onUi { descendants(host.collection).any { it.contentDescription?.contains("보유 이력 있음") == true } })
         render(GaragePreviewStates.collection)
-        assertEquals(before, onUi { pageLabel() })
+        assertEquals(before, onUi { scrollY() })
     }
 
-    fun testShorterContentClampsPageAndKeepsThatPosition() {
-        advance()
-        advance()
-        render(CollectionScreenState.Loading)
-        val shorter = GaragePreviewStates.collection.copy(entries = GaragePreviewStates.collection.entries.take(4))
-        render(shorter)
-        assertEquals("1 / 1", onUi { pageLabel() })
-        assertFalse(onUi { host.collection.findViewWithTag<Button>("collection:next").isEnabled })
-        assertFalse(onUi { host.collection.findViewWithTag<Button>("collection:previous").isEnabled })
-
-        render(GaragePreviewStates.collection)
-        assertTrue(onUi { pageLabel()?.startsWith("1 / ") == true })
-    }
-
-    fun testReturningToSameViewAfterLeavingKeepsFilterAndPage() {
-        onUi { host.collection.findViewWithTag<Button>("collection:filter:DISCOVERED").performClick() }
-        val before = advance()
+    fun testReturningToSameViewAfterLeavingKeepsFilterAndScroll() {
+        onUi { host.collection.findViewWithTag<Button>("collection:filter:UNDISCOVERED").performClick() }
+        waitForLayout()
+        val before = scrollDown()
         onUi {
             host.setContentView(View(host))
             assertFalse(host.collection.isAttachedToWindow)
@@ -130,7 +106,7 @@ class CollectionScrollDeviceTest : InstrumentationTestCase() {
             host.setContentView(host.collection)
         }
         waitForLayout()
-        assertEquals(before, onUi { pageLabel() })
-        assertTrue(onUi { host.collection.findViewWithTag<Button>("collection:filter:DISCOVERED").isSelected })
+        assertEquals(before, onUi { scrollY() })
+        assertTrue(onUi { host.collection.findViewWithTag<Button>("collection:filter:UNDISCOVERED").isSelected })
     }
 }

@@ -32,7 +32,7 @@ internal class MapPanelStyle(private val context: Context) {
             if (trackWidth <= 0f || trackHeight <= 0f) return
             val radius = trackHeight / 2
             paint.isAntiAlias = true
-            paint.color = 0xffdbe5f0.toInt()
+            paint.color = 0x33ffffff
             canvas.drawRoundRect(inset, inset, inset + trackWidth, inset + trackHeight, radius, radius, paint)
             val filled = trackWidth * percent.coerceIn(0, 100) / 100f
             if (filled > 0f) {
@@ -46,7 +46,7 @@ internal class MapPanelStyle(private val context: Context) {
     fun styleButton(button: Button, primary: Boolean) = button.apply {
         backgroundTintList = null
         background = signs.signButton(primary)
-        setTextColor(if (!isEnabled) muted else if (primary) android.graphics.Color.WHITE else ink)
+        setTextColor(if (!isEnabled) muted else if (primary) CleanUi.ON_PRIMARY else ink)
         minHeight = signs.dp(52)
         minimumHeight = minHeight
         minWidth = 0

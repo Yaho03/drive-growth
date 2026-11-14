@@ -7,7 +7,6 @@ import android.widget.LinearLayout
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.core.contract.Rarity
-import io.drivegrowth.core.contract.VehicleId
 import io.drivegrowth.core.garage.CollectionState
 
 /** 차종 × 희귀도 기록을 차종 단위로 넘겨 읽는다. */
@@ -19,14 +18,12 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
     private var controlsEnabled = false
     private var retryPending = false
     private var filter: CollectionState? = null
-    private val positions = mutableMapOf<CollectionState?, PagePosition>()
+    /** 필터마다 마지막 스크롤 위치. 다시 그려도(로딩·오류·제한 뒤 복귀) 같은 자리로 돌아온다. */
+    private val positions = mutableMapOf<CollectionState?, Int>()
     private var viewportWidth = 0
     private var viewportHeight = 0
     private val fontScale get() = resources.configuration.fontScale
     private val wide get() = viewportWidth >= style.dp(700) && fontScale <= 1.3f
-    private val pageSize get() = if (wide && viewportHeight >= style.dp(395)) 2 else 1
-
-    private data class PagePosition(val vehicle: VehicleId, val index: Int)
 
     init {
         orientation = VERTICAL
@@ -65,7 +62,12 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
 
         if (showHeading) addView(heading(s(R.string.garage_collection_title), ReferenceHudIcon.COLLECTION))
         val body = card().apply { setPadding(dp(10), dp(6), dp(10), dp(8)) }
-        val viewport = scroll(body)
+        val shownFilter = filter
+        val viewport = scroll(body, positions[shownFilter] ?: 0).apply {
+            tag = "collection:scroll"
+            isVerticalScrollBarEnabled = true
+            setOnScrollChangeListener { _, _, y, _, _ -> if (parent === this@CollectionView) positions[shownFilter] = y }
+        }
         val current = state
         if (current is CollectionScreenState.Content && current.entries.isNotEmpty()) {
             addView(filters(), LayoutParams(-1, -2))
@@ -121,7 +123,6 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
     private fun showContent(body: LinearLayout, content: CollectionScreenState.Content) = with(style) {
         sourceText(content.sourceLabel)?.let { body.addView(text(it, 14, muted)) }
         if (content.entries.isEmpty()) {
-            positions.clear()
             body.addView(text(s(R.string.garage_collection_empty), 24, bold = true))
             body.addView(text(s(R.string.garage_collection_empty_body), color = muted))
             return@with
@@ -134,44 +135,13 @@ class CollectionView(context: Context, private val onRetry: () -> Unit) : Linear
             .sortedBy { it.first().unlockShopLevel ?: Int.MAX_VALUE }
             .filter { cells -> filter == null || cells.any { it.entry.state == filter } }
         if (vehicles.isEmpty()) {
-            positions.remove(filter)
             add(body, text(s(R.string.garage_collection_filter_empty), 18, bold = true))
             return@with
         }
 
-        val lastPage = (vehicles.size - 1) / pageSize
-        val position = positions[filter]
-        val matched = vehicles.indexOfFirst { it.first().entry.key.vehicleId == position?.vehicle }
-        val index = if (matched >= 0) matched else position?.index ?: 0
-        val page = (index / pageSize).coerceAtMost(lastPage)
-        val start = page * pageSize
-        val anchor = if (matched >= 0) matched else start
-        positions[filter] = PagePosition(vehicles[anchor].first().entry.key.vehicleId, anchor)
+        // 모든 차종을 한 목록에 두고 위아래로 스크롤해 본다
         if (wide) add(body, rarityHeaders(), gap = 4)
-        vehicles.drop(start).take(pageSize).forEach { add(body, vehicleRow(it), gap = 4) }
-        add(this@CollectionView, pager(vehicles, page, lastPage), gap = 6)
-    }
-
-    private fun pager(vehicles: List<List<CollectionPresentation>>, page: Int, lastPage: Int) = with(style) {
-        row().apply {
-            gravity = Gravity.CENTER_VERTICAL
-            fun move(target: Int) {
-                if (parent !== this@CollectionView) return
-                val first = target * pageSize
-                positions[filter] = PagePosition(vehicles[first].first().entry.key.vehicleId, first)
-                drawScreen()
-            }
-            addView(button(s(R.string.garage_collection_previous), page > 0) { move(page - 1) }.apply { tag = "collection:previous" },
-                LayoutParams(0, -2, 1f))
-            addView(text(s(R.string.garage_collection_page, page + 1, lastPage + 1), 16, bold = true).apply {
-                tag = "collection:page"
-                gravity = Gravity.CENTER
-                setPadding(dp(8), 0, dp(8), 0)
-                accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE
-            }, LayoutParams(-2, -2))
-            addView(button(s(R.string.garage_collection_next), page < lastPage) { move(page + 1) }.apply { tag = "collection:next" },
-                LayoutParams(0, -2, 1f))
-        }
+        vehicles.forEach { add(body, vehicleRow(it), gap = 4) }
     }
 
     private fun rarityHeaders() = with(style) {

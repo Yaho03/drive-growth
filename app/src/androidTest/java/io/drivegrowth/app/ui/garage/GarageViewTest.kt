@@ -179,17 +179,14 @@ class GarageViewTest : InstrumentationTestCase() {
         val labels = texts(view)
         assertFalse(labels.contains("차량 도감"))
         assertTrue(labels.contains("수집 20 / 79칸"))
-        assertEquals(1, labels.count { it == "보유 이력 있음" })
-        assertEquals(1, labels.count { it == "발견 · 보유 이력 없음" })
-        assertEquals(3, labels.count { it == "미발견" }) // 상태 필터 1개와 도감 칸 2개
+        assertTrue(labels.count { it == "보유 이력 있음" } >= 1)
+        // 한 목록에 모든 차종이 나오므로 개수는 최소 조건으로 본다
+        assertTrue(labels.count { it == "발견 · 보유 이력 없음" } >= 1)
+        assertTrue(labels.count { it == "미발견" } > 1) // 상태 필터 1개와 도감 칸들
         assertTrue(labels.contains("가게 Lv1 해금"))
         assertFalse(labels.any { it.startsWith("잠김") })
 
-        val next = view.findViewWithTag<Button>("collection:next")
-        repeat(19) { view.findViewWithTag<Button>("collection:next").performClick() }
-        assertFalse(view.findViewWithTag<Button>("collection:next").isEnabled)
-        next.performClick() // 이전 렌더의 버튼은 페이지를 변경하지 않는다.
-        assertEquals("20 / 20", collectionPage(view))
+        assertNull("도감은 페이지 넘기기 대신 한 목록을 스크롤한다", view.findViewWithTag<Button>("collection:next"))
         assertTrue(texts(view).contains("해금 정보 확인 불가"))
         assertTrue(descendants(view).any {
             it.contentDescription == "캐스퍼 전설 · 수집 기록 확인 불가"
@@ -197,10 +194,9 @@ class GarageViewTest : InstrumentationTestCase() {
 
         view.render(GaragePreviewStates.emptyCollection, true)
         assertTrue(texts(view).contains("도감 데이터가 없어요"))
-        assertNull(view.findViewWithTag<TextView>("collection:page"))
     }
 
-    fun testCollectionFilterKeepsEachPageAndShowsNoMatches() = runOnUiTest {
+    fun testCollectionFilterShowsMatchesAndNoMatches() = runOnUiTest {
         val view = CollectionView(instrumentation.targetContext) {}
         val preview = GaragePreviewStates.collection
         val input = preview.copy(entries = preview.entries.mapIndexed { index, cell ->
@@ -209,33 +205,16 @@ class GarageViewTest : InstrumentationTestCase() {
             else cell
         })
         view.render(input, true)
-        view.findViewWithTag<Button>("collection:next").performClick()
-        view.findViewWithTag<Button>("collection:next").performClick()
-        assertEquals("3 / 20", collectionPage(view))
-
-        val discovered = view.findViewWithTag<Button>("collection:filter:DISCOVERED")
-        discovered.performClick()
-        assertTrue(view.findViewWithTag<Button>("collection:filter:DISCOVERED").isSelected)
-        assertEquals("1 / 2", collectionPage(view))
-        view.findViewWithTag<Button>("collection:next").performClick()
-
-        view.findViewWithTag<Button>("collection:filter:all").performClick()
-        discovered.performClick()
-        assertEquals("3 / 20", collectionPage(view))
         view.findViewWithTag<Button>("collection:filter:DISCOVERED").performClick()
-        assertEquals("2 / 2", collectionPage(view))
+        assertTrue(view.findViewWithTag<Button>("collection:filter:DISCOVERED").isSelected)
         assertTrue(texts(view).containsAll(listOf("베뉴", "보유 이력 있음", "전설")))
 
         val noDiscoveries = input.entries.filterNot { it.entry.state == CollectionState.DISCOVERED }
         view.render(input.copy(entries = noDiscoveries), true)
         assertTrue(texts(view).contains("이 상태에 해당하는 차종이 없어요"))
-        assertNull(view.findViewWithTag<TextView>("collection:page"))
         view.findViewWithTag<Button>("collection:filter:all").performClick()
-        assertEquals("3 / 20", collectionPage(view))
+        assertFalse(texts(view).contains("이 상태에 해당하는 차종이 없어요"))
     }
-
-    private fun collectionPage(view: CollectionView) =
-        view.findViewWithTag<TextView>("collection:page").text.toString()
 
     fun testCollectionDiscoveredStatusFitsAtLargeFontScale() = runOnUiTest {
         val base = instrumentation.targetContext
@@ -262,15 +241,11 @@ class GarageViewTest : InstrumentationTestCase() {
         assertTrue("마지막 줄이 문구 영역 안에 있어야 합니다",
             label.totalPaddingTop + layout.getLineBottom(lastLine) <= label.height - label.totalPaddingBottom)
         assertTrue("셀 안에 문구 전체가 들어가야 합니다", label.bottom <= (label.parent as View).height)
-        val next = view.findViewWithTag<Button>("collection:next")
-        val pager = next.parent as View
-        assertTrue("큰 글자에서도 다음 버튼의 터치 높이를 유지해야 합니다", next.height >= (48 * density).toInt())
-        assertTrue("페이지 조작이 창 아래로 잘리지 않아야 합니다", pager.bottom <= view.height)
-        assertFalse("페이지 조작은 본문 스크롤과 분리해야 합니다",
-            descendants(view).filterIsInstance<ScrollView>().any { next in descendants(it) })
+        val scroll = view.findViewWithTag<ScrollView>("collection:scroll")
+        assertTrue("큰 글자에서도 도감 목록이 창 안에서 스크롤되어야 합니다", scroll.bottom <= view.height)
     }
 
-    fun testCollectionRepaginatesAroundSameVehicleAtNarrowAndWideSizes() = runOnUiTest {
+    fun testCollectionListsEveryVehicleAtNarrowAndWideSizes() = runOnUiTest {
         val base = instrumentation.targetContext
         val context = base.createConfigurationContext(Configuration(base.resources.configuration).apply { fontScale = 1f })
         val view = CollectionView(context) {}
@@ -282,25 +257,12 @@ class GarageViewTest : InstrumentationTestCase() {
                 View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
             view.layout(0, 0, width, height)
         }
-
         view.render(GaragePreviewStates.collection, true)
-        layout(900, 480)
-        assertEquals("1 / 10", collectionPage(view))
-        assertTrue(texts(view).containsAll(listOf("캐스퍼", "베뉴", "일반", "고급", "희귀", "전설")))
-        view.findViewWithTag<Button>("collection:next").performClick()
-        layout(900, 480)
-        assertEquals("2 / 10", collectionPage(view))
-        assertTrue(texts(view).containsAll(listOf("코나", "아반떼")))
-
-        layout(320, 640)
-        assertEquals("3 / 20", collectionPage(view))
-        assertTrue(texts(view).contains("코나"))
-        assertFalse(texts(view).contains("아반떼"))
-        assertTrue(descendants(view).any { it.contentDescription == "코나 전설 · 미발견" })
-        layout(900, 340)
-        assertEquals("3 / 20", collectionPage(view))
-        layout(900, 480)
-        assertEquals("2 / 10", collectionPage(view))
-        assertTrue(texts(view).containsAll(listOf("코나", "아반떼")))
+        for ((w, h) in listOf(900 to 480, 320 to 640, 900 to 340)) {
+            layout(w, h)
+            assertTrue(texts(view).containsAll(listOf("캐스퍼", "베뉴", "코나", "아반떼")))
+            assertTrue(descendants(view).any { it.contentDescription == "코나 전설 · 미발견" })
+            assertNull(view.findViewWithTag<Button>("collection:next"))
+        }
     }
 }

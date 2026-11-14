@@ -121,15 +121,15 @@ internal class GarageStyle(
             max = total
             progress = value
             progressTintList = ColorStateList.valueOf(color)
-            progressBackgroundTintList = ColorStateList.valueOf(if (creamPanel) 0xffdbe5f0.toInt() else PixelStyle.outline)
+            progressBackgroundTintList = ColorStateList.valueOf(if (creamPanel) 0x33ffffff else PixelStyle.outline)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
 
     fun raritySurface(value: Rarity) = shape(when (value) {
         Rarity.COMMON -> inset
-        Rarity.ADVANCED -> 0xffe1f0ff.toInt()
-        Rarity.RARE -> 0xfffde4f0.toInt()
-        Rarity.LEGEND -> 0xfffff1c7.toInt()
+        Rarity.ADVANCED -> 0x4d3f9cff
+        Rarity.RARE -> 0x4dff6fb5
+        Rarity.LEGEND -> 0x59ffc52e
     })
 
     fun rarityChip(value: Rarity) = text(rarity(value), 14, rarityColor(value), bold = true).apply {
@@ -151,9 +151,9 @@ internal class GarageStyle(
     })
     fun rarityColor(value: Rarity) = if (creamPanel) when (value) {
         Rarity.COMMON -> muted
-        Rarity.ADVANCED -> 0xff1f6fb8.toInt()
-        Rarity.RARE -> 0xffc0357a.toInt()
-        Rarity.LEGEND -> 0xffa86a00.toInt()
+        Rarity.ADVANCED -> 0xff79c4ff.toInt()
+        Rarity.RARE -> 0xffff9ccc.toInt()
+        Rarity.LEGEND -> 0xffffd45a.toInt()
     } else if (pixelPanel) PixelStyle.rarityColor(value) else when (value) {
         Rarity.COMMON -> muted
         Rarity.ADVANCED -> Color.rgb(137, 186, 255)
