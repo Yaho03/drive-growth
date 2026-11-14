@@ -406,7 +406,7 @@ internal class PrototypeTitleView(
         const val EXIT_MS = 480L
         val DARK = 0xff0a0710.toInt()
         /** 르르르 출품 사용권(#29)이 확인되면 true로 바꿔 하늘과 앞줄의 주인공을 르르르로 그린다. */
-        const val RURURU_HERO = false
+        const val RURURU_HERO = true
 
         /** 금빛·크롬 글자의 가로 띠. 보드의 linear-gradient 색 띠를 그대로 옮겼다. */
         val GOLD = intArrayOf(0xfffff6cc.toInt(), 0xffffd65e.toInt(), 0xffc8781e.toInt(), 0xfffff0b0.toInt(), 0xfff0a830.toInt(), 0xff9a4a12.toInt()) to

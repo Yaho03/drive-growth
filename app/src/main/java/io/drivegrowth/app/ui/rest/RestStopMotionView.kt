@@ -118,7 +118,7 @@ internal class RestStopMotionView(
         part = next
         if (next == Part.INTRO) introConsumed = true
         val image = runCatching {
-            ImageDecoder.decodeDrawable(ImageDecoder.createSource(context.assets, "pixel/rest/blanket-${next.asset}.webp"))
+            ImageDecoder.decodeDrawable(ImageDecoder.createSource(context.assets, "pixel/rest/$VARIANT-${next.asset}.webp"))
         }.getOrNull() as? AnimatedImageDrawable
         drawable = image
         val intro = next == Part.INTRO && image != null
@@ -201,6 +201,8 @@ internal class RestStopMotionView(
     private fun dp(value: Int) = style.dp(value)
 
     private companion object {
+        /** 2026-11-14 사용자 결정으로 르르르판을 쓴다. 출품 사용권(#29)이 거절되면 "blanket"(담요를 머리끝까지 덮은 대체판)으로 바꾼다. */
+        const val VARIANT = "rururu"
         const val CARD_AT_MS = 5000L
     }
 }
