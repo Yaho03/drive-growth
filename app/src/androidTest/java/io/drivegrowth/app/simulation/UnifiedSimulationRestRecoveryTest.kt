@@ -119,6 +119,7 @@ class UnifiedSimulationRestRecoveryTest : InstrumentationTestCase() {
                 val restricted = checkNotNull(root.findViewWithTag<View>("host:restricted-screen"))
                 assertEquals("진행이 중단됐어요. 설정에서 다시 시도해 주세요.",
                     restricted.findViewWithTag<TextView>("simulation:blocked").text.toString())
+                assertFalse(checkNotNull(root.findViewWithTag<View>("host:driving-scene")).isShown)
                 assertNull(root.findViewWithTag<View>("host:destination"))
                 assertNull(root.findViewWithTag<View>("shop:scene"))
                 val retry = root.findViewWithTag<Button>("simulation:retry")
@@ -135,6 +136,7 @@ class UnifiedSimulationRestRecoveryTest : InstrumentationTestCase() {
                 assertFalse(root.findViewWithTag<Button>("simulation:start").isShown)
                 assertTrue(retry.performClick())
                 assertSame(restricted, root.findViewWithTag<View>("host:restricted-screen"))
+                assertFalse(checkNotNull(root.findViewWithTag<View>("host:driving-scene")).isShown)
                 assertSame(recovery, restricted.findViewWithTag<View>("host:simulation-recovery-settings"))
                 assertEquals(2, frames.size)
                 assertEquals(frames.first(), frames.last())
@@ -171,6 +173,7 @@ class UnifiedSimulationRestRecoveryTest : InstrumentationTestCase() {
                 val root = activity.window.decorView
                 assertEquals("진행 상황을 확인할 수 없어요. 기존 저장 기록은 그대로예요.",
                     root.findViewWithTag<TextView>("simulation:blocked").text.toString())
+                assertFalse(checkNotNull(root.findViewWithTag<View>("host:driving-scene")).isShown)
                 assertFalse(root.findViewWithTag<Button>("simulation:retry").isShown)
                 val start = root.findViewWithTag<Button>("simulation:rest-start")
                 assertTrue(start == null || start.visibility != View.VISIBLE || !start.isEnabled)

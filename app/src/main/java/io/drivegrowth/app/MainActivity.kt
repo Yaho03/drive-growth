@@ -17,6 +17,8 @@ import io.drivegrowth.core.delivery.DeliveryOutcome
 import io.drivegrowth.core.delivery.HoldOutcome
 import java.time.Instant
 import java.time.ZoneId
+import io.drivegrowth.app.ui.driving.DrivingRestrictionEvidence
+import io.drivegrowth.app.ui.driving.DrivingSceneView
 import java.time.format.DateTimeFormatter
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -97,6 +99,7 @@ open class MainActivity : Activity() {
     private var rentalFingerprint: Any? = null
     private val rentalAppExit = RentalAppExit()
     private var navigation = HostNavigation()
+    private val restrictionEvidence = DrivingRestrictionEvidence()
     private var screen: HostQueryState = HostQueryState.Restricted
     private lateinit var management: GarageCommandHost
     private lateinit var managementView: GarageCommandView
@@ -108,13 +111,15 @@ open class MainActivity : Activity() {
     private lateinit var facilityControls: io.drivegrowth.app.ui.shop.FacilityControlsView
     private var pendingPage: HostPage? = null
     private var progressionSaved = false
-    private var restrictedScreen: ScrollView? = null
+    private var restrictedScreen: FrameLayout? = null
     private var restrictionNotice: TextView? = null
     private var restrictionCard: View? = null
     private var restrictionRetry: View? = null
     private var pendingRouteGeneration = 0L
     private var pendingRouteFailed = false
     private var pendingRouteEnabled = false
+    private var restrictionTitle: TextView? = null
+    private var drivingScene: DrivingSceneView? = null
     private var failedShopRestore: Bundle? = null
     private val shopRestoreFailed get() = failedShopRestore != null
     private lateinit var shop: ShopView
@@ -586,7 +591,19 @@ open class MainActivity : Activity() {
         if (active) return
         active = true
         rentalFingerprint = null
-        session.simulation?.changed = { if (active) { updateAccess(); if (::chrome.isInitialized) render() } }
+        session.simulation?.let { simulation ->
+            simulation.changed = {
+                if (active) {
+                    if (simulation.inputState == SimulationInputState.RETRYABLE_FAILURE ||
+                        simulation.inputState == SimulationInputState.UNAVAILABLE
+                    ) {
+                        restrictionEvidence.reset()
+                    }
+                    updateAccess()
+                    if (::chrome.isInitialized) render()
+                }
+            }
+        }
         if (session.simulation?.clock() is ContractResult.Failure) { updateAccess(); return }
         val rentalReceiver = session.driving.start { result ->
             val status = when (result) {
@@ -655,7 +672,12 @@ open class MainActivity : Activity() {
         }
         if (session.simulation != null) {
             session.attachSimulation { frame, done ->
-                if (active) { updateRentalMapPresentation(); session.driving.accept(frame, done); updateAccess() }
+                if (active) {
+                    restrictionEvidence.accept(frame.observation, SystemClock.elapsedRealtime())
+                    updateRentalMapPresentation()
+                    session.driving.accept(frame, done)
+                    updateAccess()
+                }
             }
         } else try {
             input = VehicleInput(this, { observation ->
@@ -677,6 +699,7 @@ open class MainActivity : Activity() {
         closeRestStopPreview(updateAudio = false)
         dismissOpeningGift()
         titleView.setPresentationAllowed(false)
+                    restrictionEvidence.accept(observation)
         presentationAudio.setPresentationAllowed(false)
         stopObserving()
         super.onPause()
@@ -720,6 +743,7 @@ open class MainActivity : Activity() {
         }
         super.onStop()
     }
+        restrictionEvidence.reset()
 
     override fun onDestroy() {
         session.onCollectionNewChanged = null
@@ -818,6 +842,7 @@ open class MainActivity : Activity() {
 
     protected fun canStartRestSimulation(): Boolean =
         session.simulation != null && simulationControlsExpanded &&
+            MissingReason.NO_DATA, MissingReason.STALE -> R.string.vehicle_restriction_signal
             !titlePending && navigation.page != HostPage.ONBOARDING && allowed()
 
     protected fun startRestSimulation() {
@@ -968,12 +993,7 @@ open class MainActivity : Activity() {
 
     private fun updateAccess() {
         val enabled = allowed()
-        if (!enabled && session.simulation == null) {
-            body.findViewWithTag<TextView>("vehicle:blocked")?.let {
-                val message = vehicleRestrictionMessage()
-                if (it.text != message) it.text = message
-            }
-        }
+        if (!enabled && restrictedScreen?.parent === body) updateRestrictionPresentation()
         if (!enabled) simulationStartBoundary.cancel()
         val gameEnabled = enabled && !titlePending
         if (!gameEnabled && ::managementView.isInitialized) managementView.dismissMotion()
@@ -1287,15 +1307,7 @@ open class MainActivity : Activity() {
         }
         if (!enabled) {
             dismissOpeningGift()
-            val simulation = session.simulation
-            val message = when (simulation?.inputState) {
-                null -> vehicleRestrictionMessage()
-                SimulationInputState.PROCESSING -> "진행 상황을 처리하고 있어요. 잠시 기다려 주세요."
-                SimulationInputState.RETRYABLE_FAILURE -> "진행이 중단됐어요. 설정에서 다시 시도해 주세요."
-                SimulationInputState.UNAVAILABLE -> "진행 상황을 확인할 수 없어요. 기존 저장 기록은 그대로예요."
-                SimulationInputState.READY -> "지금은 조작할 수 없어요. 현재 상태를 확인해 주세요."
-            }
-            showRestriction(message)
+            showRestriction()
             return
         }
         if (titlePending) {
@@ -1399,7 +1411,48 @@ open class MainActivity : Activity() {
         updateOpeningGift()
     }
 
-    private fun showRestriction(message: String) {
+    private fun updateRestrictionPresentation() {
+        val now = SystemClock.elapsedRealtime()
+        val simulation = session.simulation
+        val simulationState = simulation?.inputState
+        val driving = active && restStartTicket == null && if (simulation == null) {
+            interaction.state(now) == Observation.Available(VehicleInteraction.RESTRICTED) &&
+                restrictionEvidence.confirmsMotion(InputSource.VEHICLE, now)
+        } else {
+            simulationState == SimulationInputState.PROCESSING && !simulation.controlsAllowed &&
+                restrictionEvidence.confirmsMotion(InputSource.SIMULATION, now)
+        }
+        val title = getString(if (driving) R.string.host_driving_pause_title else R.string.host_vehicle_pause_title)
+        val message = if (driving) getString(R.string.host_driving_pause_body) else when (simulationState) {
+            null -> vehicleRestrictionMessage()
+            SimulationInputState.PROCESSING -> "진행 상황을 처리하고 있어요. 잠시 기다려 주세요."
+            SimulationInputState.RETRYABLE_FAILURE -> "진행이 중단됐어요. 설정에서 다시 시도해 주세요."
+            SimulationInputState.UNAVAILABLE -> "진행 상황을 확인할 수 없어요. 기존 저장 기록은 그대로예요."
+            SimulationInputState.READY -> "지금은 조작할 수 없어요. 현재 상태를 확인해 주세요."
+        }
+        restrictionTitle?.let { if (it.text.toString() != title) it.text = title }
+        restrictionNotice?.let { if (it.text.toString() != message) it.text = message }
+        drivingScene?.apply {
+            if (driving) {
+                setSimulationLoop(simulation != null)
+                visibility = View.VISIBLE
+            } else {
+                visibility = View.GONE
+            }
+        }
+        restrictionCard?.let { card ->
+            val params = card.layoutParams as FrameLayout.LayoutParams
+            val gravity = if (driving) Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL else Gravity.CENTER
+            if (params.gravity != gravity) {
+                params.gravity = gravity
+                card.layoutParams = params
+                (card.parent as View).setBackgroundColor(if (driving) android.graphics.Color.TRANSPARENT else CleanUi.CARD_SOFT)
+            }
+        }
+        restrictionRetry?.visibility = if (!driving && simulation?.canRetry == true) View.VISIBLE else View.GONE
+    }
+
+    private fun showRestriction() {
         val simulation = session.simulation
         val view = restrictedScreen ?: run {
             val notice = featureStyle.text("", 18).apply {
@@ -1409,12 +1462,13 @@ open class MainActivity : Activity() {
             val sign = ReferenceHudStyle(this)
             val card = featureStyle.card().apply {
                 background = sign.signSurface()
-                addView(featureStyle.heading(getString(if (simulation == null) R.string.host_vehicle_pause_title
-                    else R.string.host_simulation_pause_title), if (simulation == null) ReferenceHudIcon.GARAGE else ReferenceHudIcon.TRUCK).apply {
+                val title = featureStyle.heading("", if (simulation == null) ReferenceHudIcon.GARAGE else ReferenceHudIcon.TRUCK).apply {
                     background = null
                     setPadding(0, 0, 0, 0)
                     isAccessibilityHeading = true
-                })
+                }
+                restrictionTitle = title
+                addView(title)
                 featureStyle.add(this, notice, gap = 6)
                 if (simulation != null) {
                     restrictionRetry = featureStyle.button("설정") {
@@ -1425,19 +1479,26 @@ open class MainActivity : Activity() {
             }
             restrictionNotice = notice
             restrictionCard = card
-            ScrollView(this).apply {
-                isFillViewport = true
-                addView(FrameLayout(this@MainActivity).apply {
-                    tag = "host:restricted-screen"
-                    setBackgroundColor(CleanUi.CARD_SOFT)
-                    addView(card, FrameLayout.LayoutParams(
-                        -1, -2, Gravity.CENTER,
-                    ).apply { setMargins(0, style.dp(12), 0, style.dp(12)) })
-                }, FrameLayout.LayoutParams(-1, -2))
+            val scene = DrivingSceneView(this).apply {
+                tag = "host:driving-scene"
+                visibility = View.GONE
+            }
+            drivingScene = scene
+            FrameLayout(this).apply {
+                addView(scene, FrameLayout.LayoutParams(-1, -1))
+                addView(ScrollView(this@MainActivity).apply {
+                    isFillViewport = true
+                    addView(FrameLayout(this@MainActivity).apply {
+                        tag = "host:restricted-screen"
+                        setBackgroundColor(CleanUi.CARD_SOFT)
+                        addView(card, FrameLayout.LayoutParams(
+                            -1, -2, Gravity.CENTER,
+                        ).apply { setMargins(0, style.dp(12), 0, style.dp(12)) })
+                    }, FrameLayout.LayoutParams(-1, -2))
+                }, FrameLayout.LayoutParams(-1, -1))
             }.also { restrictedScreen = it }
         }
-        restrictionNotice?.let { if (it.text.toString() != message) it.text = message }
-        restrictionRetry?.visibility = if (simulation?.canRetry == true) View.VISIBLE else View.GONE
+        updateRestrictionPresentation()
         resizeRestrictionCard(appRoot.width)
         showBody(view)
     }
