@@ -3822,6 +3822,8 @@ Virtual Console은 재부팅 전후 `bridge_ready=false`, `emulator_active=false
 
 ## 차량용 Release APK 신규 설치와 실행 — 2026-11-15
 
+제출용 APK는 공모전 파일명에 맞춰 [`지금당장토큰을낋여오거라_르르르렌터카_release.apk`](../apk/%EC%A7%80%EA%B8%88%EB%8B%B9%EC%9E%A5%ED%86%A0%ED%81%B0%EC%9D%84%EB%82%8B%EC%97%AC%EC%98%A4%EA%B1%B0%EB%9D%BC_%EB%A5%B4%EB%A5%B4%EB%A5%B4%EB%A0%8C%ED%84%B0%EC%B9%B4_release.apk)로 제공한다. 아래에서 시험한 배포 파일과 SHA-256이 같다.
+
 - 별도 Pleos Connect 2.1.0 에뮬레이터(Android API 34 ARM64, 사용자 10, 1080×600px·120dpi)에서 `io.drivegrowth.app`이 없는 상태를 확인하고 배포 APK를 신규 설치했다. 설치된 APK를 추출해 배포 파일과 바이트 단위로 일치함을 확인했다. SHA-256은 `ab7d73ed37817f258b4073ca8702be92b2d127e0035d3ffb0d976288c30cebd5`다.
 - 런처 컴포넌트에서 처음 실행한 뒤 속도 권한을 허용했다. 계기판에 P·0 km/h가 표시됐고, 앱 로그에 차량 SDK 수신 결과 `speed=OK gear=PARK ux=false`가 남았다.
 - 캐스퍼를 첫 차량으로 확정했다. 시작 자금 1,000 게임머니와 주차 공간 3칸을 확인하고 메인 가게에 진입했다. Pleos 앱 목록에서 앱 아이콘을 직접 눌러 가게로 복귀했다. 시스템 로그에서 `MAIN / LAUNCHER → io.drivegrowth.app/.MainActivity`를 확인했다. [실행한 메인 게임 화면](evidence/vehicle-release-52285de/game-home.png)

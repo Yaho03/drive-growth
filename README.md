@@ -34,7 +34,7 @@
 
 ## 다운로드
 
-[**게임 체험 APK 다운로드**](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-firstcarplay-52285de.apk) · [**차량 연동 APK 다운로드**](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-vehicle-fresh-install-52285de.apk) · [전체 릴리스](https://github.com/Yaho03/drive-growth/releases/tag/integrated-20261115-52285de)
+[**게임 체험 APK 다운로드**](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-firstcarplay-52285de.apk) · [**차량 연동 APK 다운로드**](https://github.com/Yaho03/drive-growth/raw/refs/heads/main/apk/%EC%A7%80%EA%B8%88%EB%8B%B9%EC%9E%A5%ED%86%A0%ED%81%B0%EC%9D%84%EB%82%8B%EC%97%AC%EC%98%A4%EA%B1%B0%EB%9D%BC_%EB%A5%B4%EB%A5%B4%EB%A5%B4%EB%A0%8C%ED%84%B0%EC%B9%B4_release.apk) · [전체 릴리스](https://github.com/Yaho03/drive-growth/releases/tag/integrated-20261115-52285de)
 
 - **게임 체험 APK:** Pleos 에뮬레이터에서 모의 차량·내비 입력으로 게임을 체험하는 Debug 앱입니다.
 - **차량 연동 APK:** 실제 Pleos SDK 입력을 사용하는 개발 서명 Release입니다. 기존 차량용 앱과 서명이 달라 별도 환경에 신규 설치해야 하며, Pleos 에뮬레이터에서 신규 설치와 실행을 확인했습니다.
