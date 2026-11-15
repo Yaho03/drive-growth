@@ -190,6 +190,8 @@
     return s.c;
   }
   function levelFor(h) { var i = 0; while (i < LEVELS.length - 1 && LEVELS[i + 1] <= h) i++; return i; }
+  // 실제 크기 이상인 가장 작은 단계 그림을 골라 줄여 그린다(단계 사이에서 크기가 툭 떨어지지 않게)
+  function levelAbove(h) { var i = 0; while (i < LEVELS.length - 1 && LEVELS[i] < h) i++; return i; }
   function wrapZ(base, t) { return SCN.zMin + (((base + SCN.v * t - SCN.zMin) % SCN.span) + SCN.span) % SCN.span; }
   // t: 정규화된 반복 시간(0~LOOP). 화면 단위 좌표로 사각형·그림 목록을 돌려준다
   function scenery(t, g, night, still) {
@@ -224,11 +226,13 @@
     items.sort(function (a, b) { return b.z - a.z; });
     items.forEach(function (it) {
       var s3 = G / it.z, hpx = it.h * s3; if (hpx < 4) return;
-      var lv = levelFor(hpx), H = LEVELS[lv], far = it.z > 40;
+      var lv = levelAbove(hpx), L0 = LEVELS[lv], far = it.z > 40;
       var key = it.type === 'pole' ? 'p' + lv : 't' + it.kind + (far ? 'f' : '') + lv;
-      var w = it.type === 'pole' ? Math.max(3, Math.round(H * 0.32)) : (Math.max(3, Math.round(H * (it.kind ? 0.55 : 0.72))) | 1);
-      var xb = vp + it.X * s3, yb = Math.round(hy + s3);
-      var left = it.type === 'pole' ? Math.round(xb - w) : Math.round(xb - w / 2);
+      // 단계 그림의 가로세로 비율은 유지하고, 높이는 실제 크기(hpx)로 매 순간 연속해서 줄인다
+      var w0 = it.type === 'pole' ? Math.max(3, Math.round(L0 * 0.32)) : (Math.max(3, Math.round(L0 * (it.kind ? 0.55 : 0.72))) | 1);
+      var H = Math.min(hpx, L0), w = w0 * H / L0;
+      var xb = vp + it.X * s3, yb = hy + s3;
+      var left = it.type === 'pole' ? xb - w : xb - w / 2;
       if (left > g.L.Wu || left + w < 0 || yb - H > Hu) return;
       sprites.push([key, left, yb - H, w, H]);
     });
@@ -495,7 +499,7 @@
     ctx.drawImage(img(b.bg), 0, 0);
     var sn = scenery(p.st, g, opts && opts.timeOfDay === 'night', false);
     sn.rects.forEach(function (r) { ctx.fillStyle = r[4]; ctx.fillRect(r[0] * u, r[1] * u, r[2] * u, r[3] * u); });
-    sn.sprites.forEach(function (sp) { ctx.drawImage(img(b.sprites[sp[0]]), sp[1] * u, sp[2] * u); });
+    sn.sprites.forEach(function (sp) { ctx.drawImage(img(b.sprites[sp[0]]), sp[1] * u, sp[2] * u, sp[3] * u, sp[4] * u); });
     ctx.drawImage(img(b.rail), 0, 0);
     var y = p.bob * u, dy = (p.bob + p.driverBob) * u / 1;
     ctx.drawImage(img(b.interior), 0, y);

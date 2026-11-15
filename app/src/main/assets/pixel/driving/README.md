@@ -4,14 +4,14 @@
 
 | 파일 | 내용 |
 |---|---|
-| `rrr-day-loop.webp`, `rrr-night-loop.webp` | 12초 반복, 10fps, 120장 |
+| `rrr-day-loop.webp`, `rrr-night-loop.webp` | 12초 반복, 20fps, 240장 |
 | `rrr-day-still.webp`, `rrr-night-still.webp` | 움직임 줄이기용 정지 그림 |
 
 르르르 출품 사용권은 #29에서 확인한다. 보드에는 정비사판도 있어 필요하면 같은 방법으로 뽑는다.
 
 | 파일 | SHA-256 |
 |---|---|
-| `rrr-day-loop.webp` | `e0e5b1c90b7ac63ab360cf3cd25ec0fcd12997f3bffbc54029f4e194dab0deab` |
-| `rrr-day-still.webp` | `51ddb0871c0d4d4687055a7ca4885dd9c21b65a448f39bdc99de06c30bce36b3` |
-| `rrr-night-loop.webp` | `1e117613cb3e6bb1e6716dbf5733d933515190080ce8e74496156000b24f8eee` |
-| `rrr-night-still.webp` | `6aee96b53da3fcb6160ac19626cae358bdc68247a4c462a8af279f69bb97d627` |
+| `rrr-day-loop.webp` | `11d567a0b1f23c176835c24486426d6453f6d2b5859f5958428904aa932d0e00` |
+| `rrr-day-still.webp` | `c49a15d4c91d77f180b0c44982deb3cd1844eec0cef5050e43670fc82ed5e88b` |
+| `rrr-night-loop.webp` | `d2c8763a55cbcc7a7773ee5eac378be48c262acd012ac02bae0fa4deac3c7fa0` |
+| `rrr-night-still.webp` | `3800c92fb7897717d4e9a91f7ddc7b6db3dbf01a88233cbc7664d5bb870b5d10` |

@@ -9,6 +9,6 @@ from PIL import Image
 src, dst = sys.argv[1], sys.argv[2]
 for t in ["day", "night"]:
     frames = [Image.open(f).convert("RGB") for f in sorted(glob.glob(f"{src}/rrr-{t}-loop_*.png"))]
-    frames[0].save(f"{dst}/rrr-{t}-loop.webp", save_all=True, append_images=frames[1:], lossless=True, method=6, duration=100, loop=0)
+    frames[0].save(f"{dst}/rrr-{t}-loop.webp", save_all=True, append_images=frames[1:], lossless=True, method=6, duration=50, loop=0)
     Image.open(f"{src}/rrr-{t}-still_000.png").convert("RGB").save(f"{dst}/rrr-{t}-still.webp", lossless=True, method=6)
     print(t, len(frames), "frames")
