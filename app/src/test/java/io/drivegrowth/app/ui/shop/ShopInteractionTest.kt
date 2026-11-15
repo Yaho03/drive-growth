@@ -87,6 +87,23 @@ class ShopInteractionTest {
         i.render(content(), true); i.select(selection()); assertTrue(i.confirm(selection()))
         assertNull(i.uiState.pending); assertEquals(selection(), i.uiState.acknowledged)
     }
+    @Test fun `반영 중 안내는 새 확정 상태가 그려지면 사라지고 실패 안내에 오류 코드를 노출하지 않는다`() {
+        val i = ShopInteraction({})
+        i.render(content(), true); i.select(selection()); i.confirm(selection())
+        i.complete(i.uiState.pending!!, ContractResult.Success(Unit))
+        assertEquals("반영하고 있어요…", i.uiState.message)
+        i.render(content(), true)
+        assertEquals("반영하고 있어요…", i.uiState.message)
+        i.render(content().copy(revision = Revision(4)), true)
+        assertNull(i.uiState.message)
+
+        val failed = ShopInteraction({})
+        failed.render(content(), true); failed.select(selection()); failed.confirm(selection())
+        failed.complete(failed.uiState.pending!!, ContractResult.Failure(ContractError.STORAGE_FAILURE))
+        assertEquals("처리하지 못했어요. 다시 시도해 주세요.", failed.uiState.message)
+        assertFalse(failed.uiState.message!!.contains("STORAGE_FAILURE"))
+    }
+
     @Test fun `공통 시설 제안 원문을 전달하고 표시 비용 불일치는 거절한다`() {
         val offer = io.drivegrowth.core.rental.FacilityOffer(io.drivegrowth.core.rental.Facility.CAR_WASH,
             RuleVersion("facility-fixture"), true, GameMoney(700))
