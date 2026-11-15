@@ -37,7 +37,8 @@ class TownPopulationTest {
         assertTrue("정비사가 주차 슬롯 안으로 들어가지 않고 근처에 도달해야 한다", worked)
     }
 
-    @Test fun mechanicUsesReachablePerimeterAndWaitsWhenFirstSlotIsIsolated() {
+    @Test fun mechanicReachesEveryParkedSlotOnTheWidenedLot() {
+        // 공터 걷기 영역(LOT)이 주차 칸 둘레의 아스팔트까지 덮으므로 구석인 1번 칸 차량에도 접근할 수 있다.
         val slots = townSlots.map { (x, y) -> TownPoint(x.toFloat(), y.toFloat()) }
         for (count in 4..slots.size) {
             val parked = slots.take(count)
@@ -45,7 +46,6 @@ class TownPopulationTest {
             for ((index, car) in parked.withIndex()) {
                 val people = TownPopulation(parked, listOf(car), true, true, Random(14))
                 val mechanic = people.residents.single { it.role.repairs }
-                val start = mechanic.point
                 var worked = false
                 for (step in 0 until 2000) {
                     people.step(.05f)
@@ -56,14 +56,31 @@ class TownPopulationTest {
                         break
                     }
                 }
-                if (index == 0) {
-                    assertFalse("첫 슬롯과 연결된 접근점이 없으면 정비 연출을 시작하지 않는다", worked)
-                    assertEquals(start, mechanic.point)
-                } else {
-                    assertTrue("$count 대 주차 배치의 ${index + 1}번 차량에 접근해야 한다", worked)
-                }
+                assertTrue("$count 대 주차 배치의 ${index + 1}번 차량에 접근해야 한다", worked)
             }
         }
+    }
+
+    @Test fun mechanicWaitsInPlaceWhenTheBrokenCarHasNoReachableApproach() {
+        // 수리할 차를 다른 차들로 빙 둘러싸 걸어서 닿을 접근점이 없게 만든다.
+        val broken = TownPoint(700f, 760f)
+        val ring = listOf(
+            TownPoint(590f, 760f), TownPoint(810f, 760f), TownPoint(700f, 700f), TownPoint(700f, 820f),
+            TownPoint(610f, 710f), TownPoint(790f, 710f), TownPoint(610f, 810f), TownPoint(790f, 810f),
+        )
+        val parked = listOf(broken) + ring
+        val map = TownWalkMap(parked)
+        val people = TownPopulation(parked, listOf(broken), false, false, Random(14))
+        val mechanic = people.residents.single { it.role.repairs }
+        val component = checkNotNull(map.component(mechanic.point))
+        assertTrue("시험 전제: 정비사 구역에서 고장 차 85px 안의 접근점이 없어야 한다", map.repairApproaches(broken, component).isEmpty())
+        val start = mechanic.point
+        repeat(600) {
+            people.step(.05f)
+            assertNotEquals(TownPopulation.Activity.WORKING, mechanic.activity)
+            assertTrue(map.allows(mechanic.point))
+        }
+        assertEquals("접근점이 없으면 걷지 않고 제자리에서 기다린다", start, mechanic.point)
     }
 
     @Test fun visitorsEnterAndExitWithoutLeavingWalkableMap() {
