@@ -213,6 +213,35 @@ class NavigationAdapterTest {
         }
     }
 
+    @Test fun explicitQuoteReconnectDiscardsOldCallbacksAndAcceptsNewQuote() {
+        val rig = Rig()
+        val oldPort = rig.connect()
+        val old = NavigationDestination(37.0, 127.0, "이전 목적지", null, null, null, null)
+        val current = old.copy(name = "새 목적지")
+        oldPort.events(NavigationSdkEvent.RouteId("old"))
+        oldPort.events(NavigationSdkEvent.Destination(old, 500))
+        oldPort.events(NavigationSdkEvent.DestinationChanged)
+        rig.drain()
+
+        rig.adapter.reconnectForQuote(rig.events::add)
+        rig.drain()
+        val newPort = rig.ports.last()
+        newPort.connected()
+        oldPort.events(NavigationSdkEvent.RouteId("old"))
+        oldPort.events(NavigationSdkEvent.Destination(old, 500))
+        rig.drain()
+        assertTrue(rig.state().destination is NavigationField.Missing)
+
+        rig.adapter.refresh()
+        rig.drain()
+        newPort.events(NavigationSdkEvent.RouteId("new"))
+        newPort.events(NavigationSdkEvent.Destination(current, 800))
+        newPort.events(NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"))
+        rig.drain()
+        assertEquals(current, (rig.state().destination as NavigationField.Value).value)
+        assertEquals(800L, (rig.state().remainingEstimatedMeters as NavigationField.Value).value)
+    }
+
     @Test fun differentFirstIdAfterReconnectCannotAuthorizeLateOldDestination() {
         val rig = Rig()
         val oldPort = rig.connect()

@@ -8,6 +8,7 @@ import android.widget.ScrollView
 import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.pixel.ReferenceHudIcon
 import io.drivegrowth.app.ui.vehicleDisplayName
+import io.drivegrowth.app.ui.shop.FacilityControlsEvent
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.progression.VehicleAction
@@ -25,6 +26,10 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
     private val heldDeadlineFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.KOREA)
         .withZone(ZoneId.of("Asia/Seoul"))
     private val interaction = GarageInteraction(onEvent)
+    internal var onRest: ((FacilityControlsEvent.SetResting) -> Unit)? = null
+    private var restActions = emptyMap<OwnedVehicleId, FacilityControlsEvent.SetResting>()
+    private var resting = emptySet<OwnedVehicleId>()
+    private var restRecovery: View? = null
     private var columnCount = 1
     private var wide = false
     private var listScroll: ScrollView? = null
@@ -39,12 +44,20 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
 
     init { orientation = VERTICAL; setBackgroundColor(style.base) }
 
-    fun render(state: GarageScreenState, controlsEnabled: Boolean) {
+    fun render(state: GarageScreenState, controlsEnabled: Boolean,
+        resting: Set<OwnedVehicleId> = emptySet(),
+        restActions: Map<OwnedVehicleId, FacilityControlsEvent.SetResting> = emptyMap(),
+        restRecovery: View? = null,
+    ) {
+        val restChanged = this.resting != resting || this.restActions != restActions || this.restRecovery !== restRecovery
+        this.resting = resting
+        this.restActions = restActions
+        this.restRecovery = restRecovery
         val previous = interaction.state
         val previouslyEnabled = interaction.controlsEnabled
         val retryWasPending = interaction.retryPending
         interaction.render(state, controlsEnabled)
-        if (childCount == 0 || previous != state || previouslyEnabled != controlsEnabled || retryWasPending) drawScreen()
+        if (childCount == 0 || previous != state || previouslyEnabled != controlsEnabled || retryWasPending || restChanged) drawScreen()
     }
 
     /** 호스트의 준비/확인/명령 흐름이 끝났을 때 호출한다. 성공 상태는 새 render 입력으로만 반영한다. */
@@ -81,6 +94,10 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
             return@with
         }
         if (showHeading) addView(heading(s(R.string.garage_title), ReferenceHudIcon.GARAGE))
+        restRecovery?.let {
+            (it.parent as? android.view.ViewGroup)?.removeView(it)
+            addView(it)
+        }
         when (val state = interaction.state) {
             GarageScreenState.Loading -> addView(message(s(R.string.garage_loading)))
             is GarageScreenState.Error -> addView(message(s(R.string.garage_error), state.message).apply {
@@ -278,7 +295,7 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
                 sharedReasons.forEach { reason -> add(this, text(reason, 16, muted), 4) }
                 garageManagementActions.forEach { (action, label) ->
                     val info = value.actions[action]
-                    val enabled = info?.enabled == true && !interaction.requestPending
+                    val enabled = info?.enabled == true && !interaction.requestPending && restRecovery == null
                     val reason = if (interaction.requestPending) s(R.string.garage_pending)
                         else info?.takeUnless { it.enabled }?.explanation?.takeIf { it.isNotBlank() }
                             ?: s(R.string.garage_action_unknown)
@@ -296,6 +313,13 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
                     }
                 }
             }
+            val restAction = restActions[value.vehicle.ownedVehicleId]?.takeIf { it.vehicle.revision == value.vehicle.revision }
+            if (restAction != null) add(actions, button(
+                if (restAction.expected) "영업 쉬기 끄기" else "영업 쉬기 켜기", !interaction.requestPending
+            ) {
+                if (interaction.controlsEnabled && !interaction.requestPending &&
+                    restActions[value.vehicle.ownedVehicleId] == restAction) onRest?.invoke(restAction)
+            }.apply { tag = "garage:rest" })
             addView(facts, LayoutParams(-1, -2))
             add(this, actions, gap = 10)
         }
@@ -334,7 +358,7 @@ class GarageView(context: Context, onEvent: (GarageEvent) -> Unit) : LinearLayou
         context.getString(R.string.garage_progress, "${value.vehicle.levelProgressPercent}%")
 
     private fun activity(value: VehiclePresentation) = s(when (value.activity) {
-        VehicleActivity.IDLE -> R.string.garage_idle
+        VehicleActivity.IDLE -> if (value.vehicle.ownedVehicleId in resting) R.string.shop_scene_resting else R.string.garage_idle
         VehicleActivity.RENTED -> R.string.garage_rented
         VehicleActivity.RETURNING -> R.string.garage_returning
         VehicleActivity.NEEDS_REPAIR -> R.string.garage_repair_needed

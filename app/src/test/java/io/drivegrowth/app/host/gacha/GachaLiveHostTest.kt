@@ -71,6 +71,19 @@ class GachaLiveHostTest {
             assertEquals(1,h.changes)
         }
     }
+    @Test fun `뽑기 화면에 다시 들어오면 다른 화면에서 바뀐 잔액을 조회한다`() {
+        val h = Harness()
+        h.start()
+        h.host.setControlsEnabled(false)
+        h.balance = GameMoney(750)
+        h.host.setControlsEnabled(true)
+        h.drain()
+
+        val offers = (h.ui.frame!!.screen as GachaScreen.Offers).value
+        assertEquals(GameMoney(750), offers.balance)
+        assertEquals(0, h.executes)
+    }
+
     @Test fun `취소는 명령 준비와 지급을 실행하지 않는다`() {
         val h=Harness();h.start();assertTrue(h.ui.select("paid"));assertTrue(h.ui.cancel());h.drain()
         assertEquals(0,h.prepares);assertEquals(0,h.executes);assertNull(h.pending)

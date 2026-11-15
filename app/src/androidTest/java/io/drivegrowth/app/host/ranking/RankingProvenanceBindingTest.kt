@@ -132,13 +132,13 @@ class RankingProvenanceBindingTest : InstrumentationTestCase() {
         assertEquals(1.toBigDecimal(), amount(snapshot, RankingMetric.OWNED))
     }
     fun testRecordedTripOriginalZoneFeedsWeeklyRewardedMeters() {
-        val receipt = recordedTrip(RankingDefinitions.acceptedLocal().week!!.zone)
+        val receipt = recordedTrip(RankingDefinitions.acceptedLocal(InputSource.SIMULATION).week!!.zone)
         val snapshot = unchangedRead()
         assertEquals(15.toBigDecimal(), amount(snapshot, RankingMetric.WEEKLY_DISTANCE))
         ok(games.open()).use { assertEquals(receipt, ok(it.store.observedDrivingReceipt(receipt.trip.id))) }
     }
     fun testOtherOriginalZoneStaysMissingInsteadOfBecomingRankingZone() {
-        recordedTrip(ZoneId.of("UTC"))
+        recordedTrip(ZoneId.of("Asia/Seoul"))
         assertTrue(unchangedRead().metrics.getValue(RankingMetric.WEEKLY_DISTANCE) is RankingValue.Missing)
     }
     fun testUnactivatedLegacyDepartureRemainsMissing() {
@@ -157,14 +157,14 @@ class RankingProvenanceBindingTest : InstrumentationTestCase() {
         assertTrue(snapshot.metrics.getValue(RankingMetric.OWNED) is RankingValue.Available)
     }
     fun testDamagedObservedOriginIsFailureForMetricsThatUseIt() {
-        recordedTrip(RankingDefinitions.acceptedLocal().week!!.zone)
+        recordedTrip(RankingDefinitions.acceptedLocal(InputSource.SIMULATION).week!!.zone)
         raw { it.execSQL("UPDATE observed_driving_receipts SET digest='damaged'") }
         val snapshot = unchangedRead()
         for (metric in listOf(RankingMetric.EARNED, RankingMetric.WEEKLY_DISTANCE))
             assertEquals(RankingValue.Failure(ContractError.STORAGE_FAILURE), snapshot.metrics.getValue(metric))
     }
     fun testForeignRecordedProfileIsFailureInsteadOfMissing() {
-        recordedTrip(RankingDefinitions.acceptedLocal().week!!.zone)
+        recordedTrip(RankingDefinitions.acceptedLocal(InputSource.SIMULATION).week!!.zone)
         raw { it.execSQL("UPDATE observed_driving_receipts SET profile='foreign-profile'") }
         assertEquals(RankingValue.Failure(ContractError.STORAGE_FAILURE),
             unchangedRead().metrics.getValue(RankingMetric.WEEKLY_DISTANCE))

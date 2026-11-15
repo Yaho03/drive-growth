@@ -16,6 +16,7 @@ data class DeliveryProposalUi(
     val vehicleNames: Map<VehicleId, String>,
     val availability: Map<DeliveryOfferId, DeliveryAvailability>,
     val confirmationTerms: String?,
+    val garageFull: Boolean = false,
 )
 
 data class DeliveryActiveUi(

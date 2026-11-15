@@ -18,6 +18,20 @@ internal class TownActors(context: Context, private val population: TownPopulati
     private val bounds = RectF()
 
     private val effect = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val sweat = Paint().apply { color = 0xff9cc2ff.toInt() }
+    private val sweatDrop = Path().apply {
+        moveTo(14f, -12f)
+        lineTo(17f, -12f)
+        lineTo(17f, -9f)
+        lineTo(20f, -9f)
+        lineTo(20f, -3f)
+        lineTo(17f, -3f)
+        lineTo(17f, 0f)
+        lineTo(11f, 0f)
+        lineTo(11f, -6f)
+        lineTo(14f, -6f)
+        close()
+    }
     private val heart = Path().apply {
         moveTo(0f, 12f)
         cubicTo(-18f, 0f, -9f, -11f, 0f, -4f)
@@ -89,6 +103,10 @@ internal class TownActors(context: Context, private val population: TownPopulati
             if (resident.held) canvas.rotate(if ((resident.clock * 8f).toInt() % 2 == 0) 10f else -10f, x, bottom - height / 2f)
             else if (resident.reaction > 0f) canvas.rotate(if ((resident.reaction * 10f).toInt() % 2 == 0) 6f else -6f, x, bottom)
             canvas.drawBitmap(sprite, null, bounds, paint)
+            if (animate && resident.held) {
+                canvas.translate(x, bottom - height)
+                canvas.drawPath(sweatDrop, sweat)
+            }
             canvas.restore()
             paint.colorFilter = null
             paint.alpha = 255
@@ -98,10 +116,7 @@ internal class TownActors(context: Context, private val population: TownPopulati
 
     private fun drawReaction(canvas: Canvas, resident: TownPopulation.Resident, x: Float, top: Float) {
         when {
-            resident.held -> {
-                effect.color = 0xff9cc2ff.toInt()
-                canvas.drawOval(x + 12f, top - 12f, x + 20f, top + 1f, effect)
-            }
+            resident.held -> Unit
             resident.reaction > 0f -> {
                 effect.color = 0xffffdeb7.toInt()
                 val hand = if ((resident.reaction * 10f).toInt() % 2 == 0) 1f else -1f

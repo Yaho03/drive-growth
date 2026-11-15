@@ -177,7 +177,9 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
             add(card, text(item.title, 28, bold = true), 0); add(card, statusText(item, enabled)); progress(card, item)
             add(card, text(s(R.string.progress_confirm_title), 24, bold = true))
             add(card, text(item.rewardLabel ?: s(R.string.progress_unknown_reward), 24))
-            add(card, text(s(R.string.progress_confirm_body)))
+            // 이미 받은 보상에는 "청구 예정" 안내 대신 지급 완료 안내를 보여 준다.
+            val claimed = item.status == RewardStatus.CLAIMED && !interaction.isPending(item)
+            add(card, text(s(if (claimed) R.string.progress_claimed_body else R.string.progress_confirm_body)))
             item.note?.let { add(card, text(it)) }
             val pending = interaction.isPending(item)
             add(card, button(s(if (pending) R.string.progress_pending else if (enabled) R.string.progress_claim else R.string.progress_no_claim), enabled, true) {
@@ -236,7 +238,9 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
                 RestOutcome.ALREADY_HANDLED -> R.string.progress_rest_handled
                 RestOutcome.UNCONFIRMED, null -> R.string.progress_rest_unconfirmed
             }
-            add(card, text(s(recognition), 24, bold = true), 0)
+            if (value.buffPhase == BuffPhase.ACTIVE && recognition == R.string.progress_rest_unconfirmed)
+                add(card, text("이번 휴식 조건은 아직 확인하지 못했어요.", color = muted), 0)
+            else add(card, text(s(recognition), 24, bold = true), 0)
             for (condition in value.conditions) {
                 val id = when (condition.satisfied) { true -> R.string.progress_condition_yes; false -> R.string.progress_condition_no; null -> R.string.progress_condition_unknown }
                 add(card, text(context.getString(id, condition.label)), 0)

@@ -8,7 +8,7 @@ import io.drivegrowth.core.delivery.*
 
 /** B가 실제 반환 목적지를 사용자에게 확인받은 문맥. SDK 요청문구나 연결 세대로 만들지 않는다. */
 data class DeliveryDestinationSelection(val identity: GameIdentity, val destination: DestinationKey, val selectionRevision: Long,
-    val actualDestination: NavigationDestination, val actualStamp: NavigationStamp)
+    val actualDestination: NavigationDestination, val actualStamp: NavigationStamp, val actualRouteId: String? = null)
 
 /** F 모델을 그대로 소비하는 순수 연결안. 실제 F source/선택 UI 공급은 B의 통합 책임이다. */
 class FNavigationDeliveryPort(
@@ -36,9 +36,15 @@ class FNavigationDeliveryPort(
         val binding = selected(identity, raw)
         val destination = raw.destination as? NavigationField.Value
         val distance = raw.remainingEstimatedMeters as? NavigationField.Value
+        val route = raw.routeId as? NavigationField.Value
+        val sameRouteUpdate = binding?.actualRouteId != null && route?.value == binding.actualRouteId &&
+            route.stamp.source == NavigationSource.PLEOS_NAVI_SDK &&
+            route.stamp.connectionGeneration == raw.stamp.connectionGeneration &&
+            destination != null && destination.stamp.connectionGeneration == binding.actualStamp.connectionGeneration &&
+            destination.stamp.sequence >= binding.actualStamp.sequence
         val sameDestination = raw.connection == NavigationConnection.CONNECTED_OBSERVED && raw.failure == null &&
             binding != null && binding.identity == identity && destination != null && binding.actualDestination == destination.value &&
-            binding.actualStamp == destination.stamp && binding.selectionRevision >= 0
+            (binding.actualStamp == destination.stamp || sameRouteUpdate) && binding.selectionRevision >= 0
         val classification = classifiedSource(identity, raw)
         val source = (classification as? Observation.Available)?.value
         val mode = (raw.guidance as? NavigationField.Value)?.value?.mode
@@ -60,9 +66,9 @@ class FNavigationDeliveryPort(
         val moved = observed(identity).let { value -> if (value is Observation.Available && value.value.source != identity.source)
             Observation.Missing(MissingReason.NO_DATA) else value }
         return ContractResult.Success(DeliveryNavigationSnapshot(
-            if (sameDestination) binding!!.destination else null,
+            if (estimated is Observation.Available) binding!!.destination else null,
             destination?.value?.name, estimated, moved,
             Observation.Missing(MissingReason.NO_DATA), // F의 arrival는 항상 독립 상관 근거 확인 대기다.
-            if (sameDestination) binding!!.selectionRevision else null, metadata))
+            if (estimated is Observation.Available) binding!!.selectionRevision else null, metadata))
     }
 }

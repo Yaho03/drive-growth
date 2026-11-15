@@ -39,6 +39,7 @@ class DeliveryView(
     private val canConfirmOffer: () -> Boolean = { true },
     private val onPresentationCue: (DeliveryPresentationCue) -> Unit = {},
     private val onPresentationCancelled: () -> Unit = {},
+    private val supportsDestinationChange: Boolean = true,
 ) : LinearLayout(context) {
     private val sceneArt = ReferenceSceneArt(context)
     private val sceneText = ReferenceSceneTypography(context)
@@ -599,6 +600,8 @@ class DeliveryView(
             addView(text(present(value.destinationName, R.string.delivery_destination_missing), 21, bold = true))
             addView(text(context.getString(R.string.delivery_estimated, deliveryDistance(value.proposed.estimated.meters))))
             info(this, present(value.confirmationTerms, R.string.delivery_terms_missing), muted = true)
+            if (selected is DeliveryOffer.Purchase && value.garageFull)
+                addView(text("차고에 빈자리가 없으면 도착 후 임시 보관함에 보관돼요. 24시간 안에 수령해 주세요.", bold = true))
             val permission = value.availability[selected.id]
             if (permission?.allowed != true) {
                 info(this, present(permission?.reason, R.string.delivery_action_unavailable), muted = true)
@@ -635,7 +638,7 @@ class DeliveryView(
                 info(this, present(value.progressLabel, R.string.delivery_progress_missing))
             })
         }
-        if (!value.change.allowed) info(summary, present(value.change.reason, R.string.delivery_change_unavailable), muted = true)
+        if (supportsDestinationChange && !value.change.allowed) info(summary, present(value.change.reason, R.string.delivery_change_unavailable), muted = true)
         if (!value.abandon.allowed) info(summary, present(value.abandon.reason, R.string.delivery_action_unavailable), muted = true)
         style.add(parent, summary, gap = 0)
     }
@@ -643,8 +646,10 @@ class DeliveryView(
     private fun activeActions(value: DeliveryActiveUi) {
         val buttons = reviewActions()
         addShopReturn(buttons)
-        action(buttons, R.string.delivery_change_destination, "delivery:destination",
-            DeliveryCommand.ChooseDestination(value.active), inline = true)
+        if (supportsDestinationChange) {
+            action(buttons, R.string.delivery_change_destination, "delivery:destination",
+                DeliveryCommand.ChooseDestination(value.active), inline = true)
+        }
         action(buttons, R.string.delivery_review_abandon, "delivery:review-abandon",
             DeliveryCommand.ReviewAbandon(value.active), inline = true)
     }

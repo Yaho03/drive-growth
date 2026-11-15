@@ -43,6 +43,7 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
     private var activationRequested = false
     private var lastFacility = facility.state
     private var facilityAccess = false
+    private var garageFacilityAccess = false
     val facilityControlsEnabled get() = display.enabled && facilityAccess
     private val originals = linkedMapOf<ShopRequest, ShopRequest>()
     private var onState: ((HomeShopState, Boolean) -> Unit)? = null
@@ -62,7 +63,7 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
         changed(state, display.enabled)
     }
     fun remember(value: ShopUiState) { uiState = value }
-    fun detach() { setControlsEnabled(false); onState = null; onComplete = null; onRetry = null; onInstallation = null }
+    fun detach() { setGarageFacilityAccess(false); setControlsEnabled(false); onState = null; onComplete = null; onRetry = null; onInstallation = null }
     fun release() { detach(); released = true; decoration?.release(); expansion?.release(); facility.changed = null }
 
     fun setControlsEnabled(value: Boolean) {
@@ -74,7 +75,17 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
         if (!value) setFacilityAccess(false)
         if (value) refresh()
     }
-    private fun setFacilityAccess(value: Boolean) { facilityAccess = value; facility.setControlsEnabled(value) }
+    fun setGarageFacilityAccess(value: Boolean) {
+        if (released || value == garageFacilityAccess) return
+        garageFacilityAccess = value
+        facility.setControlsEnabled(facilityAccess || value)
+        onState?.invoke(state, display.enabled)
+    }
+
+    private fun setFacilityAccess(value: Boolean) {
+        facilityAccess = value
+        facility.setControlsEnabled(value || garageFacilityAccess)
+    }
     private fun publish(next: HomeShopState) { state = next.copy(original = recoveredOriginal); onState?.invoke(state, display.enabled && !released) }
     private fun show(value: ShopScreenState, error: ContractError? = null, inactive: Boolean = false,
         routes: Map<HomeShopAction, Revision> = emptyMap()) {
@@ -354,7 +365,10 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
         if (released || value == lastFacility) return
         val resolved = lastFacility.pending != null && value.pending == null && value.facts != null
         lastFacility = value
-        if (!display.enabled) return
+        if (!display.enabled) {
+            if (garageFacilityAccess) onState?.invoke(state, false)
+            return
+        }
         completeFacility(value)
         if (!value.busy && (state.screen is ShopScreenState.Content || resolved)) refresh()
         else onState?.invoke(state, display.enabled)

@@ -52,10 +52,10 @@ internal object RankingAggregation {
         for (row in rows) {
             if (row.source != source || row.rewardedMeters !in 0..500000 || days.put(row.day, row) != null) return invalid()
         }
-        if(days.values.any{(it.departureZone as? Observation.Available)?.value != definition.zone})
-            return RankingValue.Missing("출발 당시 날짜의 시간대 근거가 없거나 집계 시간대와 다릅니다. 날짜 키를 임의 변환하지 않습니다.")
         val included = days.values.filter { it.day >= start && it.day < end }
         if (included.any { it.day > today }) return invalid()
+        if (included.any { (it.departureZone as? Observation.Available)?.value != definition.zone })
+            return RankingValue.Missing("이번 주 주행 기록의 시간대를 확인할 수 없어요.")
         if (included.isEmpty()) return RankingValue.Empty("$start ~ $end 미만 · ${definition.zone.id} · 확정 주행 기록 없음")
         return RankingValue.Available(included.sumOf { it.rewardedMeters }.toBigDecimal(),
             "$start ~ $end 미만 · ${definition.zone.id} · 출발일/일 500km 상한")

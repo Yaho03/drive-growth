@@ -12,11 +12,12 @@ import java.util.concurrent.Executor
 
 /** F의 원 snapshot을 그대로 보관한다. gate/stop 세대 무효화 후 disconnect하며 경로를 취소하지 않는다. */
 class SessionDeliveryNavigation(context: Context, private val main: Executor) : HostDeliveryNavigation {
+    private val fresh: (NavigationStamp) -> Boolean = { stamp ->
+        SystemClock.elapsedRealtime() - stamp.receivedElapsedMillis in 0..5_000L
+    }
+
     // 앱의 명시 신선도 제한이다. SDK의 유효 시간이나 실제 주행 증명이 아니다.
-    private val confirmation = NavigationDestinationConfirmation({ stamp ->
-        val age = SystemClock.elapsedRealtime() - stamp.receivedElapsedMillis
-        age in 0..5_000L
-    }, { DestinationKey("navi-confirmed-" + UUID.randomUUID()) })
+    private val confirmation = NavigationDestinationConfirmation(fresh, { DestinationKey("navi-confirmed-" + UUID.randomUUID()) })
     private val source = PleosNavigationSource(context, main, 10_000L)
     private var enabled = false
     private var epoch = 0L
@@ -25,31 +26,47 @@ class SessionDeliveryNavigation(context: Context, private val main: Executor) : 
     override val port: DeliveryNavigationPort = FNavigationDeliveryPort(
         { identity -> confirmation.bind(identity); confirmation.snapshot },
         { identity, _ -> confirmation.selected(identity) },
-        { identity, raw -> deliveryEstimateSource(identity, raw) { stamp ->
-            val age = SystemClock.elapsedRealtime() - stamp.receivedElapsedMillis
-            age in 0..5_000L
-        } },
+        { identity, raw -> deliveryEstimateSource(identity, raw, fresh) },
         { Observation.Missing(MissingReason.NO_DATA) },
-        { stamp -> val age = SystemClock.elapsedRealtime() - stamp.receivedElapsedMillis; age in 0..5_000L },
+        fresh,
         { identity, _ ->
-            main.execute { if (enabled) { confirmation.begin(identity); source.refresh(); changed?.invoke() } }
+            main.execute { if (enabled) { confirmation.begin(identity); refresh() } }
             ContractResult.Success(Unit)
         })
     override fun setControlsEnabled(value: Boolean) {
         if (value == enabled) return
         enabled = value
-        val token = ++epoch
+        ++epoch
         confirmation.setEnabled(value)
         if (!value) { source.disconnect(); return }
-        source.connect { event ->
+        connectForQuote(reconnect = false)
+    }
+
+    private fun connectForQuote(reconnect: Boolean) {
+        val token = ++epoch
+        var queried = false
+        val receive: (NavigationEvent) -> Unit = { event ->
             if (enabled && token == epoch) {
-                if (event is NavigationEvent.State) confirmation.accept(event.snapshot)
+                if (event is NavigationEvent.State) {
+                    confirmation.accept(event.snapshot)
+                    if (!queried && event.snapshot.connection == NavigationConnection.CONNECTED_OBSERVED) {
+                        queried = true
+                        source.refresh()
+                    }
+                }
                 changed?.invoke()
             }
         }
+        if (reconnect) source.reconnectForQuote(receive) else source.connect(receive)
     }
-    override fun refresh() { if (enabled) source.refresh() }
-    override fun confirm(): ContractResult<Unit> = when (val result = confirmation.confirm()) {
+
+    override fun refresh() {
+        if (!enabled) return
+        confirmation.invalidateQuote()
+        connectForQuote(reconnect = true)
+        changed?.invoke()
+    }
+    override fun confirm(): ContractResult<Unit> = when (val result = confirmation.confirm { identity, raw -> deliveryEstimateSource(identity, raw, fresh) }) {
         is ContractResult.Failure -> result
         is ContractResult.Success -> ContractResult.Success(Unit)
     }

@@ -83,8 +83,9 @@ internal class HostSession(
         val replayClock = ordinaryRentalReplayClock
         if (replayClock == null) {
             val restStart = simulation?.restSample(frame)?.takeIf { it.startsRestRun }
-            if (restStart == null) rentalSource.observe(frame, recorded)
-            else rentalSource.observeSimulationRestStart(frame, recorded, restStart.clock)
+            val gapStart = simulation?.departureGapStart(frame)
+            if (restStart == null && gapStart == null) rentalSource.observe(frame, recorded)
+            else rentalSource.observeSimulationDeparture(frame, recorded, restStart?.clock, gapStart)
         }
         else rentalSource.observeOrdinarySimulationReplay(frame, recorded, replayClock,
             ordinaryTerminal = simulation?.restSample(frame)?.ordinaryTerminal == true).also { result ->
@@ -287,40 +288,39 @@ internal class HostSession(
         simulation?.attach(worker, accept)
     }
 
-    fun prepareSimulation(rest: Boolean = false, done: (ContractResult<Unit>) -> Unit) {
+    fun prepareSimulation(rest: Boolean = false, done: (SimulationStartBlock?) -> Unit) {
         worker.execute {
-            val result = when (val opened = games.open()) {
-                is ContractResult.Failure -> opened
-                is ContractResult.Success -> opened.value.use { game ->
-                    when (val initialized = game.store.readInitialization(game.identity.profileId)) {
-                        is ContractResult.Failure -> initialized
-                        is ContractResult.Success -> if (initialized.value.status !is ProfileInitializationStatus.Existing)
-                            ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
-                        else when (val saved = game.store.hostCommands.load(game.identity.profileId)) {
-                            is ContractResult.Failure -> saved
-                            is ContractResult.Success -> if (saved.value != null)
-                                ContractResult.Failure(ContractError.STATE_CONFLICT)
-                                else if (rest) checkRestSimulation(game) else ContractResult.Success(Unit)
-                        }
-                    }
-                }
+            val block = when (val opened = games.open()) {
+                is ContractResult.Failure -> SimulationStartBlock.READ_FAILED
+                is ContractResult.Success -> opened.value.use { game -> checkSimulationStart(game, rest) }
             }
-            main.execute { done(result) }
+            main.execute { done(block) }
         }
     }
 
-    private fun checkRestSimulation(game: GameSession): ContractResult<Unit> {
+    private fun checkSimulationStart(game: GameSession, rest: Boolean): SimulationStartBlock? {
+        when (val initialized = game.store.readInitialization(game.identity.profileId)) {
+            is ContractResult.Failure -> return SimulationStartBlock.READ_FAILED
+            is ContractResult.Success -> if (initialized.value.status !is ProfileInitializationStatus.Existing)
+                return SimulationStartBlock.OPENING_GIFT
+        }
+        when (val saved = game.store.hostCommands.load(game.identity.profileId)) {
+            is ContractResult.Failure -> return SimulationStartBlock.READ_FAILED
+            is ContractResult.Success -> if (saved.value != null) return if (
+                saved.value?.command is io.drivegrowth.app.data.HostCheckpointCommand.Gacha
+            ) SimulationStartBlock.GACHA_RESULT else SimulationStartBlock.SAVED_REQUEST
+        }
+        if (!rest) return null
         if (simulation == null || game.identity.source != InputSource.SIMULATION)
-            return ContractResult.Failure(ContractError.INVALID_INPUT)
+            return SimulationStartBlock.REST_CONFIGURATION
         when (val delivery = game.store.delivery.inProgress()) {
-            is ContractResult.Failure -> return delivery
-            is ContractResult.Success -> if (delivery.value != null) return ContractResult.Failure(ContractError.STATE_CONFLICT)
+            is ContractResult.Failure -> return SimulationStartBlock.READ_FAILED
+            is ContractResult.Success -> if (delivery.value != null) return SimulationStartBlock.ACTIVE_DELIVERY
         }
         return when (val loaded = game.store.trialDefinitions.load()) {
-            is ContractResult.Failure -> loaded
+            is ContractResult.Failure -> SimulationStartBlock.READ_FAILED
             is ContractResult.Success -> if (loaded.value.rest.minDrivingMs == 3_600_000L &&
-                loaded.value.rest.minParkedMs == 300_000L) ContractResult.Success(Unit)
-            else ContractResult.Failure(ContractError.POLICY_UNRESOLVED)
+                loaded.value.rest.minParkedMs == 300_000L) null else SimulationStartBlock.REST_CONFIGURATION
         }
     }
 

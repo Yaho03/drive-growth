@@ -25,9 +25,10 @@ data class RankingDefinitions(val collection: CollectionCountDefinition? = null,
     val income: RankingIncomeDefinition? = null, val week: RankingWeekDefinition? = null) {
     companion object {
         /** 2026-11-10 사용자 결정. 표시 집계 정의이며 지급/경제 규칙을 바꾸지 않는다. */
-        fun acceptedLocal() = RankingDefinitions(CollectionCountDefinition.OBTAINED,
+        fun acceptedLocal(source: InputSource = InputSource.VEHICLE) = RankingDefinitions(CollectionCountDefinition.OBTAINED,
             RankingIncomeDefinition(RuleVersion("ranking-local-2026-11-10"),RankingIncomeOrigin.entries.toSet()),
-            RankingWeekDefinition(RuleVersion("ranking-week-2026-11-10"),DayOfWeek.MONDAY,ZoneId.of("Asia/Seoul")))
+            RankingWeekDefinition(RuleVersion("ranking-week-2026-11-10"),DayOfWeek.MONDAY,
+                ZoneId.of(if (source == InputSource.SIMULATION) "UTC" else "Asia/Seoul")))
     }
 }
 data class RankingIncome(val requestId: RequestId, val origin: RankingIncomeOrigin, val amount: GameMoney, val source: InputSource)

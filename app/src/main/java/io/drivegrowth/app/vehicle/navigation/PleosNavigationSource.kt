@@ -27,6 +27,7 @@ class PleosNavigationSource(context: Context, main: Executor, timeoutMillis: Lon
         { PleosNavigationSdkPort(app, worker) }, timeoutMillis)
 
     fun connect(listener: (NavigationEvent) -> Unit) = adapter.connect(listener)
+    internal fun reconnectForQuote(listener: (NavigationEvent) -> Unit) = adapter.reconnectForQuote(listener)
     fun disconnect() = adapter.disconnect()
     fun refresh() = adapter.refresh()
     fun requestRoute(request: NavigationRouteRequest) = adapter.requestRoute(request)

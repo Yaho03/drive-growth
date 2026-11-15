@@ -15,7 +15,7 @@ class StoredDeliveryHostSourceTest {
     private class Harness(purchase:Boolean=false) {
         val identity=GameIdentity(ProfileId("profile"),InputSource.SIMULATION);val day=LocalDate.of(2026,11,10)
         val content=GameContentFixtures.loaded();val calls=mutableListOf<String>();var readFailure=false;var saveFailure=false
-        var foreign=false;var pending:DeliveryHostOperation?=null;var navMissing=false;var navGeneration:Long?=1L;var navDestination=DestinationKey("destination");var discoveries=0
+        var foreign=false;var pending:DeliveryHostOperation?=null;var navMissing=false;var estimate: Observation<EstimatedRouteDistance> = Observation.Available(EstimatedRouteDistance(20000, identity.source));var navGeneration:Long?=1L;var navDestination=DestinationKey("destination");var discoveries=0
         val list=DeliveryList(0,identity.source,day,content.catalog.contentVersion,RuleVersion("delivery-test"),listOf(if(purchase)DeliveryOffer.Purchase(DeliveryOfferId("offer-0"),content.catalog.vehicles.first().vehicleId,Rarity.COMMON,GameMoney(8000))else DeliveryOffer.Income(DeliveryOfferId("offer-0"),content.catalog.vehicles.first().vehicleId,GameMoney(20))),1)
         var savedLists = listOf(list)
         val active=ActiveDelivery(RequestId("active"),DeliveryProposed(DestinationKey("destination"),EstimatedRouteDistance(20000,identity.source),list,list.offers),list.offers.single())
@@ -29,7 +29,7 @@ class StoredDeliveryHostSourceTest {
             override fun discover(identity:GameIdentity,proposed:DeliveryProposed)=ContractResult.Success(Unit)
         }
         private val nav=object:DeliveryNavigationPort {
-            override fun read(identity:GameIdentity):ContractResult<DeliveryNavigationSnapshot> = if(navMissing)ContractResult.Failure(ContractError.DATA_UNAVAILABLE) else ContractResult.Success(DeliveryNavigationSnapshot(navDestination,"목적지",Observation.Available(EstimatedRouteDistance(20000,identity.source)),Observation.Available(ObservedDistance(1000,identity.source)),Observation.Missing(MissingReason.NO_DATA),navGeneration))
+            override fun read(identity:GameIdentity):ContractResult<DeliveryNavigationSnapshot> = if(navMissing)ContractResult.Failure(ContractError.DATA_UNAVAILABLE) else ContractResult.Success(DeliveryNavigationSnapshot(navDestination,"목적지",estimate,Observation.Available(ObservedDistance(1000,identity.source)),Observation.Missing(MissingReason.NO_DATA),navGeneration))
             override fun chooseDestination(identity:GameIdentity,active:ActiveDelivery?)=ContractResult.Success(Unit)
         }
         private val journal=object:DeliveryOperationJournal {
@@ -47,6 +47,15 @@ class StoredDeliveryHostSourceTest {
         val source=StoredDeliveryHostSource(queries,{ContractResult.Success(rules)},nav,journal,{day},{EpochMillis(nowMillis)},{Random(1)},{RequestId("selection")},{RouteId("route")})
         val original=DeliveryHostOperation.Abandon(rules.change,RequestId("active"))
     }
+    @Test fun `이전 목적지가 있어도 견적이 아직 없으면 다시 확인할 수 있는 화면을 유지한다`() {
+        val h = Harness()
+        h.estimate = Observation.Missing(MissingReason.STALE)
+        val read = (h.source.read() as ContractResult.Success).value
+        val screen = read.screen as DeliveryScreen.Destination
+        assertTrue(screen.chooseAllowed)
+        assertFalse("saveList" in h.calls)
+    }
+
     @Test fun `기존 원명령은 현재 콘텐츠 읽기 실패보다 먼저 복구한다`() {
         val h=Harness();h.pending=h.original;h.readFailure=true
         val result=(h.source.read() as ContractResult.Success).value;assertEquals(h.original,result.pending);assertTrue(h.calls.isEmpty())

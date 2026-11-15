@@ -17,7 +17,7 @@ import java.util.Collections
  * 새 DB/초기화/재화 쓰기/네트워크를 만들지 않는다. 미열람 목록 대신 확정 이력 전체를 읽는다.
  */
 class RankingReadSource(private val store: SqliteGameChangeStore, private val source: InputSource,
-    content: GameContentSnapshot, definitions: RankingDefinitions = RankingDefinitions.acceptedLocal(),
+    content: GameContentSnapshot, definitions: RankingDefinitions = RankingDefinitions.acceptedLocal(source),
     /** 현재 같은 DB의 실제 퀘스트 claim 원장이 검증한 지급 요청 ID. 없으면 미분류 입금을 추측하지 않는다. */
     private val questCauses: ((SQLiteDatabase) -> ContractResult<Set<RequestId>>)? = null,
     /** 기존 LocalDate 키의 실제 출발 당시 시간대 근거. 현재 기기 시간대로 대신하지 않는다. */

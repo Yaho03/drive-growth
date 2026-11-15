@@ -104,6 +104,7 @@ open class MainActivity : Activity() {
     private var recoveredManagement = false
     private var managementVisible = false
     private var homeVehicleManagement = false
+    private lateinit var garageRestControls: io.drivegrowth.app.ui.shop.FacilityControlsView
     private lateinit var facilityControls: io.drivegrowth.app.ui.shop.FacilityControlsView
     private var pendingPage: HostPage? = null
     private var progressionSaved = false
@@ -245,6 +246,8 @@ open class MainActivity : Activity() {
         }
         facilityControls = io.drivegrowth.app.ui.shop.FacilityControlsView(this, ::onFacilityEvent)
         shop.facilityPanel = facilityControls
+        garageRestControls = io.drivegrowth.app.ui.shop.FacilityControlsView(this, ::onFacilityEvent)
+        garage.onRest = ::onFacilityEvent
         val shopMode = ShopMode.entries.firstOrNull { it.name == savedInstanceState?.getString("shopMode") } ?: ShopMode.OVERALL
         var restoredFacility: io.drivegrowth.app.host.facility.FacilityCommand.Buy? = null
         val restoredShop = if (savedInstanceState?.containsKey("shopUi") == true) {
@@ -311,7 +314,8 @@ open class MainActivity : Activity() {
             simulationDestinationControls = ::simulationDeliveryDestinationControls, hostStatus = ::deliveryHostStatus,
             canConfirmOffer = { !session.delivery.isSavingDisplayedOffers },
             onPresentationCue = ::playDeliveryCue,
-            onPresentationCancelled = presentationAudio::stopEffectPlayback).apply {
+            onPresentationCancelled = presentationAudio::stopEffectPlayback,
+            supportsDestinationChange = session.simulation == null).apply {
             showHeading = false
             onConfirmSceneResult = {
                 if (navigation.page == HostPage.DELIVERY && gameControlsAllowed()) session.delivery.acknowledge()
@@ -825,12 +829,12 @@ open class MainActivity : Activity() {
         restStartTicket = ticket
         // 같은 UI 이벤트에서 새 탁송 요청을 닫고, 앞선 거래 뒤 worker에서 원장을 확인한다.
         updateAccess()
-        session.prepareSimulation(rest = true) { result ->
+        session.prepareSimulation(rest = true) { block ->
             if (restStartTicket !== ticket) return@prepareSimulation
             restStartTicket = null
-            if (simulationControlsExpanded && page == navigation.page && gameControlsAllowed()) when (result) {
-                is ContractResult.Failure -> simulation.rejected(result.error)
-                is ContractResult.Success -> { collapseSimulationControls(); simulation.beginRest() }
+            if (simulationControlsExpanded && page == navigation.page && gameControlsAllowed()) {
+                if (block != null) simulation.rejected(block)
+                else { collapseSimulationControls(); simulation.beginRest() }
             }
             if (active) updateAccess()
         }
@@ -856,10 +860,10 @@ open class MainActivity : Activity() {
         simulationStart = featureStyle.button("모의주행 시작", primary = true) {
             if (!simulationControlsExpanded || !gameControlsAllowed() ||
                 navigation.page == HostPage.ONBOARDING) return@button
-            simulationStartBoundary.prepare({ session.prepareSimulation(done = it) }) { result ->
-                if (gameControlsAllowed() && navigation.page != HostPage.ONBOARDING) when (result) {
-                    is ContractResult.Failure -> simulation.rejected(result.error)
-                    is ContractResult.Success -> { collapseSimulationControls(); simulation.begin() }
+            simulationStartBoundary.prepare({ session.prepareSimulation(done = it) }) { block ->
+                if (gameControlsAllowed() && navigation.page != HostPage.ONBOARDING) {
+                    if (block != null) simulation.rejected(block)
+                    else { collapseSimulationControls(); simulation.begin() }
                 }
             }
         }.apply {
@@ -942,9 +946,7 @@ open class MainActivity : Activity() {
             }
         }
         simulationStatus?.let { status ->
-            val supplied = simulation.status
-            val message = if (supplied.startsWith("시작 조건 미충족 ("))
-                getString(R.string.host_simulation_start_unavailable) else supplied
+            val message = simulation.status
             if (status.text != message) status.text = message
         }
         simulationStart?.visibility = if (enabled && navigation.page != HostPage.ONBOARDING) View.VISIBLE else View.GONE
@@ -993,6 +995,7 @@ open class MainActivity : Activity() {
         session.ranking.setControlsEnabled(enabled && navigation.page == HostPage.RANKING)
         session.onboarding.setControlsEnabled(enabled)
         session.home.setControlsEnabled(enabled && navigation.page == HostPage.HOME && !shopRestoreFailed)
+        session.home.setGarageFacilityAccess(gameEnabled && navigation.page == HostPage.GARAGE)
         management.controller.setControlsEnabled(enabled)
         val routeGained = enabled && !pendingRouteEnabled
         pendingRouteEnabled = enabled
@@ -1118,6 +1121,7 @@ open class MainActivity : Activity() {
         if (map) {
             val game = section(R.string.host_settings_game, ReferenceHudIcon.GARAGE)
             action(game, getString(R.string.host_settings_facilities), "shop:map-facilities") { closeHomeSettings(); shop.openMapTools() }
+            action(game, "꾸미기", "shop:settings-decorations") { closeHomeSettings(); shop.openDecorationTools() }
             action(game, "퀘스트·업적·휴식", "host:page:PROGRESSION") { select(HostPage.PROGRESSION) }
             action(game, "첫 차량 안내", "host:page:ONBOARDING") { select(HostPage.ONBOARDING) }
 
@@ -1215,10 +1219,12 @@ open class MainActivity : Activity() {
         val homeEnabled = gameEnabled && navigation.page == HostPage.HOME && !shopRestoreFailed
         val facility = session.facility.state
         val facilityEnabled = homeEnabled && session.home.facilityControlsEnabled
+        val garageEnabled = gameEnabled && navigation.page == HostPage.GARAGE
+        val resting = facility.facts?.resting.orEmpty()
         val showHomeManagement = navigation.page == HostPage.HOME && homeVehicleManagement && managementVisible
         shop.focusManagementPanel = managementView.takeIf { showHomeManagement }
         val restRecovery = facility.receipt != null || facility.pending != null || facility.error != null
-        val restActions = if (facilityEnabled && !facility.busy && !facility.foreign && !facility.unsupported && !restRecovery) {
+        val restActions = if ((facilityEnabled || garageEnabled) && !facility.busy && !facility.foreign && !facility.unsupported && !restRecovery) {
             facility.facts?.let(FacilityHostMapper::restingRows).orEmpty().filter { it.activity != null }.associate { row ->
                 row.vehicle.ownedVehicleId to FacilityControlsEvent.SetResting(facility.version, row.vehicle, row.resting, !row.resting)
             }
@@ -1246,7 +1252,7 @@ open class MainActivity : Activity() {
                 }.toMap()
         }.orEmpty()
         shop.updateMapProjectedBalance(projected)
-        shop.updateMapHud(operatingStatus, ::openHomeSettings)
+        shop.updateMapHud(operatingStatus, ::openHomeSettings, resting)
         shop.onActivateDecoration = {
             if (gameControlsAllowed() && navigation.page == HostPage.HOME && !shopRestoreFailed &&
                 session.home.state.activationRequired
@@ -1263,7 +1269,9 @@ open class MainActivity : Activity() {
         val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
             ?.associate { it.vehicleId to it.displayName }.orEmpty()
         facilityControls.render(facility, facilityEnabled, names)
-        garage.render(garageState, gameEnabled && navigation.page == HostPage.GARAGE)
+        if (garageEnabled && restRecovery) garageRestControls.render(facility, true, names)
+        garage.render(garageState, garageEnabled, resting, restActions,
+            garageRestControls.takeIf { garageEnabled && restRecovery })
         collection.render(collectionState, gameEnabled)
         results.render(if (session.results.hasHistorySource) session.results.historyState else resultsMapper.map(screen), gameEnabled)
         onboarding.render(onboardingState, gameEnabled && navigation.page == HostPage.ONBOARDING)
@@ -1521,19 +1529,18 @@ open class MainActivity : Activity() {
             if (openingGiftOwner == identity) return
             dismissOpeningGift()
         }
-        val receipt = session.openingGift.available(identity, true) ?: return
-        if (!session.openingGift.consume(identity, receipt)) return
+        if (session.openingGift.available(identity, true) == null) return
         val overlay = io.drivegrowth.app.ui.onboarding.OpeningGiftOverlay(this)
         val card = io.drivegrowth.app.ui.onboarding.OpeningGiftView(this,
             onGacha = {
                 if (openingGiftCard === overlay && overlay.isShown && openingGiftOwner == session.onboarding.uiState.identity &&
                     canShowOpeningGift(identity)
                 ) {
-                    dismissOpeningGift()
+                    acknowledgeOpeningGift()
                     select(HostPage.GACHA)
                 }
             },
-            onClose = { if (openingGiftCard === overlay) dismissOpeningGift() })
+            onClose = { if (openingGiftCard === overlay) acknowledgeOpeningGift() })
         overlay.addView(card, FrameLayout.LayoutParams(-1, -2))
         openingGiftCard = overlay
         openingGiftOwner = identity
@@ -1542,6 +1549,12 @@ open class MainActivity : Activity() {
             leftMargin = style.dp(12)
             rightMargin = style.dp(12)
         })
+    }
+
+    private fun acknowledgeOpeningGift(): Boolean {
+        val owner = openingGiftOwner ?: return false
+        session.openingGift.available(owner, true)?.let { session.openingGift.consume(owner, it) }
+        return dismissOpeningGift()
     }
 
     private fun dismissOpeningGift(): Boolean {
@@ -1837,6 +1850,7 @@ open class MainActivity : Activity() {
         val canAcknowledge: Boolean,
         val canCancel: Boolean,
         val heldNames: Map<io.drivegrowth.core.contract.VehicleId, String>,
+        val heldGarage: io.drivegrowth.app.host.StoredGarageState?,
     )
 
     private var lastDeliveryRender: DeliveryRender? = null
@@ -1848,7 +1862,9 @@ open class MainActivity : Activity() {
                 ?.associate { it.vehicleId to it.displayName }.orEmpty()
         val next = DeliveryRender(deliveryFrame, enabled, read, session.deliveryNavigation.snapshot,
             session.delivery.isSavingDisplayedOffers, session.delivery.canAcknowledge,
-            session.delivery.canCancelUnstarted, heldNames)
+            session.delivery.canCancelUnstarted, heldNames,
+            if (read?.held.isNullOrEmpty()) null else
+                ((screen as? HostQueryState.Content)?.snapshot?.garageState as? ContractResult.Success)?.value)
         if (next == lastDeliveryRender) return
         lastDeliveryRender = next
         delivery.render(next.frame, next.enabled, next.read)
@@ -1899,7 +1915,11 @@ open class MainActivity : Activity() {
                 if (gameControlsAllowed() && navigation.page == HostPage.DELIVERY &&
                     session.delivery.state?.readOnly != true) when (session.deliveryNavigation.confirm()) {
                     is ContractResult.Success -> session.delivery.refresh()
-                    is ContractResult.Failure -> { session.deliveryNavigation.refresh(); render() }
+                    is ContractResult.Failure -> {
+                        android.widget.Toast.makeText(this, "목적지 정보가 바뀌었거나 오래됐어요. 내비 목적지를 다시 조회해 주세요.",
+                            android.widget.Toast.LENGTH_LONG).show()
+                        session.deliveryNavigation.refresh()
+                    }
                 }
             })
         }
@@ -1916,13 +1936,45 @@ open class MainActivity : Activity() {
         val names = (screen as? HostQueryState.Content)?.snapshot?.content?.catalog?.vehicles
             ?.associate { it.vehicleId to it.displayName }.orEmpty()
         val date = DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"))
-        for (held in heldVehicles) {
-            val name = names[held.vehicle.vehicleId] ?: "차량 정보 확인 중"
-            details.addView(style.text("임시 보관 · $name · ${style.rarity(held.vehicle.rarity)} · 낸 금액 ${held.price.units}"))
-            details.addView(style.text("보관 기한 ${date.format(Instant.ofEpochMilli(held.deadline.value))} (한국시간)"))
+        if (heldVehicles.isNotEmpty()) {
+            val snapshot = (screen as? HostQueryState.Content)?.snapshot?.takeIf { it.source == state?.identity?.source }
+            val capacity = ((snapshot?.garageState as? ContractResult.Success)?.value?.capacity as? ContractResult.Success)?.value
+            val garageFull = capacity != null && snapshot?.ownedVehicles.orEmpty().count {
+                it.lifecycle == io.drivegrowth.core.contract.VehicleLifecycle.OWNED
+            } >= capacity
+            val now = if (session.simulation == null) System.currentTimeMillis()
+                else (session.simulation?.clock() as? ContractResult.Success)?.value?.epoch?.value
+            val heldPanel = style.card().apply {
+                addView(style.text("임시 보관함 (${heldVehicles.size}대)", 20, bold = true))
+                for (held in heldVehicles) {
+                    val name = names[held.vehicle.vehicleId] ?: "차량 정보 확인 중"
+                    addView(style.text("$name · ${style.rarity(held.vehicle.rarity)} · 낸 금액 ${held.price.units}"))
+                    val deadline = date.format(Instant.ofEpochMilli(held.deadline.value))
+                    val remaining = now?.let { (held.deadline.value - it).coerceAtLeast(0) }
+                    val remainingText = remaining?.let {
+                        val minutes = (it + 59_999L) / 60_000L
+                        when {
+                            minutes == 0L -> " · 기한 만료"
+                            minutes < 60L -> " · ${minutes}분 남음"
+                            else -> " · ${minutes / 60}시간 ${minutes % 60}분 남음"
+                        }
+                    }.orEmpty()
+                    addView(style.text("보관 기한 $deadline (한국시간)$remainingText"))
+                }
+                val explanation = when {
+                    state?.readOnly == true -> "다른 화면에서 처리 중인 요청을 먼저 확인해 주세요."
+                    garageFull -> "차고가 가득 찼어요. 빈자리가 생기면 보관 기한 안에 수령할 수 있어요."
+                    capacity == null -> "차고의 빈자리를 확인하고 있어요."
+                    else -> "차고에 빈자리가 생기면 수령 조건을 자동으로 확인해요."
+                }
+                addView(style.text(explanation))
+                if (state?.readOnly != true) addView(style.button("보관함 새로고침",
+                    enabled = !session.delivery.isSavingDisplayedOffers) {
+                    if (gameControlsAllowed()) { session.delivery.refresh(); queries.refresh() }
+                })
+            }
+            details.addView(heldPanel)
         }
-        if (heldVehicles.isNotEmpty() && state?.readOnly != true)
-            details.addView(style.button("보관 차량 처리 조건 다시 확인", enabled = !session.delivery.isSavingDisplayedOffers) { if (gameControlsAllowed()) session.delivery.refresh() })
         state?.receipt?.let { receipt ->
             val message = when (receipt) {
                 is DeliveryHostReceipt.Selected -> "의뢰 선택이 확정됐어요."
@@ -2005,6 +2057,15 @@ open class MainActivity : Activity() {
 
     private fun select(page: HostPage) {
         if (!gameControlsAllowed()) { updateAccess(); return }
+        if (page != HostPage.GACHA && navigation.page == HostPage.GACHA &&
+            gacha.uiState.frame?.screen is io.drivegrowth.app.ui.gacha.GachaScreen.Result
+        ) {
+            session.gacha.acknowledge { result ->
+                if (!isDestroyed && gameControlsAllowed() && navigation.page == HostPage.GACHA &&
+                    result is ContractResult.Success) select(page)
+            }
+            return
+        }
         if (page != navigation.page) managementView.dismissMotion()
         automaticIntroAllowed = false
         navigation.page = page
@@ -2079,7 +2140,10 @@ open class MainActivity : Activity() {
     }
 
     private fun onFacilityEvent(event: io.drivegrowth.app.ui.shop.FacilityControlsEvent) {
-        if (!gameControlsAllowed() || navigation.page != HostPage.HOME) { updateAccess(); return }
+        if (!gameControlsAllowed() || navigation.page !in setOf(HostPage.HOME, HostPage.GARAGE)) {
+            updateAccess()
+            return
+        }
         when (event) {
             is io.drivegrowth.app.ui.shop.FacilityControlsEvent.SetResting -> session.facility.setResting(
                 io.drivegrowth.app.host.facility.RestingRequest(event.version,
@@ -2219,7 +2283,7 @@ open class MainActivity : Activity() {
         session.rental.setMapPresentationEnabled(false)
         shop.dismissRentalMapMotion()
         if (closeRestStopPreview()) return
-        if (dismissOpeningGift()) return
+        if (acknowledgeOpeningGift()) return
         if (titlePending && allowed()) { showPresentationTitle(false); return }
         automaticIntroAllowed = false
         if (closeHomeSettings()) return
@@ -2242,7 +2306,13 @@ open class MainActivity : Activity() {
                 return
             }
             if (navigation.page == HostPage.HOME && shop.handleBack()) return
-            if (navigation.page == HostPage.GACHA && gacha.handleBack()) return
+            if (navigation.page == HostPage.GACHA) {
+                if (gacha.handleBack()) return
+                if (gacha.uiState.frame?.screen is io.drivegrowth.app.ui.gacha.GachaScreen.Result) {
+                    select(HostPage.HOME)
+                    return
+                }
+            }
             if (navigation.page == HostPage.DELIVERY && delivery.handleBack()) return
             if (navigation.page == HostPage.RANKING && ranking.handleBack()) return
             if (navigation.page == HostPage.PROGRESSION && progression.handleBack()) return

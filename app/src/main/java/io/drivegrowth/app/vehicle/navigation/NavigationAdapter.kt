@@ -36,7 +36,12 @@ class NavigationAdapter(private val worker: Executor, private val main: Executor
     private var commandDeadline: NavigationCancellation? = null
     private val pendingQuery = mutableSetOf<String>()
 
-    fun connect(listener: (NavigationEvent) -> Unit) {
+    fun connect(listener: (NavigationEvent) -> Unit) = connect(resetQuote = false, listener)
+
+    /** 명시 재조회는 이전 SDK 콜백을 폐기한 뒤 새 연결에서 견적을 받는다. */
+    internal fun reconnectForQuote(listener: (NavigationEvent) -> Unit) = connect(resetQuote = true, listener)
+
+    private fun connect(resetQuote: Boolean, listener: (NavigationEvent) -> Unit) {
         if (released.get()) return
         val token = generation.incrementAndGet()
         worker.execute {
@@ -44,6 +49,10 @@ class NavigationAdapter(private val worker: Executor, private val main: Executor
             closePort()
             workerGeneration = token
             this.listener = listener
+            if (resetQuote) {
+                routeInvalidated = false
+                lastRouteId = null
+            }
             clear(if (routeInvalidated) NavigationMissing.REQUEST_CHANGED else NavigationMissing.NOT_OBSERVED)
             failure = null
             connection = NavigationConnection.CONNECTING

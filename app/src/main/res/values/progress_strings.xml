@@ -20,6 +20,7 @@
     <string name="progress_details">내용 확인</string>
     <string name="progress_confirm_title">보상 청구 확인</string>
     <string name="progress_confirm_body">아래는 청구 예정 보상이에요. 수령 결과가 확인되기 전에는 지급 완료가 아니에요.</string>
+    <string name="progress_claimed_body">이미 받은 보상이에요. 지급이 확정됐어요.</string>
     <string name="progress_claim">보상 청구 요청</string>
     <string name="progress_no_claim">청구할 수 없어요</string>
     <string name="progress_claim_unconnected">지금 보상을 받을 수 있는지 확인할 수 없어요.</string>

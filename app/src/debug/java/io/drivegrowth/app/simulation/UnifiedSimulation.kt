@@ -202,7 +202,7 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
             is ContractResult.Success -> result.value.deferred.values.firstOrNull()?.let(::failed)
         }
     }
-    override fun rejected(error: ContractError) { notice = "시작 조건 미충족 ($error). 기존 요청/초기 지급을 먼저 확인해 주세요."; changed?.invoke() }
+    override fun rejected(reason: SimulationStartBlock) { notice = reason.message; changed?.invoke() }
     override fun retry() { if (canRetry && accept != null) { failure = null; emit() } }
     override fun begin() {
         val current = progress ?: return
@@ -219,6 +219,13 @@ internal class UnifiedSimulation(private val context: Context, preferenceName: S
         notice = null
         progress = next
         emit()
+    }
+
+    override fun departureGapStart(frame: DrivingFrame): RentalClock? {
+        val current = progress ?: return null
+        if (current.stage != 1 || frame != current.frame()) return null
+        return current.clock.copy(epoch = EpochMillis(current.clock.epoch.value - 1_000L),
+            elapsedMs = current.runStartMs)
     }
 
     override fun restSample(frame: DrivingFrame): SimulationRestSample? {

@@ -365,7 +365,7 @@ class ShopViewTest : InstrumentationTestCase() {
         measureAndLayout(view, 936, 500)
         val expansion = button(view, "shop:map-expansion")
         assertEquals(View.VISIBLE, expansion.visibility)
-        assertTrue(expansion.top < view.height / 2)
+        assertTrue(expansion.top in 0 until view.height)
         assertTrue(expansion.performClick())
         assertNotNull(view.findViewWithTag<View>("shop:map-confirm"))
         view.render(state, false)

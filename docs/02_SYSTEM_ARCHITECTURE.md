@@ -949,6 +949,8 @@ Debug Main의 휴식 포함 모의주행은 같은 `GameSessionFactory`의 `unif
 
 휴식 시연 뒤 일반 모의주행을 새 프로세스에서 열면, 먼저 저장된 고객 배정 명령을 복구한다. 같은 SIMULATION 프로필·주행·boot·clock domain의 저장 관측이 원 대여 커서부터 첫 재생 표본까지 연속일 때만 기존 대여 소비자에 넘긴다. 이미 시간을 누적한 대여는 원 커서의 정산과 기한이 지난 반납을 기존 소비자로 재시도한다. 일반 시연의 종료 표본에서 주행이 먼저 확정된 경우에는 같은 표본·시간대·시계와 연결되는 유일한 저장 주행 영수증을 검증한 뒤 남은 정산·반납만 처리한다. 누락·공백·불일치는 보류한다. 과거 고객과 관측 시간을 합성하지 않으며, 닫힌 주행의 추가 시간 누적과 D→P 경계의 새 프로세스 복원은 미검증이다. 격리 모의 실행의 [활성 대여 60초 복구와 단일 도착 정산](06_VERIFICATION.md#219-포함-revision-8의-결합-장치-시험)과 [재생성 후 진행 모델·View 확인](06_VERIFICATION.md#466f80c-기준-진행-카드-판별-계측)은 서로 다른 APK의 실행 근거다.
 
+2026-11-15 모의 시연 재시작 보완. 새 시연이 공급한 출발 전 1초 경계가 같은 모의 출처·부팅·시계의 실제 수락한 출발 표본과 일치하고 이전 물리 주차 근거가 없으면 해당 1초를 미관측으로 기록한다. 수익은 이후 확인된 주행 시간부터 누적한다.
+
 ### #55 가게 꾸미기·확장 완료 원결과 조회
 
 `ShopOriginalResultReader(store).decoration(profileId, requestId)`는 `ContractResult<DecorationSettlement?>`를, `expansion(profileId, requestId, fullShopExpansion)`은 `ContractResult<Settlement?>`를 반환한다. 같은 SQLite 거래에서 실제 프로필과 저장 출처를 확인하고 원명령·최초 결과와 전역 요청 ID 소유자를 대조한다. 확장 호출자는 처음 확정한 전체 입력을 전달하고 reader는 공통 정산의 원명령과 최초 결과를 대조한다. 시설 구매 원결과는 기존 `hostCommands.facilityResult`에서 읽는다. 유료 꾸미기의 공통 원정산과 무료 구매·보유품 적용의 금융 정산 없는 typed 결과를 그대로 읽는다.

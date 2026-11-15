@@ -79,6 +79,18 @@ class RankingAggregationTest {
         assertEquals(BigDecimal.ZERO,amount(RankingAggregation.week(listOf(row.copy(rewardedMeters=0,departureZone=Observation.Available(def.zone))),def,source,at)))
     }
 
+    @Test fun simulationWeekUsesUtcAndIgnoresPreviousWeekZone() {
+        val simulation = InputSource.SIMULATION
+        val definition = RankingDefinitions.acceptedLocal(simulation).week!!
+        assertEquals(ZoneId.of("UTC"), definition.zone)
+        val asOf = EpochMillis(Instant.parse("2026-11-09T00:00:00Z").toEpochMilli())
+        val monday = LocalDate.parse("2026-11-09")
+        val current = RankingDayDistance(monday, 1_234, simulation, Observation.Available(definition.zone))
+        val older = RankingDayDistance(monday.minusDays(1), 50, simulation)
+        assertEquals(1_234.toBigDecimal(),
+            amount(RankingAggregation.week(listOf(older, current), definition, simulation, asOf)))
+    }
+
     @Test fun rarityPriceRatiosAreExactAndDoNotOverflowLong(){
         val expected=listOf("1000","1100","1200","1300")
         Rarity.entries.forEachIndexed{i,r->assertEquals(0,BigDecimal(expected[i]).compareTo(amount(RankingAggregation.highest(listOf(car.copy(rarity=r)),mapOf(car.vehicleId to GameMoney(1000))))))}
