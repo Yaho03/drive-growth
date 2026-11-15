@@ -3819,3 +3819,12 @@ Virtual Console은 재부팅 전후 `bridge_ready=false`, `emulator_active=false
 - **차량 APK 서명 전후 대조.** APK 서명 메타데이터를 제외한 ZIP 항목 131개의 비압축 내용이 서명 전후 일치했다.
 
 실제 SDK D→이동→정차→P, 차량 신호 만료, 주간 재생, 포커스·움직임 줄이기 전환, 실제 효과음 재생·중단은 위 통합 실행의 미확인 조건을 유지한다. 제출용 서명·실차·App Market 승인과 최종 제출은 별도 조건이다.
+
+## README 대표 화면의 출처 — 2026-11-15
+
+README에는 실제 캡처에서 앱 영역만 잘라낸 [시작 화면](images/game-title.png)과 [메인 게임 화면](images/game-home.png)을 사용한다. 두 이미지 모두 원본 1080×600에서 좌상단 (360, 57), 크기 702×438의 영역을 추출했다. 확대·합성·UI 재생성은 하지 않았다.
+
+- 시작 화면: [통합 릴리스 원본](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/firstcarplay-start-52285de.png), 빌드 소스 `52285de`, 원본 SHA-256 `2bfb03b345ac1ba8952c9bbcc73195a0d4bca877874f79ef23e3ded3d152bc62`.
+- 메인 게임 화면: [이전 모의 시험 원본](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/recheck-current-home.png), 원본 SHA-256 `29be9c54a2a0978a016babf78822fbeaa0626e33521f5bf6f162a581f244ebb9`. 최신 APK의 새 가게 화면 캡처나 실차 실행 증거로 사용하지 않는다.
+
+이 변경은 소개용 이미지의 표시 범위와 README 설명 정리다. 원본 실행 기록과 APK의 미검증 범위는 유지한다. 제공받은 작성된 참가신청·동의 PDF에서는 게임 소개 부분만 참고했으며 원본·참가자 정보·서명은 게시하지 않았다.
