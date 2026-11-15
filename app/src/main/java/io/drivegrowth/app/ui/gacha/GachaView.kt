@@ -266,6 +266,7 @@ class GachaView(context: Context, onEvent: (GachaEvent) -> Unit, restored: Gacha
             isEnabled = celebration.canOpenGacha
             visibility = if (isEnabled) View.VISIBLE else View.GONE
         }
+        scene.isSoundEffectsEnabled = false
         scene.setOnClickListener {
             if (canUseScene() && celebration.canOpenGacha) reveal.performClick()
         }

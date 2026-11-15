@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.shop
 
+import io.drivegrowth.app.ui.presentation.setGameButtonClick
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
@@ -463,7 +464,7 @@ internal class ShopSceneView(
                     })
                     addState(intArrayOf(android.R.attr.state_pressed), GradientDrawable().apply { setColor(0x44bfdcff) })
                 }
-                setOnClickListener { if (acceptsVehicleTap()) onVehicle(vehicle.id) }
+                setGameButtonClick(available = { acceptsVehicleTap() }) { onVehicle(vehicle.id) }
             })
         }
         vehicleTargetCount = childCount
@@ -536,7 +537,7 @@ internal class ShopSceneView(
                 setCompoundDrawablesRelative(glyph, null, null, null)
                 compoundDrawablePadding = style.dp(5)
             }
-            setOnClickListener { if (acceptsVehicleTap()) action() }
+            setGameButtonClick(available = { acceptsVehicleTap() }, action = action)
         }
         mapTargets += Triple(target, x, y)
         // 차량 그림과 선택 영역을 시설 표지판보다 앞에 둔다.

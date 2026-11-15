@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><script src="../driving-scene.js"></script>
+<script>
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function dump(name, n, fps, opts){
+  const big=document.createElement('canvas'); big.width=1360; big.height=948;
+  const g=big.getContext('2d');
+  DrivingScene.draw(g,0,opts); await sleep(600); // 이미지 데이터URL 로드 대기
+  const small=document.createElement('canvas'); small.width=340; small.height=237; const s=small.getContext('2d'); s.imageSmoothingEnabled=false;
+  for(let i=0;i<n;i++){
+    g.clearRect(0,0,1360,948); DrivingScene.draw(g,i/fps,opts);
+    s.clearRect(0,0,340,237); s.drawImage(big,0,0,340,237);
+    const b=await new Promise(r=>small.toBlob(r,'image/png'));
+    await fetch('/'+name+'_'+String(i).padStart(3,'0')+'.png',{method:'POST',body:b});
+  }
+}
+window.run=async(fps)=>{
+  for(const t of ['day','night']){
+    await dump('rrr-'+t+'-loop', 12*fps, fps, {timeOfDay:t, driver:'rrr', layout:'wide', motion:'full'});
+    await dump('rrr-'+t+'-still', 1, fps, {timeOfDay:t, driver:'rrr', layout:'wide', motion:'still'});
+  }
+  return 'done';
+};
+</script>
