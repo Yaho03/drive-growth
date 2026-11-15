@@ -3,16 +3,18 @@ package io.drivegrowth.app.host.shop
 import io.drivegrowth.app.isMainPageShown
 import io.drivegrowth.app.mainNavigation
 import io.drivegrowth.app.openMainPage
-import io.drivegrowth.app.openMainSettings
 import io.drivegrowth.app.host.HostPage
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Point
 import android.graphics.Rect
 import android.os.Bundle
 import android.os.Parcel
 import android.test.InstrumentationTestRunner
 import android.os.SystemClock
 import android.test.ActivityInstrumentationTestCase2
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -62,12 +64,34 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
         if(!gate)throw IllegalStateException("ENVIRONMENT_GATE_TIMEOUT: $label; visible=$visibleTags")
         fail("ASSERTION_STATE: $label; visible=$visibleTags")
     }
-    private fun click(a: MainActivity, tag: Any) {
-        await(a,"활성 버튼 $tag") { a.window.decorView.findViewWithTag<Button>(tag)?.let{it.isShown && it.isEnabled}==true }
-        instrumentation.runOnMainSync {
-            val b=a.window.decorView.findViewWithTag<Button>(tag)!!
-            b.requestRectangleOnScreen(Rect(0,0,b.width,b.height),true);assertTrue(b.performClick())
+    private fun click(a: MainActivity, tag: Any, ready: () -> Boolean = { true }) {
+        await(a, "실제 창의 터치 대상 $tag") {
+            val decor = a.window.decorView
+            val button = decor.findViewWithTag<Button>(tag)?.takeIf {
+                it.isAttachedToWindow && it.isShown && it.isEnabled && it.isLaidOut
+            } ?: return@await false
+            val bounds = Rect()
+            val offset = Point()
+            if (!button.getGlobalVisibleRect(bounds, offset) ||
+                !bounds.contains(offset.x + button.width / 2, offset.y + button.height / 2)) {
+                button.requestRectangleOnScreen(Rect(0, 0, button.width, button.height), true)
+                return@await false
+            }
+            if (!ready()) return@await false
+            val point = IntArray(2).also(button::getLocationInWindow)
+            val origin = IntArray(2).also(decor::getLocationInWindow)
+            val x = point[0] - origin[0] + button.width / 2f
+            val y = point[1] - origin[1] + button.height / 2f
+            val down = SystemClock.uptimeMillis()
+            for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
+                val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y, 0)
+                event.source = InputDevice.SOURCE_TOUCHSCREEN
+                try { assertTrue("창의 버튼 $tag 터치 동작 $action", decor.dispatchTouchEvent(event)) }
+                finally { event.recycle() }
+            }
+            true
         }
+        instrumentation.waitForIdleSync()
     }
     private fun fresh() {
         assertTrue(context.packageName!="io.drivegrowth.app")
@@ -75,7 +99,12 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
             assertFalse("각 selector용 fresh package가 필요하며 기존 DB를 삭제하지 않는다: $name",context.getDatabasePath(name).exists())
     }
     private fun openDecorations(a: MainActivity) {
-        val alreadyOpen = onMain { a.window.decorView.findViewWithTag<View>("shop:map-decorations")?.isShown == true }
+        fun facilityMenuShown() = a.window.decorView.findViewWithTag<Button>("shop:map-decorations")
+            ?.let { it.isShown && it.isEnabled } == true
+        await(a, "시설 메뉴 또는 확정 HOME 지도") {
+            facilityMenuShown() || (a.window.decorView.isMainPageShown(HostPage.HOME) && currentShopShown(a))
+        }
+        val alreadyOpen = onMain { facilityMenuShown() }
         if (!alreadyOpen) openFacilities(a)
         click(a, "shop:map-decorations")
     }
@@ -84,8 +113,15 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
         await(a, "확정 HOME 지도") {
             a.window.decorView.isMainPageShown(HostPage.HOME) && currentShopShown(a)
         }
-        await(a, "HOME 설정") { a.window.decorView.openMainSettings() != null }
-        click(a, "shop:map-facilities")
+        click(a, "shop:map-settings")
+        // 설정이 열린 뒤에도 HOME 조회가 끝나야 시설 메뉴를 열 수 있다.
+        var previousMap: View? = null
+        click(a, "shop:map-facilities") {
+            val map = a.window.decorView.findViewWithTag<View>("shop:map-screen").takeIf { currentShopShown(a) }
+            val stable = map != null && map === previousMap
+            previousMap = map
+            stable
+        }
         await(a, "시설 메뉴 진입") {
             a.window.decorView.findViewWithTag<Button>("shop:map-decorations")?.let { it.isShown && it.isEnabled } == true
         }
@@ -100,6 +136,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
         listOf("decoration_requests","settlements").map { table -> db.rawQuery("SELECT COUNT(*) FROM $table",null).use{it.moveToFirst();it.getLong(0)} }
     })
     private fun currentShopShown(a: MainActivity): Boolean {
+        if (a.window.decorView.findViewWithTag<View>("shop:loading-map")?.isShown == true) return false
         val name = a.getString(R.string.shop_scene_default_sign)
         val description = a.getString(R.string.shop_scene_description, name)
         return tree(shop(a)).any { it is ShopSceneView && it.isShown &&
