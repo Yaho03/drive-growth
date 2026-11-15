@@ -4,18 +4,19 @@
 
 ## 심사위원 실행 안내
 
-### 기존 검증 APK 선택과 다운로드
+### 검증 APK 선택과 다운로드
 
-이 절은 아래 릴리스에 공개된 파일과 해당 버전의 조작 문구를 설명한다. 최신 소스를 사용할 때는 [팀 공통 빌드 절차](#팀-공통-실행-절차)에서 직접 빌드하고, APK별 실행 근거는 [현재 검증 요약](06_VERIFICATION.md#현재-검증-요약--2026-11-15)에서 대조한다.
+이 절은 최신 모의 APK, 기존 차량 앱이 없는 환경용 최신 차량 APK, 이전 개발 서명 차량 APK의 실행 절차를 설명한다. 직접 빌드할 때는 [팀 공통 빌드 절차](#팀-공통-실행-절차)를 사용하고, APK별 실행 근거는 [현재 검증 요약](06_VERIFICATION.md#현재-검증-요약--2026-11-15)에서 대조한다.
 
-첫 차량 선택부터 확인하려면 **첫 차량 테스트 APK**를 사용한다. Pleos 차량 SDK 입력과 주차 시 조작 허용을 확인하려면 **차량용 APK**를 사용한다.
+첫 차량 선택부터 확인하려면 **첫 차량 테스트 APK**를 사용한다. Pleos 차량 SDK를 시험하려면 차량용 APK를 선택하고 기존 설치 유무와 인증서를 확인한다.
 
 | 다운로드 | 실행 앱·패키지 | 빌드와 소스 |
 |---|---|---|
-| [첫 차량 테스트 APK](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-first-vehicle-test-20261115.apk) | **르르르 렌터카 · 첫 차량 테스트** · `io.drivegrowth.verify.prototype.firstcarplay` | 별도 Debug 구성 · `6070445c154455c2b3f8c9e777ac2f5c04cb014b` |
-| [차량용 APK](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-vehicle-dev-709e08d.apk) | **르르르 렌터카** · `io.drivegrowth.app` | 개발 서명 Release 구성 · `709e08dcb9e8be0f98c3ccfba2ba7b33b51f12f0` |
+| [첫 차량 테스트 APK](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-firstcarplay-52285de.apk) | **르르르 렌터카 · 첫 차량 테스트** · `io.drivegrowth.verify.prototype.firstcarplay` | 격리 Debug · 모의 차량·내비 입력 |
+| [최신 차량용 APK](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-vehicle-fresh-install-52285de.apk) | **르르르 렌터카** · `io.drivegrowth.app` | 개발 서명 Release · **신규 설치용, 기존 차량 앱 업데이트 불가**. 기기 설치·실행 미검증 |
+| [이전 차량용 APK](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-vehicle-dev-709e08d.apk) | **르르르 렌터카** · `io.drivegrowth.app` | `709e08d` 기반 개발 서명 Release · Pleos 차량 SDK |
 
-[릴리스 설명](https://github.com/Yaho03/drive-growth/releases/tag/first-vehicle-test-20261115)과 [SHA256SUMS.txt](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/SHA256SUMS.txt)에서 파일과 해시를 대조한다. 두 다운로드의 실제 빌드 커밋은 위 표를 따른다. 다운로드에 접근할 수 없는 경우 심사용 저장소 공개 상태나 제공받은 소스·APK 압축본 링크를 확인한다. [심사 접근 조건](contest/01_CONTEST_GUIDE.md#4-제출물과-github)
+최신 모의 APK와 신규 설치용 차량 APK의 빌드 소스는 [`52285dec30d90957786ca11d46234d2bcc24e58d`](https://github.com/Yaho03/drive-growth/commit/52285dec30d90957786ca11d46234d2bcc24e58d)다. [최신 통합 릴리스](https://github.com/Yaho03/drive-growth/releases/tag/integrated-20261115-52285de)에서 파일을 받고 [SHA256SUMS.txt](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/SHA256SUMS.txt)와 대조한다. 최신 차량용은 이전 차량용과 다른 개발 인증서로 서명했다. 기존 차량 앱과 호환되는 서명 환경 확인, 최신 차량용의 기기 설치·실행은 남아 있다. [APK별 검증 범위](06_VERIFICATION.md#통합-apk-재빌드와-검증--2026-11-15) 다운로드에 접근할 수 없는 경우 심사용 저장소 공개 상태나 제공받은 소스·APK 압축본 링크를 확인한다. [심사 접근 조건](contest/01_CONTEST_GUIDE.md#4-제출물과-github)
 
 **시험 환경**은 Pleos Connect 에뮬레이터 2.1.0, Android API 34, ARM64다. 확인한 기본 디스플레이는 1080×600px·120dpi이며, 앱이 시스템 영역과 나눠 표시되는 경우 702×438px 앱 창을 사용했다. 일반 Android 스마트폰은 지원 대상에서 제외된다. 차량용 Release는 Pleos의 차량 신호·권한·UX 허용에 의존한다. 최종 제출용 서명, App Market 승인 및 실차 실행은 별도 확인 항목이다. [최초 지급·격리 실행 기록](06_VERIFICATION.md#첫-차량-지급과-격리-debug의-재실행--2026-11-15)
 
@@ -30,7 +31,7 @@ ANDROID_USER="$(adb -s "$SERIAL" shell am get-current-user | tr -d '\r')"
 printf 'Android user: %s\n' "$ANDROID_USER"
 ```
 
-다운로드한 APK의 SHA-256을 대조한 뒤 [설치 대상과 저장 보존](#설치-대상과-저장-보존)의 조건을 적용한다. 새 테스트 앱은 독립 데이터 공간에 설치된다. 동일 패키지를 업데이트할 때는 기존 인증서·버전과 대상 사용자가 일치하는 경우에만 `install --user … -r`을 사용한다. 서명 불일치가 발생하면 기존 앱과 저장을 유지한 채 설치 파일을 다시 확인한다.
+다운로드한 APK의 SHA-256을 대조한 뒤 [설치 대상과 저장 보존](#설치-대상과-저장-보존)의 조건을 적용한다. 테스트 앱의 저장은 차량용 앱과 분리된다. 이미 `firstcarplay`가 설치돼 있으면 기존 저장을 사용하는 업데이트다. 동일 패키지를 업데이트할 때는 기존 인증서·버전과 대상 사용자가 일치하는 경우에만 `install --user … -r`을 사용한다. 서명 불일치가 발생하면 기존 앱과 저장을 유지한 채 설치 파일을 다시 확인한다.
 
 ### 첫 차량 선택과 모의 입력
 
@@ -43,7 +44,7 @@ printf 'Android user: %s\n' "$ANDROID_USER"
      io.drivegrowth.verify.prototype.firstcarplay/io.drivegrowth.app.simulation.UnifiedSimulationActivity
    ```
 
-2. **화면을 눌러 시작 → 첫 차량 고르기 → 캐스퍼 또는 아반떼 → 선택 내용 확인 → 이 차량으로 시작 → 가게로** 순서로 진행한다. 최초 지급은 프로필당 한 번이며 일반 등급 차량 1대, 1,000 게임머니, 주차 공간 3칸을 제공한다. 새 프로필인데 가게 지도가 먼저 보이면 **설정 → 가게와 기록 → 첫 차량 안내**를 연다. 지급 기록이 있는 프로필에서는 첫 지급 원결과를 확인할 수 있다.
+2. 새 프로필에서는 **화면을 눌러 시작 → 시작하기 → 캐스퍼 또는 아반떼 카드 → 캐스퍼로 할게요 또는 아반떼로 할게요 → 확인 → 가게로 가기** 순서로 진행한다. 최초 지급은 프로필당 한 번이며 일반 등급 차량 1대, 1,000 게임머니, 주차 공간 3칸을 제공한다. 새 프로필인데 가게 지도가 먼저 보이면 **설정 → 가게와 기록 → 첫 차량 안내**를 연다. 지급 기록이 있는 프로필에서는 첫 지급 원결과를 확인할 수 있다.
 3. 재실행을 확인하려면 아래 명령으로 **테스트 앱만** 종료하고 앱 목록이나 같은 런처 인텐트로 다시 연다. 차고의 차량과 잔액을 대조한다. 기존 제품과 표준 모의 앱의 데이터는 보존한다.
 
    ```sh
@@ -54,7 +55,7 @@ printf 'Android user: %s\n' "$ANDROID_USER"
 
 ### 차량용 APK 실행
 
-`PRODUCT_APK`에 내려받은 **차량용 APK** 경로를 지정한다. 제품 앱을 새로 설치하는 경우 아래 명령을 사용한다. 기존 `io.drivegrowth.app` 설치를 갱신할 경우 위의 인증서·버전 확인 뒤 `-r`을 추가한다.
+`PRODUCT_APK`에 내려받은 **최신 차량용 APK** 경로를 지정한다. **기존 `io.drivegrowth.app`이 없는 별도 Pleos 시험 환경에서 신규 설치**한다. 최신 차량 APK는 기존 차량 앱의 인증서와 다르므로 업데이트가 불가능하다. 기존 앱과 저장을 유지한다. 기존 차량 앱을 갱신해야 하면 [이전 개발 서명 파일](#검증-apk-선택과-다운로드)의 인증서·버전을 대조하고 호환되는 경우에만 `-r`을 사용한다.
 
 ```sh
 adb -s "$SERIAL" install --user "$ANDROID_USER" "$PRODUCT_APK"
@@ -209,7 +210,7 @@ JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌�
 
 시연 화면의 **시연 · 모의 입력**과 **SIMULATION** 표시는 게임에 공급하는 모의 차량·내비 입력을 뜻한다. 시연 중 발생한 게임 기록은 시연 원장에만 남으며 차량을 조작하지 않는다. 이 절차는 고정 시연 목적지의 도착을 재현한다. 실제 SDK로 주행 후 목적지를 변경하는 경로는 현재 시연에서 지원하지 않는다.
 
-아래 번호와 메뉴 이름은 배포된 `ba38def` APK 기준이다. 최신 로컬 Debug는 명령을 공유하며 앱 이름과 화면 경로는 다음 절을 따른다.
+아래 번호와 메뉴 이름은 배포된 `ba38def` APK 기준이다. [현재 로컬 Debug의 런처 명령과 화면 경로](#현재-소스의-로컬-debug-화면-경로)는 다음 절을 따른다.
 
 1. [설치 대상과 저장 보존](#설치-대상과-저장-보존)을 확인한다. 아래 `APK_PATH`는 로컬 빌드 예시다. 이전 배포본을 사용할 때는 내려받은 파일 경로를 지정한다. 설치한 뒤 런처의 **드라이브 키우기 · 모의 시연**을 연다.
 
@@ -233,7 +234,15 @@ JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌�
 
 #### 현재 소스의 로컬 Debug 화면 경로
 
-설치 후 **르르르 렌터카 · 모의 시연**을 연다. 가게 지도 하단에서 **차고·도감·뽑기·탁송·정산·기록**을 각각 열 수 있다. 지도에서 차량과 시설을 직접 누를 수 있으며 **설정 → 가게와 기록**에서 **시설과 지도**와 **퀘스트·업적·휴식**으로 이동한다. 미확인 정산은 **정산**의 미확인 목록에서 확인한다.
+설치 후 앱 목록에서 **르르르 렌터카 · 모의 시연**을 연다. ADB로 타이틀을 포함해 열려면 앱 목록의 런처와 같은 인텐트를 사용한다.
+
+```sh
+adb -s "$SERIAL" shell am start --user "$ANDROID_USER" \
+  -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n \
+  io.drivegrowth.app.simulation/io.drivegrowth.app.simulation.UnifiedSimulationActivity
+```
+
+가게 지도 하단에서 **차고·도감·뽑기·탁송·정산·기록**을 각각 열 수 있다. 지도에서 차량과 시설을 직접 누를 수 있으며 **설정 → 가게와 기록**에서 **시설과 지도**와 **퀘스트·업적·휴식**으로 이동한다. 미확인 정산은 **정산**의 미확인 목록에서 확인한다.
 
 최신 소스의 새 프로필은 **화면을 눌러 시작 → 시작하기 → 캐스퍼 또는 아반떼 카드 → 선택한 차종명 + “로 할게요” → 확인 → 가게로 가기**로 진행한다. 확인 화면의 **다시 고르기**는 후보 선택으로 돌아간다. 같은 프로필을 재실행하면 원래 지급 결과를 조회한다. [최신 첫 차량·주행 제한 시험](06_VERIFICATION.md#첫-차량-html과-312-주행-제한-장면-통합--2026-11-15)
 
@@ -241,7 +250,7 @@ JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌�
 
 ### 첫 차량 확인용 개발 Debug APK
 
-[테스트 APK와 차량용 개발 서명 APK 다운로드](https://github.com/Yaho03/drive-growth/releases/tag/first-vehicle-test-20261115)에서 파일별 소스·패키지·SHA-256을 확인한다. 차량용 파일은 `709e08d`의 기존 설치본, 테스트 앱은 `6070445`의 격리 구성이다.
+2026-11-15 첫 차량 회귀 당시 [이전 검증 릴리스](https://github.com/Yaho03/drive-growth/releases/tag/first-vehicle-test-20261115)에 `709e08d` 기반 차량용 APK와 `6070445`의 격리 테스트 앱을 게시했다. 이 릴리스의 소스·패키지·SHA-256은 당시의 설치·실행 이력에 적용한다.
 
 별도 Debug APK는 표준 모의 시연과 같은 첫 차량 화면을 독립된 데이터로 실행한다. 사용자용 패키지는 `io.drivegrowth.verify.prototype.firstcarplay`, 앱 이름은 **르르르 렌터카 · 첫 차량 테스트**다. 자동 계측에는 사용자용과 별도의 `firstcarcheck` 또는 보강 회귀용 `firstcarrecheck` 접미사와 대응 `.test` 패키지를 사용한다. 입력과 원장 범위는 [앱 패키지와 원장 경계](02_SYSTEM_ARCHITECTURE.md#앱-패키지와-원장-경계)를 따른다.
 
@@ -254,7 +263,7 @@ JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌�
   :app:assembleDebug
 ```
 
-빌드한 APK의 설치·실행·복원 절차는 [첫 차량 선택과 모의 입력](#첫-차량-선택과-모의-입력)을 따른다. 처음부터 재시험할 때는 별도 시험 설치를 사용한다. 실제 실행의 사용자용 APK와 자동 계측 패키지, 원결과 복원의 근거는 [시험 기록](06_VERIFICATION.md#첫-차량-지급과-격리-debug의-재실행--2026-11-15)에 남겼다.
+빌드한 APK의 설치·실행·복원 절차는 [첫 차량 선택과 모의 입력](#첫-차량-선택과-모의-입력)을 따른다. 처음부터 재시험할 때는 별도 시험 설치를 사용한다. 이전 릴리스의 사용자용 APK와 자동 계측 패키지, 원결과 복원의 근거는 [당시 시험 기록](06_VERIFICATION.md#첫-차량-지급과-격리-debug의-재실행--2026-11-15)에 남겼다.
 
 ## 기존 설치 상태
 

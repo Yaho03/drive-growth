@@ -6,7 +6,7 @@
 
 1. [프로젝트 소개와 APK](../README.md)에서 플레이 흐름을 보고, [05 실행 안내](05_DEVELOPMENT_SETUP.md#심사위원-실행-안내)로 시험 앱을 설치합니다.
 2. [01 제품 요구사항](01_PRD.md)과 [09 화면 명세](09_UI_UX_SPEC.md)에서 차량용 조작 제한, 탁송, 차량 수집과 가게 성장의 설계를 확인합니다.
-3. [06 검증 기록](06_VERIFICATION.md)과 [첫 차량 지급·재실행 증거](evidence/first-vehicle-isolation-20261115/README.md)에서 실행한 APK·입력 출처·검증 범위를 확인합니다. README의 다운로드는 각각 명시된 빌드 커밋의 검증용 파일입니다.
+3. [06 검증 요약](06_VERIFICATION.md#현재-검증-요약--2026-11-15)에서 사용한 APK·입력 출처·검증 범위를 확인합니다. 이전 첫 차량 지급·재실행의 상세 근거는 [회귀 시험 기록](evidence/first-vehicle-isolation-20261115/README.md)에 있습니다.
 4. [10 제출 소개 초안](10_SUBMISSION_DRAFT.md)과 [공식 제출 자료](contest/README.md)에서 제출용 설명과 공식 양식을 찾을 수 있습니다.
 
 ## 개발 자료 읽는 순서
@@ -35,7 +35,7 @@
 |---|---|
 | [contest](contest/README.md) | 공모전 규정·공식 양식, Pleos 개발·차량 API 및 권한 조사 |
 | [design-assets](design-assets/) | 화면 시안과 자산 작업 기록. [마을 브라우저 시안](design-assets/town-preview/README.md)은 별도 시안이며 실제 APK 캡처는 아래 증거 폴더에서 확인 |
-| [evidence](evidence/) | 실행 APK의 캡처·로그·설치 해시. 최신 첫 차량 회귀는 [격리 시험 기록](evidence/first-vehicle-isolation-20261115/README.md) 참조 |
+| [evidence](evidence/) | 실행 APK의 캡처·로그·설치 해시. 이전 첫 차량 회귀는 [격리 시험 기록](evidence/first-vehicle-isolation-20261115/README.md), 통합 이후의 시험은 [06 검증 요약](06_VERIFICATION.md#현재-검증-요약--2026-11-15) 참조 |
 | [proposals](proposals/) | 검토 중이거나 과거에 참고한 제안. [영업 경제 제안](proposals/b-economy/README.md)과 채택 규칙은 01에서 대조 |
 | [data](data/) | 차량 조사 CSV와 데이터 자료. 실제 빌드가 소비하는 정의는 기술 계약과 앱 자산 참조 |
 | [내비 진단 자료](../navi-diagnostic/README.md) | 내비 SDK 콜백 실험 도구와 기록. 제품 플레이 APK는 프로젝트 README에서 제공 |

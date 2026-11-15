@@ -12,6 +12,7 @@
 |---|---|
 | 지도·차량·인물 | [Android 픽셀 자산](../app/src/main/assets/pixel/)과 [채택·권리 기록](#android-채택-픽셀-자산과-사용-조건-확인--2026-11-13). 파일 포함과 외부 사용 허가를 구분한다. |
 | 휴게소 연출 | [원본·가공 및 사용자 허가 범위](../app/src/main/assets/pixel/rest/rest-stop-source.md). 허가 범위를 다른 차량·캐릭터 자산에 확대하지 않는다. |
+| 주행 제한 장면 | [앱의 낮·밤 정지/반복 WebP와 출처](../app/src/main/assets/pixel/driving/README.md). [운전 안내 화면의 입력별 재생 조건](09_UI_UX_SPEC.md#주행-제한-안내-장면)을 따른다. 자산 출품과 차량용 정지 그림의 배포 적합성은 확인이 남아 있다. |
 | 배경음 | [시작 음악](../app/src/main/assets/bgm/title.mp3), [휴게소 음악](../app/src/main/assets/bgm/rest.mp3)이 소스에 포함돼 있다. HTML이 참조한 `shop.mp3`·`gacha.mp3`·`delivery.mp3`·`settle.mp3`의 확보를 뜻하지 않는다. 실제 재생 경로는 [음향 구현](../app/src/main/java/io/drivegrowth/app/ui/presentation/PrototypeAudio.kt), 실행 근거는 [06 검증 기록](06_VERIFICATION.md)을 따른다. |
 | 글꼴 | [전용 연출 글꼴과 OFL](../app/src/main/assets/scene-fonts/README.md), [시작 화면 글꼴 출처](../app/src/main/assets/pixel/title/README.md). 원본 및 수정본 이름과 동봉 라이선스를 확인한다. |
 

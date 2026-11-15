@@ -8,7 +8,7 @@
 
 ![Pleos 에뮬레이터에서 실행한 르르르 렌터카 가게. 지도에 보유 차량, 시설과 하단 메뉴가 표시된다.](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/recheck-current-home.png)
 
-아래에 링크한 이전 테스트 릴리스의 **격리 모의 앱 가게 화면**입니다. Pleos 전체 화면은 1080×600px이며, 오른쪽의 게임 창은 702×438px입니다. [사용자용 테스트 APK의 첫 차량 선택 화면](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/player-ready.png) · [새 프로세스에서 복원한 첫 지급 화면](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/recheck-original-result-rendered.png)
+이전 테스트 릴리스 `first-vehicle-test-20261115`의 **격리 모의 앱 가게 화면**입니다. Pleos 전체 화면은 1080×600px이며, 오른쪽의 게임 창은 702×438px입니다. [사용자용 테스트 APK의 첫 차량 선택 화면](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/player-ready.png) · [새 프로세스에서 복원한 첫 지급 화면](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/recheck-original-result-rendered.png) · [최신 모의 APK의 시작 화면](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/firstcarplay-start-52285de.png)
 
 ### 게임 흐름
 
@@ -20,16 +20,17 @@
 
 ## 실행할 앱과 APK
 
-첫 차량 안내·효과음·주행 제한을 통합한 소스는 [앱 PR #313](https://github.com/Yaho03/drive-growth/pull/313)으로 main에 반영됐습니다. 아래 다운로드와 화면은 **이전 검증 릴리스**에 해당하며, 각 APK는 표의 커밋에서 빌드했습니다. 최신 통합 소스를 실행하려면 [로컬 빌드와 실행 절차](docs/05_DEVELOPMENT_SETUP.md#팀-공통-실행-절차)를 사용하세요. 최신 소스의 실행 기록과 확인 범위는 [검증 요약](docs/06_VERIFICATION.md#현재-검증-요약--2026-11-15)에서 확인할 수 있습니다.
+첫 차량 안내·효과음·주행 제한을 통합한 소스는 [앱 PR #313](https://github.com/Yaho03/drive-growth/pull/313)으로 main에 반영됐습니다. 최신 모의 APK와 신규 설치용 차량 APK는 [`52285de`](https://github.com/Yaho03/drive-growth/commit/52285dec30d90957786ca11d46234d2bcc24e58d)에서 빌드했습니다. 기존 차량 앱과 호환되는 이전 개발 서명 APK도 받을 수 있습니다. [로컬 빌드 절차](docs/05_DEVELOPMENT_SETUP.md#팀-공통-실행-절차) · [검증 요약](docs/06_VERIFICATION.md#현재-검증-요약--2026-11-15)
 
 | 사용 목적 | 다운로드와 입력 |
 |---|---|
-| **새 저장으로 게임 체험** | [첫 차량 테스트 APK](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-first-vehicle-test-20261115.apk) · `io.drivegrowth.verify.prototype.firstcarplay` · 모의 차량·내비 입력. 코드 `6070445`, 릴리스 문서 `2c75715` |
-| **Pleos 차량 SDK 입력 확인** | [차량용 APK](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-vehicle-dev-709e08d.apk) · `io.drivegrowth.app` · `709e08d` 기반 개발 서명 Release |
+| **게임 체험과 첫 차량 선택** | [첫 차량 테스트 APK](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-firstcarplay-52285de.apk) · `io.drivegrowth.verify.prototype.firstcarplay` · 모의 차량·내비 입력을 사용하는 Debug |
+| **Pleos 차량 SDK 신규 시험 설치** | [최신 차량용 APK](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-vehicle-fresh-install-52285de.apk) · `io.drivegrowth.app` · 개발 서명 Release · **신규 설치용, 기존 차량 앱 업데이트 불가** |
+| **기존 개발 서명 차량 앱과 호환** | [이전 차량용 APK](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-vehicle-dev-709e08d.apk) · `io.drivegrowth.app` · `709e08d` 기반 개발 서명 Release |
 
-두 앱은 저장 공간이 분리됩니다. 설치한 앱을 업데이트할 때는 패키지·서명·Android 사용자를 확인하세요. 비공개 저장소에는 다운로드 권한이 필요합니다. [릴리스와 SHA-256](https://github.com/Yaho03/drive-growth/releases/tag/first-vehicle-test-20261115) · [기존 저장을 보존하는 설치 방법](docs/05_DEVELOPMENT_SETUP.md#설치-대상과-저장-보존)
+기존 `firstcarplay`는 동일 인증서와 Android 사용자에서 최신 모의 APK로 업데이트할 수 있습니다. 최신 차량용 APK는 기존 `io.drivegrowth.app`이 없는 별도 Pleos 시험 환경용입니다. 서명을 검증했고 기기 설치·실행은 아직 확인하지 않았습니다. 기존 차량 앱과 저장은 유지하세요. 비공개 저장소에는 다운로드 권한이 필요합니다. [최신 통합 릴리스와 SHA-256](https://github.com/Yaho03/drive-growth/releases/tag/integrated-20261115-52285de) · [기존 저장을 보존하는 설치 방법](docs/05_DEVELOPMENT_SETUP.md#설치-대상과-저장-보존)
 
-**위 테스트 APK의 빠른 체험** — 앱을 열어 **화면을 눌러 시작 → 첫 차량 고르기 → 캐스퍼 또는 아반떼 선택 → 선택 내용 확인 → 이 차량으로 시작 → 가게로**를 누릅니다. 종료 후 같은 앱을 다시 열어 차고와 잔액을 확인할 수 있습니다. 탁송은 **탁송 → 이 목적지의 탁송 후보 보기 → 수익 탁송 → 이 의뢰 선택 → 탁송 수락**에서 시작합니다. 저장된 선택 결과를 확인한 뒤 **설정 → 시연 → 모의 입력 모드**에서 모의주행을 시작합니다. [심사위원 설치·실행 안내](docs/05_DEVELOPMENT_SETUP.md#심사위원-실행-안내) · [모의주행의 자세한 순서](docs/05_DEVELOPMENT_SETUP.md#현재-소스의-로컬-debug-화면-경로)
+**새 프로필에서 빠른 체험** — 테스트 앱을 열어 **화면을 눌러 시작 → 시작하기 → 캐스퍼 또는 아반떼 카드 → 캐스퍼로 할게요 또는 아반떼로 할게요 → 확인 → 가게로 가기** 순서로 진행합니다. 종료 후 같은 앱을 다시 열어 차고와 잔액을 확인할 수 있습니다. 탁송은 **탁송 → 이 목적지의 탁송 후보 보기 → 수익 탁송 → 이 의뢰 선택 → 탁송 수락**에서 시작합니다. 저장된 선택 결과를 확인한 뒤 **설정 → 시연 → 모의 입력 모드**에서 모의주행을 시작합니다. [심사위원 설치·실행 안내](docs/05_DEVELOPMENT_SETUP.md#심사위원-실행-안내) · [모의주행의 자세한 순서](docs/05_DEVELOPMENT_SETUP.md#현재-소스의-로컬-debug-화면-경로)
 
 ## 핵심 기능
 

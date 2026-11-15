@@ -36,7 +36,7 @@ Pleos Connect의 Android Automotive OS 환경에서 Kotlin 앱을 구현했습�
 | 범위 | 적용 기술과 확인한 결과 |
 |---|---|
 | 주차·주행 제한 | Pleos 에뮬레이터의 차량 신호와 UX 제한을 사용합니다. 앞선 장치 시험에서 P·D, 권한 거부와 복원, Back 뒤 제한·복귀를 확인했습니다. [차량용 SDK 시험](06_VERIFICATION.md#같은-ce03352-apk의-실제-sdk-제한과-back) |
-| 목적지·탁송 | NaviHelper에서 수신한 최초 목적지·견적과 후보 표시를 별도 SDK 시험에서 확인했습니다. 모의 흐름으로 의뢰 수락·도착·정산·재실행을 확인했습니다. 실제 SDK 환경에서 목적지 설정부터 도착과 지급까지 이어지는 검증은 남아 있습니다. [SDK 최초 견적](06_VERIFICATION.md#37-실제-sdk-최초-견적과-main-구매잔액-부족--2026-11-13) · [최신 통합 검증](06_VERIFICATION.md#310-최신-main-통합과-재검증--2026-11-15) |
+| 목적지·탁송 | NaviHelper에서 수신한 최초 목적지·견적과 후보 표시를 별도 SDK 시험에서 확인했습니다. 모의 흐름으로 의뢰 수락·도착·정산·재실행을 확인했습니다. 실제 SDK 환경에서 목적지 설정부터 도착과 지급까지 이어지는 검증은 남아 있습니다. [SDK 최초 견적](06_VERIFICATION.md#37-실제-sdk-최초-견적과-main-구매잔액-부족--2026-11-13) · [탁송을 포함한 통합 검증](06_VERIFICATION.md#310-최신-main-통합과-재검증--2026-11-15) |
 | 첫 지급·저장 복원 | 기존 첫 차량 테스트 APK와 같은 제품 코드를 사용한 격리 계측에서 지급 전 종료와 재진입, 확정 뒤 새 프로세스의 동일 차량·잔액·지급 이력 1건을 확인했습니다. 사용자용 APK에서 선택 화면도 확인했습니다. [첫 차량 시험](06_VERIFICATION.md#첫-차량-지급과-격리-debug의-재실행--2026-11-15) |
 | 대여·가게 성장 | 앞선 모의 원장 시험에서 첫 대여, 개업 선물, 차량 영입, 공간 확장·시설을 연결했습니다. 연속 시연의 해금용 자금·대여 이력 일부에는 시험 준비 입력을 사용했습니다. 실제 환경에서 앱 종료 중 영업 수익과 경제 밸런스 검증은 남아 있습니다. [모의 연속 실행](06_VERIFICATION.md#최종-동일-모의-원장의-연속-실행--2026-11-13) |
 | 후속 검증 | 내비 도착의 귀속과 실제 신호의 지속 수신, 창·권한 변경 시 복구, 장시간 영업 수익을 우선 확인합니다. 백그라운드 차량 입력은 SDK 지원·권한과 정책을 확인한 범위에서 적용합니다. 실차 실행과 최종 마켓 서명·승인은 별도 검증입니다. [검증 현황](06_VERIFICATION.md) |
@@ -49,14 +49,15 @@ Pleos Connect의 Android Automotive OS 환경에서 Kotlin 앱을 구현했습�
 
 ## 7. 참고자료
 
-이 절의 다운로드와 캡처는 아래에 적힌 이전 검증 릴리스에 해당합니다. 현재 소스의 첫 차량과 주행 제한 통합은 [앱 PR #313](https://github.com/Yaho03/drive-growth/pull/313)과 [통합 실행 기록](06_VERIFICATION.md#첫-차량-html과-312-주행-제한-장면-통합--2026-11-15)을 참조합니다.
+최신 모의 APK와 신규 설치용 차량 APK는 [빌드 소스 `52285de`](https://github.com/Yaho03/drive-growth/commit/52285dec30d90957786ca11d46234d2bcc24e58d)를 사용합니다. 최신 차량용 APK는 별도 Pleos 시험 환경의 신규 설치용입니다. 기존 차량 앱과 호환되는 서명 환경 및 최신 차량 APK의 기기 설치·실행은 미확인입니다. 아래 이전 캡처는 촬영 당시 빌드에 귀속됩니다. 현재 소스의 첫 차량과 주행 제한 통합은 [앱 PR #313](https://github.com/Yaho03/drive-growth/pull/313)과 [통합 실행 기록](06_VERIFICATION.md#첫-차량-html과-312-주행-제한-장면-통합--2026-11-15)을 참조합니다.
 
 | 자료 | 심사 시 확인 범위 |
 |---|---|
-| [선택·가게·복원 화면과 APK 릴리스](https://github.com/Yaho03/drive-growth/releases/tag/first-vehicle-test-20261115) | 첫 차량 선택 화면과 검증 환경의 가게·최초 지급 원결과 캡처. 캡처와 실행 패키지별 근거는 [첫 차량 시험 기록](evidence/first-vehicle-isolation-20261115/README.md)에 수록 |
-| [차량용 APK 다운로드](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-vehicle-dev-709e08d.apk) | `io.drivegrowth.app`, 개발 서명 Release 구성. 빌드 소스 `709e08dcb9e8be0f98c3ccfba2ba7b33b51f12f0` |
-| [첫 차량 테스트 APK 다운로드](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-first-vehicle-test-20261115.apk) | `io.drivegrowth.verify.prototype.firstcarplay`, 실제 SDK 입력과 분리된 Debug 모의 앱. 빌드 소스 `6070445c154455c2b3f8c9e777ac2f5c04cb014b` |
-| [저장소](https://github.com/Yaho03/drive-growth) · [해시 목록](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/SHA256SUMS.txt) | 각 다운로드의 빌드 소스는 위 두 행에 표시했습니다. 심사에 사용할 제출 커밋과 링크 접근은 발송 전 확인합니다. |
+| [이전 검증 릴리스의 선택·가게·복원 화면](https://github.com/Yaho03/drive-growth/releases/tag/first-vehicle-test-20261115) | 첫 차량 선택 화면과 당시의 가게·최초 지급 원결과 캡처. 캡처와 실행 패키지별 근거는 [첫 차량 시험 기록](evidence/first-vehicle-isolation-20261115/README.md)에 수록 |
+| [최신 차량용 APK 다운로드](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-vehicle-fresh-install-52285de.apk) | `io.drivegrowth.app`, 신규 시험 설치용 개발 서명 Release. **기존 차량 앱 업데이트 불가**, 기기 설치·실행 미검증 |
+| [이전 차량용 APK 다운로드](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-vehicle-dev-709e08d.apk) | `io.drivegrowth.app`, Pleos 차량 SDK 입력용 개발 서명 Release. 빌드 소스 `709e08dcb9e8be0f98c3ccfba2ba7b33b51f12f0` |
+| [첫 차량 테스트 APK 다운로드](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-firstcarplay-52285de.apk) | `io.drivegrowth.verify.prototype.firstcarplay`, 모의 차량·내비 입력을 사용하는 Debug |
+| [저장소](https://github.com/Yaho03/drive-growth) · [최신 통합 릴리스와 해시 목록](https://github.com/Yaho03/drive-growth/releases/tag/integrated-20261115-52285de) | 빌드 소스와 릴리스 태그를 확인할 수 있습니다. 접수 메일에 기재할 제출 커밋과 심사 링크 접근은 발송 전 대조합니다. |
 | [로컬 시연 영상 검토 기록](06_VERIFICATION.md#표준-debug-앱-로컬-시연과-모의주행-조작-제한--2026-11-13) | 기존 Debug 검토본의 실행 조건과 한계. 심사용 영상 링크와 사용 자산·표기·익명성은 별도로 검수합니다. |
 
 GitHub 개발 산출물을 선택 제출할 경우 소스 코드와 실행 가능한 Release APK를 함께 제공하고 README에 앱 이름·한 줄 소개, 실행 방법, 시험 환경·설정, Pleos Connect 에뮬레이터 버전·화면 규격, APK 위치를 적는다. 메일의 최종 커밋과 접근 가능한 파일을 대조하고, 비공개로 접수한다면 공지의 공개 전환 기간 또는 압축본 절차를 적용한다. [공식 제출 안내](https://appdevchallenge.auto-hmg.io/guide/submission) · [비공개 저장소 안내](https://appdevchallenge.auto-hmg.io/notice/c0a1a000-2026-4923-8000-000000000007)
