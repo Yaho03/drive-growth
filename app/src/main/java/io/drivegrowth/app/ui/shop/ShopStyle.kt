@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.shop
 
+import io.drivegrowth.app.ui.presentation.setGameButtonClick
 import android.content.Context
 import android.graphics.Typeface
 import android.view.View
@@ -46,7 +47,7 @@ internal class ShopStyle(private val context: Context) {
             text = label
             isAllCaps = false
             isEnabled = enabled
-            setOnClickListener { if (isEnabled) action() }
+            setGameButtonClick(action = action)
         }, primary)
     fun add(parent: LinearLayout, child: View, gap: Int = PixelStyle.gapDp) {
         parent.addView(child, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(gap) })

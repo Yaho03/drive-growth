@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.results
 
+import io.drivegrowth.app.ui.presentation.setGameButtonClick
 import android.content.Context
 import android.graphics.Typeface
 import android.view.Gravity
@@ -53,7 +54,7 @@ internal class ResultsStyle(private val context: Context) {
         background = hud.signButton(primary)
         minHeight = dp(52); minimumHeight = dp(52)
         setPadding(dp(16), dp(8), dp(16), dp(8))
-        setOnClickListener { if (isEnabled) action() }
+        setGameButtonClick(action = action)
     }
     fun add(parent: LinearLayout, child: View, gap: Int = PixelStyle.gapDp) {
         parent.addView(child, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(gap) })

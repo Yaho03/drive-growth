@@ -16,6 +16,8 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import io.drivegrowth.app.ui.garage.CollectionScrollTestActivity
 import io.drivegrowth.core.contract.Rarity
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
 @Suppress("DEPRECATION")
@@ -88,6 +90,41 @@ class RewardCelebrationDeviceTest : InstrumentationTestCase() {
             }
         } finally {
             bitmap.recycle()
+        }
+    }
+
+    fun testFirstGrantAudioIsCancelledOnDetachAfterVisualCompletion() {
+        if (!ValueAnimator.areAnimatorsEnabled()) return
+        val visualCompleted = CountDownLatch(1)
+        var starts = 0
+        var cancels = 0
+        val container = FrameLayout(host)
+        val effect = RewardCelebrationView(host).apply {
+            playFirstGrantAudio = {
+                starts++
+                val cancel: () -> Unit = { cancels++ }
+                cancel
+            }
+            onFirstGrantFrame = { elapsed ->
+                if (elapsed == null && starts == 1) visualCompleted.countDown()
+            }
+        }
+        onUi {
+            host.setContentView(container)
+            effect.render("grant-detach", RewardCelebrationKind.FIRST_GRANT)
+            container.addView(effect, FrameLayout.LayoutParams(320, 180))
+        }
+        awaitWindowFocus(container)
+        assertTrue("first grant did not complete its visual timeline",
+            visualCompleted.await(6, TimeUnit.SECONDS))
+        onUi {
+            assertEquals(1, starts)
+            assertEquals(0, cancels)
+            container.removeView(effect)
+            assertEquals(1, cancels)
+            effect.stopFirstGrantAudio()
+            effect.render(null, RewardCelebrationKind.FIRST_GRANT)
+            assertEquals(1, cancels)
         }
     }
 

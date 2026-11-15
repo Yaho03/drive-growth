@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.garage
 
+import io.drivegrowth.app.ui.presentation.setGameButtonClick
 import android.annotation.SuppressLint
 import android.content.Context
 import android.view.Gravity
@@ -306,10 +307,10 @@ internal class MapVehicleDetailView(
             val version = generation
             tag = key
             mapStyle.styleButton(this, primary)
-            setOnClickListener {
-                if (isEnabled && version == generation && visibility == VISIBLE &&
-                    this@MapVehicleDetailView.visibility == VISIBLE && interaction.controlsEnabled) action()
-            }
+            setGameButtonClick(available = {
+                version == generation && visibility == VISIBLE &&
+                    this@MapVehicleDetailView.visibility == VISIBLE && interaction.controlsEnabled
+            }, action = action)
         }
 
     private fun activityLabel(activity: VehicleActivity?) = s(when (activity) {

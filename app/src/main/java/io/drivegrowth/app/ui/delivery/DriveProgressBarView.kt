@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.delivery
 
+import io.drivegrowth.app.ui.presentation.setGameButtonClick
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
@@ -76,7 +77,9 @@ internal class DriveProgressBarView(
         textColumn.addView(provenance)
         textColumn.addView(status)
         textColumn.addView(track, LayoutParams(LayoutParams.MATCH_PARENT, signs.dp(7)).apply { topMargin = signs.dp(4) })
-        setOnClickListener { currentProgress()?.let(onOpen) }
+        setGameButtonClick(available = { currentProgress() != null }) {
+            currentProgress()?.let(onOpen)
+        }
         setOnLongClickListener { collapse() }
     }
 
@@ -256,8 +259,8 @@ internal class DriveProgressChipView(context: Context, private val onExpand: (Dr
         isFocusableInTouchMode = true
         background = signs.signButton()
         visibility = GONE
-        setOnClickListener {
-            progress?.takeIf { acceptsProgressInput() }?.let(onExpand)
+        setGameButtonClick(available = { progress != null && acceptsProgressInput() }) {
+            progress?.let(onExpand)
         }
     }
 

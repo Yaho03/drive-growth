@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.progress
 
+import io.drivegrowth.app.ui.presentation.setGameButtonClick
 import android.content.Context
 import android.graphics.Typeface
 import android.widget.Button
@@ -44,7 +45,7 @@ internal class ProgressStyle(private val context: Context) {
         background = hud.signButton(primary)
         setTypeface(typeface, Typeface.BOLD)
         minHeight = dp(64); minimumHeight = minHeight; setPadding(dp(12), dp(8), dp(12), dp(8))
-        setOnClickListener { if (isEnabled) action() }
+        setGameButtonClick(action = action)
     }
     fun add(parent: LinearLayout, child: android.view.View, gap: Int = PixelStyle.gapDp) {
         parent.addView(child, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(gap) })

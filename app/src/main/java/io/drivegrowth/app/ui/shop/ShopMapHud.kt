@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.shop
 
+import io.drivegrowth.app.ui.presentation.setGameButtonClick
 import android.content.Context
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -74,7 +75,7 @@ internal class ShopMapHud(
                 minHeight = 0
                 foreground = InsetDrawable(style.icon(ReferenceHudIcon.SETTINGS, 26), style.dp(13))
                 foregroundGravity = Gravity.FILL
-                setOnClickListener { onSettings() }
+                setGameButtonClick(action = onSettings)
             }, LinearLayout.LayoutParams(style.dp(56), style.dp(56)).apply { marginStart = style.dp(4) })
         }
     }

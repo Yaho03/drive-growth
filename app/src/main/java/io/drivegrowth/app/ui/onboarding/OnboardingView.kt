@@ -1,10 +1,18 @@
 package io.drivegrowth.app.ui.onboarding
 
+import android.animation.ValueAnimator
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
@@ -33,9 +41,12 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
     private val hud = ReferenceHudStyle(context)
     private val panels = MapPanelStyle(context)
     private val style = GarageStyle(context, pixelPanel = true)
-    internal var onCelebration: ((RewardCelebrationKind) -> Unit)? = null
+    internal var playFirstGrantAudio: (() -> (() -> Unit)?)? = null
+    private var firstGrantElapsed: Long? = null
+    private var prepareFirstGrant: (() -> Unit)? = null
+    private var firstGrantWillAnimate: Boolean? = null
     private val celebration = RewardCelebrationView(context).apply {
-        onStarted = { onCelebration?.invoke(it) }
+        playFirstGrantAudio = { this@OnboardingView.playFirstGrantAudio?.invoke() }
     }
     private var confirmedChoice: VehicleId? = null
     private val interaction = OnboardingInteraction { event ->
@@ -53,7 +64,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         }
     }
     private var layoutWidth = 0
-    private val wide get() = layoutWidth >= style.dp(560)
+    private val wide get() = layoutWidth >= style.dp(560) && resources.configuration.fontScale <= 1.3f
     private var scroll: ScrollView? = null
     private var savedY = 0
     private var previousScene: Class<*>? = null
@@ -78,15 +89,28 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         interaction.restoreSelection(id)
         if (previous != interaction.selectedId) drawScreen()
     }
+    internal fun stopFirstGrantAudio() = celebration.stopFirstGrantAudio()
+
     fun handleBack(): Boolean {
         val handled = interaction.handleBack()
         if (handled) drawScreen()
         return handled
     }
 
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        if (w != layoutWidth) { layoutWidth = w; post { drawScreen() } }
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val width = MeasureSpec.getSize(widthMeasureSpec)
+        if (width != layoutWidth) {
+            layoutWidth = width
+            if (childCount > 0) drawScreen()
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        val prepare = prepareFirstGrant
+        prepareFirstGrant = null
+        prepare?.invoke()
+        super.dispatchDraw(canvas)
     }
 
     private fun s(id: Int) = context.getString(id)
@@ -95,10 +119,15 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         if (scene == previousScene) scroll?.takeIf { it.isLaidOut }?.let { savedY = it.scrollY } else savedY = 0
         previousScene = scene
         val focused = findFocus()?.tag
+        prepareFirstGrant = null
+        celebration.onFirstGrantFrame = null
+        if (interaction.state !is OnboardingScreenState.Completed || !interaction.controlsEnabled) {
+            celebration.render(null, RewardCelebrationKind.FIRST_GRANT)
+            firstGrantElapsed = null
+        }
         celebration.rebuildContent { removeAllViews() }; scroll = null
         setPadding(dp(PixelStyle.panelPaddingDp), dp(PixelStyle.gapDp), dp(PixelStyle.panelPaddingDp), dp(PixelStyle.gapDp))
         if (!interaction.controlsEnabled) {
-            celebration.render(null, RewardCelebrationKind.FIRST_GRANT)
             confirmedChoice = null
             heading(this@OnboardingView, R.string.onboarding_restricted, R.string.onboarding_restricted_body)
             return@with
@@ -120,50 +149,70 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             }
             is OnboardingScreenState.Intro -> {
                 source(body, state.sourceLabel)
-                intro(body, state)
+                intro(body)
                 action(this@OnboardingView, R.string.onboarding_start, primary = true) { interaction.start() }
             }
             is OnboardingScreenState.Choosing -> {
                 source(body, state.sourceLabel)
-                heading(body, R.string.onboarding_choose_title, R.string.onboarding_choose_body)
+                stageTitle(body, R.string.onboarding_choose_title)
+                body.addView(label(s(R.string.onboarding_choose_body), 17, panels.muted))
                 if (state.candidates.isEmpty()) {
                     heading(body, R.string.onboarding_empty, R.string.onboarding_empty_body)
-                    action(body, R.string.onboarding_retry) { interaction.retry() }
+                    action(this@OnboardingView, R.string.onboarding_retry) { interaction.retry() }
                 } else {
                     state.candidates.chunked(if (wide) 2 else 1).forEach { candidates ->
                         val row = row()
                         candidates.forEachIndexed { index, value ->
-                            row.addView(candidate(value, true), LayoutParams(0, -2, 1f).apply { if (index > 0) marginStart = dp(PixelStyle.gapDp) })
+                            row.addView(candidate(value), LayoutParams(0, -2, 1f).apply {
+                                if (index > 0) marginStart = dp(PixelStyle.gapDp)
+                            })
                         }
                         add(body, row, PixelStyle.gapDp)
                     }
-                    if (interaction.selectedCandidate == null) heading(body, if (interaction.selectedId == null)
-                        R.string.onboarding_select_required else R.string.onboarding_selection_missing)
+                    val selected = interaction.selectedCandidate
+                    val reviewedId = selected?.vehicle?.vehicleId
+                    if (selected == null && interaction.selectedId != null)
+                        add(body, label(s(R.string.onboarding_selection_missing), 16, panels.muted))
+                    val review = selected?.vehicle?.displayName?.let {
+                        context.getString(R.string.onboarding_review_selected, it)
+                    } ?: s(R.string.onboarding_select_required)
+                    add(this@OnboardingView, actionButton(review, R.string.onboarding_review,
+                        enabled = selected?.selectable == true, primary = true) {
+                        interaction.selectedId == reviewedId && interaction.review()
+                    }, PixelStyle.gapDp)
                 }
-                benefits(body, state.plannedBenefits)
-                action(body, R.string.onboarding_previous) { interaction.handleBack() }
-                if (state.candidates.isNotEmpty())
-                    action(this@OnboardingView, R.string.onboarding_review,
-                        interaction.selectedCandidate?.selectable == true, true) { interaction.review() }
             }
             is OnboardingScreenState.Confirming -> {
                 source(body, state.sourceLabel)
-                val review = pixelCard().apply {
+                val review = pixelCard(selected = true).apply {
                     gravity = Gravity.CENTER_HORIZONTAL
-                    addView(candidate(state.candidate, false))
-                    addView(label(s(R.string.onboarding_confirm_title), 22, bold = true))
-                    add(this, label(s(R.string.onboarding_confirm_body), 16, hud.signInk, true).apply {
-                        background = hud.detailSurface(true)
-                        setPadding(dp(12), dp(8), dp(12), dp(8))
-                    })
-                    benefits(this, state.plannedBenefits)
-                    action(this, R.string.onboarding_previous, state.backAllowed) { interaction.handleBack() }
+                    addVehicleArt(this, state.candidate.vehicle.vehicleId, height = 140)
+                    addView(label(context.getString(R.string.onboarding_confirm_title, state.candidate.vehicle.displayName),
+                        26, bold = true).apply { gravity = Gravity.CENTER })
+                    if (!state.candidate.selectable)
+                        addView(label(state.candidate.unavailableReason ?: s(R.string.onboarding_unavailable), 17, panels.muted))
+                    val benefits = if (state.plannedBenefits.isEmpty()) s(R.string.onboarding_benefits_missing)
+                    else context.getString(R.string.onboarding_planned_summary, state.plannedBenefits.joinToString(" · "))
+                    addView(label(benefits, 16, panels.muted).apply { gravity = Gravity.CENTER })
                 }
                 addCentered(body, review, 560)
                 if (interaction.pendingSelection != null) body.addView(label(s(R.string.onboarding_submitting), 24))
-                action(this@OnboardingView, R.string.onboarding_confirm, state.candidate.selectable, true) {
+                val footer = row()
+                footer.addView(actionButton(s(R.string.onboarding_previous), R.string.onboarding_previous, state.backAllowed) {
+                    interaction.handleBack()
+                }, LayoutParams(0, -2, 1f))
+                footer.addView(actionButton(s(R.string.onboarding_confirm), R.string.onboarding_confirm,
+                    state.candidate.selectable, primary = true) {
                     interaction.confirm(state.candidate.vehicle.vehicleId)
+                }, LayoutParams(0, -2, 1f).apply { marginStart = dp(PixelStyle.gapDp) })
+                val confirmation = column().apply {
+                    addView(label(s(R.string.onboarding_confirm_body), 17, panels.muted).apply {
+                        gravity = Gravity.CENTER
+                        tag = R.string.onboarding_confirm_body
+                    }, LayoutParams(-1, -2))
+                    add(this, footer, PixelStyle.gapDp)
                 }
+                add(this@OnboardingView, confirmation, PixelStyle.gapDp)
             }
             is OnboardingScreenState.Submitting -> {
                 source(body, state.sourceLabel)
@@ -186,32 +235,43 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
             }
             is OnboardingScreenState.Completed -> {
                 source(body, state.sourceLabel)
-                heading(body, if (state.alreadyGranted) R.string.onboarding_already_granted else R.string.onboarding_complete)
+                stageTitle(body, if (state.alreadyGranted) R.string.onboarding_already_granted else R.string.onboarding_complete,
+                    centered = true)
                 completedRewards(body, state)
-                action(this@OnboardingView, R.string.onboarding_to_shop, primary = true) { interaction.goToShop() }
             }
         }
         if (focused != null) findViewWithTag<View>(focused)?.takeIf { it.isEnabled }?.requestFocus()
     }
 
     private fun completedRewards(body: LinearLayout, state: OnboardingScreenState.Completed) = with(style) {
-        val money = state.initialMoney?.let { NumberFormat.getIntegerInstance(Locale.KOREA).format(it.units) }
+        val numberFormat = NumberFormat.getIntegerInstance(Locale.KOREA)
+        val money = state.initialMoney?.units
         val spaces = state.initialParkingSpaces?.let { context.getString(R.string.onboarding_reward_parking_spaces, it) }
+        val moneyValue = rewardValue(money?.let(numberFormat::format))
+        val parkingValue = rewardValue(spaces)
+        val slotLights = mutableListOf<View>()
+        val parkingArt = state.initialParkingSpaces?.takeIf { it > 0 }?.let { capacity ->
+            parkingSlots(capacity) { slotLights += it }
+        } ?: rewardIcon(ReferenceHudIcon.GARAGE)
         val rewards = if (wide) row() else column()
+        val sprite = sprites.bitmap(state.vehicle.vehicleId)
+        val effectKey = state.vehicle.ownedVehicleId.value.takeIf {
+            sprite != null && !state.alreadyGranted && firstGrantWillAnimate != false && confirmedChoice == state.vehicle.vehicleId
+        }
+        celebration.render(effectKey, RewardCelebrationKind.FIRST_GRANT, vehicle = sprite)
+        if (effectKey == null) firstGrantElapsed = null
         val vehicle = pixelCard(selected = true).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             addView(label(s(R.string.onboarding_reward_vehicle), 14, color = panels.muted))
-            val effectKey = state.vehicle.ownedVehicleId.value.takeIf { !state.alreadyGranted && confirmedChoice == state.vehicle.vehicleId }
-            celebration.render(effectKey, RewardCelebrationKind.FIRST_GRANT, vehicle = sprites.bitmap(state.vehicle.vehicleId))
             addVehicleArt(this, state.vehicle.vehicleId, celebrate = true)
             addView(label(state.displayName, 22, bold = true))
             addView(onboardingRarityChip(state.vehicle.rarity))
             addView(label(context.getString(R.string.onboarding_level, state.vehicle.level), 16))
         }
         val cards = listOf(
-            rewardCard(s(R.string.onboarding_reward_money), ReferenceHudIcon.COIN, money),
+            rewardCard(s(R.string.onboarding_reward_money), rewardIcon(ReferenceHudIcon.COIN), moneyValue),
             vehicle,
-            rewardCard(s(R.string.onboarding_reward_parking), ReferenceHudIcon.GARAGE, spaces),
+            rewardCard(s(R.string.onboarding_reward_parking), parkingArt, parkingValue),
         )
         cards.forEachIndexed { index, card ->
             val params = if (wide) LayoutParams(0, -1, 1f).apply { if (index > 0) marginStart = dp(PixelStyle.gapDp) }
@@ -222,20 +282,118 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         state.summary.forEach {
             add(body, label(it, color = panels.muted), PixelStyle.gapDp)
         }
+        val shop = actionButton(s(R.string.onboarding_to_shop), R.string.onboarding_to_shop, primary = true) {
+            if (firstGrantElapsed?.let { it < 1450L } == true) false else interaction.goToShop()
+        }
+        val shopAvailable = shop.isEnabled
+        add(this@OnboardingView, shop, PixelStyle.gapDp)
+        if (effectKey != null) {
+            val renderFrame: (Long?) -> Unit = { elapsed ->
+                firstGrantElapsed = elapsed
+                cards.forEachIndexed { index, card ->
+                    val start = index * 150L
+                    val opacity = elapsed?.let { rewardPhase(it, start, 100) } ?: 1f
+                    // 차 카드의 캔버스가 다음 프레임을 그릴 수 있도록 완전히 투명하게 만들지 않는다.
+                    card.alpha = if (index == 1) opacity.coerceAtLeast(.01f) else opacity
+                    val lift = elapsed?.let { rewardPhase(it, start, 400) } ?: 1f
+                    card.translationY = dp(24) * (1f - lift) * (1f - lift)
+                }
+                if (money != null) {
+                    moneyValue.visibility = if (elapsed == null || elapsed >= 450L) View.VISIBLE else View.INVISIBLE
+                    val ticks = ((elapsed ?: 1150L) - 450L).coerceIn(0L, 700L)
+                    val amount = (money / 700L) * ticks + (money % 700L) * ticks / 700L
+                    val formatted = numberFormat.format(amount)
+                    if (moneyValue.text != formatted) moneyValue.text = formatted
+                }
+                slotLights.forEachIndexed { index, light ->
+                    val cue = 700L + index * 100L
+                    light.alpha = elapsed?.let { rewardPhase(it, cue, 80) } ?: 1f
+                }
+                val shopReady = elapsed == null || elapsed >= 1450L
+                shop.isEnabled = shopAvailable && shopReady
+                shop.alpha = elapsed?.let { rewardPhase(it, 1450, 100) } ?: 1f
+                val scale = elapsed?.let { .8f + .2f * rewardPhase(it, 1450, 300) } ?: 1f
+                shop.scaleX = scale
+                shop.scaleY = scale
+            }
+            celebration.onFirstGrantFrame = renderFrame
+            renderFrame(firstGrantElapsed)
+            val visibleClockBounds = Rect()
+            fun showStaticReward() {
+                firstGrantWillAnimate = false
+                celebration.onFirstGrantFrame = null
+                celebration.render(null, RewardCelebrationKind.FIRST_GRANT, vehicle = sprite)
+                renderFrame(null)
+            }
+            fun settleIfClockClipped() {
+                if (firstGrantElapsed != null && !celebration.getLocalVisibleRect(visibleClockBounds)) {
+                    showStaticReward()
+                }
+            }
+            if (firstGrantWillAnimate == null) {
+                prepareFirstGrant = {
+                    if (hasWindowFocus() && ValueAnimator.areAnimatorsEnabled() &&
+                        celebration.getLocalVisibleRect(visibleClockBounds)) {
+                        firstGrantWillAnimate = true
+                        renderFrame(0)
+                        settleIfClockClipped()
+                    } else {
+                        // 첫 프레임에 정적 결과를 보여준 경우 이후 스크롤·포커스로 연출을 다시 열지 않는다.
+                        showStaticReward()
+                    }
+                }
+            }
+            scroll?.apply {
+                setOnScrollChangeListener { _, _, _, _, _ -> settleIfClockClipped() }
+                addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> settleIfClockClipped() }
+            }
+        }
     }
 
-    private fun rewardCard(title: String, icon: ReferenceHudIcon, value: String?) = pixelCard().apply {
+    private fun rewardPhase(elapsed: Long, start: Long, duration: Long): Float =
+        ((elapsed - start).toFloat() / duration).coerceIn(0f, 1f)
+
+    private fun rewardValue(value: String?) =
+        if (value != null) label(value, 26, bold = true).apply { gravity = Gravity.CENTER }
+        else label(s(R.string.onboarding_reward_unknown), 16, color = panels.muted)
+
+    private fun rewardIcon(icon: ReferenceHudIcon) = ImageView(context).apply {
+        setImageDrawable(hud.icon(icon, 42))
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
+
+    private fun parkingSlots(capacity: Int, rememberLight: (View) -> Unit) = with(style) {
+        val slots = row()
+        val shown = capacity.coerceAtMost(12)
+        val gap = dp(2)
+        slots.gravity = Gravity.CENTER
+        slots.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        repeat(shown) { index ->
+            val bay = FrameLayout(context).apply {
+                background = GradientDrawable().apply {
+                    setColor(Color.rgb(27, 40, 62))
+                    setStroke(dp(1).coerceAtLeast(1), PixelStyle.muted)
+                }
+                addView(View(context).apply {
+                    tag = "first-grant:parking-slot:$index"
+                    setBackgroundColor(panels.accent)
+                    rememberLight(this)
+                }, FrameLayout.LayoutParams(-1, -1).apply { setMargins(gap, gap, gap, gap) })
+            }
+            slots.addView(bay, LayoutParams(0, dp(32), 1f).apply { if (index > 0) marginStart = gap })
+        }
+        slots
+    }
+
+    private fun rewardCard(title: String, art: View, value: View) = pixelCard().apply {
         gravity = Gravity.CENTER_HORIZONTAL
-        addView(ImageView(context).apply {
-            setImageDrawable(hud.icon(icon, 42))
-            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-        }, LayoutParams(style.dp(54), style.dp(54)))
+        val artWidth = if (art is ImageView) style.dp(54) else LayoutParams.MATCH_PARENT
+        addView(art, LayoutParams(artWidth, style.dp(54)))
         addView(label(title, 15, color = panels.muted))
-        addView(if (value != null) label(value, 21, bold = true).apply { gravity = Gravity.CENTER }
-            else label(s(R.string.onboarding_reward_unknown), 16, color = panels.muted))
+        addView(value)
     }
 
-    private fun intro(body: LinearLayout, state: OnboardingScreenState.Intro) = with(style) {
+    private fun intro(body: LinearLayout) = with(style) {
         val welcome = pixelCard().apply {
             val guide = guideBitmap
             if (guide != null) addView(row().apply {
@@ -244,12 +402,11 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
                     tag = "onboarding:town-art"
                     background = null
                 }, LayoutParams(dp(48), dp(48)))
-                addView(label("정비사", 15, panels.muted),
+                addView(label(s(R.string.onboarding_mechanic), 16, panels.muted),
                     LayoutParams(-2, -2).apply { marginStart = dp(10) })
             })
             add(this, label(s(R.string.onboarding_intro_title), 31, bold = true))
             addView(label(s(R.string.onboarding_intro_body), 17, panels.muted))
-            benefits(this, state.plannedBenefits)
         }
         addCentered(body, welcome, 640)
     }
@@ -273,30 +430,54 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         if (value == "모의 입력 프로필" || value == "차량 모드 프로필") return
         style.add(body, pixelCard().apply { addView(label(value, color = panels.muted)) })
     }
-    private fun benefits(body: LinearLayout, lines: List<String>) = with(style) {
-        add(body, pixelCard().apply {
-            addView(label(s(R.string.onboarding_planned_title), 18, bold = true))
-            if (lines.isEmpty()) addView(label(s(R.string.onboarding_benefits_missing), color = panels.muted))
-            else lines.forEach { addView(label(it, 16)) }
-        })
+    private fun stageTitle(body: LinearLayout, title: Int, centered: Boolean = false) {
+        body.addView(label(s(title), 26, bold = true).apply {
+            isAccessibilityHeading = true
+            if (centered) gravity = Gravity.CENTER
+        }, LayoutParams(-1, -2))
     }
-    private fun candidate(value: OnboardingCandidate, selectable: Boolean) = with(style) {
-        val selected = interaction.selectedId == value.vehicle.vehicleId
-        pixelCard(selected).apply {
-            addVehicleArt(this, value.vehicle.vehicleId)
+
+    private fun vehicleClass(id: VehicleId): String? = when (id.value) {
+        "hyundai_casper" -> s(R.string.onboarding_casper_class)
+        "hyundai_avante" -> s(R.string.onboarding_avante_class)
+        else -> null
+    }
+
+    private fun candidate(value: OnboardingCandidate): View = with(style) {
+        val id = value.vehicle.vehicleId
+        val selected = interaction.selectedId == id
+        val classification = vehicleClass(id)
+        val description = value.description ?: s(R.string.onboarding_description_missing)
+            .takeIf { !value.selectable || classification == null }
+        val details = if (value.selectable && classification != null) listOf(classification)
+        else listOfNotNull(classification, description).distinct()
+        val unavailable = if (!value.selectable) value.unavailableReason ?: s(R.string.onboarding_unavailable) else null
+        val content = pixelCard(selected).apply {
+            addVehicleArt(this, id, height = 148)
             addView(row().apply {
                 gravity = Gravity.CENTER_VERTICAL
-                addView(label(value.vehicle.displayName, 24, bold = true), LayoutParams(0, -2, 1f))
-                addView(onboardingRarityChip(Rarity.COMMON), LayoutParams(-2, -2))
-            })
-            addView(label(value.description ?: s(R.string.onboarding_description_missing), 16, panels.muted))
-            addView(label(s(R.string.onboarding_first_vehicle), 14, color = panels.muted))
-            addView(label(s(R.string.onboarding_game_note), color = panels.muted))
-            if (!value.selectable) addView(label(value.unavailableReason ?: s(R.string.onboarding_unavailable), color = panels.muted))
-            if (selected) addView(label(s(R.string.onboarding_selected), 16, bold = true))
-            if (selectable) action(this, R.string.onboarding_select, value.selectable, selected, value.vehicle.vehicleId, "${value.vehicle.displayName}, ${s(R.string.onboarding_select)}") {
-                interaction.select(value.vehicle.vehicleId)
+                addView(label(value.vehicle.displayName, 25, bold = true), LayoutParams(0, -2, 1f))
+                if (selected) addView(label(s(R.string.onboarding_selected), 16, bold = true), LayoutParams(-2, -2))
+            }, LayoutParams(-1, -2))
+            details.forEach { addView(label(it, 18, panels.muted)) }
+            if (unavailable != null) addView(label(unavailable, 17, panels.muted))
+            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        }
+        FrameLayout(context).apply {
+            addView(content, FrameLayout.LayoutParams(-1, -2))
+            val select = button("", value.selectable && !interaction.inputPending && interaction.pendingSelection == null) {
+                if (interaction.select(id)) drawScreen()
+            }.apply {
+                tag = id
+                isSelected = selected
+                background = RippleDrawable(ColorStateList.valueOf(0x40539cff), null, ColorDrawable(Color.WHITE))
+                contentDescription = (listOf(value.vehicle.displayName) + details + listOfNotNull(unavailable,
+                    s(if (selected) R.string.onboarding_selected else R.string.onboarding_select))).joinToString(", ")
+                setOnFocusChangeListener { _, focused ->
+                    content.background = if (selected || focused) hud.detailSurface(true) else hud.signSurface()
+                }
             }
+            addView(select, FrameLayout.LayoutParams(-1, -1))
         }
     }
     private fun onboardingRarityChip(value: Rarity) = label(style.rarity(value), 14, bold = true).apply {
@@ -321,7 +502,7 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         scaleType = ImageView.ScaleType.FIT_CENTER
     }
 
-    private fun addVehicleArt(card: LinearLayout, id: VehicleId, celebrate: Boolean = false) {
+    private fun addVehicleArt(card: LinearLayout, id: VehicleId, celebrate: Boolean = false, height: Int = GRANT_ART_HEIGHT_DP) {
         val drawable = sprites.drawable(id) ?: return
         val art = artwork(drawable).apply {
             tag = "onboarding:vehicle-art:${id.value}"
@@ -329,21 +510,21 @@ class OnboardingView(context: Context, onEvent: (OnboardingEvent) -> Unit) : Lin
         }
         art.background = null
         card.addView(if (celebrate) celebration.over(art, fillHeight = true, stage = true) else art,
-            LayoutParams(-1, style.dp(if (celebrate) GRANT_ART_HEIGHT_DP else 84)))
+            LayoutParams(-1, style.dp(height)))
     }
 
     private fun action(body: LinearLayout, label: Int, enabled: Boolean = true, primary: Boolean = false,
-                       tag: Any = label, description: String? = null, callback: () -> Boolean) = with(style) {
+                       callback: () -> Boolean) {
+        style.add(body, actionButton(s(label), label, enabled, primary, callback), PixelStyle.gapDp)
+    }
+
+    private fun actionButton(label: CharSequence, tag: Int, enabled: Boolean = true, primary: Boolean = false,
+                             callback: () -> Boolean) = with(style) {
         val available = enabled && !interaction.inputPending && interaction.pendingSelection == null
-        add(body, button(s(label), available, primary = primary) { callback(); drawScreen() }.apply {
+        button(label.toString(), available, primary = primary) { callback(); drawScreen() }.apply {
             this.tag = tag
-            textSize = 18f
-            minimumHeight = maxOf(minimumHeight, dp(52))
-            backgroundTintList = null
-            background = hud.signButton(primary)
-            setTextColor(hud.featureButtonText(primary))
-            if (description != null) contentDescription = description
-        }, PixelStyle.gapDp)
+            textSize = 20f
+        }
     }
 
     private companion object {
