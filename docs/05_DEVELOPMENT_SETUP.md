@@ -2,6 +2,69 @@
 
 현재 저장소 설정 대조: 2026-11-15 KST. 빌드 기준의 최초 반영은 2026-11-04다. 아래 설치·조사 기록은 각 수행 시점을 따른다.
 
+## 심사위원 실행 안내
+
+### 기존 검증 APK 선택과 다운로드
+
+이 절은 아래 릴리스에 공개된 파일과 해당 버전의 조작 문구를 설명한다. 최신 소스를 사용할 때는 [팀 공통 빌드 절차](#팀-공통-실행-절차)에서 직접 빌드하고, APK별 실행 근거는 [현재 검증 요약](06_VERIFICATION.md#현재-검증-요약--2026-11-15)에서 대조한다.
+
+첫 차량 선택부터 확인하려면 **첫 차량 테스트 APK**를 사용한다. Pleos 차량 SDK 입력과 주차 시 조작 허용을 확인하려면 **차량용 APK**를 사용한다.
+
+| 다운로드 | 실행 앱·패키지 | 빌드와 소스 |
+|---|---|---|
+| [첫 차량 테스트 APK](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-first-vehicle-test-20261115.apk) | **르르르 렌터카 · 첫 차량 테스트** · `io.drivegrowth.verify.prototype.firstcarplay` | 별도 Debug 구성 · `6070445c154455c2b3f8c9e777ac2f5c04cb014b` |
+| [차량용 APK](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-vehicle-dev-709e08d.apk) | **르르르 렌터카** · `io.drivegrowth.app` | 개발 서명 Release 구성 · `709e08dcb9e8be0f98c3ccfba2ba7b33b51f12f0` |
+
+[릴리스 설명](https://github.com/Yaho03/drive-growth/releases/tag/first-vehicle-test-20261115)과 [SHA256SUMS.txt](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/SHA256SUMS.txt)에서 파일과 해시를 대조한다. 두 다운로드의 실제 빌드 커밋은 위 표를 따른다. 다운로드에 접근할 수 없는 경우 심사용 저장소 공개 상태나 제공받은 소스·APK 압축본 링크를 확인한다. [심사 접근 조건](contest/01_CONTEST_GUIDE.md#4-제출물과-github)
+
+**시험 환경**은 Pleos Connect 에뮬레이터 2.1.0, Android API 34, ARM64다. 확인한 기본 디스플레이는 1080×600px·120dpi이며, 앱이 시스템 영역과 나눠 표시되는 경우 702×438px 앱 창을 사용했다. 일반 Android 스마트폰은 지원 대상에서 제외된다. 차량용 Release는 Pleos의 차량 신호·권한·UX 허용에 의존한다. 최종 제출용 서명, App Market 승인 및 실차 실행은 별도 확인 항목이다. [최초 지급·격리 실행 기록](06_VERIFICATION.md#첫-차량-지급과-격리-debug의-재실행--2026-11-15)
+
+### 설치 대상과 사용자 확인
+
+ADB에 시험 에뮬레이터를 연결하고 연결 목록에서 시리얼을 지정한다. 현재 Android 사용자를 읽어 설치와 실행에 같은 값을 사용한다. 별도 ADB 서버를 사용하는 환경에서는 모든 명령에 해당 포트를 지정한다.
+
+```sh
+adb devices -l
+SERIAL='<연결 목록의 시험 에뮬레이터 시리얼>'
+ANDROID_USER="$(adb -s "$SERIAL" shell am get-current-user | tr -d '\r')"
+printf 'Android user: %s\n' "$ANDROID_USER"
+```
+
+다운로드한 APK의 SHA-256을 대조한 뒤 [설치 대상과 저장 보존](#설치-대상과-저장-보존)의 조건을 적용한다. 새 테스트 앱은 독립 데이터 공간에 설치된다. 동일 패키지를 업데이트할 때는 기존 인증서·버전과 대상 사용자가 일치하는 경우에만 `install --user … -r`을 사용한다. 서명 불일치가 발생하면 기존 앱과 저장을 유지한 채 설치 파일을 다시 확인한다.
+
+### 첫 차량 선택과 모의 입력
+
+1. `FIRST_CAR_APK`에 내려받은 **첫 차량 테스트 APK** 경로를 지정한다. 신규 설치 뒤 앱 목록에서 **르르르 렌터카 · 첫 차량 테스트**를 연다. 앱 목록에서 실행하기 어려우면 아래 런처 인텐트를 사용한다.
+
+   ```sh
+   adb -s "$SERIAL" install --user "$ANDROID_USER" "$FIRST_CAR_APK"
+   adb -s "$SERIAL" shell am start --user "$ANDROID_USER" \
+     -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n \
+     io.drivegrowth.verify.prototype.firstcarplay/io.drivegrowth.app.simulation.UnifiedSimulationActivity
+   ```
+
+2. **화면을 눌러 시작 → 첫 차량 고르기 → 캐스퍼 또는 아반떼 → 선택 내용 확인 → 이 차량으로 시작 → 가게로** 순서로 진행한다. 최초 지급은 프로필당 한 번이며 일반 등급 차량 1대, 1,000 게임머니, 주차 공간 3칸을 제공한다. 새 프로필인데 가게 지도가 먼저 보이면 **설정 → 가게와 기록 → 첫 차량 안내**를 연다. 지급 기록이 있는 프로필에서는 첫 지급 원결과를 확인할 수 있다.
+3. 재실행을 확인하려면 아래 명령으로 **테스트 앱만** 종료하고 앱 목록이나 같은 런처 인텐트로 다시 연다. 차고의 차량과 잔액을 대조한다. 기존 제품과 표준 모의 앱의 데이터는 보존한다.
+
+   ```sh
+   adb -s "$SERIAL" shell am force-stop --user "$ANDROID_USER" io.drivegrowth.verify.prototype.firstcarplay
+   ```
+
+4. 탁송까지 시연할 경우 **탁송 → 이 목적지의 탁송 후보 보기 → 수익 탁송 → 후보 선택 → 탁송 수락**을 사용한다. 저장 결과 확인이 표시되면 **처리 결과 확인하고 새로 조회**를 누른다. 가게로 돌아와 **설정 → 시연 → 모의 입력 모드 → 모의주행 시작**을 선택한다. 주행 중 조작 제한과 모의 주차 뒤 탁송·정산을 확인한다. 결과는 이 앱의 모의 원장에 기록된다. [통합 시연과 입력의 구분](06_VERIFICATION.md#301-이후-남색-화면탁송-수락-조작-후속-확인--2026-11-15)
+
+### 차량용 APK 실행
+
+`PRODUCT_APK`에 내려받은 **차량용 APK** 경로를 지정한다. 제품 앱을 새로 설치하는 경우 아래 명령을 사용한다. 기존 `io.drivegrowth.app` 설치를 갱신할 경우 위의 인증서·버전 확인 뒤 `-r`을 추가한다.
+
+```sh
+adb -s "$SERIAL" install --user "$ANDROID_USER" "$PRODUCT_APK"
+adb -s "$SERIAL" shell am start --user "$ANDROID_USER" \
+  -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n \
+  io.drivegrowth.app/io.drivegrowth.app.MainActivity
+```
+
+차량용 앱은 정상 차량 입력에서 기어 P·정차·시스템 조작 허용을 연속 확인한 뒤 게임 화면을 연다. 권한 안내가 나오면 주차한 상태에서 **차량 설정 → 앱 → 르르르 렌터카 → 권한**에서 차량 데이터 접근을 확인한다. 신호 미수신이나 권한·UX 제한 중에는 앱의 주차 안내가 계속 표시될 수 있다. 먼저 기능 흐름을 확인하려면 첫 차량 테스트 APK를 사용한다. 실제 SDK의 최초 견적 확인과 모의 경로의 도착·정산 검증은 구분한다. [SDK 최초 견적 범위](06_VERIFICATION.md#37-실제-sdk-최초-견적과-main-구매잔액-부족--2026-11-13) · [통합 검증과 남은 범위](06_VERIFICATION.md#310-최신-main-통합과-재검증--2026-11-15)
+
 ## 개발 기반과 버전 기준
 
 기술 책임·선택 이유·게임 기획에 따른 결정 대기는 [기술 설계](02_SYSTEM_ARCHITECTURE.md#개발-기반-결정), 공식 Pleos SDK 조사 버전은 [개발 자료 2절](contest/02_PLEOS_DEVELOPMENT.md)에서 관리한다. 이 절은 실제 설정과 팀이 사용할 기준의 차이를 설명한다. 현재 설정은 저장소 파일, 설치 이력은 아래 기록, 실제 통과 결과는 [검증 문서](06_VERIFICATION.md)가 근거다.
@@ -172,7 +235,7 @@ JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌�
 
 설치 후 **르르르 렌터카 · 모의 시연**을 연다. 가게 지도 하단에서 **차고·도감·뽑기·탁송·정산·기록**을 각각 열 수 있다. 지도에서 차량과 시설을 직접 누를 수 있으며 **설정 → 가게와 기록**에서 **시설과 지도**와 **퀘스트·업적·휴식**으로 이동한다. 미확인 정산은 **정산**의 미확인 목록에서 확인한다.
 
-고정 모의 목적지는 **탁송 → 목적지 확인**에서 확인한다. 예상 거리를 가져오지 못한 경우 **모의 목적지 다시 확인**을 사용한다. 탁송 선택 결과를 확인한 뒤 가게의 **설정 → 시연 → 모의 입력 모드**에서 **모의주행 시작**을 누른다. 화면별 시험 범위와 APK 해시는 통합 검증 기록을 따른다. [로컬 Debug 화면과 검증 기록](06_VERIFICATION.md#pr-300-타이틀기능-창도감-선택-적용--2026-11-14) · [#82 실차 시험](https://github.com/Yaho03/drive-growth/issues/82)
+고정 모의 목적지와 예상 거리는 **탁송**에서 확인하고 **이 목적지의 탁송 후보 보기**로 의뢰 목록을 연다. 예상 거리를 가져오지 못한 경우 **모의 목적지 다시 확인**을 사용한다. 탁송 선택 결과를 확인한 뒤 가게의 **설정 → 시연 → 모의 입력 모드**에서 **모의주행 시작**을 누른다. 화면별 시험 범위와 APK 해시는 통합 검증 기록을 따른다. [로컬 Debug 화면과 검증 기록](06_VERIFICATION.md#pr-300-타이틀기능-창도감-선택-적용--2026-11-14) · [#82 실차 시험](https://github.com/Yaho03/drive-growth/issues/82)
 
 ### 첫 차량 확인용 개발 Debug APK
 
@@ -189,23 +252,7 @@ JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌�
   :app:assembleDebug
 ```
 
-[설치 대상과 저장 보존](#설치-대상과-저장-보존)을 확인한 뒤 `FIRST_CAR_APK`에 `firstcarplay`로 확인한 APK 경로를 지정한다.
-
-```sh
-adb -s "$SERIAL" install --user "$ANDROID_USER" -r "$FIRST_CAR_APK"
-adb -s "$SERIAL" shell am start --user "$ANDROID_USER" -n \
-  io.drivegrowth.verify.prototype.firstcarplay/io.drivegrowth.app.simulation.UnifiedSimulationActivity
-```
-
-새 시험 프로필에서는 **시작 → 첫 차량 고르기 → 선택 내용 확인 → 이 차량으로 시작 → 가게로** 순서로 진행한다. 차고에서 선택 차량을 확인하고, 아래 명령으로 시험 앱만 종료한 뒤 같은 런처를 다시 열어 차고와 잔액을 비교한다.
-
-```sh
-adb -s "$SERIAL" shell am force-stop --user "$ANDROID_USER" io.drivegrowth.verify.prototype.firstcarplay
-```
-
-처음부터 다시 시험하려면 별도 시험 환경을 사용하거나 삭제가 승인된 **`firstcarplay`의 시험 데이터만** 초기화한다. **제품 `io.drivegrowth.app`과 표준 모의 앱 `io.drivegrowth.app.simulation`의 기존 데이터는 보존한다.** 재실행·복원 시험은 시험 앱의 데이터도 유지한 채 수행한다.
-
-사용자용 APK의 설치·매니페스트 확인과 격리 계측의 첫 지급·중복 방지·새 프로세스 복원 결과는 [시험 기록](06_VERIFICATION.md#첫-차량-지급과-격리-debug의-재실행--2026-11-15)에서 확인한다.
+빌드한 APK의 설치·실행·복원 절차는 [첫 차량 선택과 모의 입력](#첫-차량-선택과-모의-입력)을 따른다. 처음부터 재시험할 때는 별도 시험 설치를 사용한다. 실제 실행의 사용자용 APK와 자동 계측 패키지, 원결과 복원의 근거는 [시험 기록](06_VERIFICATION.md#첫-차량-지급과-격리-debug의-재실행--2026-11-15)에 남겼다.
 
 ## 기존 설치 상태
 
