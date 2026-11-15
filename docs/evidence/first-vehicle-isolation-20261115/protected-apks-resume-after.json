@@ -1,0 +1,15 @@
+{
+  "io.drivegrowth.app": {
+    "present": true,
+    "apk": [
+      "aef2f4c62fc79390f28362dfc6599facafa6fcf89a90017b9a440574b3b097f3"
+    ],
+    "user10": [
+      "491836",
+      "true"
+    ]
+  },
+  "io.drivegrowth.app.simulation": {
+    "present": false
+  }
+}

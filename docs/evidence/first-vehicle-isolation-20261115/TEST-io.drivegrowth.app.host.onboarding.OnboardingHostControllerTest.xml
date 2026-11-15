@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-11-15T06:54:58" hostname="choehwanseog-ui-MacBookPro-1136.local" time="0.17">
+  <properties/>
+  <testcase name="unknownProfileNeverShowsCandidatesOrCommits" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.084"/>
+  <testcase name="firstRentalGiftCommitsThenReloadsAndNeverDuplicatesOnRefresh" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.014"/>
+  <testcase name="completedViewCanGoToShopWhileRefreshReplyIsPending" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.014"/>
+  <testcase name="retryAfterCommittedReadFailureRestoresSameResultWithoutNewGrant" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.006"/>
+  <testcase name="detachedOrOtherProfileSelectionCannotLeakIntoFreshProfile" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.002"/>
+  <testcase name="reconnectAfterFreshCompletionShowsOnlyTheStoredResult" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.003"/>
+  <testcase name="mismatchedOriginalProfileIsRejectedBeforeAnyGiftCommit" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.019"/>
+  <testcase name="gateLossDropsQueuedCommitAndLateReadThenRestoresSameChoiceRetry" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.001"/>
+  <testcase name="completedCommitLateCallbackIsDiscardedAndDatabaseResultRestores" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.001"/>
+  <testcase name="twoHostsThatReadNewOnlyCelebrateTheCommittedFirstGrant" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.001"/>
+  <testcase name="existingResultRestoresWithoutCurrentCatalogOrNewCommit" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.002"/>
+  <testcase name="originalViewPendingLockCanRetryAfterGateCancelsQueuedCommit" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.003"/>
+  <testcase name="storageFailureShowsRetryAndDoesNotNavigate" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.003"/>
+  <testcase name="mismatchedGiftSourceIsRejectedBeforeAnyGiftCommit" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.008"/>
+  <testcase name="newProfileSelectionConfirmationCommitsOnceAndRequeries" classname="io.drivegrowth.app.host.onboarding.OnboardingHostControllerTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

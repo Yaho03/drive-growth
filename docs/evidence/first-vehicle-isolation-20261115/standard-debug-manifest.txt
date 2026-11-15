@@ -1,0 +1,3 @@
+package: name='io.drivegrowth.app.simulation' versionCode='1' versionName='0.1.0' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+application-label:'르르르 렌터카 · 모의 시연'
+launchable-activity: name='io.drivegrowth.app.simulation.UnifiedSimulationActivity'  label='' icon=''

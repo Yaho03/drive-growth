@@ -1,6 +1,6 @@
 # 개발 기반·버전 기준과 로컬 환경 기록
 
-현재 저장소 설정 대조: 2026-11-13 KST. 빌드 기준의 최초 반영은 2026-11-04다. 아래 설치·조사 기록은 각 수행 시점을 따른다.
+현재 저장소 설정 대조: 2026-11-15 KST. 빌드 기준의 최초 반영은 2026-11-04다. 아래 설치·조사 기록은 각 수행 시점을 따른다.
 
 ## 개발 기반과 버전 기준
 
@@ -102,11 +102,39 @@ Gradle의 `--version`에 표시되는 내장 Kotlin 2.0.20은 Gradle 자체 스�
 
 팀원 네 명의 공통 명령줄 빌드 재현 근거를 [#12](https://github.com/Yaho03/drive-growth/issues/12)에 연결해 환경 확인을 완료했다. 팀원별 OS·CPU와 검사 범위는 #12의 근거를 따른다. IDE 설치·실행, Pleos AVD·차량 SDK·실차 시험은 실제 수행자와 환경별로 [검증 문서](06_VERIFICATION.md)와 해당 기능 이슈에 기록한다.
 
+### 설치 대상과 저장 보존
+
+제품 Release와 표준 모의 Debug는 Android 앱 패키지가 다르므로 같은 시험 장치에 각각 설치할 수 있다. 같은 패키지를 업데이트할 때는 기존 APK와 호환되는 서명, `versionCode`, 대상 Android 사용자를 확인하고 `install --user … -r`을 사용한다. 제품과 모의 앱의 원장·출처 선택은 [저장 경계](02_SYSTEM_ARCHITECTURE.md#앱-패키지와-원장-경계)를 따른다.
+
+- 아래 명령의 `SERIAL`과 `ANDROID_USER`에는 조율한 시험 기기의 시리얼과 Android 사용자 ID를 넣는다. `adb devices -l`과 `adb -s "$SERIAL" shell am get-current-user`로 대상을 대조한다. 별도 ADB 서버를 사용하는 환경은 해당 포트를 모든 명령에 동일하게 지정한다.
+- 설치 전에 APK의 application ID·서명·SHA-256을 대조한다. `apkanalyzer manifest application-id <APK>`, `apksigner verify --print-certs <APK>`, `shasum -a 256 <APK>`를 사용할 수 있다. 서명이나 버전 때문에 업데이트가 거절되면 해당 패키지를 보존한 채 설치 조건을 다시 확인한다.
+- `am force-stop --user`는 지정한 앱 프로세스를 종료하며 앱 데이터를 유지한다. `pm clear`, 앱 제거, AVD 데이터 초기화는 저장 상태를 지울 수 있으므로 데이터 보존·복원 확인의 절차로 사용하지 않는다. 첫 실행 확인은 독립 시험 패키지나 새 시험 환경에서 수행한다.
+
+### 차량용 제품 Release APK
+
+- 표시 이름은 **르르르 렌터카**, 패키지는 `io.drivegrowth.app`, 런처는 `io.drivegrowth.app.MainActivity`다. Pleos SDK의 차량 상태와 주차·UX 허용 조건으로 화면 조작을 제공한다.
+- JDK 17 및 위 공통 SDK 환경에서 `./gradlew :app:assembleRelease`를 실행한다. 저장소 기본 설정에는 Release 서명이 없으므로 `app/build/outputs/apk/release/app-release-unsigned.apk`에는 설치 전 승인된 서명이 필요하다. 기존 설치를 업데이트할 때는 기존 인증서와 호환되는 승인된 서명을 사용한다. 서명 키와 비밀번호는 Git에 넣지 않는다.
+
+아래 명령은 `PRODUCT_APK`에 위 조건을 확인한 **서명된 차량용 APK**의 경로를 지정한 상태에서 사용한다. 런처에서 앱을 직접 열 수도 있다.
+
+```sh
+adb -s "$SERIAL" install --user "$ANDROID_USER" -r "$PRODUCT_APK"
+adb -s "$SERIAL" shell am start --user "$ANDROID_USER" -n io.drivegrowth.app/io.drivegrowth.app.MainActivity
+```
+
+저장을 유지하고 새 프로세스에서 실행하려면 다음 명령으로 제품 앱만 종료한 뒤 위 실행 명령을 다시 사용한다.
+
+```sh
+adb -s "$SERIAL" shell am force-stop --user "$ANDROID_USER" io.drivegrowth.app
+```
+
+개발 서명으로 시험한 과거 Release는 [차량용 첫 실행 검증](06_VERIFICATION.md#차량용-첫-실행과-마을-주민-검증--2026-11-13)을 참조한다. 제출용 APK의 소스·서명·설치 근거는 [#29](https://github.com/Yaho03/drive-growth/issues/29)에서 추적한다.
+
 ### 별도 모의 시연 Debug APK
 
 | APK | 소스·위치 | 입력과 사용 |
 |---|---|---|
-| 배포된 모의 시연 Debug | [릴리스 ba38def와 SHA256SUMS](https://github.com/Yaho03/drive-growth/releases/tag/demo-20261113-ba38def)의 `drive-growth-ba38def-debug.apk`. 비공개 저장소 접근 권한 필요 | `io.drivegrowth.app.simulation`의 모의 입력. 아래 번호 절차의 앱과 메뉴 이름은 이 배포본 기준 |
+| 2026-11-13에 배포한 모의 시연 Debug | [릴리스 ba38def와 SHA256SUMS](https://github.com/Yaho03/drive-growth/releases/tag/demo-20261113-ba38def)의 `drive-growth-ba38def-debug.apk`. 비공개 저장소 접근 권한 필요 | `io.drivegrowth.app.simulation`의 모의 입력. 아래 번호 절차의 앱과 메뉴 이름은 이 배포본 기준 |
 | 현재 소스의 로컬 Debug | `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` | **르르르 렌터카 · 모의 시연**. 모의 입력과 별도 시연 원장을 사용하며 현재 빌드 커밋과 해시는 별도 기록 |
 | 새 가게 UI 로컬 시험 APK | `af2118e`와 `e55baad`의 시험별 빌드. [소스·APK 해시](06_VERIFICATION.md#새-가게-ui의-통합-확인-항목--2026-11-13) | `af2118e` 화면·스크롤 장치 시험과 `e55baad`의 Main 모의 시연에 사용 |
 | #287 로컬 시험 APK | 제품·시험 소스 `5fac471`의 모의 Debug 및 기존 개발용 서명을 사용한 차량용 Release 구성. [빌드·설치 해시](06_VERIFICATION.md#차량용-첫-실행과-마을-주민-검증--2026-11-13) | 모의 APK는 SIMULATION. 차량용 `io.drivegrowth.app`은 Pleos SDK 입력·권한·PARK/UX 허용 사용. 배포 Debug 다운로드는 이 소스의 APK를 제공하지 않음 |
@@ -114,18 +142,18 @@ Gradle의 `--version`에 표시되는 내장 Kotlin 2.0.20은 Gradle 자체 스�
 
 [공식 개발 요구사항](https://appdevchallenge.auto-hmg.io/guide/development)의 API 28 이상·Gradle 8.0 이상은 최소 조건이다. 프로젝트의 정확한 도구 버전은 위 [현재 적용값](#개발-기반과-버전-기준)을 사용한다. 에뮬레이터의 API 34는 앱의 minSdk나 compileSdk와 별개다.
 
-JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌드한다. 기본 Debug 산출물은 `app/build/outputs/apk/debug/app-debug.apk`, 패키지는 `io.drivegrowth.app.simulation`이다. 시연 원장 `unified-simulation.db`와 진행 기록은 이 패키지에 저장된다. Release는 `io.drivegrowth.app` 패키지와 차량 입력을 사용한다.
+JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌드한다. 기본 Debug 산출물은 `app/build/outputs/apk/debug/app-debug.apk`, 패키지는 `io.drivegrowth.app.simulation`이다. 시연 진행은 [별도 원장](02_SYSTEM_ARCHITECTURE.md#앱-패키지와-원장-경계)에 저장된다.
 
 시연 화면의 **시연 · 모의 입력**과 **SIMULATION** 표시는 게임에 공급하는 모의 차량·내비 입력을 뜻한다. 시연 중 발생한 게임 기록은 시연 원장에만 남으며 차량을 조작하지 않는다. 이 절차는 고정 시연 목적지의 도착을 재현한다. 실제 SDK로 주행 후 목적지를 변경하는 경로는 현재 시연에서 지원하지 않는다.
 
 아래 번호와 메뉴 이름은 배포된 `ba38def` APK 기준이다. 최신 로컬 Debug는 명령을 공유하며 앱 이름과 화면 경로는 다음 절을 따른다.
 
-1. Pleos 시험 장치 사용 시간을 조율하고 `SERIAL`에 시험 장치 시리얼을 지정한다. 아래 `APK_PATH`는 로컬 빌드 예시다. 배포본은 내려받은 파일의 실제 경로를 넣고 릴리스의 해시와 대조한다. 기존 설치본과 서명이 다르면 같은 데이터에 덮어쓰지 말고 승인된 별도 시험 환경을 사용한다. 설치한 뒤 런처의 **드라이브 키우기 · 모의 시연**을 연다.
+1. [설치 대상과 저장 보존](#설치-대상과-저장-보존)을 확인한다. 아래 `APK_PATH`는 로컬 빌드 예시다. 이전 배포본을 사용할 때는 내려받은 파일 경로를 지정한다. 설치한 뒤 런처의 **드라이브 키우기 · 모의 시연**을 연다.
 
    ```sh
    APK_PATH=app/build/outputs/apk/debug/app-debug.apk
-   adb -s "$SERIAL" install -r "$APK_PATH"
-   adb -s "$SERIAL" shell am start -n io.drivegrowth.app.simulation/io.drivegrowth.app.simulation.UnifiedSimulationActivity
+   adb -s "$SERIAL" install --user "$ANDROID_USER" -r "$APK_PATH"
+   adb -s "$SERIAL" shell am start --user "$ANDROID_USER" -n io.drivegrowth.app.simulation/io.drivegrowth.app.simulation.UnifiedSimulationActivity
    ```
 
 2. 처음 시작 화면이 보이면 **시작**을 누른다. 새 프로필이면 **첫 차량 고르기**에서 차량을 선택한다. **선택 내용 확인** → **이 차량으로 시작**으로 첫 지급을 확정하고 **가게로**를 누른다.
@@ -135,7 +163,7 @@ JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌�
 6. 새 프로세스에서 저장 결과를 확인하려면 시연 패키지만 종료하고 1단계의 실행 명령으로 다시 연다. 앱 데이터를 유지한 채 탁송 결과의 확인 대기 여부와 정산 기록을 확인한다. 이미 열람한 정산은 **전체 기록**에서 확인할 수 있다.
 
    ```sh
-   adb -s "$SERIAL" shell am force-stop io.drivegrowth.app.simulation
+   adb -s "$SERIAL" shell am force-stop --user "$ANDROID_USER" io.drivegrowth.app.simulation
    ```
 
 재실행 로그를 대조할 때는 `DriveGrowthSimulation`의 `simulation_input`과 `simulation_terminal_restored`를 같은 논리 시각으로 비교한다. 각 시험의 범위는 [시연 검증 기록](06_VERIFICATION.md#통합-모의주행-debug-검증--2026-11-11)을 따른다.
@@ -145,6 +173,39 @@ JDK 17과 기존 Android SDK를 사용해 `./gradlew :app:assembleDebug`로 빌�
 설치 후 **르르르 렌터카 · 모의 시연**을 연다. 가게 지도 하단에서 **차고·도감·뽑기·탁송·정산·기록**을 각각 열 수 있다. 지도에서 차량과 시설을 직접 누를 수 있으며 **설정 → 가게와 기록**에서 **시설과 지도**와 **퀘스트·업적·휴식**으로 이동한다. 미확인 정산은 **정산**의 미확인 목록에서 확인한다.
 
 고정 모의 목적지는 **탁송 → 목적지 확인**에서 확인한다. 예상 거리를 가져오지 못한 경우 **모의 목적지 다시 확인**을 사용한다. 탁송 선택 결과를 확인한 뒤 가게의 **설정 → 시연 → 모의 입력 모드**에서 **모의주행 시작**을 누른다. 화면별 시험 범위와 APK 해시는 통합 검증 기록을 따른다. [로컬 Debug 화면과 검증 기록](06_VERIFICATION.md#pr-300-타이틀기능-창도감-선택-적용--2026-11-14) · [#82 실차 시험](https://github.com/Yaho03/drive-growth/issues/82)
+
+### 첫 차량 확인용 개발 Debug APK
+
+[테스트 APK와 차량용 개발 서명 APK 다운로드](https://github.com/Yaho03/drive-growth/releases/tag/first-vehicle-test-20261115)에서 파일별 소스·패키지·SHA-256을 확인한다. 차량용 파일은 `709e08d`의 기존 설치본, 테스트 앱은 `6070445`의 격리 구성이다.
+
+별도 Debug APK는 표준 모의 시연과 같은 첫 차량 화면을 독립된 데이터로 실행한다. 사용자용 패키지는 `io.drivegrowth.verify.prototype.firstcarplay`, 앱 이름은 **르르르 렌터카 · 첫 차량 테스트**다. 자동 계측에는 사용자용과 별도의 `firstcarcheck` 또는 보강 회귀용 `firstcarrecheck` 접미사와 대응 `.test` 패키지를 사용한다. 입력과 원장 범위는 [앱 패키지와 원장 경계](02_SYSTEM_ARCHITECTURE.md#앱-패키지와-원장-경계)를 따른다.
+
+아래 빌드는 `simulationAppLabel`과 `prototypeVerificationLabel`을 포함한 소스에서 실행한다. 표준 Debug와 출력 파일명이 같으므로 빌드 후 APK의 패키지를 확인하고 별도 이름으로 보관한다.
+
+```sh
+./gradlew -I scripts/prototype-isolation.gradle \
+  -PprototypeVerificationPackage=io.drivegrowth.verify.prototype.firstcarplay \
+  '-PprototypeVerificationLabel=르르르 렌터카 · 첫 차량 테스트' \
+  :app:assembleDebug
+```
+
+[설치 대상과 저장 보존](#설치-대상과-저장-보존)을 확인한 뒤 `FIRST_CAR_APK`에 `firstcarplay`로 확인한 APK 경로를 지정한다.
+
+```sh
+adb -s "$SERIAL" install --user "$ANDROID_USER" -r "$FIRST_CAR_APK"
+adb -s "$SERIAL" shell am start --user "$ANDROID_USER" -n \
+  io.drivegrowth.verify.prototype.firstcarplay/io.drivegrowth.app.simulation.UnifiedSimulationActivity
+```
+
+새 시험 프로필에서는 **시작 → 첫 차량 고르기 → 선택 내용 확인 → 이 차량으로 시작 → 가게로** 순서로 진행한다. 차고에서 선택 차량을 확인하고, 아래 명령으로 시험 앱만 종료한 뒤 같은 런처를 다시 열어 차고와 잔액을 비교한다.
+
+```sh
+adb -s "$SERIAL" shell am force-stop --user "$ANDROID_USER" io.drivegrowth.verify.prototype.firstcarplay
+```
+
+처음부터 다시 시험하려면 별도 시험 환경을 사용하거나 삭제가 승인된 **`firstcarplay`의 시험 데이터만** 초기화한다. **제품 `io.drivegrowth.app`과 표준 모의 앱 `io.drivegrowth.app.simulation`의 기존 데이터는 보존한다.** 재실행·복원 시험은 시험 앱의 데이터도 유지한 채 수행한다.
+
+사용자용 APK의 설치·매니페스트 확인과 격리 계측의 첫 지급·중복 방지·새 프로세스 복원 결과는 [시험 기록](06_VERIFICATION.md#첫-차량-지급과-격리-debug의-재실행--2026-11-15)에서 확인한다.
 
 ## 기존 설치 상태
 

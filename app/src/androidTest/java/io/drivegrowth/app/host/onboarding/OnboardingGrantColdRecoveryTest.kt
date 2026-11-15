@@ -3,6 +3,7 @@ package io.drivegrowth.app.host.onboarding
 import io.drivegrowth.app.mainNavigation
 import io.drivegrowth.app.openMainPage
 import io.drivegrowth.app.host.HostPage
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Process
@@ -15,10 +16,13 @@ import android.widget.Button
 import android.widget.TextView
 import io.drivegrowth.app.MainActivity
 import io.drivegrowth.app.R
+import io.drivegrowth.app.data.SettlementHistoryCause
+import io.drivegrowth.app.data.SettlementHistoryReader
 import io.drivegrowth.app.host.GameSessionFactory
 import io.drivegrowth.app.host.HostSession
 import io.drivegrowth.app.simulation.UnifiedSimulationActivity
 import io.drivegrowth.app.ui.shop.ShopView
+import io.drivegrowth.core.contract.ProfileId
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.InputSource
@@ -139,6 +143,105 @@ class OnboardingGrantColdRecoveryTest :
             .put("grant", after))
     }
 
+    fun testUnconfirmedSelectionLeavesNewProfileForHostStop() {
+        assertFirstVehiclePackage()
+        assertFalse(context.getDatabasePath("unified-simulation.db").exists())
+        val main = launchFromStartScreen()
+        click(main, R.string.onboarding_start)
+        click(main, choice)
+        click(main, R.string.onboarding_review)
+        awaitUi("지급 전 확인 버튼") { button(main, R.string.onboarding_confirm) != null }
+        val profile = readUninitializedProfile()
+        writeMarker(File(context.cacheDir, "first-car-unconfirmed.json"), JSONObject()
+            .put("pid", Process.myPid()).put("profileId", profile.value))
+        awaitHostStop()
+    }
+
+    fun testColdReentryAllowsOneFirstVehicleGrant() {
+        assertFirstVehiclePackage()
+        val before = JSONObject(File(context.cacheDir, "first-car-unconfirmed.json").readText())
+        assertTrue(before.getInt("pid") != Process.myPid())
+        assertEquals(before.getString("profileId"), readUninitializedProfile().value)
+        val main = launchFromStartScreen()
+        click(main, R.string.onboarding_start)
+        click(main, choice)
+        click(main, R.string.onboarding_review)
+        click(main, R.string.onboarding_confirm)
+        awaitUi("최초 지급 완료 및 가게 진입 가능") { button(main, R.string.onboarding_to_shop) != null }
+        val original = readOriginalGrant()
+        assertEquals(before.getString("profileId"), original.getString("profileId"))
+        instrumentation.runOnMainSync { captureContent(main, "first-car-granted.png") }
+        click(main, R.string.onboarding_to_shop)
+        awaitUi("지급 후 가게") { menu(main)?.let { it.isShown && it.isEnabled } == true }
+        writeMarker(File(context.cacheDir, "first-car-granted.json"), JSONObject()
+            .put("pid", Process.myPid()).put("grant", original))
+        awaitHostStop()
+    }
+
+    fun testColdReentryRestoresSameFirstVehicleAndBalance() {
+        assertFirstVehiclePackage()
+        val before = JSONObject(File(context.cacheDir, "first-car-granted.json").readText())
+        assertTrue(before.getInt("pid") != Process.myPid())
+        val original = before.getJSONObject("grant").toString()
+        val main = launchFromStartScreen()
+        awaitUi("복귀 뒤 가게 조작 가능") { menu(main)?.let { it.isShown && it.isEnabled } == true }
+        instrumentation.runOnMainSync { main.window.decorView.openMainPage(HostPage.ONBOARDING) }
+        awaitUi("원래 최초 지급 안내") { button(main, R.string.onboarding_to_shop) != null }
+        instrumentation.runOnMainSync {
+            assertTrue(context.getString(R.string.onboarding_already_granted) in labels(main))
+            assertTrue("캐스퍼" in labels(main))
+            assertNull(button(main, R.string.onboarding_confirm))
+            captureContent(main, "first-car-restored.png")
+        }
+        click(main, R.string.onboarding_to_shop)
+        awaitUi("가게 지도에 동일 첫 차량") {
+            main.window.decorView.findViewWithTag<View>(
+                "shop:map-vehicle:${before.getJSONObject("grant").getString("ownedVehicleId")}"
+            )?.isShown == true
+        }
+        val restored = readOriginalGrant()
+        assertEquals(original, restored.toString())
+        writeMarker(File(context.cacheDir, "first-car-restored.json"), JSONObject()
+            .put("pid", Process.myPid()).put("grant", restored))
+    }
+
+    private fun launchFromStartScreen(): UnifiedSimulationActivity {
+        setActivityIntent(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER))
+        val main = activity
+        click(main, "presentation:start")
+        return main
+    }
+
+    private fun assertFirstVehiclePackage() {
+        assertTrue(context.packageName in setOf(
+            "io.drivegrowth.verify.prototype.firstcarcheck",
+            "io.drivegrowth.verify.prototype.firstcarrecheck",
+        ))
+        assertFalse(context.getDatabasePath("game-ledger-vehicle.db").exists())
+        assertFalse(context.getDatabasePath("game-ledger-simulation.db").exists())
+    }
+
+    private fun readUninitializedProfile(): ProfileId {
+        assertTrue(context.getDatabasePath("unified-simulation.db").isFile)
+        val factory = GameSessionFactory(context,
+            mapOf(InputSource.SIMULATION to "unified-simulation.db"), InputSource.SIMULATION)
+        return ok(factory.open()).use { game ->
+            val state = ok(game.store.readInitialization(game.identity.profileId))
+            assertEquals(InputSource.SIMULATION, game.identity.source)
+            assertTrue(state.status is ProfileInitializationStatus.New)
+            assertEquals(0, state.ownedVehicleCount)
+            assertEquals(0L, state.balance.units)
+            assertTrue(ok(game.store.listOwnedVehicles()).isEmpty())
+            assertTrue(ok(SettlementHistoryReader(game.store).read()).entries.isEmpty())
+            game.identity.profileId
+        }
+    }
+
+    private fun awaitHostStop() {
+        CountDownLatch(1).await(35, TimeUnit.SECONDS)
+        fail("호스트에서 표식의 시험 프로세스를 종료해야 합니다")
+    }
+
     private fun captureContent(main: MainActivity, name: String) {
         val content = main.findViewById<View>(android.R.id.content)
         val bitmap = Bitmap.createBitmap(content.width, content.height, Bitmap.Config.ARGB_8888)
@@ -175,11 +278,15 @@ class OnboardingGrantColdRecoveryTest :
             assertEquals(choice, car.vehicleId)
             assertEquals(listOf(car), ok(store.listOwnedVehicles()))
             assertEquals(listOf(original.grant), ok(store.listUnviewedSettlements()))
-            assertEquals(FirstGrant.INITIAL_MONEY, original.grant.balance)
-            assertEquals(FirstGrant.INITIAL_MONEY, state.balance)
+            val history = ok(SettlementHistoryReader(store).read()).entries
+            assertEquals(1, history.size)
+            assertEquals(SettlementHistoryCause.INITIAL_GRANT, history.single().cause)
+            assertEquals(original.grant, history.single().settlement)
+            assertEquals(1_000L, original.grant.balance.units)
+            assertEquals(1_000L, state.balance.units)
             assertEquals(1, state.ownedVehicleCount)
-            assertEquals(FirstGrant.INITIAL_GARAGE_CAPACITY, original.garageCapacity)
-            assertEquals(original.garageCapacity, shop.capacity)
+            assertEquals(3, original.garageCapacity)
+            assertEquals(3, shop.capacity)
             assertEquals(1, shop.progress.shopLevel)
             assertNull("초기 지급은 공용 checkpoint 슬롯을 사용하지 않습니다", ok(store.hostCommands.load(identity.profileId)))
             JSONObject()
