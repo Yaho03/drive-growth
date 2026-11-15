@@ -84,6 +84,7 @@ internal class ShopSceneView(
         TownActors(context, population)
     }
     private val actors by actorsDelegate
+    private val lampForeground by lazy(LazyThreadSafetyMode.NONE) { TownLampForeground.extract(background) }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = false }
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.create("sans-serif", Typeface.BOLD)
@@ -659,6 +660,8 @@ internal class ShopSceneView(
         }
         rental?.let { (animation, time) -> animation.art.draw(canvas, time) }
         actors.draw(canvas, animate)
+        // 주민이 가로등 뒤로 지나가도록 배경의 아래 연석 가로등을 주민 위에 다시 그린다.
+        for (lamp in lampForeground) canvas.drawBitmap(lamp.bitmap, lamp.left, lamp.top, paint)
         if (!fillViewport && selectedId == null && mode == ShopMode.OVERALL) {
             val unknown = context.getString(R.string.shop_unknown)
             val summary = context.getString(R.string.shop_scene_summary, content.level?.toString() ?: unknown,
