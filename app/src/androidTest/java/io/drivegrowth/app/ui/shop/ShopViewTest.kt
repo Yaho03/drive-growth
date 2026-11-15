@@ -186,6 +186,26 @@ class ShopViewTest : InstrumentationTestCase() {
         assertTrue(events.isEmpty())
     }
 
+    fun testDecorationShortcutOpensWithoutActivatingUntilExplicitRequest() {
+        val events = mutableListOf<ShopEvent>()
+        var activations = 0
+        onUi {
+            val view = ShopView(instrumentation.targetContext, events::add).apply {
+                onActivateDecoration = { activations++ }
+                render(ShopPreviewStates.normal(), true)
+            }
+            view.openDecorationTools()
+            button(view, "shop:map-close")
+            assertEquals(0, activations)
+            assertTrue(view.handleBack())
+            assertEquals(0, activations)
+            assertTrue(events.isEmpty())
+            view.openMapTools()
+            assertTrue(button(view, "decoration:activate").performClick())
+            assertEquals(1, activations)
+        }
+    }
+
     fun testPreviewCancelAndFailureKeepCommittedFacts() {
         val events = mutableListOf<ShopEvent>()
         val view = onUi { ShopView(instrumentation.targetContext, events::add).apply { render(ShopPreviewStates.normal(), true) } }
@@ -376,7 +396,7 @@ class ShopViewTest : InstrumentationTestCase() {
         measureAndLayout(view, 936, 500)
         val expansion = button(view, "shop:map-expansion")
         assertEquals(View.VISIBLE, expansion.visibility)
-        assertTrue(expansion.top < view.height / 2)
+        assertTrue(expansion.top in 0 until view.height)
         assertTrue(expansion.performClick())
         assertNotNull(view.findViewWithTag<View>("shop:map-confirm"))
         view.render(state, false)

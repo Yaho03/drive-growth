@@ -4,9 +4,13 @@ import io.drivegrowth.core.rental.Facility
 
 /** #229 원본 픽셀 좌표. 차량은 화면에만 배치하며 저장 슬롯과 무관하다. */
 internal val townSlots = listOf(
-    253 to 635, 326 to 672, 400 to 709, 474 to 745, 548 to 781,
+    250 to 635, 320 to 672, 391 to 709, 463 to 745, 541 to 781,
     984 to 758, 1063 to 796, 1142 to 835, 1220 to 873, 1299 to 912,
 )
+
+/** 다음에 열릴 첫 주차 칸 옆 도로에 표지판을 둔다. */
+internal fun expansionSignAnchor(capacity: Int?): Pair<Float, Float>? =
+    capacity?.takeIf { it > 0 }?.let(townSlots::getOrNull)?.let { (x, y) -> x + 116f to y - 115f }
 
 internal enum class TownGrowthArt(val parkingSpaces: Int) {
     LEVEL_1(3), LEVEL_2(5), LEVEL_3(7), LEVEL_4(10);

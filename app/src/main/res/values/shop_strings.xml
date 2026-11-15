@@ -46,4 +46,5 @@
     <string name="shop_menu_installed">운영 중</string>
     <string name="shop_menu_unknown">상태 확인 불가</string>
     <string name="shop_menu_map_view">지도 보기</string>
+    <string name="shop_scene_resting">영업 쉬는 중</string>
 </resources>

@@ -110,6 +110,17 @@ class DeliveryViewTest : InstrumentationTestCase() {
         assertTrue(nodes(view).filterIsInstance<TextView>().any { it.text.contains("도착") })
     }
 
+    fun testFullGarageShowsTemporaryStorageNoticeBeforePurchase() = onUi {
+        val data = DeliveryPreviewStates
+        val view = DeliveryView(instrumentation.targetContext, { fail("확정 전에 거래가 발생했습니다") })
+        val offers = data.offers.screen as DeliveryScreen.Offers
+        view.render(data.offers.copy(screen = DeliveryScreen.Offers(offers.proposal.copy(garageFull = true))), true)
+        view.findViewWithTag<Button>("delivery:tab:purchase").performClick()
+        view.findViewWithTag<Button>("delivery:offer:offer-1").performClick()
+        assertTrue(nodes(view).filterIsInstance<TextView>().any { it.text.contains("24시간 안에 수령") })
+        assertNotNull(view.findViewWithTag<Button>("delivery:confirm"))
+    }
+
     fun testIncomeAcceptanceWaitsForDiscoveryAndRejectsStaleConfirmation() = onUi {
         val context = instrumentation.targetContext
         val requests = mutableListOf<DeliveryRequest>()

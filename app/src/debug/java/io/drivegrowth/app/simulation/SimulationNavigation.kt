@@ -5,6 +5,7 @@ import io.drivegrowth.app.host.*
 import io.drivegrowth.app.host.delivery.*
 import io.drivegrowth.app.host.driving.DrivingRecordingResult
 import io.drivegrowth.app.runtime.rental.RentalClock
+import io.drivegrowth.app.vehicle.navigation.NavigationStamp
 import io.drivegrowth.core.contract.*
 import io.drivegrowth.core.delivery.*
 import java.math.RoundingMode
@@ -69,7 +70,7 @@ internal class SimulationNavigation(private val prefs: SharedPreferences, privat
 
     override fun setControlsEnabled(value: Boolean) { enabled = value }
     override fun refresh() { if (enabled) changed?.invoke() }
-    override fun confirm(): ContractResult<Unit> = if (!enabled) ContractResult.Failure(ContractError.UX_RESTRICTED)
+    override fun confirm(displayedStamp: NavigationStamp?): ContractResult<Unit> = if (!enabled) ContractResult.Failure(ContractError.UX_RESTRICTED)
         else if (!prefs.edit().putBoolean("destinationConfirmed", true)
             .putLong("destinationRevision", if (prefs.getBoolean("destinationConfirmed", false)) prefs.getLong("destinationRevision", -1)
                 else Math.addExact(prefs.getLong("destinationRevision", 0), 1)).commit()) ContractResult.Failure(ContractError.STORAGE_FAILURE)

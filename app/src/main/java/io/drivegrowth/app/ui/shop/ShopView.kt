@@ -31,6 +31,7 @@ import io.drivegrowth.core.contract.GameMoney
 import io.drivegrowth.core.contract.OwnedVehicleId
 import io.drivegrowth.core.contract.Revision
 import io.drivegrowth.core.contract.VehicleLifecycle
+import io.drivegrowth.core.progression.VehicleActivity
 import io.drivegrowth.core.rental.Facility
 import io.drivegrowth.app.host.GameIdentity
 import io.drivegrowth.app.runtime.rental.RentalMapEvent
@@ -199,6 +200,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     private var mapPan = ShopMapOffset()
     private var viewedMode = ShopMode.OVERALL
     private var operatingStatus: String? = null
+    private var restingVehicles = emptySet<OwnedVehicleId>()
     private var openSettings: (() -> Unit)? = null
     internal var onMapModalChanged: ((Boolean) -> Unit)? = null
     private var mapModalOpen = false
@@ -214,9 +216,11 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     internal fun updateMapHud(
         operatingStatus: String? = null,
         onSettings: (() -> Unit)? = null,
+        restingVehicles: Set<OwnedVehicleId> = emptySet(),
     ) {
         displayChanged = displayChanged || this.operatingStatus != operatingStatus ||
-            (openSettings == null) != (onSettings == null)
+            (openSettings == null) != (onSettings == null) || this.restingVehicles != restingVehicles
+        this.restingVehicles = restingVehicles
         this.operatingStatus = operatingStatus
         openSettings = onSettings
     }
@@ -612,8 +616,10 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     }
     private fun withVehicleLabels(content: ShopScreenState.Content): ShopScreenState.Content {
         val labels = vehicleInstanceLabels(content.vehicles.map { it.id to it.name })
-        return if (labels.isEmpty()) content else content.copy(vehicles = content.vehicles.map { vehicle ->
-            vehicle.copy(name = vehicleDisplayName(vehicle.name, labels[vehicle.id]))
+        return content.copy(vehicles = content.vehicles.map { vehicle ->
+            val resting = vehicle.id in restingVehicles
+            vehicle.copy(name = vehicleDisplayName(vehicle.name, labels[vehicle.id]), resting = resting,
+                status = if (resting && vehicle.activity == VehicleActivity.IDLE) "영업 쉬는 중" else vehicle.status)
         })
     }
 
@@ -672,7 +678,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             focusRestRecovery && !recoveryDismissed && panelTarget == null -> MapPanel.FacilityMenu
             else -> panelTarget
         }
-        val region = (target as? MapPanel.Details)?.target?.focusRegion()
+        val region = (target as? MapPanel.Details)?.target?.focusRegion(c.capacity)
         val display = withVehicleLabels(c)
         val scene = cameraScene(display, generation, onVehicle = { id: OwnedVehicleId ->
             if (acceptsFocusInput(generation) && activeSheet == null && mapOverlay == null) {
@@ -821,6 +827,11 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
     /** 지도 기본 화면에는 주 탐색만 두고 보조 조작은 설정에서 연다. */
     fun openMapTools() {
         if (acceptsFocusInput(sceneGeneration)) openMapPanel(MapPanel.FacilityMenu)
+    }
+
+    internal fun openDecorationTools() {
+        if (!acceptsFocusInput(sceneGeneration)) return
+        showMapPanel(ShopMapTarget.Decorations)
     }
 
     private fun facilityMenu(content: ShopScreenState.Content) = with(style) {

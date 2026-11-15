@@ -60,9 +60,9 @@ class FNavigationDeliveryPort(
         val moved = observed(identity).let { value -> if (value is Observation.Available && value.value.source != identity.source)
             Observation.Missing(MissingReason.NO_DATA) else value }
         return ContractResult.Success(DeliveryNavigationSnapshot(
-            if (sameDestination) binding!!.destination else null,
+            if (estimated is Observation.Available) binding!!.destination else null,
             destination?.value?.name, estimated, moved,
             Observation.Missing(MissingReason.NO_DATA), // F의 arrival는 항상 독립 상관 근거 확인 대기다.
-            if (sameDestination) binding!!.selectionRevision else null, metadata))
+            if (estimated is Observation.Available) binding!!.selectionRevision else null, metadata))
     }
 }

@@ -17,6 +17,7 @@ data class ShopVehicle(
     val vehicleId: VehicleId? = null,
     val rarity: Rarity? = null,
     val activity: VehicleActivity? = null,
+    val resting: Boolean = false,
 )
 enum class ShopAvailability { LOCKED, AVAILABLE, INSTALLED, UNKNOWN }
 

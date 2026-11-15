@@ -24,15 +24,22 @@ class NavigationDestinationConfirmation(private val fresh: (NavigationStamp) -> 
     }
     @Synchronized fun accept(value: NavigationSnapshot) { if (enabled) snapshot = value }
     @Synchronized fun selected(value: GameIdentity): DeliveryDestinationSelection? = selection?.takeIf { enabled && identity == value && it.identity == value }
+    @Synchronized fun invalidateQuote() { snapshot = null; selection = null }
     @Synchronized fun begin(value: GameIdentity) { bind(value); selection = null }
-    @Synchronized fun confirm(): ContractResult<DeliveryDestinationSelection> {
+    @Synchronized fun confirm(
+        displayedStamp: NavigationStamp? = null,
+        classification: ((GameIdentity, NavigationSnapshot) -> Observation<InputSource>)? = null,
+    ): ContractResult<DeliveryDestinationSelection> {
         val profile = identity ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         val raw = snapshot ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         val destination = raw.destination as? NavigationField.Value ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         val distance = raw.remainingEstimatedMeters as? NavigationField.Value ?: return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         if (!enabled || raw.connection != NavigationConnection.CONNECTED_OBSERVED || raw.failure != null ||
+            (displayedStamp != null && displayedStamp != destination.stamp) ||
             destination.stamp != distance.stamp || destination.stamp.source != NavigationSource.PLEOS_NAVI_SDK ||
             destination.stamp.connectionGeneration != raw.stamp.connectionGeneration || !fresh(destination.stamp) || distance.value < 0)
+            return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
+        if (classification != null && classification(profile, raw) != Observation.Available(profile.source))
             return ContractResult.Failure(ContractError.DATA_UNAVAILABLE)
         if (revision == Long.MAX_VALUE) return ContractResult.Failure(ContractError.STATE_CONFLICT)
         return ContractResult.Success(DeliveryDestinationSelection(profile, newKey(), ++revision, destination.value, destination.stamp)

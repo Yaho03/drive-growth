@@ -28,13 +28,15 @@ internal sealed interface ShopMapTarget {
     data object Decorations : ShopMapTarget
 }
 
-internal fun ShopMapTarget.focusRegion(): ShopFocusRegion? = when (this) {
+internal fun ShopMapTarget.focusRegion(capacity: Int? = null): ShopFocusRegion? = when (this) {
     is ShopMapTarget.FacilityLot -> when (facility) {
         Facility.FUEL_STATION -> ShopFocusRegion(92f, 0f, 513f, 309f)
         Facility.INSURANCE -> ShopFocusRegion(205f, 282f, 590f, 604f)
         Facility.CAR_WASH -> ShopFocusRegion(1150f, 365f, 1536f, 700f)
     }
-    ShopMapTarget.Expansion -> ShopFocusRegion(1135f, 245f, 1370f, 425f)
+    ShopMapTarget.Expansion -> expansionSignAnchor(capacity)?.let { (x, y) ->
+        ShopFocusRegion(x - 155f, y - 35f, x + 90f, y + 155f)
+    }
     ShopMapTarget.Decorations -> null
 }
 
@@ -236,7 +238,8 @@ internal class ShopMapOverlayView(
             val gap = style.dp(12)
             val region = focusRegion
             val fit = region?.let { ShopFocusLayout.fit(width, height, resources.displayMetrics.density) }
-            val panelWidth = fit?.panelWidth ?: minOf(style.dp(CENTERED_WIDTH_DP), (width - gap * 2).coerceAtLeast(0))
+            val centeredWidth = if (target == ShopMapTarget.Decorations) 560 else CENTERED_WIDTH_DP
+            val panelWidth = fit?.panelWidth ?: minOf(style.dp(centeredWidth), (width - gap * 2).coerceAtLeast(0))
             val maxHeight = fit?.maxPanelHeight ?: minOf(style.dp(540), (height - gap * 2).coerceAtLeast(0))
             panel.measure(MeasureSpec.makeMeasureSpec(panelWidth, MeasureSpec.EXACTLY),
                 MeasureSpec.makeMeasureSpec(maxHeight, if (fit?.side == true) MeasureSpec.EXACTLY else MeasureSpec.AT_MOST))

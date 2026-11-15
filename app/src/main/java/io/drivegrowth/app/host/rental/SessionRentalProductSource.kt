@@ -201,11 +201,13 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
     fun observe(frame: DrivingFrame, recorded: ContractResult<DrivingRecordingResult>): ContractResult<RentalRuntimeSnapshot> =
         observe(frame, recorded, null, false)
 
-    internal fun observeSimulationRestStart(
+    internal fun observeSimulationDeparture(
         frame: DrivingFrame,
         recorded: ContractResult<DrivingRecordingResult>,
-        clock: RestClockDomain,
-    ): ContractResult<RentalRuntimeSnapshot> = observe(frame, recorded, null, false, restStartBoot = clock.bootId)
+        restClock: RestClockDomain?,
+        gapStart: RentalClock?,
+    ): ContractResult<RentalRuntimeSnapshot> = observe(frame, recorded, null, false,
+        restStartBoot = restClock?.bootId, simulationGapStart = gapStart)
 
     internal fun observeOrdinarySimulationReplay(
         frame: DrivingFrame,
@@ -220,6 +222,7 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
         originalClock: RestClockDomain?,
         ordinaryTerminal: Boolean,
         restStartBoot: String? = null,
+        simulationGapStart: RentalClock? = null,
     ): ContractResult<RentalRuntimeSnapshot> {
         val state = when (recorded) {
             is ContractResult.Failure -> { previous = null; latest = null; parkedBeforeJump = null; parkedJumpEnd = null; return recorded }
@@ -319,11 +322,19 @@ class SessionRentalProductSource(private val games: GameSessionFactory,
                 else -> Observation.Missing(MissingReason.NO_DATA)
             }
             visitFloor = before?.at ?: at
-            if (continuous) {
+            // 모의 시연은 출발 표본을 이전 시연 끝보다 1초 뒤에 만든다.
+            // 재시작으로 주차 근거가 없으면 이 1초를 미관측으로 넘기고 확인된 새 주행부터 계산한다.
+            val departureGap = simulationGapStart?.takeIf { origin ->
+                input.source == InputSource.SIMULATION && state.trip?.departure == input &&
+                    origin.bootId == at.bootId && at.elapsedMs - origin.elapsedMs == 1_000L &&
+                    at.epoch.value - origin.epoch.value == 1_000L &&
+                    (before == null || before.at == origin && before.motion is Observation.Missing)
+            }
+            if (continuous && departureGap == null) {
                 append(RentalTick(input.source, before.at, at, before.motion, before.unobservedSince))
             }
             // 수락한 recorder revision이 건너뛰면 그 사이의 관측을 공백으로 단정하지 않는다.
-            val unobservedSince = before?.takeIf {
+            val unobservedSince = departureGap ?: before?.takeIf {
                 delta != null && delta > policy.maxGapMs && state.revision - it.revision == 1L
             }?.at
             previous = AcceptedFrame(at, motion, state.receiver, state.revision, unobservedSince)
