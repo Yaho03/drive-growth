@@ -63,6 +63,8 @@ internal class ShopSceneView(
     internal val model = shopSceneModel(content)
     private val sign = content.appearance.sign.displayShopSign()
     private val defaultSign = sign == "기본 간판"
+    // 꾸미기 항목 이름(예: "간판 색상")은 간판 문구가 아니다. 간판에는 항상 가게 이름을 쓰고 꾸미기는 색만 바꾼다.
+    private val shopName = context.getString(R.string.shop_scene_default_sign)
     private val scene = if (mode == ShopMode.OVERALL) RectF(0f, 0f, 1536f, 1024f)
         else RectF(100f, 546f, 1450f, 986f)
     private val placed = model.vehicles.zip(townSlots).sortedBy { it.second.second }
@@ -82,7 +84,9 @@ internal class ShopSceneView(
         TownActors(context, population)
     }
     private val actors by actorsDelegate
+    private val lampForeground by lazy(LazyThreadSafetyMode.NONE) { TownLampForeground.extract(background, growthArt) }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = false }
+    private val lampPaint = Paint().apply { isFilterBitmap = false }
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.create("sans-serif", Typeface.BOLD)
         textAlign = Paint.Align.CENTER
@@ -439,7 +443,7 @@ internal class ShopSceneView(
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         contentDescription = buildString {
             append(context.getString(R.string.shop_scene_description,
-                if (defaultSign) context.getString(R.string.shop_scene_default_sign) else sign))
+                shopName))
             append(". ")
             append(content.capacity?.let { context.getString(R.string.shop_scene_spaces, it) }
                 ?: context.getString(R.string.shop_scene_spaces_unknown))
@@ -657,6 +661,14 @@ internal class ShopSceneView(
         }
         rental?.let { (animation, time) -> animation.art.draw(canvas, time) }
         actors.draw(canvas, animate)
+        // 주민이 가로등 뒤로 지나가도록 배경의 아래 연석 가로등을 주민 위에 다시 그린다.
+        for (lamp in lampForeground) {
+            area.set(lamp.left, lamp.top, lamp.left + lamp.bitmap.width, lamp.top + lamp.bitmap.height)
+            canvas.drawBitmap(lamp.bitmap, null, area, lampPaint)
+        }
+        for ((vehicle, slot) in placed) {
+            drawVehicleBadge(canvas, vehicle, slot.first.toFloat(), slot.second.toFloat())
+        }
         if (!fillViewport && selectedId == null && mode == ShopMode.OVERALL) {
             val unknown = context.getString(R.string.shop_unknown)
             val summary = context.getString(R.string.shop_scene_summary, content.level?.toString() ?: unknown,
@@ -756,7 +768,7 @@ internal class ShopSceneView(
         paint.color = fill
         canvas.drawRect(0f, 0f, 205f, 45f, paint)
         val luminance = .299f * Color.red(fill) + .587f * Color.green(fill) + .114f * Color.blue(fill)
-        drawText(canvas, sign, 102.5f, 22.5f, 189f, 28f,
+        drawText(canvas, shopName, 102.5f, 22.5f, 189f, 28f,
             if (luminance > 152) PixelStyle.background else PixelStyle.text)
         canvas.restore()
     }
@@ -787,7 +799,11 @@ internal class ShopSceneView(
             }
             canvas.restore()
         }
-        if (mode == ShopMode.VEHICLES || bitmap == null) {
+    }
+
+    private fun drawVehicleBadge(canvas: Canvas, vehicle: ShopVehicle, x: Float, y: Float) {
+        val parked = vehicle.activity == VehicleActivity.IDLE || vehicle.activity == VehicleActivity.NEEDS_REPAIR
+        if (mode == ShopMode.VEHICLES || bitmaps[vehicle.id] == null) {
             val label = if (vehicle.activity == VehicleActivity.IDLE) vehicle.name else "${vehicle.name} · ${vehicle.status}"
             badge(canvas, label, x - 30f, y + 27f, 155f, size = 20f)
         } else {

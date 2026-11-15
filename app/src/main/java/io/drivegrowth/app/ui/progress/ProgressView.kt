@@ -177,7 +177,9 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
             add(card, text(item.title, 28, bold = true), 0); add(card, statusText(item, enabled)); progress(card, item)
             add(card, text(s(R.string.progress_confirm_title), 24, bold = true))
             add(card, text(item.rewardLabel ?: s(R.string.progress_unknown_reward), 24))
-            add(card, text(s(R.string.progress_confirm_body)))
+            // 이미 받은 보상에는 "청구 예정" 안내 대신 지급 완료 안내를 보여 준다.
+            val claimed = item.status == RewardStatus.CLAIMED && !interaction.isPending(item)
+            add(card, text(s(if (claimed) R.string.progress_claimed_body else R.string.progress_confirm_body)))
             item.note?.let { add(card, text(it)) }
             val pending = interaction.isPending(item)
             add(card, button(s(if (pending) R.string.progress_pending else if (enabled) R.string.progress_claim else R.string.progress_no_claim), enabled, true) {

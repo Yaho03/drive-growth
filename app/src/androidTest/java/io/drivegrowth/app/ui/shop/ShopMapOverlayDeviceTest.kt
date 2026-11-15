@@ -10,6 +10,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import io.drivegrowth.app.R
 import io.drivegrowth.app.ui.garage.CollectionScrollTestActivity
 import io.drivegrowth.core.contract.ContractResult
 import io.drivegrowth.core.contract.GameMoney
@@ -198,7 +199,10 @@ class ShopMapOverlayDeviceTest : InstrumentationTestCase() {
         assertEquals("blue-sign", interaction.selection?.option?.id)
         assertEquals(state.appearance, (interaction.state as ShopScreenState.Content).appearance)
         overlay.render(ShopMapTarget.Decorations, interaction)
-        assertTrue(text(overlay).contains("파란 가게"))
+        val shopName = overlay.context.getString(R.string.shop_scene_default_sign)
+        assertTrue(text(overlay).contains(overlay.context.getString(R.string.shop_before, shopName)))
+        assertTrue(text(overlay).contains(overlay.context.getString(R.string.shop_after, shopName)))
+        assertFalse(text(overlay).contains(overlay.context.getString(R.string.shop_after, "파란 가게")))
         val oldConfirm = overlay.findViewWithTag<Button>("shop:map-confirm")
         assertTrue(overlay.handleBack())
         oldConfirm.performClick()

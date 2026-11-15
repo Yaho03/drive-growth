@@ -157,8 +157,9 @@ internal class ShopMapOverlayView(
                         val command = selected.option.command as? ShopCommand.Decorate
                         if (command != null) {
                             addView(text(s(R.string.shop_preview_label), 18, color = accent))
-                            addView(signPreview(s(R.string.shop_before, content.appearance.sign.displayShopSign()), content.appearance))
-                            addView(signPreview(s(R.string.shop_after, command.appearance.sign.displayShopSign()), command.appearance))
+                            val shopName = s(R.string.shop_scene_default_sign)
+                            addView(signPreview(s(R.string.shop_before, shopName), content.appearance))
+                            addView(signPreview(s(R.string.shop_after, shopName), command.appearance))
                         }
                         describe(this, content, selected.option, projectedBalance)
                         confirmButton = confirm(interaction, selected, ::current, alreadySelected = true)

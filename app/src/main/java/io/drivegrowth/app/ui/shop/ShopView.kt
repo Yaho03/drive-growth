@@ -517,12 +517,14 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         when (state) {
             ShopScreenState.Loading -> {
                 val previous = lastMapContent
+                val message = uiState.message?.takeIf { it == ShopInteraction.APPLYING_MESSAGE }
+                    ?: s(R.string.shop_loading)
                 if (previous != null) {
-                    addView(loadingMap(previous, generation), LayoutParams(-1, 0, 1f))
+                    addView(loadingMap(previous, generation, message), LayoutParams(-1, 0, 1f))
                 } else {
                     val content = column().apply {
                         addView(text(s(R.string.shop_title), 32, bold = true))
-                        addView(text(s(R.string.shop_loading)))
+                        addView(text(message))
                         addFacilityPanel(this)
                     }
                     addView(scroll(content, controlsY), LayoutParams(-1, 0, 1f))
@@ -538,7 +540,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
         updateMapModal(activeSheet != null || mapOverlay != null)
         if (focus != null) findViewWithTag<View>(focus)?.takeIf { it.isEnabled }?.requestFocus()
     }
-    private fun loadingMap(previous: ShopScreenState.Content, generation: Long): View = with(style) {
+    private fun loadingMap(previous: ShopScreenState.Content, generation: Long, message: String): View = with(style) {
         val panel = facilityPanel
         if (focusRestRecovery && panel != null) return@with facilityResultMap(previous, generation, panel)
         object : FrameLayout(context) {
@@ -551,7 +553,7 @@ class ShopView(context: Context, onEvent: (ShopEvent) -> Unit) : LinearLayout(co
             addView(cameraScene(previous, generation, onVehicle = null, region = cameraRegion, readOnly = true).apply {
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             }, FrameLayout.LayoutParams(-1, -1))
-            addView(text(s(R.string.shop_loading), 18, accent).apply {
+            addView(text(message, 18, accent).apply {
                 background = surface()
                 setPadding(dp(12), dp(8), dp(12), dp(8))
                 accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE

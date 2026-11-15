@@ -77,7 +77,7 @@ sealed interface ShopScreenState {
         }
     }
     data class Empty(val message: String) : ShopScreenState
-    data class Failure(val message: String) : ShopScreenState
+    data class Failure(val message: String, val error: ContractError? = null) : ShopScreenState
     data class Unsupported(val message: String) : ShopScreenState
 }
 
@@ -121,6 +121,10 @@ class ShopInteraction(
             if (value.revision.value < (uiState.latestRevision?.value ?: -1)) return
             uiState = uiState.copy(latestRevision = value.revision,
                 requestIds = immutableMap(uiState.requestIds.filterKeys { it.revision == value.revision }))
+            // 처리 후 새 확정 상태가 그려지면 반영 중 안내를 지운다. 결과는 별도 완료 안내가 보여준다.
+            val acknowledged = uiState.acknowledged
+            if (uiState.message == APPLYING_MESSAGE && acknowledged != null && acknowledged.revision != value.revision)
+                uiState = uiState.copy(message = null)
         }
         state = if (value is ShopScreenState.Content) value.copy(
             vehicles = immutable(value.vehicles), facilities = immutable(value.facilities), decorations = immutable(value.decorations),
@@ -173,8 +177,8 @@ class ShopInteraction(
         val pending = uiState.pending?.takeIf { it == request } ?: return
         uiState = when (result) {
             is ContractResult.Success -> uiState.copy(pending = null, selection = null, acknowledged = pending.selection,
-                message = "처리 응답을 받았습니다. 확정 상태 재조회를 기다립니다")
-            is ContractResult.Failure -> uiState.copy(pending = null, selection = null, message = "요청 실패: ${result.error}. 확정 상태를 확인하고 다시 선택해 주세요")
+                message = APPLYING_MESSAGE)
+            is ContractResult.Failure -> uiState.copy(pending = null, selection = null, message = FAILURE_MESSAGE)
         }
     }
     fun retry() {
@@ -183,6 +187,10 @@ class ShopInteraction(
         onEvent(ShopEvent.Retry)
     }
     fun completeRetry() { uiState = uiState.copy(retryPending = false) }
+    companion object {
+        internal const val APPLYING_MESSAGE = "반영하고 있어요…"
+        internal const val FAILURE_MESSAGE = "처리하지 못했어요. 다시 시도해 주세요."
+    }
     private fun <K, V> immutableMap(values: Map<K, V>): Map<K, V> = Collections.unmodifiableMap(LinkedHashMap(values))
     private fun <T> immutable(values: List<T>): List<T> = Collections.unmodifiableList(ArrayList(values))
 }
