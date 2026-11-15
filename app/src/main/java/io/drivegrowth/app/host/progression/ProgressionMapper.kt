@@ -105,7 +105,8 @@ class ProgressionMapper {
         }
         val label = measure?.let { value ->
             val total = value.total
-            if (total == null) "${value.count} / ${definition.goal}"
+            // 목표를 넘은 진행은 목표에서 멈춰 표시한다 (예: 5 / 3 → 3 / 3).
+            if (total == null) "${minOf(value.count, definition.goal)} / ${definition.goal}"
             else "${value.count} / ${total}칸 · 목표 ${definition.goal}%"
         } ?: "진행 확인 불가"
         val claim = command?.takeIf { progress.status == AchievementStatus.CLAIMABLE }?.let {
@@ -171,12 +172,23 @@ class ProgressionMapper {
             QuestAction.RENTAL_COMPLETED -> "영업 완료하기"
         }
         val note = if (!known) "퀘스트 기간이나 활동 기록을 아직 확인할 수 없어요."
-            else "시작일 ${p.period.start} · ${p.period.zone.id}"
+            else "시작일 ${p.period.start} · ${zoneLabel(p.period.zone)}"
+        // 목표를 넘은 진행은 목표에서 멈춰 표시한다 (예: 5 / 1회 → 1 / 1회).
         return ProgressItem(progressKey(p), if (p.definition.cadence == QuestCadence.DAILY) ProgressGroup.DAILY else ProgressGroup.WEEKLY,
-            0, action, if (known) "${p.count} / ${p.definition.goal}회" else "진행 확인 불가", percent,
+            0, action, if (known) "${minOf(p.count!!, p.definition.goal)} / ${p.definition.goal}회" else "진행 확인 불가", percent,
             "${p.definition.reward.units} 게임머니", status, note,
             command?.takeIf { known && p.status == QuestStatus.CLAIMABLE }?.let {
                 ClaimOffer(it.requestId.value, allowClaim, if (allowClaim) null else "지금은 보상을 받을 수 없어요. 확인 중인 요청이 있다면 결과를 먼저 확인해 주세요.")
             })
+    }
+
+    /**
+     * 퀘스트 기간 시간대를 사용자 표시용으로 바꾼다. 계산 시간대는 그대로다.
+     * 모의 시연은 모의 시계를 UTC로 고정하고(HostSession), 차량 입력은 기기 시간대를 쓴다.
+     */
+    internal fun zoneLabel(zone: java.time.ZoneId): String = when (zone.normalized()) {
+        java.time.ZoneOffset.UTC -> "모의 시연 시각 기준"
+        java.time.ZoneId.systemDefault().normalized() -> "기기 시간 기준"
+        else -> "${zone.id} 기준"
     }
 }
