@@ -28,6 +28,13 @@ class DeliveryHostMapperTest {
         assertEquals(GameMoney(80),ui.fee);assertEquals(GameMoney(720),ui.refund);assertTrue(ui.permission.allowed)
     }
 
+    @Test fun `포기 안내 문구는 수익 탁송과 구매 탁송을 구분한다`() {
+        val income=DeliveryHostMapper.abandonNote(DeliveryOffer.Income(DeliveryOfferId("income-0"),VehicleId("sonata"),GameMoney(150)))
+        assertTrue(income.contains("완료 보상은 받지 못하지만 벌금은 없어요"))
+        assertFalse(income.contains("구매 차량") || income.contains("수수료"))
+        assertTrue(DeliveryHostMapper.abandonNote(offer).contains("표시된 수수료를 공제한 금액"))
+    }
+
     @Test fun `변경 후보는 전체 구매가가 아닌 실제 차액으로 잔액을 검사한다`() {
         val cheaper=offer.copy(price=GameMoney(600))
         val next=proposed.copy(list=list.copy(offers=listOf(cheaper)),offers=listOf(cheaper))
