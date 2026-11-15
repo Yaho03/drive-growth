@@ -63,6 +63,8 @@ internal class ShopSceneView(
     internal val model = shopSceneModel(content)
     private val sign = content.appearance.sign.displayShopSign()
     private val defaultSign = sign == "기본 간판"
+    // 꾸미기 항목 이름(예: "간판 색상")은 간판 문구가 아니다. 간판에는 항상 가게 이름을 쓰고 꾸미기는 색만 바꾼다.
+    private val shopName = context.getString(R.string.shop_scene_default_sign)
     private val scene = if (mode == ShopMode.OVERALL) RectF(0f, 0f, 1536f, 1024f)
         else RectF(100f, 546f, 1450f, 986f)
     private val placed = model.vehicles.zip(townSlots).sortedBy { it.second.second }
@@ -439,7 +441,7 @@ internal class ShopSceneView(
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         contentDescription = buildString {
             append(context.getString(R.string.shop_scene_description,
-                if (defaultSign) context.getString(R.string.shop_scene_default_sign) else sign))
+                shopName))
             append(". ")
             append(content.capacity?.let { context.getString(R.string.shop_scene_spaces, it) }
                 ?: context.getString(R.string.shop_scene_spaces_unknown))
@@ -756,7 +758,7 @@ internal class ShopSceneView(
         paint.color = fill
         canvas.drawRect(0f, 0f, 205f, 45f, paint)
         val luminance = .299f * Color.red(fill) + .587f * Color.green(fill) + .114f * Color.blue(fill)
-        drawText(canvas, sign, 102.5f, 22.5f, 189f, 28f,
+        drawText(canvas, shopName, 102.5f, 22.5f, 189f, 28f,
             if (luminance > 152) PixelStyle.background else PixelStyle.text)
         canvas.restore()
     }
