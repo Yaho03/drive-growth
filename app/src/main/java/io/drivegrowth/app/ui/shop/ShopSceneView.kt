@@ -84,8 +84,9 @@ internal class ShopSceneView(
         TownActors(context, population)
     }
     private val actors by actorsDelegate
-    private val lampForeground by lazy(LazyThreadSafetyMode.NONE) { TownLampForeground.extract(background) }
+    private val lampForeground by lazy(LazyThreadSafetyMode.NONE) { TownLampForeground.extract(background, growthArt) }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = false }
+    private val lampPaint = Paint().apply { isFilterBitmap = false }
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.create("sans-serif", Typeface.BOLD)
         textAlign = Paint.Align.CENTER
@@ -661,7 +662,13 @@ internal class ShopSceneView(
         rental?.let { (animation, time) -> animation.art.draw(canvas, time) }
         actors.draw(canvas, animate)
         // 주민이 가로등 뒤로 지나가도록 배경의 아래 연석 가로등을 주민 위에 다시 그린다.
-        for (lamp in lampForeground) canvas.drawBitmap(lamp.bitmap, lamp.left, lamp.top, paint)
+        for (lamp in lampForeground) {
+            area.set(lamp.left, lamp.top, lamp.left + lamp.bitmap.width, lamp.top + lamp.bitmap.height)
+            canvas.drawBitmap(lamp.bitmap, null, area, lampPaint)
+        }
+        for ((vehicle, slot) in placed) {
+            drawVehicleBadge(canvas, vehicle, slot.first.toFloat(), slot.second.toFloat())
+        }
         if (!fillViewport && selectedId == null && mode == ShopMode.OVERALL) {
             val unknown = context.getString(R.string.shop_unknown)
             val summary = context.getString(R.string.shop_scene_summary, content.level?.toString() ?: unknown,
@@ -792,7 +799,11 @@ internal class ShopSceneView(
             }
             canvas.restore()
         }
-        if (mode == ShopMode.VEHICLES || bitmap == null) {
+    }
+
+    private fun drawVehicleBadge(canvas: Canvas, vehicle: ShopVehicle, x: Float, y: Float) {
+        val parked = vehicle.activity == VehicleActivity.IDLE || vehicle.activity == VehicleActivity.NEEDS_REPAIR
+        if (mode == ShopMode.VEHICLES || bitmaps[vehicle.id] == null) {
             val label = if (vehicle.activity == VehicleActivity.IDLE) vehicle.name else "${vehicle.name} · ${vehicle.status}"
             badge(canvas, label, x - 30f, y + 27f, 155f, size = 20f)
         } else {

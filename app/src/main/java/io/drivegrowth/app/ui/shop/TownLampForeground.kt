@@ -23,15 +23,17 @@ internal object TownLampForeground {
 
     class Piece(val bitmap: Bitmap, val left: Float, val top: Float)
 
-    fun extract(background: Bitmap): List<Piece> {
+    fun extract(background: Bitmap, growthArt: TownGrowthArt?): List<Piece> {
         if (background.width != TOWN_WIDTH || background.height != TOWN_HEIGHT) return emptyList()
-        return boxes.mapNotNull { (left, top, right, bottom) ->
+        return boxes.mapIndexedNotNull { index, (left, top, right, bottom) ->
             val width = right - left
             val height = bottom - top
             val pixels = IntArray(width * height)
             background.getPixels(pixels, 0, width, left, top, width, height)
-            val mask = mask(pixels, width, height)
-            if (mask.none { it }) return@mapNotNull null
+            val mask = if (index == 2 && growthArt != null && growthArt != TownGrowthArt.LEVEL_4) {
+                growthLampMask(pixels, width, height)
+            } else mask(pixels, width, height)
+            if (mask.none { it }) return@mapIndexedNotNull null
             for (index in pixels.indices) if (!mask[index]) pixels[index] = 0
             Piece(Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888), left.toFloat(), top.toFloat())
         }
@@ -93,6 +95,17 @@ internal object TownLampForeground {
         }
         return keep
     }
+
+    // Lv1~3의 세 번째 가로등은 밝은 윗면 테두리가 아스팔트 밝기 기준을 넘는다.
+    // 세 자산에서 같은 지붕의 왼쪽 사선을 기존 마스크까지 연결한다.
+    internal fun growthLampMask(pixels: IntArray, width: Int, height: Int): BooleanArray =
+        mask(pixels, width, height).apply {
+            for (y in 29..33) {
+                val left = 21 - 2 * (y - 29)
+                val first = (left until width).firstOrNull { this[y * width + it] } ?: continue
+                fill(true, y * width + left, y * width + first)
+            }
+        }
 
     private fun luminance(color: Int): Int {
         val r = color shr 16 and 0xff

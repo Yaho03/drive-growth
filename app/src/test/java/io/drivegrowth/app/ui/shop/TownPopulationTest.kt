@@ -19,6 +19,16 @@ class TownPopulationTest {
         assertNull(map.path(from, map.destinations(TownZone.FUEL).first()))
     }
 
+    @Test fun widenedLotKeepsResidentsOnPavement() {
+        val map = TownWalkMap(emptyList())
+        assertTrue(map.allows(TownPoint(540f, 785f)))
+        assertTrue(map.allows(TownPoint(880f, 900f)))
+        assertFalse("보험시설 화단", map.allows(TownPoint(399f, 558f)))
+        assertFalse("세차장 오른쪽 나무", map.allows(TownPoint(1405f, 787f)))
+        assertFalse("왼쪽 연석 화단", map.allows(TownPoint(410f, 817f)))
+        assertFalse("아래 연석 화단", map.allows(TownPoint(670f, 941f)))
+    }
+
     @Test fun mechanicReachesAValidApproachToTheFirstParkedCar() {
         val car = TownPoint(253f, 635f)
         val parked = listOf(car, TownPoint(326f, 672f), TownPoint(400f, 709f))
