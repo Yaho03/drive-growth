@@ -1,59 +1,55 @@
 # 르르르 렌터카
 
-**평소 이동을 탁송과 수익으로 연결하고, 주차한 뒤 차량을 모아 렌터카 가게를 키우는 Pleos Connect 경영 게임입니다.** 프로젝트 이름은 **드라이브 키우기**입니다. 현대자동차그룹 차량용 앱 개발 공모전을 위해 만들었습니다.
+**평소 이동으로 탁송 의뢰를 수행하고, 주차한 뒤 차량을 모아 가게를 키우는 Pleos Connect 경영 게임입니다.**
 
-[APK 다운로드와 체험 순서](#실행할-앱과-apk) · [심사 자료 안내](docs/README.md#심사-자료-읽는-순서)
+현대자동차그룹 차량용 앱 개발 공모전 프로젝트입니다.
 
-## 실제 화면과 시연
+[APK 다운로드와 실행](#실행할-앱과-apk) · [테스트 환경](#테스트-환경과-설정)
 
-![Pleos 에뮬레이터에서 실행한 르르르 렌터카 가게. 지도에 보유 차량, 시설과 하단 메뉴가 표시된다.](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/recheck-current-home.png)
+## 실제 앱 화면
 
-이전 테스트 릴리스 `first-vehicle-test-20261115`의 **격리 모의 앱 가게 화면**입니다. Pleos 전체 화면은 1080×600px이며, 오른쪽의 게임 창은 702×438px입니다. [사용자용 테스트 APK의 첫 차량 선택 화면](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/player-ready.png) · [새 프로세스에서 복원한 첫 지급 화면](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/recheck-original-result-rendered.png) · [최신 모의 APK의 시작 화면](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/firstcarplay-start-52285de.png)
+### 시작 화면
 
-### 게임 흐름
+![르르르 렌터카 타이틀과 화면을 눌러 시작 버튼](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/firstcarplay-start-52285de.png)
 
-아래 흐름은 모의 입력 앱에서 체험할 수 있습니다. 이전 별도 차량용 SDK 계측에서 최초 견적과 의뢰 복원을 확인했습니다. 실제 SDK에 연결된 활성 의뢰의 도착·지급 검증은 남아 있습니다. [SDK 계측 범위](docs/06_VERIFICATION.md#3739-실제-sdk-견적의-구매-복원변경-거절과-모의-종료-결과--2026-11-13)
+### 메인 게임 화면(앞선 검증 버전)
 
-1. **주차 중 의뢰 선택** — 렌터카를 시작할 첫 차량을 고릅니다. 목적지의 예상 경로를 확인하고, 게임머니를 받는 수익 탁송이나 도착 후 차량을 얻는 구매 탁송을 선택합니다.
-2. **평소대로 이동** — 운전 중에는 게임 화면과 조작을 제한합니다. 앱은 전경에서 수신한 주행 데이터를 기록하고 도착 근거를 확인합니다.
-3. **다시 주차하고 가게 관리** — 탁송과 주행·대여 정산을 확인합니다. 차량을 차고와 도감에 모으고, 모은 재화로 차량·차고·시설을 관리합니다.
+![가게 지도에 보유 차량과 시설, 하단 게임 메뉴가 표시된 메인 화면](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/recheck-current-home.png)
+
+두 화면은 Pleos 에뮬레이터에서 촬영했습니다. 타이틀은 최신 체험 APK, 가게 화면은 앞선 모의 시험에서 촬영했습니다.
+
+## 플레이 흐름
+
+1. **첫 차량을 고릅니다.** 캐스퍼나 아반떼 한 대로 렌터카 영업을 시작합니다.
+2. **주차한 상태에서 탁송을 맡습니다.** 목적지의 예상 거리를 확인하고, 도착 후 게임머니를 받는 수익 탁송이나 차량을 얻는 구매 탁송을 고릅니다. 주행 중에는 게임 화면과 조작이 제한됩니다.
+3. **다시 주차하면 수익을 확인합니다.** 탁송 보상과 자동 대여 수익을 확인하고, 뽑기로 새로운 차량을 모아 도감을 채웁니다. 차고의 차량을 강화하거나 주차 공간과 시설을 늘려 가게를 키울 수 있습니다.
 
 ## 실행할 앱과 APK
 
-첫 차량 안내·효과음·주행 제한을 통합한 소스는 [앱 PR #313](https://github.com/Yaho03/drive-growth/pull/313)으로 main에 반영됐습니다. 최신 모의 APK와 신규 설치용 차량 APK는 [`52285de`](https://github.com/Yaho03/drive-growth/commit/52285dec30d90957786ca11d46234d2bcc24e58d)에서 빌드했습니다. 기존 차량 앱과 호환되는 이전 개발 서명 APK도 받을 수 있습니다. [로컬 빌드 절차](docs/05_DEVELOPMENT_SETUP.md#팀-공통-실행-절차) · [검증 요약](docs/06_VERIFICATION.md#현재-검증-요약--2026-11-15)
+| 목적 | 다운로드 | 설치 조건 |
+| --- | --- | --- |
+| **게임 체험** | [첫 차량 체험 APK](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-firstcarplay-52285de.apk) | 모의 차량·내비 입력을 쓰는 Debug 앱입니다. 같은 서명과 Android 사용자에서 기존 체험 앱을 업데이트할 수 있습니다. |
+| **Pleos 차량 SDK 시험** | [차량용 APK](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-vehicle-fresh-install-52285de.apk) | 개발 서명 Release입니다. 기존 차량 앱과 서명이 달라, `io.drivegrowth.app`이 없는 별도 Pleos 환경에 신규 설치합니다. 기기 설치·실행은 아직 확인하지 않았습니다. |
 
-| 사용 목적 | 다운로드와 입력 |
-|---|---|
-| **게임 체험과 첫 차량 선택** | [첫 차량 테스트 APK](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-firstcarplay-52285de.apk) · `io.drivegrowth.verify.prototype.firstcarplay` · 모의 차량·내비 입력을 사용하는 Debug |
-| **Pleos 차량 SDK 신규 시험 설치** | [최신 차량용 APK](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-vehicle-fresh-install-52285de.apk) · `io.drivegrowth.app` · 개발 서명 Release · **신규 설치용, 기존 차량 앱 업데이트 불가** |
-| **기존 개발 서명 차량 앱과 호환** | [이전 차량용 APK](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-vehicle-dev-709e08d.apk) · `io.drivegrowth.app` · `709e08d` 기반 개발 서명 Release |
+[통합 GitHub 릴리스와 체크섬](https://github.com/Yaho03/drive-growth/releases/tag/integrated-20261115-52285de) · [설치 명령과 기존 저장 보존](docs/05_DEVELOPMENT_SETUP.md#심사위원-실행-안내)
 
-기존 `firstcarplay`는 동일 인증서와 Android 사용자에서 최신 모의 APK로 업데이트할 수 있습니다. 최신 차량용 APK는 기존 `io.drivegrowth.app`이 없는 별도 Pleos 시험 환경용입니다. 서명을 검증했고 기기 설치·실행은 아직 확인하지 않았습니다. 기존 차량 앱과 저장은 유지하세요. 비공개 저장소에는 다운로드 권한이 필요합니다. [최신 통합 릴리스와 SHA-256](https://github.com/Yaho03/drive-growth/releases/tag/integrated-20261115-52285de) · [기존 저장을 보존하는 설치 방법](docs/05_DEVELOPMENT_SETUP.md#설치-대상과-저장-보존)
+1. **첫 차량 체험 APK**를 Pleos 에뮬레이터에 설치하고 앱 목록에서 **르르르 렌터카 · 첫 차량 테스트**를 엽니다. [APK 설치·런처 실행 명령](docs/05_DEVELOPMENT_SETUP.md#첫-차량-선택과-모의-입력)
+2. **화면을 눌러 시작 → 시작하기**를 누릅니다. 새 프로필에서 차량 카드를 고르고 **캐스퍼로 할게요** 또는 **아반떼로 할게요**를 누릅니다. 이어서 **확인 → 가게로 가기**를 선택합니다.
+3. **탁송 → 이 목적지의 탁송 후보 보기 → 수익 탁송 → 이 의뢰 선택 → 탁송 수락** 순서로 진행합니다.
+4. 출발 연출에서는 **확인**을 누릅니다. 저장 결과 확인이 표시되면 **처리 결과 확인하고 새로 조회**를 누릅니다. 가게로 돌아와 **설정 → 시연 → 모의 입력 모드 → 모의주행 시작**을 선택합니다. 모의주행 중 화면 제한과 주차 후 정산을 볼 수 있습니다. [탁송 상세 조작 순서](docs/05_DEVELOPMENT_SETUP.md#첫-차량-선택과-모의-입력)
 
-**새 프로필에서 빠른 체험** — 테스트 앱을 열어 **화면을 눌러 시작 → 시작하기 → 캐스퍼 또는 아반떼 카드 → 캐스퍼로 할게요 또는 아반떼로 할게요 → 확인 → 가게로 가기** 순서로 진행합니다. 종료 후 같은 앱을 다시 열어 차고와 잔액을 확인할 수 있습니다. 탁송은 **탁송 → 이 목적지의 탁송 후보 보기 → 수익 탁송 → 이 의뢰 선택 → 탁송 수락**에서 시작합니다. 저장된 선택 결과를 확인한 뒤 **설정 → 시연 → 모의 입력 모드**에서 모의주행을 시작합니다. [심사위원 설치·실행 안내](docs/05_DEVELOPMENT_SETUP.md#심사위원-실행-안내) · [모의주행의 자세한 순서](docs/05_DEVELOPMENT_SETUP.md#현재-소스의-로컬-debug-화면-경로)
+## 테스트 환경과 설정
 
-## 핵심 기능
+- **에뮬레이터** — Pleos Connect Emulator **2.1.0**, Android API 34 ARM64.
+- **화면 규격** — 기본 디스플레이 **1080×600px·120dpi**, 캡처한 앱 창 **702×438px**.
+- **입력 설정** — 체험 앱의 **설정 → 시연**에서 모의 입력을 선택합니다. 차량용 APK에는 Pleos 차량 데이터 권한과 시스템 조작 허용이 필요하며, 기어 P와 정차가 확인된 뒤 게임을 조작할 수 있습니다. [차량용 설치와 권한 확인](docs/05_DEVELOPMENT_SETUP.md#차량용-apk-실행)
 
-- **탁송·정산** — 수익 의뢰와 구매 의뢰를 고르고, 조건을 충족하면 완료 보상이나 차량을 받습니다. 기본 주행 수익과 자동 대여 수익은 정산에서 각각 확인할 수 있습니다.
-- **차량 수집·관리** — 첫 차량 선택, 뽑기, 차종×희귀도 도감, 개별 차량의 강화·수리·판매·폐차를 제공합니다.
-- **가게 성장·기록** — 주차 공간을 늘리고 시설과 간판을 꾸밉니다. 퀘스트·업적, 내 기록과 시연용 랭킹을 확인할 수 있습니다. [제품 규칙](docs/01_PRD.md) · [화면 흐름](docs/09_UI_UX_SPEC.md)
+## 현재 지원 범위
 
-## 차량용 앱이어야 하는 이유
+체험 앱에서 첫 차량 선택, 모의 탁송·정산, 차량 수집과 가게 성장을 확인할 수 있습니다. 랭킹은 시연용입니다. 실제 내비의 도착과 보상 지급이 이어지는 과정 및 실차 동작은 검증이 남아 있습니다. [실행 검증과 확인 범위](docs/06_VERIFICATION.md#현재-검증-요약--2026-11-15)
 
-차량용 앱은 Pleos SDK의 속도·기어·UX 제한을 확인해 주차 후에만 게임 조작을 엽니다. 목적지는 예상 경로를 확인하는 데 쓰고, 도착 보상은 현재 의뢰의 도착 근거를 확인한 뒤 처리합니다. 실제 SDK의 활성 의뢰 도착·지급은 미검증이며, 모의 앱은 고정 시연 목적지와 논리 시각으로 이 게임 흐름을 체험할 수 있습니다. [차량 입력과 안전 기준](docs/01_PRD.md#안전기술-확인과-남은-결정)
+## 개발 문서
 
-## 공모전과 개발 조건
-
-- **시험 환경** — Pleos Connect Emulator 2.1.0, Android API 34 ARM64, Android 사용자 10. 위 시연의 기본 디스플레이는 1080×600px·120dpi이며, 실제 게임 창은 702×438px입니다. [에뮬레이터와 실행 설정](docs/05_DEVELOPMENT_SETUP.md) · [창 크기별 시험](docs/06_VERIFICATION.md#공식-세로가로-창과-표준-debug-apk-직접-설치--2026-11-13)
-- **개발 환경** — Kotlin과 Android Views, JDK 17, KGP 2.2.21, AGP 8.10.1, Gradle 8.11.1. `app`은 Pleos 입력·화면·SQLite 저장을 연결하고, `core`는 거래·수익·성장 규칙과 공통 계약을 담습니다. [빌드 명령](docs/05_DEVELOPMENT_SETUP.md#팀-공통-실행-절차) · [구조와 데이터 계약](docs/02_SYSTEM_ARCHITECTURE.md)
-- **제출 자료** — [공모전 규정과 제출 방법](docs/contest/01_CONTEST_GUIDE.md#4-제출물과-github), [심사용 소개 문안](docs/10_SUBMISSION_DRAFT.md), [자산별 출처와 사용 조건](docs/04_VEHICLE_RESEARCH.md#android-채택-픽셀-자산과-사용-조건-확인--2026-11-13)을 확인할 수 있습니다.
-
-## 검증과 한계
-
-- **격리 모의 실행** — 첫 지급 전 전체 정산 0건, 지급 후 최초 지급 1건, 새 프로세스에서 같은 캐스퍼·잔액·차고 공간·원정산의 복원을 계측했습니다. 탁송·정산·확장·진행 보상은 별도 모의 실행 기록에 있습니다. [첫 차량 보강 회귀](docs/evidence/first-vehicle-isolation-20261115/README.md) · [같은 모의 원장의 연속 실행](docs/06_VERIFICATION.md#최종-동일-모의-원장의-연속-실행--2026-11-13)
-- **Pleos SDK 실행** — 별도 차량용 시험에서 실제 SDK의 PARK·UX 허용, 권한 거부 및 복귀를 확인했습니다. [차량용 첫 실행과 SDK 시험](docs/06_VERIFICATION.md#차량용-첫-실행과-마을-주민-검증--2026-11-13)
-- **남은 검증과 계획** — 실제 SDK 목적지 변경·도착 지급, 전원·실차, 최종 제출 APK와 App Market 검증은 후속입니다. 온라인 사용자 간 순위는 향후 계획입니다. [전체 검증과 제출 준비](docs/06_VERIFICATION.md) · [1차 랭킹 범위](docs/01_PRD.md#1차-랭킹-범위)
-
-## 문서 안내와 읽는 순서
-
-심사 흐름, 개발자 진입점, 문서별 현재 기준과 과거 기록을 [문서 안내](docs/README.md)에 모았습니다. 개발 중 참고할 표준 Debug와 과거 배포 APK는 [개발환경 문서](docs/05_DEVELOPMENT_SETUP.md#별도-모의-시연-debug-apk)에서 찾을 수 있습니다.
+- [설치·로컬 빌드](docs/05_DEVELOPMENT_SETUP.md) · [시연·검증 기록](docs/06_VERIFICATION.md)
+- [제품 요구사항](docs/01_PRD.md) · [화면 명세](docs/09_UI_UX_SPEC.md) · [기술 구조와 저장 계약](docs/02_SYSTEM_ARCHITECTURE.md)
+- [문서 안내](docs/README.md) · [공식 제출 안내](https://appdevchallenge.auto-hmg.io/guide/submission)
