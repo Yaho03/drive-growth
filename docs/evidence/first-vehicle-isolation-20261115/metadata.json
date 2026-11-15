@@ -1,0 +1,49 @@
+{
+  "date": "2026-11-15 KST",
+  "base_commit": "709e08dcb9e8be0f98c3ccfba2ba7b33b51f12f0",
+  "code_commit": "6070445c154455c2b3f8c9e777ac2f5c04cb014b",
+  "environment": "Pleos Connect 2.1.0 / API 34 ARM64 / Android user 10",
+  "input_source": "SIMULATION",
+  "final_device_result": {
+    "unconfirmed_pid": 9449,
+    "grant_pid": 23902,
+    "restored_pid": 28196,
+    "junit_tests": 1,
+    "junit_seconds": 16.862,
+    "earlier_phases": "2 host-coordinated force-stops; not counted as JUnit pass"
+  },
+  "artifacts": {
+    "player": {
+      "package": "io.drivegrowth.verify.prototype.firstcarplay",
+      "sha256": "e9fecd7fcd0ea2737ca8bdcedc007e793ad17976c8b7e5c06368cac0742d627e",
+      "source_commit": "6070445c154455c2b3f8c9e777ac2f5c04cb014b",
+      "signer_certificate_sha256": "3398b6f1e8a85d4950d221b75ec046770046d8bc2c614ef7af3ebc1bbef856da"
+    },
+    "instrumented_app": {
+      "package": "io.drivegrowth.verify.prototype.firstcarrecheck",
+      "sha256": "0bd6bdf125d0c99496293bf1f47307265219d6ffb84440c5959a79b99fa0a25d",
+      "source_commit": "6070445c154455c2b3f8c9e777ac2f5c04cb014b"
+    },
+    "instrumentation": {
+      "package": "io.drivegrowth.verify.prototype.firstcarrecheck.test",
+      "sha256": "f53b7f811fd8ed6eb6c34750b8861fdbbf4e8e6e0750bc51466398788f973c58",
+      "source_commit": "6070445c154455c2b3f8c9e777ac2f5c04cb014b"
+    },
+    "vehicle": {
+      "package": "io.drivegrowth.app",
+      "sha256": "aef2f4c62fc79390f28362dfc6599facafa6fcf89a90017b9a440574b3b097f3",
+      "source_commit": "709e08dcb9e8be0f98c3ccfba2ba7b33b51f12f0",
+      "signer_certificate_sha256": "82de3d6731f445c10f27c9e3c9b8bc1d7a1e1dd9a22b45a5140eacaded647eb5"
+    }
+  },
+  "local_checks": {
+    "unit_tests": 21,
+    "unit_failures": 0,
+    "core_tests_executed": false,
+    "debug_and_release_build": "PASS",
+    "instrumentation_build": "PASS",
+    "lint_errors": 0,
+    "lint_warnings": 158
+  },
+  "signing": "Existing Android development certificates; not final market signing"
+}

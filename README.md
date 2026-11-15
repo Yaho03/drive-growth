@@ -8,9 +8,9 @@
 
 앱 표시 이름은 **르르르 렌터카**입니다. 위 화면은 #301의 Pleos 에뮬레이터 모의 프로필에서 촬영했습니다. 크림색 HOME HUD와 남색 기능 창은 당시 화면입니다. [#301 앱 화면과 설치 해시](docs/evidence/pdf-polish-poster-20261115/README.md) · [전체 검증 기록](docs/06_VERIFICATION.md)
 
-11월 15일 후속 기준은 **#300의 화면 흐름에 B 남색 픽셀 표현을 적용하고, 글자와 버튼을 더 읽고 누르기 쉽게 조정하는 것**입니다. 최종 APK의 모의 목적지, 수익 탁송 수락, 구매 확정과 출발 화면을 확인했습니다. [실제 화면과 설치 해시](docs/evidence/navy-ui-delivery-20261115/README.md) · [화면 명세](docs/09_UI_UX_SPEC.md#300-배치와-전체-b-남색-픽셀-ui--2026-11-15) · [#309 통합 후 꾸미기 검증](docs/06_VERIFICATION.md#309-통합-후-main-꾸미기-계측--2026-11-15) · [#310 탁송 견적·선물·뽑기 복원 재검증](docs/06_VERIFICATION.md#310-최신-main-통합과-재검증--2026-11-15)
+11월 15일 후속 기준은 **#300의 화면 흐름에 B 남색 픽셀 표현을 적용하고, 글자와 버튼을 더 읽고 누르기 쉽게 조정하는 것**입니다. 해당 검증 APK에서 모의 목적지, 수익 탁송 수락, 구매 확정과 출발 화면을 확인했습니다. [실제 화면과 설치 해시](docs/evidence/navy-ui-delivery-20261115/README.md) · [화면 명세](docs/09_UI_UX_SPEC.md#300-배치와-전체-b-남색-픽셀-ui--2026-11-15) · [#309 통합 후 꾸미기 검증](docs/06_VERIFICATION.md#309-통합-후-main-꾸미기-계측--2026-11-15) · [#310 탁송 견적·선물·뽑기 복원 재검증](docs/06_VERIFICATION.md#310-최신-main-통합과-재검증--2026-11-15)
 
-아래 모의 시연 다운로드는 기존 `ba38def` 빌드입니다. 차 없이 체험하려면 이 APK를 설치해 **드라이브 키우기 · 모의 시연**을 여세요. 첫 차량을 선택한 뒤 **탁송 → 시연 목적지 확인 → 수익 탁송 선택 확정**을 진행합니다. 선택이 저장되면 **처리 결과 확인하고 새로 조회**를 누릅니다. **시연 · 모의 입력**에서 **모의주행 시작**을 누르고 모의 주차가 끝나면 탁송 결과와 미확인 정산을 확인하세요. 같은 앱을 다시 열어 저장된 결과를 볼 수 있습니다. [설치·재실행 순서](docs/05_DEVELOPMENT_SETUP.md#별도-모의-시연-debug-apk)
+실차 없이 새 저장으로 게임을 체험할 때는 아래 **첫 차량 테스트 APK**를 사용합니다. 기존 표준 모의 시연 Debug와 같은 게임 흐름을 별도 저장에서 실행합니다. 첫 차량 선택, 탁송 수락, 모의주행과 저장 결과 확인 순서는 [모의 시연 절차](docs/05_DEVELOPMENT_SETUP.md#별도-모의-시연-debug-apk)를 따릅니다.
 
 2026-11-13 빌드에서는 지도·패널과 당시 다섯 메뉴의 배치·입력 장치 시험을 통과했습니다. [화면과 기능 연결](docs/09_UI_UX_SPEC.md#새-가게-지도와-기능-연결--2026-11-13) · [좁은 창·세로 창 수정과 실제 화면](docs/06_VERIFICATION.md#최종-모의-apk의-좁은-가로세로-지도-패널--2026-11-13)
 
@@ -34,16 +34,18 @@
 - 공식 개발 조건은 **Android API 28 이상, Gradle 8.0 이상, Java 또는 Kotlin**입니다. 프로젝트 적용값은 **KGP 2.2.21, AGP 8.10.1, Gradle 8.11.1, JDK 17**입니다. Pleos 에뮬레이터 시험에는 2.1.0/API 34 ARM64를 사용했습니다. [공식 개발 안내](https://appdevchallenge.auto-hmg.io/guide/development) · [프로젝트 환경](docs/05_DEVELOPMENT_SETUP.md)
 - 운영사무국은 공개 SDK 문서 범위에서 개발하고 문서에서 지원하지 않는 기능은 기획서의 향후 계획에 쓰도록 안내했습니다. SDK별 공개·제공·실행 근거와 App Market 심사는 구분합니다. [운영사무국 회신 기록](docs/contest/03_VEHICLE_API.md#45-navihelper-기술-문의-회신--2026-11-11-사용자-제공)
 
-## 설치용 APK 다운로드
+## 실행할 앱과 APK
 
-| 종류 | 받는 곳과 실행 |
-|---|---|
-| 배포된 모의 시연 Debug `ba38def` | [APK 다운로드](https://github.com/Yaho03/drive-growth/releases/download/demo-20261113-ba38def/drive-growth-ba38def-debug.apk) · [Release와 해시](https://github.com/Yaho03/drive-growth/releases/tag/demo-20261113-ba38def). 저장소 접근 권한이 필요합니다. 패키지 `io.drivegrowth.app.simulation`을 시험 기기에 설치해 **드라이브 키우기 · 모의 시연**을 엽니다. |
-| 현재 소스의 로컬 Debug | JDK 17과 Android SDK를 준비해 `./gradlew :app:assembleDebug`를 실행합니다. 산출물은 `app/build/outputs/apk/debug/app-debug.apk`입니다. |
-| 새 가게 UI 로컬 시험 APK | `3358574`의 좁은·세로 패널 수정본을 모의 APK로 실행했습니다. [창별 화면·설치 해시](docs/06_VERIFICATION.md#최종-모의-apk의-좁은-가로세로-지도-패널--2026-11-13). 이전 `af2118e`의 화면·스크롤 시험과 `e55baad`의 Main 시연은 당시 근거로 구분합니다. [시험별 소스·APK 해시](docs/06_VERIFICATION.md#새-가게-ui의-통합-확인-항목--2026-11-13) |
-| #287 로컬 검증 APK | 별도로 조립한 모의 Debug와 개발 서명 차량용 Release 구성을 시험했습니다. 차량용은 `io.drivegrowth.app`으로 Pleos 런처에서 실제 SDK 입력을 받습니다. [정확한 소스·해시·실행 조건](docs/06_VERIFICATION.md#차량용-첫-실행과-마을-주민-검증--2026-11-13) |
+| 앱 | 패키지·입력 | 빌드·다운로드 |
+|---|---|---|
+| 차량용 제품 **르르르 렌터카** | `io.drivegrowth.app` · Pleos 차량 SDK | [차량용 APK](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-vehicle-dev-709e08d.apk) · 기존 `709e08d` 개발 서명. [빌드·서명·설치](docs/05_DEVELOPMENT_SETUP.md#차량용-제품-release-apk) |
+| 현재 소스의 **르르르 렌터카 · 모의 시연** | `io.drivegrowth.app.simulation` · 게임의 모의 차량·내비 입력 | [표준 Debug 빌드·설치·재실행](docs/05_DEVELOPMENT_SETUP.md#별도-모의-시연-debug-apk). 제품 앱과 별도 저장 사용 |
+| 개발용 **르르르 렌터카 · 첫 차량 테스트** | `io.drivegrowth.verify.prototype.firstcarplay` · 첫 지급과 저장 복원을 확인하는 모의 입력 | [테스트 APK](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-first-vehicle-test-20261115.apk) · [별도 패키지 빌드·실행](docs/05_DEVELOPMENT_SETUP.md#첫-차량-확인용-개발-debug-apk) |
+| 2026-11-13에 배포한 모의 시연 Debug `ba38def` | `io.drivegrowth.app.simulation` · 당시 표시 이름 **드라이브 키우기 · 모의 시연** | [이전 APK](https://github.com/Yaho03/drive-growth/releases/download/demo-20261113-ba38def/drive-growth-ba38def-debug.apk) · [해당 릴리스와 해시](https://github.com/Yaho03/drive-growth/releases/tag/demo-20261113-ba38def). 저장소 접근 권한 필요 |
 
-[APK 구분·설치·모의 플레이 전체 절차](docs/05_DEVELOPMENT_SETUP.md#별도-모의-시연-debug-apk). 제출용 서명과 실제 제출할 소스·APK의 조합은 [#29](https://github.com/Yaho03/drive-growth/issues/29)에서 확인합니다.
+[11월 15일 APK 릴리스와 SHA-256](https://github.com/Yaho03/drive-growth/releases/tag/first-vehicle-test-20261115) · [첫 차량 단일 지급·새 프로세스 복원 근거](docs/evidence/first-vehicle-isolation-20261115/README.md). 두 APK는 서로 다른 패키지이며 기존 저장을 공유하지 않습니다. 개발 서명 APK를 최종 제출용 서명으로 표시하지 않습니다. 저장소가 비공개인 동안 다운로드에도 접근 권한이 필요합니다.
+
+현재 소스와 이전 APK의 화면·실행 근거는 각 [검증 기록](docs/06_VERIFICATION.md)을 따릅니다. 기존 앱의 데이터를 보존하며 설치할 때는 [패키지·서명·Android 사용자 확인 절차](docs/05_DEVELOPMENT_SETUP.md#설치-대상과-저장-보존)를 확인하세요. 제출할 소스·서명 APK 조합은 [#29](https://github.com/Yaho03/drive-growth/issues/29)에서 추적합니다.
 
 ## 검증과 한계
 
