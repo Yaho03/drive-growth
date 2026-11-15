@@ -11,15 +11,12 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import io.drivegrowth.core.contract.Rarity
+import io.drivegrowth.app.ui.presentation.PrototypeSound.*
 import io.drivegrowth.app.ui.rest.RestStopMotionView
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.io.IOException
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.floor
-import kotlin.math.pow
-import kotlin.math.sin
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** 게임 화면의 소리만 관리한다. 공개 메서드는 호스트의 UI 스레드에서 호출한다. */
 internal class PrototypeAudio(context: Context) : AutoCloseable {
@@ -28,7 +25,7 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
     }
 
     enum class Cue {
-        CLICK, START, FIRST_GRANT, GACHA, SETTLEMENT, EXPAND,
+        CLICK, START, GACHA, SETTLEMENT, EXPAND,
         DELIVERY_DEPARTURE, DELIVERY_INCOME_ARRIVAL, DELIVERY_VEHICLE_ARRIVAL, DELIVERY_HELD,
     }
 
@@ -56,6 +53,7 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
     private var musicScene: Scene? = null
     private var musicRevision: Long? = null
     private var effect: AudioTrack? = null
+    private var effectOwner: AtomicBoolean? = null
     private var releaseEffect: Runnable? = null
     @Volatile private var restSoundPart: RestStopMotionView.Part? = null
     private var restSound: AudioTrack? = null
@@ -95,9 +93,28 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
         }
     }
 
-    fun play(cue: Cue) = queueEffect { pcm(notes(cue)) }
+    fun play(cue: Cue) = queueEffect(onlyWhenIdle = cue == Cue.CLICK) {
+        PrototypeSound.pcm(notes(cue), SAMPLE_RATE)
+    }
 
-    fun playGacha(rarity: Rarity, opening: Boolean) = queueEffect { pcm(gachaNotes(rarity, opening)) }
+    fun play(sound: PrototypeSound) = queueEffect(onlyWhenIdle = sound == CLICK) {
+        PrototypeSound.pcm(sound.notes(), SAMPLE_RATE)
+    }
+
+    fun playGacha(rarity: Rarity, opening: Boolean) = queueEffect { PrototypeSound.pcm(gachaNotes(rarity, opening), SAMPLE_RATE) }
+
+    fun playFirstGrant(): () -> Unit {
+        val cancelled = AtomicBoolean()
+        queueEffect(cancelled) { PrototypeSound.pcm(PrototypeSound.firstGrant(), SAMPLE_RATE) }
+        return {
+            if (cancelled.compareAndSet(false, true)) handler?.post {
+                if (effectOwner === cancelled) {
+                    stopEffect()
+                    abandonIdleFocus()
+                }
+            }
+        }
+    }
 
     /** 같은 화면에서 건너뛰어도 대기 중인 효과음과 재생 중인 효과음을 함께 정리한다. */
     fun stopEffectPlayback() {
@@ -108,15 +125,19 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
         }
     }
 
-    private fun queueEffect(samples: () -> ShortArray) {
+    private fun queueEffect(
+        cancelled: AtomicBoolean? = null, onlyWhenIdle: Boolean = false, samples: () -> ShortArray,
+    ) {
         val expected = revision
         val expectedFocus = focusLossRevision
         val expectedEffect = effectRevision
         fun canPlayEffect() = canPlay(expected) && focusLossRevision == expectedFocus &&
-            effectRevision == expectedEffect && !focusState.paused
+            effectRevision == expectedEffect && cancelled?.get() != true && !focusState.paused
         if (!canPlayEffect()) return
         audioHandler().post {
-            if (canPlayEffect()) playEffect(samples(), ::canPlayEffect)
+            if (canPlayEffect() && (!onlyWhenIdle || effect == null)) {
+                playEffect(samples(), cancelled, ::canPlayEffect)
+            }
         }
     }
 
@@ -220,7 +241,7 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
         }
     }
 
-    private fun playEffect(samples: ShortArray, canPlayEffect: () -> Boolean) {
+    private fun playEffect(samples: ShortArray, owner: AtomicBoolean?, canPlayEffect: () -> Boolean) {
         if (!canPlayEffect()) return
         stopEffect()
         if (!requestFocus(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)) {
@@ -234,6 +255,7 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
                     .setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
                 .setTransferMode(AudioTrack.MODE_STATIC).setBufferSizeInBytes(samples.size * 2).build()
             effect = track
+            effectOwner = owner
             val wrote = track.write(samples, 0, samples.size, AudioTrack.WRITE_BLOCKING)
             if (wrote != samples.size) Log.w("DriveGrowthAudio", "Effect PCM write: $wrote/${samples.size}")
             if (wrote != samples.size || !canPlayEffect()) {
@@ -396,6 +418,7 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
         releaseEffect = null
         val previous = effect
         effect = null
+        effectOwner = null
         runCatching { previous?.pause() }
         runCatching { previous?.flush() }
         runCatching { previous?.release() }
@@ -420,94 +443,34 @@ internal class PrototypeAudio(context: Context) : AutoCloseable {
         abandonFocus()
     }
 
-    private enum class Wave { SINE, SQUARE, TRIANGLE, SAWTOOTH }
-
-    private data class Note(
-        val hertz: Int,
-        val startMs: Int,
-        val durationMs: Int,
-        val volume: Double,
-        val wave: Wave = Wave.SQUARE,
-        val slide: Int = 0,
-    )
-
-    private fun notes(cue: Cue) = when (cue) {
-        Cue.CLICK -> listOf(Note(880, 0, 50, .06))
-        Cue.START -> listOf(Note(300, 0, 300, .1, Wave.SINE, slide = 900))
-        Cue.FIRST_GRANT -> listOf(
-            Note(1200, 0, 30, .07), Note(1200, 100, 30, .07), Note(1200, 200, 30, .07),
-            Note(1047, 450, 80, .1), Note(1568, 530, 160, .1),
-            Note(440, 780, 200, .1, Wave.SAWTOOTH), Note(554, 780, 200, .08, Wave.SAWTOOTH),
-        ) + fanfare(1250)
+    private fun notes(cue: Cue): List<PrototypeSound.Note> = when (cue) {
+        Cue.CLICK -> CLICK.notes()
+        Cue.START -> WHOOSH.notes()
         Cue.GACHA -> gachaNotes(Rarity.COMMON, opening = true)
-        Cue.SETTLEMENT -> listOf(Note(880, 0, 50, .06), Note(1047, 650, 80, .1), Note(1568, 730, 160, .1)) +
-            listOf(1760, 2200, 2640).mapIndexed { index, hz -> Note(hz, 1050 + index * 60, 140, .08, Wave.TRIANGLE) }
-        Cue.DELIVERY_DEPARTURE -> listOf(
-            Note(1400, 500, 280, .05, Wave.SAWTOOTH, slide = -1000),
-            Note(110, 1000, 300, .18, Wave.SAWTOOTH, slide = -70),
-            Note(150, 1120, 60, .12), Note(150, 1210, 60, .12), Note(150, 1300, 60, .12),
-            Note(400, 1750, 120, .12, slide = 500),
-            Note(120, 1900, 550, .12, Wave.SAWTOOTH, slide = 90),
-        )
-        Cue.DELIVERY_INCOME_ARRIVAL -> arrivalNotes() + listOf(
-            Note(110, 1100, 300, .18, Wave.SAWTOOTH, slide = -70),
-            Note(1047, 1700, 80, .1), Note(1568, 1780, 160, .1),
-        )
-        Cue.DELIVERY_VEHICLE_ARRIVAL -> arrivalNotes() + Note(400, 1400, 120, .12, slide = 500)
-        Cue.DELIVERY_HELD -> arrivalNotes() + Note(880, 1450, 50, .06)
-        Cue.EXPAND -> listOf(523, 659, 784, 1047, 1319).mapIndexed { i, hz -> Note(hz, i * 70, 160, .1) }
+        Cue.SETTLEMENT -> CLICK.notes() + COIN.notes(650) + SPARKLE.notes(1050)
+        Cue.DELIVERY_DEPARTURE -> BRAKE.notes(500) + SHUTTER.notes(1000) +
+            KNOCK.notes(1120) + POP.notes(1750) + DEPART.notes(1900)
+        Cue.DELIVERY_INCOME_ARRIVAL -> arrivalNotes() + SHUTTER.notes(1100) + COIN.notes(1700)
+        Cue.DELIVERY_VEHICLE_ARRIVAL -> arrivalNotes() + POP.notes(1400)
+        Cue.DELIVERY_HELD -> arrivalNotes() + CLICK.notes(1450)
+        Cue.EXPAND -> PrototypeSound.expansion()
     }
 
-    private fun gachaNotes(rarity: Rarity, opening: Boolean): List<Note> {
-        if (!opening) return listOf(Note(110, 420, 300, .18, Wave.SAWTOOTH, slide = -70))
+    private fun gachaNotes(rarity: Rarity, opening: Boolean): List<PrototypeSound.Note> {
+        if (!opening) return SHUTTER.notes(420)
         val start = (gachaRevealStart(rarity) * 1000f).toInt()
         val openAt = if (rarity == Rarity.LEGEND) 3300 else 2900
         val revealAt = openAt + 550 - start
         val promotions = when (rarity) {
-            Rarity.RARE -> listOf(Note(785, 1400 - start, 250, .12, Wave.TRIANGLE))
-            Rarity.LEGEND -> listOf(Note(785, 1150 - start, 250, .12, Wave.TRIANGLE),
-                Note(935, 1850 - start, 250, .12, Wave.TRIANGLE))
+            Rarity.RARE -> CHIME.notes(1400 - start, step = 1)
+            Rarity.LEGEND -> CHIME.notes(1150 - start, step = 1) + CHIME.notes(1850 - start, step = 2)
             else -> emptyList()
         }
-        val reveal = if (rarity == Rarity.LEGEND) fanfare(revealAt) else listOf(1760, 2200, 2640).mapIndexed { i, hz ->
-            Note(hz, revealAt + i * 60, 140, .08, Wave.TRIANGLE)
-        }
-        return promotions + Note(300, openAt - start, 300, .1, Wave.SINE, slide = 900) + reveal
+        val revealSound = if (rarity == Rarity.LEGEND) FANFARE else SPARKLE
+        return promotions + WHOOSH.notes(openAt - start) + revealSound.notes(revealAt)
     }
 
-    /** 원본 WebAudio의 파형, 타이밍, 주파수 변화를 로컬 PCM으로 합성한다. */
-    private fun pcm(notes: List<Note>): ShortArray {
-        val mix = FloatArray(notes.maxOf { it.startMs + it.durationMs } * SAMPLE_RATE / 1_000)
-        notes.forEach { note ->
-            val start = note.startMs * SAMPLE_RATE / 1_000
-            val length = note.durationMs * SAMPLE_RATE / 1_000
-            repeat(length) { sample ->
-                val t = sample.toDouble() / SAMPLE_RATE
-                val progress = sample.toDouble() / length
-                val cycles = (note.hertz + note.slide * progress / 2) * t
-                val fraction = cycles - floor(cycles)
-                val signal = when (note.wave) {
-                    Wave.SINE -> sin(2 * PI * fraction)
-                    Wave.SQUARE -> if (fraction < .5) 1.0 else -1.0
-                    Wave.TRIANGLE -> 1 - 4 * abs(fraction - .5)
-                    Wave.SAWTOOTH -> 2 * fraction - 1
-                }
-                val attack = (sample / 44.0).coerceAtMost(1.0)
-                val gain = note.volume * (.001 / note.volume).pow(progress)
-                mix[start + sample] += (signal * attack * gain).toFloat()
-            }
-        }
-        return ShortArray(mix.size) { i -> (mix[i].coerceIn(-1f, 1f) * Short.MAX_VALUE).toInt().toShort() }
-    }
-
-    private fun arrivalNotes() = listOf(
-        Note(1400, 300, 280, .05, Wave.SAWTOOTH, slide = -1000),
-        Note(300, 660, 300, .1, Wave.SINE, slide = 900),
-    )
-
-    private fun fanfare(start: Int) = listOf(523, 659, 784, 1047).mapIndexed { i, hz ->
-        Note(hz, start + i * 120, 320, .1)
-    }
+    private fun arrivalNotes() = BRAKE.notes(300) + WHOOSH.notes(660)
 
     private companion object {
         const val SAMPLE_RATE = 22_050

@@ -217,13 +217,13 @@ internal class DeliveryMotionView(
                 elapsed += frameMillis
             }
             lastFrame = now
-            if (current != null && !started) {
-                started = true
-                onStarted(current.key, current.kind.cue)
-            }
         } else {
             lastFrame = null
             if (!motionEnabled && current != null) elapsed = duration
+        }
+        if (visible && current != null && !started && (running || !motionEnabled)) {
+            started = true
+            onStarted(current.key, current.kind.cue)
         }
         val stageWidth = if (road == null) STAGE_WIDTH else 1304f
         val stageHeight = if (road == null) STAGE_HEIGHT else 736f

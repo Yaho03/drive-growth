@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@latest/dist/galmuri.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap">
+<script>window.OM_SCENES = '[{"name":"Glance","dur":4,"desc":"1초 눈 깜빡, 2.2초부터 귀가 바람에 살짝 흔들림"},{"name":"Ornament","dur":4,"desc":"5초 눈 깜빡, 6.2초부터 대시보드 장식이 스프링 위에서 흔들림"},{"name":"Quiet","dur":4,"desc":"9초 눈 깜빡, 나머지는 차체 흔들림과 반사만"}]';</script>
+<script>window.OM_PLAYBACK = '{"mode":"loop"}';</script>
+<style>html,body{margin:0;height:100%;background:#0d0f14;overflow:hidden} a{color:#9fb4c0} a:hover{color:#c6d4db}</style>
+</helmet>
+<div style="position:fixed;inset:0;background:#0d0f14">
+  <x-import component-from-global-scope="DrivingPiece" from="./animations-v3.jsx ./driving-scene.js ./driving-piece.jsx" time-of-day="{{ timeOfDay }}" driver="{{ driver }}" layout="{{ layout }}" motion="{{ motion }}" caption="{{ caption }}" hint-size="100%,100%"></x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;timeOfDay&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;day&quot;,&quot;night&quot;],&quot;default&quot;:&quot;day&quot;,&quot;tsType&quot;:&quot;'day'|'night'&quot;,&quot;section&quot;:&quot;장면&quot;},&quot;driver&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;rrr&quot;,&quot;mechanic&quot;],&quot;default&quot;:&quot;rrr&quot;,&quot;tsType&quot;:&quot;'rrr'|'mechanic'&quot;,&quot;section&quot;:&quot;장면&quot;},&quot;layout&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;wide&quot;,&quot;narrow&quot;],&quot;default&quot;:&quot;wide&quot;,&quot;tsType&quot;:&quot;'wide'|'narrow'&quot;,&quot;section&quot;:&quot;장면&quot;},&quot;motion&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;full&quot;,&quot;blinkOnly&quot;,&quot;still&quot;],&quot;default&quot;:&quot;full&quot;,&quot;tsType&quot;:&quot;'full'|'blinkOnly'|'still'&quot;,&quot;section&quot;:&quot;움직임&quot;},&quot;caption&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;운전 중에는 화면을 쉬어요&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;글자&quot;},&quot;motionEditor&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;움직임&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    return {
+      timeOfDay: p.timeOfDay ?? 'day',
+      driver: p.driver ?? 'rrr',
+      layout: p.layout ?? 'wide',
+      motion: p.motion ?? 'full',
+      caption: p.caption ?? '운전 중에는 화면을 쉬어요',
+    };
+  }
+}
+</script>
+</body>
+</html>

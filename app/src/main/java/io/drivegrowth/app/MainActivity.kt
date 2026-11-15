@@ -1,5 +1,6 @@
 package io.drivegrowth.app
 
+import android.animation.ValueAnimator
 import android.app.Activity
 import io.drivegrowth.app.ui.rest.RestStopMotionView
 import android.content.Intent
@@ -10,8 +11,14 @@ import android.widget.ImageView
 import android.view.Gravity
 import io.drivegrowth.app.ui.presentation.PrototypeTitleView
 import io.drivegrowth.app.ui.presentation.PrototypeAudio
+import io.drivegrowth.app.ui.presentation.PrototypeButtonSoundHost
+import io.drivegrowth.app.ui.presentation.PrototypeSound
+import io.drivegrowth.app.host.garage.GarageReceipt
+import io.drivegrowth.core.contract.SettlementId
 import io.drivegrowth.app.ui.presentation.RewardCelebrationKind
 import io.drivegrowth.app.ui.delivery.*
+import io.drivegrowth.app.ui.driving.DrivingRestrictionEvidence
+import io.drivegrowth.app.ui.driving.DrivingSceneView
 import io.drivegrowth.app.host.delivery.DeliveryHostReceipt
 import io.drivegrowth.core.delivery.DeliveryOutcome
 import io.drivegrowth.core.delivery.HoldOutcome
@@ -89,9 +96,10 @@ import io.drivegrowth.core.contract.Revision
 import io.drivegrowth.core.contract.VehicleInteraction
 import io.drivegrowth.core.progression.VehicleAction
 
-open class MainActivity : Activity() {
+open class MainActivity : Activity(), PrototypeButtonSoundHost {
     private val handler = Handler(Looper.getMainLooper())
     private val interaction = ForegroundInteraction()
+    private val restrictionEvidence = DrivingRestrictionEvidence()
     private var input: VehicleInput? = null
     private var drivingStatus: String? = null
     private var rentalFingerprint: Any? = null
@@ -108,8 +116,10 @@ open class MainActivity : Activity() {
     private lateinit var facilityControls: io.drivegrowth.app.ui.shop.FacilityControlsView
     private var pendingPage: HostPage? = null
     private var progressionSaved = false
-    private var restrictedScreen: ScrollView? = null
+    private var restrictedScreen: FrameLayout? = null
     private var restrictionNotice: TextView? = null
+    private var restrictionTitle: TextView? = null
+    private var drivingScene: DrivingSceneView? = null
     private var restrictionCard: View? = null
     private var restrictionRetry: View? = null
     private var pendingRouteGeneration = 0L
@@ -139,6 +149,7 @@ open class MainActivity : Activity() {
     private var navigationBar: View? = null
     private var openingGiftCard: View? = null
     private var openingGiftOwner: GameIdentity? = null
+    private var soundedOpeningGift: SettlementId? = null
     private var mapModalOpen = false
     private var homeSettings: FrameLayout? = null
     private var homeSoundButton: Button? = null
@@ -171,6 +182,7 @@ open class MainActivity : Activity() {
     private lateinit var titleView: PrototypeTitleView
     private var titleSoundButton: Button? = null
     private lateinit var presentationAudio: PrototypeAudio
+    private var cancelFirstGrantPlayback: (() -> Unit)? = null
     private lateinit var pageHeading: LinearLayout
     private lateinit var pageTitle: TextView
     private lateinit var pageRefresh: Button
@@ -275,7 +287,7 @@ open class MainActivity : Activity() {
             RankingMode.entries.firstOrNull { it.name == savedInstanceState?.getString("rankingMode") } ?: RankingMode.MY_RECORD,
             RankingMetric.entries.firstOrNull { it.name == savedInstanceState?.getString("rankingMetric") } ?: RankingMetric.SHOP_LEVEL,
             (savedInstanceState?.getInt("rankingY", 0) ?: 0).coerceAtLeast(0)))
-        onboarding = OnboardingView(this, ::onOnboardingEvent).also { it.showHeading = false }
+        onboarding = createOnboardingView()
         routedNewProfile = savedInstanceState?.getString("onboardingRoutedProfile")
         automaticIntroAllowed = if (savedInstanceState?.containsKey("onboardingAutoEntryAllowed") == true)
             savedInstanceState.getBoolean("onboardingAutoEntryAllowed") else savedInstanceState == null && lastNonConfigurationInstance == null
@@ -356,6 +368,13 @@ open class MainActivity : Activity() {
             }
             if (state is GarageCommandState.Review || state is GarageCommandState.Running || state is GarageCommandState.Confirmed)
                 managementVisible = true
+            if (state is GarageCommandState.Confirmed && prior is GarageCommandState.Running &&
+                prior.pending.command.requestId == state.pending.command.requestId &&
+                (navigation.page == HostPage.GARAGE || navigation.page == HostPage.HOME && homeVehicleManagement)
+            ) {
+                val money = (state.receipt as? GarageReceipt.Single)?.value?.transaction?.money
+                PrototypeSound.garageAction(state.pending.request.action, money)?.let(::playGameSound)
+            }
             if ((state is GarageCommandState.Confirmed || state is GarageCommandState.Rejected) && allowed()) queries.refresh()
             if (state is GarageCommandState.Rejected && homeVehicleManagement && allowed()) {
                 session.home.refresh()
@@ -487,7 +506,6 @@ open class MainActivity : Activity() {
         }
         session.onCollectionNewChanged = collection::refreshNewCollectionCells
         results.onCelebration = ::playCelebration
-        onboarding.onCelebration = ::playCelebration
         shop.onCelebration = ::playCelebration
         session.gacha.attach({ frame, enabled ->
             gacha.render(frame, enabled && gameControlsAllowed())
@@ -506,7 +524,8 @@ open class MainActivity : Activity() {
             onboardingState = state
             if (!onboarding.render(state, enabled && gameControlsAllowed())) {
                 // 기존 View의 Completed 역행 방지와 새 저장 조회 실패/프로필 세대를 분리한다.
-                onboarding = OnboardingView(this, ::onOnboardingEvent).also { it.showHeading = false }.apply { onCelebration = ::playCelebration }
+                stopFirstGrantAudio()
+                onboarding = createOnboardingView()
                 onboarding.restoreSelection(session.onboarding.uiState.selected)
                 onboarding.render(state, enabled && gameControlsAllowed())
             }
@@ -517,7 +536,8 @@ open class MainActivity : Activity() {
             render()
         }, {
             // Completed의 이동 입력 잠금은 새 View에서 초기화하고 저장 결과를 다시 공급한다.
-            onboarding = OnboardingView(this, ::onOnboardingEvent).also { it.showHeading = false }
+            stopFirstGrantAudio()
+            onboarding = createOnboardingView()
             onboarding.restoreSelection(session.onboarding.uiState.selected)
             onboarding.render(onboardingState, gameControlsAllowed())
             select(HostPage.HOME)
@@ -586,7 +606,19 @@ open class MainActivity : Activity() {
         if (active) return
         active = true
         rentalFingerprint = null
-        session.simulation?.changed = { if (active) { updateAccess(); if (::chrome.isInitialized) render() } }
+        session.simulation?.let { simulation ->
+            simulation.changed = {
+                if (active) {
+                    if (simulation.inputState == SimulationInputState.RETRYABLE_FAILURE ||
+                        simulation.inputState == SimulationInputState.UNAVAILABLE
+                    ) {
+                        restrictionEvidence.reset()
+                    }
+                    updateAccess()
+                    if (::chrome.isInitialized) render()
+                }
+            }
+        }
         if (session.simulation?.clock() is ContractResult.Failure) { updateAccess(); return }
         val rentalReceiver = session.driving.start { result ->
             val status = when (result) {
@@ -655,13 +687,19 @@ open class MainActivity : Activity() {
         }
         if (session.simulation != null) {
             session.attachSimulation { frame, done ->
-                if (active) { updateRentalMapPresentation(); session.driving.accept(frame, done); updateAccess() }
+                if (active) {
+                    restrictionEvidence.accept(frame.observation, SystemClock.elapsedRealtime())
+                    updateRentalMapPresentation()
+                    session.driving.accept(frame, done)
+                    updateAccess()
+                }
             }
         } else try {
             input = VehicleInput(this, { observation ->
                 val zone = session.drivingCalendar.take(observation)
                 if (active) {
                     interaction.accept(observation)
+                    restrictionEvidence.accept(observation)
                     updateRentalMapPresentation()
                     session.driving.accept(io.drivegrowth.app.host.driving.DrivingFrame(observation, zone))
                     updateAccess()
@@ -677,6 +715,7 @@ open class MainActivity : Activity() {
         closeRestStopPreview(updateAudio = false)
         dismissOpeningGift()
         titleView.setPresentationAllowed(false)
+        stopFirstGrantAudio()
         presentationAudio.setPresentationAllowed(false)
         stopObserving()
         super.onPause()
@@ -704,6 +743,7 @@ open class MainActivity : Activity() {
         active = false
         handler.removeCallbacks(watchdog)
         interaction.reset()
+        restrictionEvidence.reset()
         updateAccess()
         input?.stop()
         input = null
@@ -802,6 +842,7 @@ open class MainActivity : Activity() {
         val message = when (missing?.reason) {
             MissingReason.PERMISSION_DENIED -> R.string.vehicle_restriction_permission
             MissingReason.UNSUPPORTED -> R.string.vehicle_restriction_unsupported
+            MissingReason.NO_DATA, MissingReason.STALE -> R.string.vehicle_restriction_signal
             else -> R.string.vehicle_restriction_park
         }
         return getString(message)
@@ -968,12 +1009,7 @@ open class MainActivity : Activity() {
 
     private fun updateAccess() {
         val enabled = allowed()
-        if (!enabled && session.simulation == null) {
-            body.findViewWithTag<TextView>("vehicle:blocked")?.let {
-                val message = vehicleRestrictionMessage()
-                if (it.text != message) it.text = message
-            }
-        }
+        if (!enabled && restrictedScreen?.parent === body) updateRestrictionPresentation()
         if (!enabled) simulationStartBoundary.cancel()
         val gameEnabled = enabled && !titlePending
         if (!gameEnabled && ::managementView.isInitialized) managementView.dismissMotion()
@@ -1126,7 +1162,7 @@ open class MainActivity : Activity() {
 
             val preferences = section(R.string.host_settings_preferences, ReferenceHudIcon.SETTINGS)
             homeSoundButton = action(preferences, soundSettingLabel(), "presentation:sound") {
-                presentationAudio.enabled = !presentationAudio.enabled
+                togglePresentationSound()
                 updatePresentation(allowed())
             }
             action(preferences, "시작 화면", "presentation:home-title") { closeHomeSettings(); showPresentationTitle(true) }
@@ -1287,15 +1323,7 @@ open class MainActivity : Activity() {
         }
         if (!enabled) {
             dismissOpeningGift()
-            val simulation = session.simulation
-            val message = when (simulation?.inputState) {
-                null -> vehicleRestrictionMessage()
-                SimulationInputState.PROCESSING -> "진행 상황을 처리하고 있어요. 잠시 기다려 주세요."
-                SimulationInputState.RETRYABLE_FAILURE -> "진행이 중단됐어요. 설정에서 다시 시도해 주세요."
-                SimulationInputState.UNAVAILABLE -> "진행 상황을 확인할 수 없어요. 기존 저장 기록은 그대로예요."
-                SimulationInputState.READY -> "지금은 조작할 수 없어요. 현재 상태를 확인해 주세요."
-            }
-            showRestriction(message)
+            showRestriction()
             return
         }
         if (titlePending) {
@@ -1399,7 +1427,48 @@ open class MainActivity : Activity() {
         updateOpeningGift()
     }
 
-    private fun showRestriction(message: String) {
+    private fun updateRestrictionPresentation() {
+        val now = SystemClock.elapsedRealtime()
+        val simulation = session.simulation
+        val simulationState = simulation?.inputState
+        val driving = active && restStartTicket == null && if (simulation == null) {
+            interaction.state(now) == Observation.Available(VehicleInteraction.RESTRICTED) &&
+                restrictionEvidence.confirmsMotion(InputSource.VEHICLE, now)
+        } else {
+            simulationState == SimulationInputState.PROCESSING && !simulation.controlsAllowed &&
+                restrictionEvidence.confirmsMotion(InputSource.SIMULATION, now)
+        }
+        val title = getString(if (driving) R.string.host_driving_pause_title else R.string.host_vehicle_pause_title)
+        val message = if (driving) getString(R.string.host_driving_pause_body) else when (simulationState) {
+            null -> vehicleRestrictionMessage()
+            SimulationInputState.PROCESSING -> "진행 상황을 처리하고 있어요. 잠시 기다려 주세요."
+            SimulationInputState.RETRYABLE_FAILURE -> "진행이 중단됐어요. 설정에서 다시 시도해 주세요."
+            SimulationInputState.UNAVAILABLE -> "진행 상황을 확인할 수 없어요. 기존 저장 기록은 그대로예요."
+            SimulationInputState.READY -> "지금은 조작할 수 없어요. 현재 상태를 확인해 주세요."
+        }
+        restrictionTitle?.let { if (it.text.toString() != title) it.text = title }
+        restrictionNotice?.let { if (it.text.toString() != message) it.text = message }
+        drivingScene?.apply {
+            if (driving) {
+                setSimulationLoop(simulation != null)
+                visibility = View.VISIBLE
+            } else {
+                visibility = View.GONE
+            }
+        }
+        restrictionCard?.let { card ->
+            val params = card.layoutParams as FrameLayout.LayoutParams
+            val gravity = if (driving) Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL else Gravity.CENTER
+            if (params.gravity != gravity) {
+                params.gravity = gravity
+                card.layoutParams = params
+                (card.parent as View).setBackgroundColor(if (driving) android.graphics.Color.TRANSPARENT else CleanUi.CARD_SOFT)
+            }
+        }
+        restrictionRetry?.visibility = if (!driving && simulation?.canRetry == true) View.VISIBLE else View.GONE
+    }
+
+    private fun showRestriction() {
         val simulation = session.simulation
         val view = restrictedScreen ?: run {
             val notice = featureStyle.text("", 18).apply {
@@ -1409,12 +1478,13 @@ open class MainActivity : Activity() {
             val sign = ReferenceHudStyle(this)
             val card = featureStyle.card().apply {
                 background = sign.signSurface()
-                addView(featureStyle.heading(getString(if (simulation == null) R.string.host_vehicle_pause_title
-                    else R.string.host_simulation_pause_title), if (simulation == null) ReferenceHudIcon.GARAGE else ReferenceHudIcon.TRUCK).apply {
+                val title = featureStyle.heading("", if (simulation == null) ReferenceHudIcon.GARAGE else ReferenceHudIcon.TRUCK).apply {
                     background = null
                     setPadding(0, 0, 0, 0)
                     isAccessibilityHeading = true
-                })
+                }
+                restrictionTitle = title
+                addView(title)
                 featureStyle.add(this, notice, gap = 6)
                 if (simulation != null) {
                     restrictionRetry = featureStyle.button("설정") {
@@ -1425,19 +1495,26 @@ open class MainActivity : Activity() {
             }
             restrictionNotice = notice
             restrictionCard = card
-            ScrollView(this).apply {
-                isFillViewport = true
-                addView(FrameLayout(this@MainActivity).apply {
-                    tag = "host:restricted-screen"
-                    setBackgroundColor(CleanUi.CARD_SOFT)
-                    addView(card, FrameLayout.LayoutParams(
-                        -1, -2, Gravity.CENTER,
-                    ).apply { setMargins(0, style.dp(12), 0, style.dp(12)) })
-                }, FrameLayout.LayoutParams(-1, -2))
+            val scene = DrivingSceneView(this).apply {
+                tag = "host:driving-scene"
+                visibility = View.GONE
+            }
+            drivingScene = scene
+            FrameLayout(this).apply {
+                addView(scene, FrameLayout.LayoutParams(-1, -1))
+                addView(ScrollView(this@MainActivity).apply {
+                    isFillViewport = true
+                    addView(FrameLayout(this@MainActivity).apply {
+                        tag = "host:restricted-screen"
+                        setBackgroundColor(CleanUi.CARD_SOFT)
+                        addView(card, FrameLayout.LayoutParams(
+                            -1, -2, Gravity.CENTER,
+                        ).apply { setMargins(0, style.dp(12), 0, style.dp(12)) })
+                    }, FrameLayout.LayoutParams(-1, -2))
+                }, FrameLayout.LayoutParams(-1, -1))
             }.also { restrictedScreen = it }
         }
-        restrictionNotice?.let { if (it.text.toString() != message) it.text = message }
-        restrictionRetry?.visibility = if (simulation?.canRetry == true) View.VISIBLE else View.GONE
+        updateRestrictionPresentation()
         resizeRestrictionCard(appRoot.width)
         showBody(view)
     }
@@ -1528,7 +1605,7 @@ open class MainActivity : Activity() {
             if (openingGiftOwner == identity) return
             dismissOpeningGift()
         }
-        if (session.openingGift.available(identity, true) == null) return
+        val gift = session.openingGift.available(identity, true) ?: return
         val overlay = io.drivegrowth.app.ui.onboarding.OpeningGiftOverlay(this)
         val card = io.drivegrowth.app.ui.onboarding.OpeningGiftView(this,
             onGacha = {
@@ -1548,6 +1625,10 @@ open class MainActivity : Activity() {
             leftMargin = style.dp(12)
             rightMargin = style.dp(12)
         })
+        if (soundedOpeningGift != gift.settlementId) {
+            soundedOpeningGift = gift.settlementId
+            playGameSound(PrototypeSound.SPARKLE)
+        }
     }
 
     private fun acknowledgeOpeningGift(): Boolean {
@@ -1566,6 +1647,9 @@ open class MainActivity : Activity() {
     }
 
     private fun updatePresentation(enabled: Boolean) {
+        if (!enabled || titlePending || !presentationFocused || navigation.page != HostPage.ONBOARDING) {
+            stopFirstGrantAudio()
+        }
         if (::shop.isInitialized && (!enabled || titlePending || navigation.page != HostPage.HOME))
             shop.dismissInstallation()
         updateRentalMapPresentation()
@@ -1700,7 +1784,7 @@ open class MainActivity : Activity() {
         val sign = ReferenceHudStyle(this)
         return style.button("소리 꺼짐") {
             if (titlePending && allowed() && presentationFocused) {
-                presentationAudio.enabled = !presentationAudio.enabled
+                togglePresentationSound()
                 updateTitleSound(true)
             }
         }.apply {
@@ -1713,13 +1797,29 @@ open class MainActivity : Activity() {
         }
     }
 
+    private fun togglePresentationSound() {
+        presentationAudio.enabled = !presentationAudio.enabled
+        if (presentationAudio.enabled && allowed() && presentationFocused) {
+            presentationAudio.play(PrototypeSound.POP)
+        }
+    }
+
+    override fun onGameButtonClick(button: View) {
+        if (button.tag == "presentation:sound" || button.tag == "presentation:title-sound") return
+        playGameSound(PrototypeSound.CLICK)
+    }
+
+    private fun playGameSound(sound: PrototypeSound) {
+        if (gameControlsAllowed() && presentationFocused) presentationAudio.play(sound)
+    }
+
     private fun soundSettingLabel() = if (presentationAudio.enabled) "게임 소리 끄기" else "게임 소리 켜기"
 
     private fun playCelebration(kind: RewardCelebrationKind) {
         if (!allowed() || titlePending || !presentationFocused) return
         presentationAudio.play(when (kind) {
             RewardCelebrationKind.GACHA -> PrototypeAudio.Cue.GACHA
-            RewardCelebrationKind.FIRST_GRANT -> PrototypeAudio.Cue.FIRST_GRANT
+            RewardCelebrationKind.FIRST_GRANT -> return
             RewardCelebrationKind.SETTLEMENT -> PrototypeAudio.Cue.SETTLEMENT
             RewardCelebrationKind.EXPANSION -> PrototypeAudio.Cue.EXPAND
         })
@@ -1727,6 +1827,10 @@ open class MainActivity : Activity() {
 
     private fun playDeliveryCue(cue: DeliveryPresentationCue) {
         if (!gameControlsAllowed() || !presentationFocused || navigation.page != HostPage.DELIVERY) return
+        if (!ValueAnimator.areAnimatorsEnabled()) {
+            presentationAudio.play(if (cue == DeliveryPresentationCue.DEPARTURE) PrototypeSound.DEPART else PrototypeSound.COIN)
+            return
+        }
         presentationAudio.play(when (cue) {
             DeliveryPresentationCue.DEPARTURE -> PrototypeAudio.Cue.DELIVERY_DEPARTURE
             DeliveryPresentationCue.INCOME_ARRIVAL -> PrototypeAudio.Cue.DELIVERY_INCOME_ARRIVAL
@@ -2214,6 +2318,21 @@ open class MainActivity : Activity() {
         }
     }
 
+    private fun createOnboardingView(): OnboardingView = OnboardingView(this, ::onOnboardingEvent).apply {
+        showHeading = false
+        playFirstGrantAudio = {
+            if (onboarding === this && navigation.page == HostPage.ONBOARDING &&
+                gameControlsAllowed() && presentationFocused
+            ) presentationAudio.playFirstGrant().also { cancelFirstGrantPlayback = it } else null
+        }
+    }
+
+    private fun stopFirstGrantAudio() {
+        val cancel = cancelFirstGrantPlayback
+        cancelFirstGrantPlayback = null
+        cancel?.invoke()
+    }
+
     private fun onOnboardingEvent(event: OnboardingEvent) {
         if (!gameControlsAllowed() || navigation.page != HostPage.ONBOARDING) { updateAccess(); return }
         session.onboarding.onEvent(event)
@@ -2270,6 +2389,7 @@ open class MainActivity : Activity() {
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
+        if (navigation.page == HostPage.ONBOARDING) stopFirstGrantAudio()
         session.rental.setMapPresentationEnabled(false)
         shop.dismissRentalMapMotion()
         if (closeRestStopPreview()) return

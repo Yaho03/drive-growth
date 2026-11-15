@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.garage
 
+import io.drivegrowth.app.ui.presentation.setGameButtonClick
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -76,7 +77,7 @@ internal class GarageStyle(
         isEnabled = enabled
         if (featureWindow) {
             map.styleButton(this, primary)
-            setOnClickListener { if (isEnabled) onClick() }
+            setGameButtonClick(action = onClick)
             return@apply
         }
         if (pixelPanel) {
@@ -90,7 +91,7 @@ internal class GarageStyle(
         }
         minHeight = dp(64); minimumHeight = dp(64)
         setPadding(dp(16), dp(12), dp(16), dp(12))
-        setOnClickListener { if (isEnabled) onClick() }
+        setGameButtonClick(action = onClick)
     }
     fun add(parent: LinearLayout, child: View, gap: Int = 12) {
         parent.addView(child, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(gap) })

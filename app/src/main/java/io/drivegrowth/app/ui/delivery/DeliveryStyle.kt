@@ -1,5 +1,6 @@
 package io.drivegrowth.app.ui.delivery
 
+import io.drivegrowth.app.ui.presentation.setGameButtonClick
 import android.content.Context
 import android.graphics.Typeface
 import android.view.Gravity
@@ -72,7 +73,7 @@ internal class DeliveryStyle(private val context: Context, private val scene: Bo
             setPadding(dp(14), dp(8), dp(14), dp(8))
             alpha = if (enabled) 1f else .55f
             isEnabled = enabled
-            setOnClickListener { if (isEnabled) onClick() }
+            setGameButtonClick(action = onClick)
         }
     }
 }

@@ -71,6 +71,9 @@ internal class RewardCelebrationView(context: Context) : View(context) {
         private set
     private var onRevealFinished: ((Boolean) -> Unit)? = null
     var onStarted: ((RewardCelebrationKind) -> Unit)? = null
+    var onFirstGrantFrame: ((Long?) -> Unit)? = null
+    var playFirstGrantAudio: (() -> (() -> Unit)?)? = null
+    private var cancelFirstGrantPlayback: (() -> Unit)? = null
     private val advanceShutter = object : Runnable {
         override fun run() {
             if (!waitingForReveal || !isAttachedToWindow || !hasWindowFocus()) return
@@ -110,7 +113,7 @@ internal class RewardCelebrationView(context: Context) : View(context) {
     fun render(
         key: String?, kind: RewardCelebrationKind, accent: Int = PixelStyle.gold, vehicle: Bitmap? = null,
     ) {
-        if (this.key != key || this.kind != kind) startedAt = null
+        if (this.key != key || this.kind != kind) cancelNonGachaFrame()
         this.key = key
         this.kind = kind
         this.accent = accent
@@ -216,7 +219,7 @@ internal class RewardCelebrationView(context: Context) : View(context) {
 
     override fun onDetachedFromWindow() {
         pauseShutter()
-        if (!rebuilding) { finishGacha(); startedAt = null }
+        if (!rebuilding) { finishGacha(); cancelNonGachaFrame() }
         super.onDetachedFromWindow()
     }
 
@@ -227,7 +230,7 @@ internal class RewardCelebrationView(context: Context) : View(context) {
             invalidate()
         } else if (!rebuilding) {
             finishGacha()
-            startedAt = null
+            cancelNonGachaFrame()
         }
     }
 
@@ -238,8 +241,22 @@ internal class RewardCelebrationView(context: Context) : View(context) {
             invalidate()
         } else if (!rebuilding) {
             if (waitingForReveal) pauseShutter() else finishGacha()
-            startedAt = null
+            cancelNonGachaFrame()
         }
+    }
+
+    fun stopFirstGrantAudio() {
+        val cancel = cancelFirstGrantPlayback
+        cancelFirstGrantPlayback = null
+        cancel?.invoke()
+    }
+
+    private fun cancelNonGachaFrame() {
+        stopFirstGrantAudio()
+        if (kind == RewardCelebrationKind.FIRST_GRANT && startedAt != null) {
+            onFirstGrantFrame?.invoke(null)
+        }
+        startedAt = null
     }
 
     private fun pauseShutter() {
@@ -255,7 +272,7 @@ internal class RewardCelebrationView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         val result = key ?: return
         if (!canShowEffect()) {
-            startedAt = null
+            cancelNonGachaFrame()
             return
         }
         if (onRevealFinished != null && !ValueAnimator.areAnimatorsEnabled()) {
@@ -270,8 +287,15 @@ internal class RewardCelebrationView(context: Context) : View(context) {
         val now = SystemClock.uptimeMillis()
         val begin = startedAt ?: run {
             if (!displayedKeys.add(result)) return
-            onStarted?.invoke(kind)
-            if (!ValueAnimator.areAnimatorsEnabled()) return
+            val animate = ValueAnimator.areAnimatorsEnabled()
+            if (kind != RewardCelebrationKind.FIRST_GRANT || animate) onStarted?.invoke(kind)
+            if (!animate) {
+                if (kind == RewardCelebrationKind.FIRST_GRANT) onFirstGrantFrame?.invoke(null)
+                return
+            }
+            if (kind == RewardCelebrationKind.FIRST_GRANT) {
+                cancelFirstGrantPlayback = playFirstGrantAudio?.invoke()
+            }
             now.also { startedAt = it }
         }
         val seconds = (now - begin) / 1000f
@@ -292,13 +316,18 @@ internal class RewardCelebrationView(context: Context) : View(context) {
         val motionEnabled = ValueAnimator.areAnimatorsEnabled()
         if (progress >= 1f || !motionEnabled) {
             finishGacha(stopAudio = !motionEnabled, completed = motionEnabled && progress >= 1f)
-            startedAt = null
+            if (!motionEnabled) cancelNonGachaFrame()
+            else {
+                if (kind == RewardCelebrationKind.FIRST_GRANT) onFirstGrantFrame?.invoke(null)
+                startedAt = null
+            }
             return
         }
         val span = minOf(width, height).toFloat()
         when (kind) {
             RewardCelebrationKind.GACHA -> drawGachaFrame(canvas, progress)
             RewardCelebrationKind.FIRST_GRANT -> {
+                onFirstGrantFrame?.invoke(now - begin)
                 val sprite = vehicle
                 if (sprite != null) {
                     drawStage(canvas, width.toFloat(), height.toFloat(), accent)
@@ -307,9 +336,14 @@ internal class RewardCelebrationView(context: Context) : View(context) {
                     val y = height * (.52f - hop)
                     drawVehicle(canvas, sprite, width * .5f, y, minOf(width * .65f / sprite.width, height * .80f / sprite.height))
                 }
-                if (seconds >= 1.25f) drawBurst(canvas, width * .5f, height * .58f,
-                    phase(seconds, 1.25f, 1.75f), span * 1.25f)
                 drawFirstGrantCoins(canvas, seconds, span)
+                drawFirstGrantHorn(canvas, seconds, span)
+                if (seconds >= 1.25f) {
+                    canvas.save()
+                    canvas.scale(width / 1360f, height / 948f)
+                    referenceConfetti(canvas, seconds - 1.25f, 26, 33)
+                    canvas.restore()
+                }
             }
             RewardCelebrationKind.SETTLEMENT -> drawSettlementCoins(canvas, seconds, span)
             RewardCelebrationKind.EXPANSION -> if (seconds >= 1.75f) {
@@ -920,14 +954,38 @@ internal class RewardCelebrationView(context: Context) : View(context) {
         canvas.drawPath(rays, paint)
     }
 
+    private fun drawFirstGrantHorn(canvas: Canvas, seconds: Float, span: Float) {
+        for (index in 0..2) {
+            val start = .60f + index * .08f
+            val opacity = sin(PI * phase(seconds, start, start + .25f)).toFloat()
+            if (opacity <= 0.001f) continue
+            val x = width * (.73f + index * .085f)
+            val y = height * (.43f + index * .09f)
+            referenceStar(canvas, x, y, span * .035f, 0xffffe38a.toInt(), opacity)
+        }
+        val scale = pop(phase(seconds, .78f, 1f)) * (1f - phase(seconds, 1.2f, 1.3f))
+        if (scale <= .001f) return
+        val x = width * .69f
+        val y = height * .3f
+        canvas.save()
+        canvas.scale(scale, scale, x, y)
+        ink(0xfff4f5fa.toInt(), 255)
+        canvas.drawRoundRect(x, y - span * .16f, x + span * .27f, y, span * .035f, span * .035f, paint)
+        ink(0xff0b0e1f.toInt(), 255)
+        paint.typeface = sceneText.plexMedium
+        paint.textSize = span * .105f
+        canvas.drawText("빵!", x + span * .046f, y - span * .046f, paint)
+        canvas.restore()
+    }
+
     private fun drawFirstGrantCoins(canvas: Canvas, seconds: Float, span: Float) {
         val horizontalScale = width / 260f
         val verticalScale = height / 360f
         for (index in 0 until 10) {
             val t = seconds - (.45f + index * .05f)
             if (t !in 0f..0.7f) continue
-            val vx = (fraction(index, 37) - .5f) * 380f
-            val vy = -(560f + fraction(index, 53) * 240f)
+            val vx = (referenceRandom(index, 80) - .5f) * 380f
+            val vy = -(560f + referenceRandom(index, 81) * 240f)
             val x = width * .5f + vx * t * horizontalScale
             val y = height * .72f + (vy * t + 850f * t * t) * verticalScale
             drawCoin(canvas, x, y, span * .068f, t * 14f + index,
