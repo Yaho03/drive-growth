@@ -15,7 +15,10 @@ android {
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     buildTypes {
-        debug { applicationIdSuffix = ".simulation" }
+        debug {
+            applicationIdSuffix = ".simulation"
+            manifestPlaceholders["simulationAppLabel"] = "르르르 렌터카 · 모의 시연"
+        }
         release { isMinifyEnabled = false }
     }
     lint { abortOnError = true }

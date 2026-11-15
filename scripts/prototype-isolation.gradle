@@ -4,6 +4,7 @@ gradle.beforeProject { project ->
     if (project.path == ':app') {
         def packageId = project.providers.gradleProperty('prototypeVerificationPackage')
             .getOrElse('io.drivegrowth.verify.prototype')
+        def displayName = project.providers.gradleProperty('prototypeVerificationLabel').orNull
         if (!(packageId ==~ /io\.drivegrowth\.verify\.prototype(\.[a-z][a-z0-9]*)?/)) {
             throw new GradleException('격리 계측 패키지 접두사를 확인하세요.')
         }
@@ -12,7 +13,9 @@ gradle.beforeProject { project ->
                 android.defaultConfig.applicationId = packageId
                 android.defaultConfig.testApplicationId = packageId + ".test"
                 android.sourceSets.getByName('androidTest').java.srcDir('src/prototypeVerification/java')
-                android.buildTypes.getByName('debug').applicationIdSuffix = null
+                def debug = android.buildTypes.getByName('debug')
+                debug.applicationIdSuffix = null
+                if (displayName != null) debug.manifestPlaceholders['simulationAppLabel'] = displayName
             }
         }
     }
