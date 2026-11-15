@@ -3,6 +3,7 @@ package io.drivegrowth.app.host.shop
 import io.drivegrowth.app.isMainPageShown
 import io.drivegrowth.app.mainNavigation
 import io.drivegrowth.app.openMainPage
+import io.drivegrowth.app.openMainSettings
 import io.drivegrowth.app.host.HostPage
 import android.app.Activity
 import android.content.Intent
@@ -63,8 +64,13 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
     }
     private fun openDecorations(a: MainActivity) {
         val alreadyOpen = onMain { a.window.decorView.findViewWithTag<View>("shop:map-decorations")?.isShown == true }
-        if (!alreadyOpen) click(a, "shop:map-facilities")
+        if (!alreadyOpen) openFacilities(a)
         click(a, "shop:map-decorations")
+    }
+
+    private fun openFacilities(a: MainActivity) {
+        await(a, "HOME 설정") { a.window.decorView.openMainSettings() != null }
+        click(a, "shop:map-facilities")
     }
 
     private fun preview(a: MainActivity, id: String) {
@@ -180,7 +186,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
             game.identity to ok(game.store.balance())
         }
         val first=activity
-        click(first, "shop:map-facilities")
+        openFacilities(first)
         await(first,"실제 Main의 SIMULATION 프로필 HOME") { first.window.decorView.findViewWithTag<Button>("decoration:activate")?.isEnabled==true }
         click(first,"decoration:activate")
         openDecorations(first)
