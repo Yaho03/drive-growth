@@ -44,11 +44,23 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
     private fun await(a: MainActivity, label: String, check: () -> Boolean) {
         val end=SystemClock.uptimeMillis()+30_000;var passed=false;var gate=false
         while(!passed && SystemClock.uptimeMillis()<end) {
-            instrumentation.runOnMainSync { gate=menu(a)?.let{it.isShown && it.isEnabled}==true;passed=check() }
+            instrumentation.runOnMainSync {
+                val view = a.window.decorView
+                gate = sequenceOf(menu(a), view.findViewWithTag<View>("host:settings-close"),
+                    view.findViewWithTag<View>("shop:map-sheet"), view.findViewWithTag<View>("shop:map-overlay"))
+                    .any { it?.isShown == true && it.isEnabled }
+                passed=check()
+            }
             if(!passed)SystemClock.sleep(50)
         }
-        if(!passed && !gate)throw IllegalStateException("ENVIRONMENT_GATE_TIMEOUT: $label; 실제 SDK 허용을 조작하지 않는다")
-        assertTrue("ASSERTION_STATE: $label",passed)
+        if (passed) return
+        val visibleTags = onMain {
+            tree(a.window.decorView).filter(View::isShown).mapNotNull { it.tag as? String }
+                .filter { it.startsWith("shop:") || it.startsWith("host:") || it.startsWith("decoration:") }
+                .distinct().take(40)
+        }
+        if(!gate)throw IllegalStateException("ENVIRONMENT_GATE_TIMEOUT: $label; visible=$visibleTags")
+        fail("ASSERTION_STATE: $label; visible=$visibleTags")
     }
     private fun click(a: MainActivity, tag: Any) {
         await(a,"활성 버튼 $tag") { a.window.decorView.findViewWithTag<Button>(tag)?.let{it.isShown && it.isEnabled}==true }
@@ -69,8 +81,14 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
     }
 
     private fun openFacilities(a: MainActivity) {
+        await(a, "확정 HOME 지도") {
+            a.window.decorView.isMainPageShown(HostPage.HOME) && currentShopShown(a)
+        }
         await(a, "HOME 설정") { a.window.decorView.openMainSettings() != null }
         click(a, "shop:map-facilities")
+        await(a, "시설 메뉴 진입") {
+            a.window.decorView.findViewWithTag<Button>("shop:map-decorations")?.let { it.isShown && it.isEnabled } == true
+        }
     }
 
     private fun preview(a: MainActivity, id: String) {
@@ -102,7 +120,11 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
         preview(a,id)
         assertEquals(before,read { game -> Triple(ok(game.store.balance()),ok(game.store.decorations.state(game.identity.profileId)),counts(game)) })
         instrumentation.runOnMainSync { a.onBackPressed() }
-        await(a,"Back은 미리보기만 닫음") { shop(a).uiState.selection==null && menu(a)?.isEnabled==true }
+        await(a, "Back으로 미리보기를 닫고 꾸미기 목록 유지") {
+            val view = a.window.decorView
+            shop(a).uiState.selection == null && view.findViewWithTag<View>("shop:map-overlay")?.isShown == true &&
+                view.findViewWithTag<Button>("shop:map-preview:decoration:$id")?.let { it.isShown && it.isEnabled } == true
+        }
         assertEquals(before,read { game -> Triple(ok(game.store.balance()),ok(game.store.decorations.state(game.identity.profileId)),counts(game)) })
         click(a,"shop:map-preview:decoration:$id")
         click(a,"shop:map-close")
