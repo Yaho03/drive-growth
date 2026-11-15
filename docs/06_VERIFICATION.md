@@ -3775,3 +3775,19 @@ Pleos Connect API 34 ARM64 에뮬레이터의 Android 사용자 10에서 격리 
 사용자용 `firstcarplay.apk`는 `io.drivegrowth.verify.prototype.firstcarplay`와 표시 이름 **르르르 렌터카 · 첫 차량 테스트**, 런처 `io.drivegrowth.app.simulation.UnifiedSimulationActivity`를 가진다. 로컬 APK와 설치 APK의 SHA-256은 `e9fecd7fcd0ea2737ca8bdcedc007e793ad17976c8b7e5c06368cac0742d627e`로 일치했다. 사용자용 APK의 DEX 23개와 자산 84개는 초기·보강 장치 시험의 각 앱 APK와 일치했다. Android 패키지 관리자가 런처 인텐트를 해당 Activity로 해석했다. 첫 지급·복원 단언은 위의 격리 계측 패키지에서 실행했으며, 사용자용 APK의 AppGrid 아이콘 실행은 별도로 확인할 항목이다.
 
 초기 실행과 보강 실행의 시험 전후 제품 `io.drivegrowth.app`의 설치 APK SHA-256 `aef2f4c62fc79390f28362dfc6599facafa6fcf89a90017b9a440574b3b097f3`과 사용자 10의 설치 상태·CE 데이터 디렉터리 inode `491836`가 일치했다. 표준 모의 앱 `io.drivegrowth.app.simulation`은 해당 사용자에서 전후 미설치였다. 이 비교는 제품 DB 바이트를 확인한 것이 아니다. 실제 SDK 차량 입력·실차에서의 첫 지급은 별도 검증 범위다. 복원 단언 직후 PNG는 빈 패널이므로 화면 표시의 증거로 사용하지 않는다. JUnit의 텍스트·원결과 복원과 캡처의 그리기 완료를 구분한다.
+
+## 첫 차량 HTML과 #312 주행 제한 장면 통합 — 2026-11-15
+
+로컬 후보는 main `2fdf42e25edc5dcc105a5d1d4e2c9e22d91cd857` 위의 첫 차량·효과음·주행 제한 변경이다. 앱 빌드 시 변경 파일 매니페스트 SHA-256은 `815e6ed07c46a341ce3d9e7156086cc612fd60ecd55e82dceb0e467402388a9f`다. `assembleDebug`, `assembleDebugAndroidTest`, 앱 단위 **939건**, 저장소 검사와 공백 검사가 통과했다. Debug Lint는 오류 0건, 경고 165건이었다. 앱 SHA-256 `8987385f8413955783d3609d57a2b3fc32b293357c7a9aa9a6ccbddf6a4e41a2`는 장치에서 회수한 표준 Debug 설치본과 일치했다. 표준 계측 빌드 SHA-256은 `f83050ea1b23d2e8630cd3063aabab7dcbfc763c68dc5cada9edeb48057a7bee`다. 아래 장치 계측에는 별도 격리 패키지를 사용했다.
+
+[#312의 나무·가로등 보완 댓글](https://github.com/Yaho03/drive-growth/pull/312#issuecomment-6891535766)이 가리키는 `f94310a1f1247d0442496453dbd66e070ca5d5cb`의 `driving-scene.js`와 WebP 네 개가 로컬 원본과 바이트 단위로 일치했다. 앱 APK의 WebP도 원본과 일치했고, 낮·밤 반복 그림은 각각 240프레임·12초였다. 이동이 확인된 모의주행에서 반복 그림을 사용하고 차량 SDK에서 이동이 확인되면 정지 그림을 사용한다. 차량용 정지 그림의 개별 배포 적합성은 확인 대기다. [Pleos 주행 안전 설계](https://document.pleos.ai/docs/pleos-only/vehicle-app-planning-guide/driver-distraction-guideline)
+
+Pleos API 34 ARM64 `emulator-5556`의 Android 사용자 10에서 다음을 확인했다.
+
+| 범위 | 관측 결과 |
+|---|---|
+| 실제 Main의 모의주행과 주차 복귀 | 격리 앱 `io.drivegrowth.verify.prototype.firstcarhtmlgateb1115`에서 모의 이동 중 “지금은 운전 중이에요 / 주차 후 다시 만나요.”와 야간 그림을 확인했다. `sim-moving-physical.png`는 1080×600 장치 캡처다. 장면의 `focus=true`, `AnimatedImageDrawable running=true`를 확인한 뒤 주차 조작이 다시 허용됐다. `scene-main-test.txt`의 실제 Main 계측 1건 통과, 36.611초. |
+| 첫 차량의 프로세스 재실행 | 처음에는 타이틀의 활성 시작 버튼 대기에서 실패했다. 해당 로그를 보존하고 계측 진입만 비런처 방식으로 바꿨다. 격리 `io.drivegrowth.verify.prototype.firstcarhtmlb1115`의 미확정·지급·복원 PID는 14757→15900→17060이었다. 앞 두 단계는 표식 수집 직후 의도적으로 강제 종료했으며 러너의 `Process crashed`가 이에 해당한다. 마지막 1건이 2.148초에 통과했고, 캐스퍼 한 대·1,000 게임머니·차고 3칸과 최초 요청·거래·정산 식별자가 지급·복원 JSON에서 일치했다. `cold-retry/03-restored.log` 및 지급·복원 표식. |
+| 실제 차량 SDK의 권한 거부와 P 복귀 | 동일 표준 설치 APK의 `MainActivity`를 직접 열었다. `CAR_SPEED` 거부 시 SDK가 `speed=PERMISSION_DENIED gear=PARK ux=false`를 보고했고 장면 없이 중립 제목과 권한 안내가 표시됐다. 임시 권한 허용 후 `speed=OK gear=PARK ux=false`와 첫 차량 시작 화면 복귀를 확인했다. `sdk-denied-final.png`, `sdk-restoration-park.png`와 해당 SDK 로그를 대조했다. 속도 권한은 시험 전의 거부 상태로 원복했다. |
+
+Virtual Console은 재부팅 전후 `bridge_ready=false`, `emulator_active=false`였고 D/P 요청은 HTTP 503으로 응답했다. 실제 SDK 이동·정차·P 전체 전환과 실제 이동 시 정지 그림은 후속 확인 범위다. 시작 순간의 `NO_DATA`는 별도 관측 값이며 신호 만료 시험으로 집계하지 않는다. 주간 재생, 포커스 상실 후 정지·재개, 움직임 줄이기 전환 및 실제 효과음 재생·취소도 기기 확인이 남아 있다. 장치는 데이터 유지 재부팅 1회 뒤 부팅 완료·사용자 10을 확인했다. 임시 콘솔 포워딩을 제거했고, 제품·사용자용 첫 차량 앱의 설치 APK 해시와 데이터 디렉터리 inode는 전후 일치했다.
