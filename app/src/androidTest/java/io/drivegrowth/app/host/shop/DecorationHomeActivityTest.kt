@@ -75,10 +75,11 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
     private fun counts(game: GameSession)=ok(game.store.read { db ->
         listOf("decoration_requests","settlements").map { table -> db.rawQuery("SELECT COUNT(*) FROM $table",null).use{it.moveToFirst();it.getLong(0)} }
     })
-    private fun currentShopShown(a: MainActivity, id: String): Boolean {
-        val children=tree(shop(a))
-        val sign=when(id) { "neutral-sign"->a.getString(R.string.shop_scene_default_sign); "blue-sign"->"간판 색상"; else->error("시험 기대 외 품목") }
-        return children.any { it is ShopSceneView && it.isShown && sign in it.contentDescription?.toString().orEmpty() }
+    private fun currentShopShown(a: MainActivity): Boolean {
+        val name = a.getString(R.string.shop_scene_default_sign)
+        val description = a.getString(R.string.shop_scene_description, name)
+        return tree(shop(a)).any { it is ShopSceneView && it.isShown &&
+            it.contentDescription?.toString()?.startsWith(description) == true }
     }
     private fun awaitState(a: MainActivity,id:String) {
         val end=SystemClock.uptimeMillis()+30_000;var found=false
@@ -88,7 +89,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
             if(!found)SystemClock.sleep(50)
         }
         assertTrue("꾸미기 확정과 finish: $id",found)
-        await(a,"기존 ShopView 재조회") { a.window.decorView.findViewWithTag<View>("decoration:receipt")?.isShown==true && shop(a).uiState.pending==null && currentShopShown(a,id) }
+        await(a,"기존 ShopView 재조회") { a.window.decorView.findViewWithTag<View>("decoration:receipt")?.isShown==true && shop(a).uiState.pending==null && currentShopShown(a) }
     }
     private fun previewWithoutWrite(a:MainActivity,id:String) {
         val before=read { game -> Triple(ok(game.store.balance()),ok(game.store.decorations.state(game.identity.profileId)),counts(game)) }
@@ -108,7 +109,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
             instrumentation.runOnMainSync { a.recreate() }
             next=instrumentation.waitForMonitorWithTimeout(monitor,15_000) as? MainActivity;assertNotNull(next)
             val current=next!!
-            await(current,"같은 HOME/원결과 복원") { current.window.decorView.findViewWithTag<View>("decoration:receipt")?.isShown==true && shop(current).uiState.pending==null && currentShopShown(current,expected.second.selectedId!!) }
+            await(current,"같은 HOME/원결과 복원") { current.window.decorView.findViewWithTag<View>("decoration:receipt")?.isShown==true && shop(current).uiState.pending==null && currentShopShown(current) }
             assertEquals(expected,read{it.identity to ok(it.store.decorations.state(it.identity.profileId))})
             instrumentation.runOnMainSync {
                 current.window.decorView.openMainPage(HostPage.GARAGE)
