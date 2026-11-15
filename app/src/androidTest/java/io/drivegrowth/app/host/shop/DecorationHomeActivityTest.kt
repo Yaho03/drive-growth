@@ -130,7 +130,7 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
         fresh();val first=activity
         click(first,R.string.onboarding_start);click(first,VehicleId("hyundai_casper"));click(first,R.string.onboarding_review)
         click(first,R.string.onboarding_confirm);click(first,R.string.onboarding_to_shop)
-        click(first, "shop:map-facilities")
+        openFacilities(first)
         await(first,"명시 활성화 조작") { first.window.decorView.findViewWithTag<Button>("decoration:activate")?.isEnabled==true }
         val original=read { game ->
             assertEquals(InputSource.VEHICLE,game.identity.source);assertEquals(GameMoney(1000),ok(game.store.balance()))
