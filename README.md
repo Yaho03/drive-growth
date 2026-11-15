@@ -18,6 +18,8 @@
 
 ![차량과 시설이 있는 렌터카 가게](docs/images/game-home.png)
 
+[▶ 게임 시연 영상 보기](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-demo.mp4)
+
 ## 게임 콘텐츠
 
 - **목적지와 연결되는 탁송 의뢰** — 원래 이동하려던 목적지에 맞는 의뢰를 고릅니다. 수익 탁송으로 게임머니를 벌거나, 구매 탁송으로 원하는 차량을 가게에 데려올 수 있습니다.
@@ -35,7 +37,7 @@
 [**게임 체험 APK 다운로드**](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-firstcarplay-52285de.apk) · [**차량 연동 APK 다운로드**](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-vehicle-fresh-install-52285de.apk) · [전체 릴리스](https://github.com/Yaho03/drive-growth/releases/tag/integrated-20261115-52285de)
 
 - **게임 체험 APK:** Pleos 에뮬레이터에서 모의 차량·내비 입력으로 게임을 체험하는 Debug 앱입니다.
-- **차량 연동 APK:** 실제 Pleos SDK 입력을 사용하는 개발 서명 Release입니다. 기존 차량용 앱과 서명이 달라 별도 환경에 신규 설치해야 하며, 이 APK의 기기 설치·실행은 아직 확인하지 않았습니다.
+- **차량 연동 APK:** 실제 Pleos SDK 입력을 사용하는 개발 서명 Release입니다. 기존 차량용 앱과 서명이 달라 별도 환경에 신규 설치해야 하며, Pleos 에뮬레이터에서 신규 설치와 실행을 확인했습니다.
 
 ## 시작하기
 

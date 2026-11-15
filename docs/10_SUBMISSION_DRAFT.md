@@ -49,12 +49,12 @@ Pleos Connect의 Android Automotive OS 환경에서 Kotlin 앱을 구현했습�
 
 ## 7. 참고자료
 
-최신 모의 APK와 신규 설치용 차량 APK는 [빌드 소스 `52285de`](https://github.com/Yaho03/drive-growth/commit/52285dec30d90957786ca11d46234d2bcc24e58d)를 사용합니다. 최신 차량용 APK는 별도 Pleos 시험 환경의 신규 설치용입니다. 기존 차량 앱과 호환되는 서명 환경 및 최신 차량 APK의 기기 설치·실행은 미확인입니다. 아래 이전 캡처는 촬영 당시 빌드에 귀속됩니다. 현재 소스의 첫 차량과 주행 제한 통합은 [앱 PR #313](https://github.com/Yaho03/drive-growth/pull/313)과 [통합 실행 기록](06_VERIFICATION.md#첫-차량-html과-312-주행-제한-장면-통합--2026-11-15)을 참조합니다.
+최신 모의 APK와 신규 설치용 차량 APK는 [빌드 소스 `52285de`](https://github.com/Yaho03/drive-growth/commit/52285dec30d90957786ca11d46234d2bcc24e58d)를 사용합니다. 최신 차량용 APK는 별도 Pleos 시험 환경의 신규 설치용입니다. Pleos 에뮬레이터에서 신규 설치, 앱 목록에서 실행, 첫 차량 지급과 가게 진입을 확인했습니다. 기존 설치본과 호환되는 서명 환경은 확인이 남아 있습니다. [차량용 APK 실행 기록](06_VERIFICATION.md#차량용-release-apk-신규-설치와-실행--2026-11-15) 아래 이전 캡처는 촬영 당시 빌드에 귀속됩니다. 현재 소스의 첫 차량과 주행 제한 통합은 [앱 PR #313](https://github.com/Yaho03/drive-growth/pull/313)과 [통합 실행 기록](06_VERIFICATION.md#첫-차량-html과-312-주행-제한-장면-통합--2026-11-15)을 참조합니다.
 
 | 자료 | 심사 시 확인 범위 |
 |---|---|
 | [이전 검증 릴리스의 선택·가게·복원 화면](https://github.com/Yaho03/drive-growth/releases/tag/first-vehicle-test-20261115) | 첫 차량 선택 화면과 당시의 가게·최초 지급 원결과 캡처. 캡처와 실행 패키지별 근거는 [첫 차량 시험 기록](evidence/first-vehicle-isolation-20261115/README.md)에 수록 |
-| [최신 차량용 APK 다운로드](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-vehicle-fresh-install-52285de.apk) | `io.drivegrowth.app`, 신규 시험 설치용 개발 서명 Release. **기존 차량 앱 업데이트 불가**, 기기 설치·실행 미검증 |
+| [최신 차량용 APK 다운로드](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-vehicle-fresh-install-52285de.apk) | `io.drivegrowth.app`, 신규 시험 설치용 개발 서명 Release. **기존 차량 앱 업데이트 불가**, Pleos 에뮬레이터에서 신규 설치·실행 확인 |
 | [이전 차량용 APK 다운로드](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-vehicle-dev-709e08d.apk) | `io.drivegrowth.app`, Pleos 차량 SDK 입력용 개발 서명 Release. 빌드 소스 `709e08dcb9e8be0f98c3ccfba2ba7b33b51f12f0` |
 | [첫 차량 테스트 APK 다운로드](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/rrr-rentcar-firstcarplay-52285de.apk) | `io.drivegrowth.verify.prototype.firstcarplay`, 모의 차량·내비 입력을 사용하는 Debug |
 | [저장소](https://github.com/Yaho03/drive-growth) · [최신 통합 릴리스와 해시 목록](https://github.com/Yaho03/drive-growth/releases/tag/integrated-20261115-52285de) | 빌드 소스와 릴리스 태그를 확인할 수 있습니다. 접수 메일에 기재할 제출 커밋과 심사 링크 접근은 발송 전 대조합니다. |
