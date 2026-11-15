@@ -131,6 +131,10 @@ class ShopExpansionHostControllerTest {
     @Test fun finishFailurePreservesOriginalResultForRetry() {
         val h=ExpansionHarness();h.load();h.source.finishFailure=ContractError.STORAGE_FAILURE
         assertTrue(h.host.submit(h.request()));h.drain();val original=h.source.applied!!
+        val failure = h.frames.last().first as ShopScreenState.Failure
+        assertFalse(failure.message.contains("STORAGE_FAILURE"))
+        assertTrue(failure.message.contains("저장된 원명령을 재시도"))
+        assertEquals(ContractError.STORAGE_FAILURE, failure.error)
         assertNotNull(h.source.saved);h.source.finishFailure=null
         assertTrue(h.host.load());h.drain()
         assertEquals(listOf(original,original),h.receipts);assertNull(h.source.saved)

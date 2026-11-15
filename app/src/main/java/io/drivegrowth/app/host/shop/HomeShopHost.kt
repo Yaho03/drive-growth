@@ -83,7 +83,7 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
         publish(HomeShopState(display.screen, inactive, decoration?.state, error))
     }
     private fun fail(error: ContractError) {
-        show(ShopScreenState.Failure("가게 상태 확인 실패: $error. 원래 요청을 보존하고 다시 확인해 주세요."), error)
+        show(ShopScreenState.Failure("가게 상태를 확인하지 못했어요. 다시 확인해 주세요."), error)
         onRetry?.invoke()
     }
 
@@ -341,7 +341,7 @@ internal class HomeShopHost(private val source: HomeShopPort, private val facili
                                 waitingForExpansion = false; refresh()
                             }
                         }
-                        is ShopScreenState.Failure -> { expansionLoading = false; show(value); onRetry?.invoke() }
+                        is ShopScreenState.Failure -> { expansionLoading = false; show(value, value.error); onRetry?.invoke() }
                         else -> Unit
                     }
                 } }, ::completeMapped, {}, committed = ::completeExpansion)

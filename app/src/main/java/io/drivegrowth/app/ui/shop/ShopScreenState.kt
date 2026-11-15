@@ -77,7 +77,7 @@ sealed interface ShopScreenState {
         }
     }
     data class Empty(val message: String) : ShopScreenState
-    data class Failure(val message: String) : ShopScreenState
+    data class Failure(val message: String, val error: ContractError? = null) : ShopScreenState
     data class Unsupported(val message: String) : ShopScreenState
 }
 

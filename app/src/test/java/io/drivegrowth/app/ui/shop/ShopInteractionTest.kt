@@ -97,6 +97,16 @@ class ShopInteractionTest {
         i.render(content().copy(revision = Revision(4)), true)
         assertNull(i.uiState.message)
 
+        val contentFirst = ShopInteraction({})
+        contentFirst.render(content(), true)
+        contentFirst.select(selection())
+        assertTrue(contentFirst.confirm(selection()))
+        val refreshed = content().copy(revision = Revision(4))
+        contentFirst.render(refreshed, true)
+        contentFirst.complete(contentFirst.uiState.pending!!, ContractResult.Success(Unit))
+        contentFirst.render(refreshed, true)
+        assertNull(contentFirst.uiState.message)
+
         val failed = ShopInteraction({})
         failed.render(content(), true); failed.select(selection()); failed.confirm(selection())
         failed.complete(failed.uiState.pending!!, ContractResult.Failure(ContractError.STORAGE_FAILURE))

@@ -139,8 +139,11 @@ class ShopExpansionHostController(
         val request=activeRequest;activeRequest=null
         val serial=sequence
         if(request!=null)complete(request,ContractResult.Failure(error))
-        if(valid(serial))show(ShopScreenState.Failure("확장 요청/조회 실패: $error. "+
-            if(pending!=null)"저장된 원명령을 재시도하거나 실행 전인 경우 명시 취소해 주세요." else "저장 상태와 정의를 다시 확인해 주세요."))
+        if (valid(serial)) {
+            val recovery = if (pending != null) "저장된 원명령을 재시도하거나 실행 전인 경우 명시 취소해 주세요."
+                else "저장 상태를 다시 확인해 주세요."
+            show(ShopScreenState.Failure("가게 확장 정보를 확인하지 못했어요. $recovery", error))
+        }
     }
     private fun valid(serial:Long)=!released && sequence==serial
     private fun show(state:ShopScreenState){frame=state;render(state,allowed)}

@@ -198,7 +198,8 @@ class ShopViewTest : InstrumentationTestCase() {
             button(view, "shop:map-preview:blue-sign").performClick(); button(view, "shop:map-confirm").performClick()
             val request = (events.single() as ShopEvent.Submit).request
             view.complete(request, ContractResult.Failure(ContractError.STORAGE_FAILURE))
-            assertTrue(text(view).contains("STORAGE_FAILURE"))
+            assertTrue(text(view).contains("처리하지 못했어요. 다시 시도해 주세요."))
+            assertFalse(text(view).contains("STORAGE_FAILURE"))
             assertFalse(text(view).contains("변경안 · 파란 가게"))
             assertAccessibleBalance(view, "2,400 게임머니")
         }
@@ -233,9 +234,13 @@ class ShopViewTest : InstrumentationTestCase() {
             val request = restored.uiState.pending!!
             restored.complete(request.copy(requestId = RequestId("unrelated")), ContractResult.Success(Unit)); assertNotNull(restored.uiState.pending)
             restored.complete(request, ContractResult.Success(Unit))
-            assertCapacity(restored, 2, 5); assertTrue(text(restored).contains("확정 상태 재조회"))
+            assertCapacity(restored, 2, 5)
+            assertTrue(text(restored).contains("반영하고 있어요…"))
+            restored.render(ShopScreenState.Loading, true)
+            assertTrue(text(restored).contains("반영하고 있어요…"))
             restored.render(state.copy(revision = Revision(13), level = 3, capacity = 7, balance = GameMoney(900)), true)
             assertCapacity(restored, 2, 7); assertAccessibleBalance(restored, "900 게임머니")
+            assertFalse(text(restored).contains("반영하고 있어요…"))
         }
     }
 
