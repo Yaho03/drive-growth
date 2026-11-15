@@ -172,7 +172,7 @@ class ProgressionMapper {
             QuestAction.RENTAL_COMPLETED -> "영업 완료하기"
         }
         val note = if (!known) "퀘스트 기간이나 활동 기록을 아직 확인할 수 없어요."
-            else "시작일 ${p.period.start} · ${zoneLabel(p.period.zone)}"
+            else "시작일 ${p.period.start} · ${zoneLabel(p.source, p.period.zone)}"
         // 목표를 넘은 진행은 목표에서 멈춰 표시한다 (예: 5 / 1회 → 1 / 1회).
         return ProgressItem(progressKey(p), if (p.definition.cadence == QuestCadence.DAILY) ProgressGroup.DAILY else ProgressGroup.WEEKLY,
             0, action, if (known) "${minOf(p.count!!, p.definition.goal)} / ${p.definition.goal}회" else "진행 확인 불가", percent,
@@ -182,13 +182,14 @@ class ProgressionMapper {
             })
     }
 
-    /**
-     * 퀘스트 기간 시간대를 사용자 표시용으로 바꾼다. 계산 시간대는 그대로다.
-     * 모의 시연은 모의 시계를 UTC로 고정하고(HostSession), 차량 입력은 기기 시간대를 쓴다.
-     */
-    internal fun zoneLabel(zone: java.time.ZoneId): String = when (zone.normalized()) {
-        java.time.ZoneOffset.UTC -> "모의 시연 시각 기준"
-        java.time.ZoneId.systemDefault().normalized() -> "기기 시간 기준"
+    /** 입력 출처와 퀘스트 기간의 시간대는 별개다. 저장된 기간은 변경하지 않는다. */
+    internal fun zoneLabel(
+        source: InputSource,
+        zone: java.time.ZoneId,
+        deviceZone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+    ): String = when {
+        source == InputSource.SIMULATION -> "모의 시연 시각 기준"
+        zone.normalized() == deviceZone.normalized() -> "기기 시간 기준"
         else -> "${zone.id} 기준"
     }
 }
