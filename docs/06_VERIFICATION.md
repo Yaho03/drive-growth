@@ -7,7 +7,7 @@
 | 앱 기능·픽셀 화면 통합 | [PR #310](https://github.com/Yaho03/drive-growth/pull/310)은 main `709e08d`에 반영됐다. [#310 통합 실행](#310-최신-main-통합과-재검증--2026-11-15)에 로컬 검사와 격리 앱별 시험을, [B 남색 픽셀·탁송 화면](#301-이후-남색-화면탁송-수락-조작-후속-확인--2026-11-15)에 모의 목적지·수익 탁송 수락·구매 확정·출발 조작과 실제 캡처를 기록했다. |
 | 첫 차량과 재실행 | [PR #311](https://github.com/Yaho03/drive-growth/pull/311)은 main `2fdf42e`에 반영됐다. [격리 Debug 보강 회귀](#전체-정산-이력을-대조한-보강-회귀)에서 확정 전 종료, 새 프로세스에서 캐스퍼 1대·1,000·차고 3칸과 원정산 1건 지급, 다시 실행한 뒤 동일 원결과 복원을 확인했다. [사용자용 APK](#사용자용-apk와-기존-설치-상태)는 별도 패키지이며 AppGrid 아이콘 실행은 미확인이다. |
 | 첫 차량 HTML·효과음·주행 제한 통합 | [PR #313](https://github.com/Yaho03/drive-growth/pull/313)은 main `fe17a996b6875eaef855e6e5cfb35b36911cd327`에 반영됐다. [통합본의 실행 기록](#첫-차량-html과-312-주행-제한-장면-통합--2026-11-15)에서 야간 모의 이동·주차 복귀, 별도 프로세스의 첫 지급 원결과 복원, 차량 SDK 속도 권한 거부 안내·P 복귀를 확인했다. SDK 이동·정차·P 전체 전환과 신호 만료, 주간 재생, 포커스 전환·움직임 줄이기, 실제 효과음 재생·취소는 기기 확인이 남아 있다. 이 실행 기록은 시험 당시의 표준 Debug와 계측 APK에 귀속된다. |
-| 통합 APK 재빌드·배포 | [최신 APK 기록](#통합-apk-재빌드와-검증--2026-11-15)에서 `52285de` 기반 모의 APK의 기존 설치 갱신과 런처 기동을 확인할 수 있다. 최신 차량용 Release는 신규 설치용 개발 서명 빌드이며, 기기 설치·실행은 미검증이다. |
+| 통합 APK 재빌드·배포 | [최신 APK 기록](#통합-apk-재빌드와-검증--2026-11-15)에서 `52285de` 기반 모의 APK의 기존 설치 갱신과 런처 기동을 확인할 수 있다. 최신 차량용 Release는 별도 Pleos 에뮬레이터에서 [신규 설치·런처 실행·가게 진입](#차량용-release-apk-신규-설치와-실행--2026-11-15)을 확인했다. |
 | 에뮬레이터의 실제 Pleos SDK | [차량 제한·복귀](#back-뒤-지연된-관측-재시작-수정--2026-11-13)와 [실제 내비 견적·구매 의뢰 복원](#3739-실제-sdk-견적의-구매-복원변경-거절과-모의-종료-결과--2026-11-13)의 확인 범위를 참고한다. 실제 SDK 목적지 변경 성공·차액 정산 및 활성 경로 도착에 따른 지급은 미검증이다. |
 | 정책·실차·제출 | 실제 도로 주행과 차량 전원 경계, 백그라운드 기록·음성 등 플랫폼 허용 조건, 자산 권리 및 최종 제출 확인이 남아 있다. [통합 검증 #28](https://github.com/Yaho03/drive-growth/issues/28) · [정책 #81](https://github.com/Yaho03/drive-growth/issues/81) · [실차 #82](https://github.com/Yaho03/drive-growth/issues/82) · [제출 상태](#제출-상태) |
 | 원격 CI | GitHub Actions 결제·사용 한도로 실행되지 않은 검사는 원격 CI 미실행이다. 로컬 검사와 장치 시험의 결과는 각 실행 기록에 있다. [원격 검사 미실행 기준](../CONTRIBUTING.md#github-actions-사용-한도로-원격-검사가-실행되지-않을-때) |
@@ -571,7 +571,7 @@ macOS ARM64의 JVM 회귀에서 가짜 SDK 포트로 경로·권한·연결 전�
 | 공식 양식 원본 | 다운로드 보관 완료 |
 | 팀 기획서 초안 | 원본 PDF는 로컬에 보존했다. 렌터카 방향을 [제품 기준](01_PRD.md)과 [심사용 소개 초안](10_SUBMISSION_DRAFT.md)에 반영했다. 공식 양식 전사와 최종 앱·기능 설명·자산 권리 대조가 남아 있다. |
 | 저장소의 구현·검증 근거 | main에 렌터카 앱과 시험 소스가 반영됐다. [Debug 모의 시연](#실제-ui와-새-os-프로세스-재실행)에서 첫 차량 지급·꾸미기·수익 탁송·정산·새 프로세스 복원을 확인했고, [Pleos SDK 시험](#80-실제-sdk-최초-견적과-경로-교체-뒤-미지급--2026-11-12)에서 최초 견적과 경로 교체 뒤 미지급을 확인했다. [#54](https://github.com/Yaho03/drive-growth/issues/54)는 실제 Main의 [원정산 표시와 열람 저장·복원](#54-확정-정산-원결과와-열람-저장-경계) 검증 후 종료했다. [#43](https://github.com/Yaho03/drive-growth/issues/43)은 PR #243의 [제어 SIM 시계·D/P 및 실제 SQLite·새 PID 복구](#43-utc-전진-후-대여-복구--2026-11-13)와 별도 실제 SDK Back·P 관측으로 기능 검증을 마쳐 종료했다. 최종 UI 자산은 디자인팀 제작 중이다. 최종 제출 후보의 통합 실행과 실제 Home 이탈·OS 시계 변경은 [#28](https://github.com/Yaho03/drive-growth/issues/28), 전원·실차는 [#82](https://github.com/Yaho03/drive-growth/issues/82)에서 추적한다. |
-| Release APK·소스 대응 | [최신 APK](#통합-apk-재빌드와-검증--2026-11-15)의 빌드 소스·해시와 모의 APK 업데이트 결과를 기록했다. 최신 차량용 Release의 기기 설치·실행, 기존 앱 호환 서명과 최종 제출 후보 확정은 [#29](https://github.com/Yaho03/drive-growth/issues/29)에서 확인한다. |
+| Release APK·소스 대응 | [최신 APK](#통합-apk-재빌드와-검증--2026-11-15)의 빌드 소스·해시와 모의 APK 업데이트 결과를 기록했다. 최신 차량용 Release는 [Pleos 에뮬레이터에서 신규 설치·실행](#차량용-release-apk-신규-설치와-실행--2026-11-15)을 확인했다. 기존 앱 호환 서명과 최종 제출 후보 확정은 [#29](https://github.com/Yaho03/drive-growth/issues/29)에서 확인한다. |
 | 실제 앱 시연 영상·대표 화면 | 시험용 앱 화면 기록이 있다. 제출용 영상·대표 화면의 선정과 검수는 남아 있다. |
 | 개인정보·동의·서명 | 참가자별 실제 동의와 서명 확보는 팀이 확인한다. 개인정보와 서명은 저장소에 게시하지 않는다. |
 | 최종 기능 범위 일치 확인 | 공식 양식·앱 설명을 실제 구현과 대조하고, 제공하는 선택 자료의 버전과 접근을 확인한다. 실차 실행 근거는 미확보다. |
@@ -3813,12 +3813,19 @@ Virtual Console은 재부팅 전후 `bridge_ready=false`, `emulator_active=false
 빌드 소스는 [`52285dec30d90957786ca11d46234d2bcc24e58d`](https://github.com/Yaho03/drive-growth/commit/52285dec30d90957786ca11d46234d2bcc24e58d)다. [통합 릴리스](https://github.com/Yaho03/drive-growth/releases/tag/integrated-20261115-52285de)의 태그는 이 빌드 소스를 가리킨다. 다운로드 안내 문서는 그 뒤 별도 커밋에서 갱신한다.
 
 - **첫 차량 테스트 Debug.** `rrr-rentcar-firstcarplay-52285de.apk`, `io.drivegrowth.verify.prototype.firstcarplay`, 버전 0.1.0(1), minSdk 28·targetSdk 34. SHA-256은 `7ba597887f8efa40c2317ad5d81ed4758592636efc4cee90ff07c6b27a23b0e7`이다. 인증서 SHA-256은 `3398b6f1e8a85d4950d221b75ec046770046d8bc2c614ef7af3ebc1bbef856da`다. Pleos API 34 ARM64의 사용자 10에서 기존 설치와 같은 인증서로 업데이트했다. 설치 APK 해시 일치, 데이터 디렉터리 inode 유지, 런처 기동을 대조했다. [설치 메타데이터](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/APK-METADATA.json) · [업데이트 설치 후 시작 화면](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/firstcarplay-start-52285de.png). 이 설치 결과는 위 #313의 별도 격리 첫 지급·재실행과 구분한다.
-- **신규 설치용 차량 Release.** 같은 소스에서 `rrr-rentcar-vehicle-fresh-install-52285de.apk`를 `io.drivegrowth.app`으로 조립하고 기존 모의 앱 개발 인증서로 서명했다. APK SHA-256은 `ab7d73ed37817f258b4073ca8702be92b2d127e0035d3ffb0d976288c30cebd5`다. `apksigner verify`로 서명과 위 모의 APK와 같은 인증서를 확인했다. 이전 차량용의 인증서 SHA-256은 `82de3d6731f445c10f27c9e3c9b8bc1d7a1e1dd9a22b45a5140eacaded647eb5`로 다르므로 기존 앱에 덮어쓸 수 없다. 기존 차량 앱이 없는 별도 시험 환경용이며 새 APK의 기기 설치·실행은 미검증이다. [이전 차량용 개발 서명 APK](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-vehicle-dev-709e08d.apk)의 빌드 소스는 `709e08dcb9e8be0f98c3ccfba2ba7b33b51f12f0`다.
+- **신규 설치용 차량 Release.** 같은 소스에서 `rrr-rentcar-vehicle-fresh-install-52285de.apk`를 `io.drivegrowth.app`으로 조립하고 기존 모의 앱 개발 인증서로 서명했다. APK SHA-256은 `ab7d73ed37817f258b4073ca8702be92b2d127e0035d3ffb0d976288c30cebd5`다. `apksigner verify`로 서명과 위 모의 APK와 같은 인증서를 확인했다. 이전 차량용의 인증서 SHA-256은 `82de3d6731f445c10f27c9e3c9b8bc1d7a1e1dd9a22b45a5140eacaded647eb5`로 다르므로 기존 앱에 덮어쓸 수 없다. 기존 차량 앱이 없는 별도 시험 환경용이다. 이 빌드 기록 이후 같은 파일의 [신규 설치·실행](#차량용-release-apk-신규-설치와-실행--2026-11-15)을 확인했다. [이전 차량용 개발 서명 APK](https://github.com/Yaho03/drive-growth/releases/download/first-vehicle-test-20261115/rrr-rentcar-vehicle-dev-709e08d.apk)의 빌드 소스는 `709e08dcb9e8be0f98c3ccfba2ba7b33b51f12f0`다.
 
 - **격리 첫 지급 시험.** 배포 모의 APK와 DEX·앱 자산이 같은 별도 패키지 `io.drivegrowth.verify.prototype.firstcarrelease52285`의 새 프로필을 사용했다. 통제된 SIMULATION 입력으로 실제 MainActivity와 SQLite를 거쳐 첫 차량 지급과 주행 제한 화면에서의 복귀를 확인했다. 계측 테스트 1개가 7.11초에 통과했다. [시험 메타데이터](https://github.com/Yaho03/drive-growth/releases/download/integrated-20261115-52285de/APK-METADATA.json)
 - **차량 APK 서명 전후 대조.** APK 서명 메타데이터를 제외한 ZIP 항목 131개의 비압축 내용이 서명 전후 일치했다.
 
 실제 SDK D→이동→정차→P, 차량 신호 만료, 주간 재생, 포커스·움직임 줄이기 전환, 실제 효과음 재생·중단은 위 통합 실행의 미확인 조건을 유지한다. 제출용 서명·실차·App Market 승인과 최종 제출은 별도 조건이다.
+
+## 차량용 Release APK 신규 설치와 실행 — 2026-11-15
+
+- 별도 Pleos Connect 2.1.0 에뮬레이터(Android API 34 ARM64, 사용자 10, 1080×600px·120dpi)에서 `io.drivegrowth.app`이 없는 상태를 확인하고 배포 APK를 신규 설치했다. 설치된 APK를 추출해 배포 파일과 바이트 단위로 일치함을 확인했다. SHA-256은 `ab7d73ed37817f258b4073ca8702be92b2d127e0035d3ffb0d976288c30cebd5`다.
+- 런처 컴포넌트에서 처음 실행한 뒤 속도 권한을 허용했다. 계기판에 P·0 km/h가 표시됐고, 앱 로그에 차량 SDK 수신 결과 `speed=OK gear=PARK ux=false`가 남았다.
+- 캐스퍼를 첫 차량으로 확정했다. 시작 자금 1,000 게임머니와 주차 공간 3칸을 확인하고 메인 가게에 진입했다. Pleos 앱 목록에서 앱 아이콘을 직접 눌러 가게로 복귀했다. 시스템 로그에서 `MAIN / LAUNCHER → io.drivegrowth.app/.MainActivity`를 확인했다. [실행한 메인 게임 화면](evidence/vehicle-release-52285de/game-home.png)
+- 이 시험은 에뮬레이터에서의 신규 설치·실행·주차 상태 게임 진입을 확인했다. 실차 주행과 실제 내비 도착 후 정산은 별도 검증 범위다.
 
 ## README 대표 화면의 출처 — 2026-11-15
 
