@@ -31,6 +31,30 @@ class NavigationDestinationConfirmationTest {
             assertTrue(state.confirm() is ContractResult.Failure)
         }
     }
+    @Test fun `화면에 표시한 SDK 응답과 현재 응답이 다르면 확인하지 않는다`() {
+        val state = NavigationDestinationConfirmation({ true }, { DestinationKey("chosen") })
+        state.setEnabled(true)
+        state.bind(identity)
+        state.accept(raw())
+        val newer = stamp.copy(sequence = stamp.sequence + 1)
+        state.accept(raw(newer).copy(destination = NavigationField.Value(destination, newer),
+            remainingEstimatedMeters = NavigationField.Value(800L, newer)))
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE), state.confirm(stamp))
+        assertNull(state.selected(identity))
+        assertTrue(state.confirm(newer) is ContractResult.Success)
+    }
+
+    @Test fun `표시한 SDK 응답은 5000ms까지 확인할 수 있다`() {
+        var now = stamp.receivedElapsedMillis + 5_000L
+        val state = NavigationDestinationConfirmation({ deliveryQuoteFresh(it, now) }, { DestinationKey("chosen") })
+        state.setEnabled(true)
+        state.bind(identity)
+        state.accept(raw())
+        assertTrue(state.confirm(stamp) is ContractResult.Success)
+        now++
+        assertEquals(ContractResult.Failure(ContractError.DATA_UNAVAILABLE), state.confirm(stamp))
+    }
+
     @Test fun `gate 해제와 프로필 전환은 확인을 무효화하고 정지 중 수신을 버린다`() {
         val state = NavigationDestinationConfirmation({ true }, { DestinationKey("chosen") })
         state.setEnabled(true); state.bind(identity); state.accept(raw()); state.confirm()

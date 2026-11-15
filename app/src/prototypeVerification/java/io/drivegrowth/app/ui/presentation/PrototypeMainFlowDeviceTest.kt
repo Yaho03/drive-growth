@@ -262,16 +262,42 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
                 assertSame(card, button(host, "opening-gift:card"))
                 assertTrue(card.isShown)
             }
+            click(host, "shop:map-settings")
+            await("설정 중 선물 카드 숨김") { button(host, "opening-gift:card") == null }
+            click(host, "host:settings-close")
+            await("설정 닫은 뒤 미확인 선물 복원") {
+                button(host, "opening-gift:gacha")?.let { it.isShown && it.isEnabled && it.isLaidOut } == true
+            }
             capture(host, "main-opening-gift")
             onUi { touchView(host, checkNotNull(button(host, "opening-gift:gacha"))) }
             await("추첨 전 뽑기 화면") {
                 host.window.decorView.isMainPageShown(HostPage.GACHA) &&
                     button(host, "gacha:option:free")?.isEnabled == true
             }
+            val confirmedGift = ok(games.open()).use { game ->
+                val gift = ok(game.store.readFirstRentalGift(identity.profileId))
+                assertEquals(1L, gift.progress.freeTickets)
+                assertEquals(before, ok(game.store.readGachaState()).progress.drawsSinceGuarantee)
+                val granted = checkNotNull(gift.granted)
+                assertEquals(io.drivegrowth.core.garage.FirstGrant.GIFT_REQUEST_ID, granted.command.requestId)
+                assertEquals(identity.profileId, granted.command.profileId)
+                assertEquals(identity.source, granted.command.source)
+                gift
+            }
+            openPage(host, HostPage.HOME)
+            await("HOME 복귀와 확인한 선물 종료") {
+                host.window.decorView.isMainPageShown(HostPage.HOME) &&
+                    button(host, "shop:map-settings")?.isShown == true
+            }
+            onUi {
+                assertNull(button(host, "opening-gift:card"))
+                assertNull(session.openingGift.available(identity, true))
+            }
             ok(games.open()).use { game ->
-                assertEquals(1L, ok(game.store.readFirstRentalGift(identity.profileId)).progress.freeTickets)
+                assertEquals(confirmedGift, ok(game.store.readFirstRentalGift(identity.profileId)))
                 assertEquals(before, ok(game.store.readGachaState()).progress.drawsSinceGuarantee)
             }
+            openPage(host, HostPage.GACHA)
             verifyNewGachaAward(host, games, GachaOptionKind.FREE)
         } finally { finishHost(host) }
     }
@@ -372,10 +398,28 @@ class PrototypeMainFlowDeviceTest : InstrumentationTestCase() {
         openPage(host, HostPage.GACHA)
         await("저장된 원래 결과") { button(host, "gacha:garage")?.isEnabled == true }
         onUi { assertNull(button(host, badgeTag)) }
+        val pending = ok(games.open()).use { game ->
+            checkNotNull(ok(game.store.hostCommands.load(game.identity.profileId)))
+        }
         val restored = recreate(host)
         try {
             await("재생성한 원래 결과") { button(restored, "gacha:garage")?.isEnabled == true }
             onUi { assertNull(button(restored, badgeTag)) }
+            ok(games.open()).use { game ->
+                assertEquals(pending, ok(game.store.hostCommands.load(game.identity.profileId)))
+            }
+            click(restored, "gacha:garage")
+            await("명시 확인 뒤 실제 차고 진입") {
+                restored.window.decorView.isMainPageShown(HostPage.GARAGE)
+            }
+            ok(games.open()).use { game ->
+                assertNull(ok(game.store.hostCommands.load(game.identity.profileId)))
+                assertEquals(candidate.award.vehicle, ok(game.store.listOwnedVehicles()).single {
+                    it.ownedVehicleId == candidate.award.vehicle.ownedVehicleId
+                })
+            }
+            openPage(restored, HostPage.GACHA)
+            await("확인 완료 뒤 다음 뽑기 선택") { button(restored, "gacha:option:paid")?.isEnabled == true }
         } finally { finishHost(restored) }
     }
 

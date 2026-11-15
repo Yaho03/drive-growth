@@ -61,8 +61,10 @@ class StoredDeliveryHostSource(private val queries: DeliveryHostQueries,
         val terms = data.terms
         if (terms == null) {
             changing = null; changeOffer = null; changeRevision = null; changeRoute = null
-            if (nav.destination == null) return ContractResult.Success(DeliveryHostRead(identity,
-                DeliveryScreen.Destination(null, null, sourceLabel(identity.source), true), data.held, navigation = nav))
+            val estimate = (nav.estimated as? Observation.Available)?.value
+            if (nav.destination == null || estimate == null || estimate.source != identity.source || estimate.meters <= 0)
+                return ContractResult.Success(DeliveryHostRead(identity,
+                    DeliveryScreen.Destination(null, null, sourceLabel(identity.source), true), data.held, navigation = nav))
             return offers.offers(identity)
         }
         val progress = data.progress

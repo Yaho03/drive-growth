@@ -213,6 +213,68 @@ class NavigationAdapterTest {
         }
     }
 
+    @Test fun explicitQuoteReconnectDiscardsOldCallbacksAndAcceptsNewQuote() {
+        val rig = Rig()
+        val oldPort = rig.connect()
+        val old = NavigationDestination(37.0, 127.0, "이전 목적지", null, null, null, null)
+        val current = old.copy(name = "새 목적지")
+        oldPort.events(NavigationSdkEvent.RouteId("old"))
+        oldPort.events(NavigationSdkEvent.Destination(old, 500))
+        rig.drain()
+
+        rig.adapter.connect(rig.events::add)
+        rig.drain()
+        val newPort = rig.ports.last()
+        newPort.connected()
+        oldPort.events(NavigationSdkEvent.RouteId("old"))
+        oldPort.events(NavigationSdkEvent.Destination(old, 500))
+        rig.drain()
+        assertTrue(rig.state().destination is NavigationField.Missing)
+
+        rig.adapter.refresh()
+        rig.drain()
+        newPort.events(NavigationSdkEvent.RouteId("old"))
+        newPort.events(NavigationSdkEvent.Destination(current, 800))
+        newPort.events(NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"))
+        rig.drain()
+        assertEquals(current, (rig.state().destination as NavigationField.Value).value)
+        assertEquals(800L, (rig.state().remainingEstimatedMeters as NavigationField.Value).value)
+    }
+
+    @Test fun explicitReconnectCannotReviveInvalidatedQuoteAcrossCallbackOrders() {
+        for (routeFirst in listOf(false, true)) {
+            val rig = Rig()
+            val oldPort = rig.connect()
+            val quote = Quote(rig)
+            val old = NavigationDestination(37.0, 127.0, "A", "A 주소", null, null, null)
+            oldPort.events(NavigationSdkEvent.RouteId("A"))
+            oldPort.events(NavigationSdkEvent.Destination(old, 500))
+            oldPort.events(NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING"))
+            rig.drain()
+            quote.accept(rig)
+            assertTrue(quote.confirmation.confirm() is ContractResult.Success)
+            oldPort.events(NavigationSdkEvent.DestinationChanged)
+            rig.drain()
+
+            rig.adapter.connect(rig.events::add)
+            rig.drain()
+            val newPort = rig.ports.last()
+            newPort.connected()
+            rig.drain()
+            rig.adapter.refresh()
+            rig.drain()
+            val destination = NavigationSdkEvent.Destination(old, 450)
+            val route = NavigationSdkEvent.RouteId("B")
+            val ordered = if (routeFirst) listOf(route, destination) else listOf(destination, route)
+            for (event in ordered + NavigationSdkEvent.Guidance(mode = "ROUTE_GUIDING")) {
+                newPort.events(event)
+                rig.drain()
+                quote.accept(rig)
+                quote.assertBlocked()
+            }
+        }
+    }
+
     @Test fun differentFirstIdAfterReconnectCannotAuthorizeLateOldDestination() {
         val rig = Rig()
         val oldPort = rig.connect()

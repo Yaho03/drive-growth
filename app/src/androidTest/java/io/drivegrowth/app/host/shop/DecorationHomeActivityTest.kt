@@ -113,15 +113,19 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
         await(a, "확정 HOME 지도") {
             a.window.decorView.isMainPageShown(HostPage.HOME) && currentShopShown(a)
         }
-        click(a, "shop:map-settings")
-        // 설정이 열린 뒤에도 HOME 조회가 끝나야 시설 메뉴를 열 수 있다.
         var previousMap: View? = null
-        click(a, "shop:map-facilities") {
+        fun stableMap(): Boolean {
             val map = a.window.decorView.findViewWithTag<View>("shop:map-screen").takeIf { currentShopShown(a) }
             val stable = map != null && map === previousMap
             previousMap = map
-            stable
+            return stable
         }
+        click(a, "shop:map-settings", ::stableMap)
+        await(a, "설정 패널 진입") {
+            a.window.decorView.findViewWithTag<View>("host:settings-panel")?.isShown == true
+        }
+        previousMap = null
+        click(a, "shop:map-facilities", ::stableMap)
         await(a, "시설 메뉴 진입") {
             a.window.decorView.findViewWithTag<Button>("shop:map-decorations")?.let { it.isShown && it.isEnabled } == true
         }
@@ -245,6 +249,12 @@ class DecorationHomeActivityTest : ActivityInstrumentationTestCase2<MainActivity
             game.identity to ok(game.store.balance())
         }
         val first=activity
+        // 세 건을 완료한 이 fixture는 최초 개업 선물을 함께 연다.
+        click(first, "opening-gift:close")
+        await(first, "개업 선물 확인 뒤 HOME 복귀") {
+            first.window.decorView.findViewWithTag<View>("opening-gift:card") == null &&
+                first.window.decorView.isMainPageShown(HostPage.HOME) && currentShopShown(first)
+        }
         openFacilities(first)
         await(first,"실제 Main의 SIMULATION 프로필 HOME") { first.window.decorView.findViewWithTag<Button>("decoration:activate")?.isEnabled==true }
         click(first,"decoration:activate")

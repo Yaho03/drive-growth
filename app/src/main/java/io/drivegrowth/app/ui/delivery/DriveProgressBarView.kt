@@ -27,7 +27,7 @@ import io.drivegrowth.app.ui.pixel.VehicleSprites
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-private const val LAST_DELIVERY_LOOKUP = "마지막 탁송 조회"
+private const val LAST_DELIVERY_LOOKUP = "주차 후 확인 · 마지막 탁송 조회"
 
 private fun View.acceptsProgressInput() =
     isEnabled && isAttachedToWindow && isShown && hasWindowFocus() && windowVisibility == View.VISIBLE
@@ -99,7 +99,7 @@ internal class DriveProgressBarView(
         val message = value.awaitingMessage ?: value.observedMeters?.let { "관측 거리 ${DriveProgress.km(it)} km" }
             ?: "거리 확인 대기"
         status.text = "$message\n$estimated"
-        contentDescription = "탁송 진행도. ${destination.text}. ${provenance.text}. $message. $estimated."
+        contentDescription = "주차 후 확인하는 탁송 진행도. ${destination.text}. ${provenance.text}. $message. $estimated."
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

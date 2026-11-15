@@ -488,9 +488,11 @@ internal class ShopSceneView(
                 else -> null
             }
             val expansionLabel = context.getString(R.string.shop_expand)
-            addMapTarget(expansionLabel, "shop:map-expansion", 1250f, 340f, expansionIcon,
-                description = "$expansionLabel · ${facilityStatus(expansionStatus)}") {
-                onMapTarget(ShopMapTarget.Expansion)
+            expansionSignAnchor(content.capacity)?.let { (x, y) ->
+                addMapTarget(expansionLabel, "shop:map-expansion", x, y, expansionIcon,
+                    description = "$expansionLabel · ${facilityStatus(expansionStatus)}") {
+                    onMapTarget(ShopMapTarget.Expansion)
+                }
             }
         }
     }
@@ -787,7 +789,7 @@ internal class ShopSceneView(
         val parked = vehicle.activity == VehicleActivity.IDLE || vehicle.activity == VehicleActivity.NEEDS_REPAIR
         if (bitmap != null && parked && drawParkedSprite) {
             if (vehicle.id == selectedId) drawVehicleSelection(canvas, x, y + 13f)
-            val drawWidth = bitmap.width * 1.8f
+            val drawWidth = bitmap.width * 1.65f
             val drawHeight = drawWidth * bitmap.height / bitmap.width
             area.set(x - drawWidth / 2, y - 7f - drawHeight / 2, x + drawWidth / 2, y - 7f + drawHeight / 2)
             canvas.save()
@@ -804,11 +806,11 @@ internal class ShopSceneView(
     private fun drawVehicleBadge(canvas: Canvas, vehicle: ShopVehicle, x: Float, y: Float) {
         val parked = vehicle.activity == VehicleActivity.IDLE || vehicle.activity == VehicleActivity.NEEDS_REPAIR
         if (mode == ShopMode.VEHICLES || bitmaps[vehicle.id] == null) {
-            val label = if (vehicle.activity == VehicleActivity.IDLE) vehicle.name else "${vehicle.name} · ${vehicle.status}"
+            val label = if (vehicle.activity == VehicleActivity.IDLE && !vehicle.resting) vehicle.name else "${vehicle.name} · ${vehicle.status}"
             badge(canvas, label, x - 30f, y + 27f, 155f, size = 20f)
         } else {
             val status = when (vehicle.activity) {
-                VehicleActivity.IDLE -> return
+                VehicleActivity.IDLE -> if (vehicle.resting) R.string.shop_scene_resting else return
                 VehicleActivity.RENTED -> R.string.shop_scene_rented
                 VehicleActivity.RETURNING -> R.string.shop_scene_returning
                 VehicleActivity.NEEDS_REPAIR -> R.string.shop_scene_needs_repair

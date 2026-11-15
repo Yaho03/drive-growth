@@ -176,7 +176,6 @@ class GarageCommandView(context: Context, private val confirm: () -> Unit, priva
                 content.addView(text("당시 확정 잔액 ${balance.units} 게임머니", 24, bold = true))
                 action("결과 확인", primary = true) { dismissMotion(); done() }
                 pending(state.pending, showArtwork = false)
-                content.addView(text("이 요청의 확정 결과를 확인했습니다. 현재 차고와 잔액은 다시 조회합니다"))
             }
             is GarageCommandState.Rejected -> {
                 content.addView(text("원장이 미실행 요청의 취소를 확인했습니다 (${state.error}). 최신 차량 상태로 다시 선택할 수 있습니다"))

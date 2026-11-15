@@ -44,6 +44,21 @@ class FNavigationDeliveryPortTest {
         assertTrue(value.estimated is Observation.Missing);assertTrue(value.arrival is Observation.Missing)
     }
 
+    @Test fun `확인 뒤 남아 있는 이전 경로 ID로 새 거리의 귀속을 추정하지 않는다`() {
+        val newer = stamp.copy(sequence = stamp.sequence + 1)
+        val binding = DeliveryDestinationSelection(identity, DestinationKey("confirmed"), 3, actual, stamp)
+        val updated = raw.copy(destination = NavigationField.Value(actual, newer),
+            remainingEstimatedMeters = NavigationField.Value(800L, newer))
+        fun estimate(snapshot: NavigationSnapshot) = read(FNavigationDeliveryPort(
+            { snapshot }, { _, _ -> binding }, { _, _ -> Observation.Available(InputSource.SIMULATION) },
+            { Observation.Missing(MissingReason.NO_DATA) }, { true }, { _, _ -> ContractResult.Success(Unit) }
+        )).estimated
+        assertEquals(Observation.Available(EstimatedRouteDistance(12345, InputSource.SIMULATION)), estimate(raw))
+        assertTrue(estimate(updated) is Observation.Missing)
+        assertTrue(estimate(updated.copy(routeId = NavigationField.Value("other-route", newer))) is Observation.Missing)
+        assertTrue(estimate(updated.copy(destination = NavigationField.Value(actual.copy(name = "다른 목적지"), newer))) is Observation.Missing)
+    }
+
     @Test fun `SDK 실패 중 다시 받은 필드로 확인한 목적지와 예상 거리를 제공하지 않는다`() {
         for (error in listOf(NavigationError.PERMISSION_DENIED, NavigationError.ASYNC_SDK_ERROR)) {
             val failure = NavigationFailure(error, NavigationOperation.SDK_EVENT, NavigationErrorOrigin.ASYNCHRONOUS)

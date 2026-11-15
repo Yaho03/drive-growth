@@ -238,7 +238,9 @@ class ProgressView(context: Context, onEvent: (ProgressEvent) -> Unit) : LinearL
                 RestOutcome.ALREADY_HANDLED -> R.string.progress_rest_handled
                 RestOutcome.UNCONFIRMED, null -> R.string.progress_rest_unconfirmed
             }
-            add(card, text(s(recognition), 24, bold = true), 0)
+            if (value.buffPhase == BuffPhase.ACTIVE && recognition == R.string.progress_rest_unconfirmed)
+                add(card, text("이번 휴식 조건은 아직 확인하지 못했어요.", color = muted), 0)
+            else add(card, text(s(recognition), 24, bold = true), 0)
             for (condition in value.conditions) {
                 val id = when (condition.satisfied) { true -> R.string.progress_condition_yes; false -> R.string.progress_condition_no; null -> R.string.progress_condition_unknown }
                 add(card, text(context.getString(id, condition.label)), 0)

@@ -42,7 +42,8 @@ class GachaLiveHost(private val source: CheckpointGachaSource, private val worke
         if (released || enabled == value) return
         enabled = value; controller?.setControlsEnabled(value)
         render?.invoke(frame, value)
-        if (value && controller == null && !busy && frame.screen !is GachaScreen.Result) refresh()
+        if (value && ((controller == null && frame.screen !is GachaScreen.Result) ||
+                frame.screen is GachaScreen.Offers)) refresh()
     }
     fun draw(value: GachaRequest): Boolean {
         val host = controller

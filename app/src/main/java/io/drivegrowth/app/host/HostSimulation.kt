@@ -9,6 +9,7 @@ import io.drivegrowth.app.runtime.rental.RentalRuntimeSnapshot
 import io.drivegrowth.app.runtime.rental.product.RentalPreparationInputs
 import io.drivegrowth.app.ui.rest.RestAreaScene
 import io.drivegrowth.app.vehicle.navigation.NavigationSnapshot
+import io.drivegrowth.app.vehicle.navigation.NavigationStamp
 import io.drivegrowth.core.contract.*
 import java.util.concurrent.Executor
 import kotlin.random.Random
@@ -35,11 +36,21 @@ internal interface HostSimulation {
     fun begin()
     fun beginRest()
     fun restSample(frame: DrivingFrame): SimulationRestSample?
+    fun departureGapStart(frame: DrivingFrame): RentalClock? = null
     val restRecording: Boolean
     fun retry()
-    fun rejected(error: ContractError)
+    fun rejected(reason: SimulationStartBlock)
     fun stop()
 }
+internal enum class SimulationStartBlock(val message: String) {
+    OPENING_GIFT("첫 차량을 받은 뒤 모의주행을 시작할 수 있어요."),
+    GACHA_RESULT("뽑기 화면에서 결과를 먼저 확인해 주세요."),
+    SAVED_REQUEST("다른 화면에서 처리 중인 요청의 결과를 먼저 확인해 주세요."),
+    ACTIVE_DELIVERY("진행 중인 탁송을 마친 뒤 휴식 포함 모의주행을 시작할 수 있어요."),
+    REST_CONFIGURATION("휴식 시연에 필요한 설정을 확인할 수 없어요."),
+    READ_FAILED("저장된 가게 상태를 읽지 못했어요. 잠시 후 다시 시도해 주세요."),
+}
+
 internal enum class SimulationInputState { READY, PROCESSING, RETRYABLE_FAILURE, UNAVAILABLE }
 
 internal data class SimulationRestSample(val clock: RestClockDomain, val area: Observation<RestAreaProof>,
@@ -56,5 +67,5 @@ interface HostDeliveryNavigation : AutoCloseable {
     val port: DeliveryNavigationPort
     fun setControlsEnabled(value: Boolean)
     fun refresh()
-    fun confirm(): ContractResult<Unit>
+    fun confirm(displayedStamp: NavigationStamp? = null): ContractResult<Unit>
 }

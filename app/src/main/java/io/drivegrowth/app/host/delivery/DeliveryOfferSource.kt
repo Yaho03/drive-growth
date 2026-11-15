@@ -36,7 +36,8 @@ class DeliveryOfferSource(private val queries: DeliveryHostQueries,
         val names = current.content.catalog.vehicles.associate { it.vehicleId to it.displayName }
         displayed = identity to stored
         return ContractResult.Success(DeliveryHostRead(identity,
-            DeliveryScreen.Offers(DeliveryHostMapper.proposal(stored, names, nav.destinationName, current.balance, identity.source)),
+            DeliveryScreen.Offers(DeliveryHostMapper.proposal(stored, names, nav.destinationName, current.balance, identity.source)
+                .copy(garageFull = current.freeSlots == 0)),
             current.held, stored, navigation = nav))
     }
     internal fun readOnly(data: DeliveryHostData, nav: DeliveryNavigationSnapshot, rules: DeliveryRules,
@@ -59,7 +60,7 @@ class DeliveryOfferSource(private val queries: DeliveryHostQueries,
                 is ContractResult.Failure -> return read
                 is ContractResult.Success -> {
                     val proposal = DeliveryHostMapper.proposal(read.value, names, nav.destinationName, data.balance, identity.source)
-                    DeliveryScreen.Offers(proposal.copy(availability = proposal.availability.mapValues {
+                    DeliveryScreen.Offers(proposal.copy(garageFull = data.freeSlots == 0, availability = proposal.availability.mapValues {
                         DeliveryAvailability(false, DELIVERY_SLOT_NOTICE)
                     }))
                 }
