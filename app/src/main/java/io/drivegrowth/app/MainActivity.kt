@@ -108,7 +108,7 @@ open class MainActivity : Activity() {
     private lateinit var facilityControls: io.drivegrowth.app.ui.shop.FacilityControlsView
     private var pendingPage: HostPage? = null
     private var progressionSaved = false
-    private var restrictedScreen: ScrollView? = null
+    private var restrictedScreen: FrameLayout? = null
     private var restrictionNotice: TextView? = null
     private var restrictionCard: View? = null
     private var restrictionRetry: View? = null
@@ -1425,22 +1425,38 @@ open class MainActivity : Activity() {
             }
             restrictionNotice = notice
             restrictionCard = card
-            ScrollView(this).apply {
-                isFillViewport = true
-                addView(FrameLayout(this@MainActivity).apply {
-                    tag = "host:restricted-screen"
-                    setBackgroundColor(CleanUi.CARD_SOFT)
-                    addView(card, FrameLayout.LayoutParams(
-                        -1, -2, Gravity.CENTER,
-                    ).apply { setMargins(0, style.dp(12), 0, style.dp(12)) })
-                }, FrameLayout.LayoutParams(-1, -2))
+            // 주행 중에는 뒤에 르르르 운전 장면(9차)을 아주 조용히 깔고, 안내 카드는 아래로 내린다
+            val scene = io.drivegrowth.app.ui.driving.DrivingSceneView(this).apply { tag = "host:driving-scene" }
+            drivingScene = scene
+            FrameLayout(this).apply {
+                addView(scene, FrameLayout.LayoutParams(-1, -1))
+                addView(ScrollView(this@MainActivity).apply {
+                    isFillViewport = true
+                    addView(FrameLayout(this@MainActivity).apply {
+                        tag = "host:restricted-screen"
+                        addView(card, FrameLayout.LayoutParams(
+                            -1, -2, Gravity.CENTER,
+                        ).apply { setMargins(0, style.dp(12), 0, style.dp(12)) })
+                    }, FrameLayout.LayoutParams(-1, -2))
+                }, FrameLayout.LayoutParams(-1, -1))
             }.also { restrictedScreen = it }
         }
         restrictionNotice?.let { if (it.text.toString() != message) it.text = message }
+        // 권한 없음·미지원 안내에는 운전 장면을 깔지 않는다(실제로 운전 중인지 모른다)
+        val missing = (interaction.state(SystemClock.elapsedRealtime()) as? Observation.Missing)?.reason
+        val driving = simulation != null || (missing != MissingReason.PERMISSION_DENIED && missing != MissingReason.UNSUPPORTED)
+        drivingScene?.visibility = if (driving) View.VISIBLE else View.GONE
+        (restrictionCard?.parent as? View)?.setBackgroundColor(if (driving) 0 else CleanUi.CARD_SOFT)
+        (restrictionCard?.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
+            val gravity = if (driving) Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL else Gravity.CENTER
+            if (params.gravity != gravity) { params.gravity = gravity; restrictionCard?.layoutParams = params }
+        }
         restrictionRetry?.visibility = if (simulation?.canRetry == true) View.VISIBLE else View.GONE
         resizeRestrictionCard(appRoot.width)
         showBody(view)
     }
+
+    private var drivingScene: View? = null
 
     private fun resizeRestrictionCard(windowWidth: Int) {
         val card = restrictionCard ?: return
